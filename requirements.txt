@@ -1,0 +1,3 @@
+# requirements.txt の例
+discord.py
+# 他にも aiohttp など、必要なライブラリがあれば追記
