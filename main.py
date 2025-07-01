@@ -1,8 +1,6 @@
-# main.py の例
 import discord
-import os # osライブラリをインポート
+import os
 
-# 環境変数からトークンを読み込む
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 intents = discord.Intents.default()
@@ -11,7 +9,7 @@ client = discord.Client(intents=intents)
 
 @client.event
 async def on_ready():
-    print(f'{client.user} としてログインしました')
+    print(f'Logged in as {client.user}')
 
 @client.event
 async def on_message(message):
