@@ -15,6 +15,7 @@ class RaidTracker(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.previous_raid_counts = {}
+        self.player_name_cache = {} # UUIDと名前をキャッシュ
         self.raid_check_loop.start()
 
     def cog_unload(self):
@@ -40,10 +41,13 @@ class RaidTracker(commands.Cog):
                 print("⚠️ ギルドメンバーが見つかりませんでした。")
                 return
 
-            # ▼▼▼【エラー修正箇所】▼▼▼
             online_member_info = {m['uuid']: m['server'] for m in all_members_data if isinstance(m, dict) and m.get('online')}
             all_member_uuids = [m['uuid'] for m in all_members_data if isinstance(m, dict)]
-            # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+            
+            # 名前をキャッシュに保存
+            for member in all_members_data:
+                if isinstance(member, dict):
+                    self.player_name_cache[member['uuid']] = member.get('name', 'N/A')
 
             current_raid_counts = {}
             tasks = [self.fetch_player_raids(session, uuid) for uuid in all_member_uuids]
@@ -81,6 +85,8 @@ class RaidTracker(commands.Cog):
                     player_data = await response.json()
                     raids = player_data.get("guild", {}).get("raids", {})
                     raid_counts = {raid: raids.get(raid, 0) for raid in RAID_TYPES}
+                    # 名前もキャッシュしておく
+                    self.player_name_cache[player_uuid] = player_data.get('username', 'N/A')
                     return {'uuid': player_uuid, 'raids': raid_counts}
                 return None
         except Exception:
@@ -123,11 +129,10 @@ class RaidTracker(commands.Cog):
             group_id = str(uuid.uuid4())
             cleared_at = datetime.now(timezone.utc)
             db_records = []
-            # ここではプレイヤーのUUIDから名前を取得する処理が必要ですが、今回はUUIDをそのまま表示します
-            player_display_names = [p_uuid.replace('-', '') for p_uuid in party['players']]
+            
+            player_display_names = [self.player_name_cache.get(p_uuid, p_uuid) for p_uuid in party['players']]
             
             for player_uuid in party['players']:
-                # 本来はUUIDからDiscord IDを引く必要がありますが、今回は0として保存します
                 db_records.append((group_id, 0, player_uuid, party['raid_type'], cleared_at))
 
             add_raid_records(db_records)
