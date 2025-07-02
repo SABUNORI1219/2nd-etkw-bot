@@ -1,5 +1,5 @@
-# requirements.txt
 discord.py
 Flask
 psycopg2-binary
 aiohttp
+python-dotenv
