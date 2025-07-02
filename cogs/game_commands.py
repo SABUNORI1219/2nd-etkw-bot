@@ -70,7 +70,7 @@ class GameCommands(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="raidaddmanual", description="レイドクリア記録を手動で追加します。(MCID指定)")
-    @app_commands.checks.has_any_role("Admin", "Officer")
+    @app_commands.checks.has_any_role("おーなー")
     @app_commands.describe(
         raid_type="レイドの種類 (tna, tcc, nol, nog)",
         player1="プレイヤー1のMCID",
