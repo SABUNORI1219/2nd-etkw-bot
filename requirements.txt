@@ -1,4 +1,4 @@
-# requirements.txt の例
+# requirements.txt
 discord.py
 Flask
-# 他にも aiohttp など、必要なライブラリがあれば追記
+psycopg2-binary
