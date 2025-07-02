@@ -24,11 +24,16 @@ async def on_ready():
 
 # Cogsを読み込むための非同期関数
 async def load_cogs():
+    print("---Cogsの読み込みを開始---")
     # cogsフォルダ内の.pyファイルをすべて読み込む
     for filename in os.listdir('./cogs'):
         if filename.endswith('.py'):
-            # 'cogs.ファイル名'（.pyは除く）の形式で読み込む
-            await bot.load_extension(f'cogs.{filename[:-3]}')
+            try:
+                await bot.load_extension(f'cogs.{filename[:-3]}')
+                print(f"✅ Cog '{filename}' の読み込みに成功しました。")
+            except Exception as e:
+                print(f"✅ Cog '{filename}' の読み込みに失敗しました。エラー: {e}")
+    print("--- すべてのCogsの読み込みが完了 ---")
 
 # メインの実行部分
 async def main():
