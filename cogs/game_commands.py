@@ -3,18 +3,28 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timezone
 import uuid
+import aiohttp
 
-# 他のファイルから関数をインポート
 from database import add_raid_records, get_raid_counts
 
-# APIからプレイヤーのUUIDを取得するヘルパー関数
-async def get_uuid_from_name(player_name):
-    # Nori APIや他のAPIを使って名前からUUIDを取得する
-    # 今回は仮の関数として定義
-    # 例: return "f1b5d3c8-9b8a-4b0e-8b0a-9b8d3c8b0a9b"
-    # 実際にはaiohttpを使ったAPIリクエストが必要
-    # この機能は後で実装
-    return None 
+# Wynncraft公式のUUID検索API
+UUID_API_URL = "https://api.wynncraft.com/v3/player/{}"
+
+# プレイヤー名からUUIDを取得するヘルパー関数
+async def get_uuid_from_name(player_name: str):
+    """プレイヤー名からハイフン付きのUUIDを取得する。見つからなければNoneを返す。"""
+    try:
+        # v3 APIはプレイヤー名で検索可能
+        async with aiohttp.ClientSession() as session:
+            async with session.get(UUID_API_URL.format(player_name)) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    # ハイフン付きUUIDを返す
+                    return data.get('uuid')
+                else:
+                    return None
+    except Exception:
+        return None
 
 class GameCommands(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -23,9 +33,8 @@ class GameCommands(commands.Cog):
     @app_commands.command(name="graidcount", description="指定プレイヤーのレイドクリア回数を集計します。")
     @app_commands.describe(player_name="Minecraftのプレイヤー名", since="集計開始日 (YYYY-MM-DD形式)")
     async def raid_count(self, interaction: discord.Interaction, player_name: str, since: str = None):
-        await interaction.response.defer() # 処理に時間がかかることを通知
+        await interaction.response.defer() 
 
-        # 日付の処理
         if since:
             try:
                 since_date = datetime.strptime(since, "%Y-%m-%d")
@@ -33,16 +42,13 @@ class GameCommands(commands.Cog):
                 await interaction.followup.send("日付の形式が正しくありません。`YYYY-MM-DD`形式で入力してください。")
                 return
         else:
-            # 指定がない場合は1ヶ月前から
             since_date = datetime.now() - discord.Timedelta(days=30)
             
-        # プレイヤーUUIDの取得（後で実装）
         player_uuid = await get_uuid_from_name(player_name)
         if not player_uuid:
-            # 仮実装：今はUUIDを直接入力
-            player_uuid = player_name 
+            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
+            return
 
-        # データベースから記録を取得
         records = get_raid_counts(player_uuid, since_date)
 
         embed = discord.Embed(
@@ -56,23 +62,24 @@ class GameCommands(commands.Cog):
         else:
             total = 0
             for record in records:
-                raid_type = record[0].upper()
-                count = record[1]
+                raid_type, count = record[0].upper(), record[1]
                 embed.add_field(name=raid_type, value=f"{count} 回", inline=True)
                 total += count
             embed.set_footer(text=f"合計: {total} 回")
 
         await interaction.followup.send(embed=embed)
 
-    # 権限設定（例：'Admin' or 'Officer' の役職を持つ人のみ実行可能）
-    @app_commands.command(name="raidaddmanual", description="レイドクリア記録を手動で追加します。")
-    @app_commands.checks.has_any_role("MEMBER") # 役職名をギルドに合わせて変更してください
+    @app_commands.command(name="raidaddmanual", description="レイドクリア記録を手動で追加します。(MCID指定)")
+    @app_commands.checks.has_any_role("Admin", "Officer")
     @app_commands.describe(
         raid_type="レイドの種類 (tna, tcc, nol, nog)",
-        member1="メンバー1", member2="メンバー2", member3="メンバー3", member4="メンバー4"
+        player1="プレイヤー1のMCID",
+        player2="プレイヤー2のMCID",
+        player3="プレイヤー3のMCID",
+        player4="プレイヤー4のMCID"
     )
     async def raid_add_manual(self, interaction: discord.Interaction, raid_type: str, 
-                              member1: discord.User, member2: discord.User, member3: discord.User, member4: discord.User):
+                              player1: str, player2: str, player3: str, player4: str):
         
         raid_type = raid_type.lower()
         if raid_type not in ["tna", "tcc", "nol", "nog"]:
@@ -81,17 +88,24 @@ class GameCommands(commands.Cog):
             
         await interaction.response.defer()
 
-        members = [member1, member2, member3, member4]
+        player_names = [player1, player2, player3, player4]
         group_id = f"manual-{uuid.uuid4()}"
         cleared_at = datetime.now(timezone.utc)
         db_records = []
-        player_uuids = [] # UUID取得は後で実装
+        
+        # 各プレイヤーのUUIDを非同期で取得
+        uuid_tasks = [get_uuid_from_name(name) for name in player_names]
+        player_uuids = await asyncio.gather(*uuid_tasks)
 
-        for member in members:
-            # 仮実装：今はDiscord IDをUUIDとして保存
-            player_uuid = str(member.id) 
-            player_uuids.append(player_uuid)
-            db_records.append((group_id, member.id, player_uuid, raid_type, cleared_at))
+        # 見つからなかったプレイヤーをチェック
+        not_found_players = [player_names[i] for i, u in enumerate(player_uuids) if not u]
+        if not_found_players:
+            await interaction.followup.send(f"以下のプレイヤーが見つかりませんでした: {', '.join(not_found_players)}")
+            return
+
+        for i, player_uuid in enumerate(player_uuids):
+            # Discord IDは不明なので0として保存
+            db_records.append((group_id, 0, player_uuid, raid_type, cleared_at))
 
         add_raid_records(db_records)
 
@@ -101,7 +115,7 @@ class GameCommands(commands.Cog):
             color=discord.Color.green(),
             timestamp=cleared_at
         )
-        embed.add_field(name="メンバー", value="\n".join([m.mention for m in members]), inline=False)
+        embed.add_field(name="メンバー", value="\n".join(player_names), inline=False)
         embed.set_footer(text=f"実行者: {interaction.user.display_name}")
         
         await interaction.followup.send(embed=embed)
@@ -112,7 +126,6 @@ class GameCommands(commands.Cog):
             await interaction.response.send_message("このコマンドを実行する権限がありません。", ephemeral=True)
         else:
             await interaction.response.send_message(f"エラーが発生しました: {error}", ephemeral=True)
-
 
 async def setup(bot):
     await bot.add_cog(GameCommands(bot))
