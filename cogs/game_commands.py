@@ -66,7 +66,7 @@ class GameCommands(commands.Cog):
 
     # 権限設定（例：'Admin' or 'Officer' の役職を持つ人のみ実行可能）
     @app_commands.command(name="raidaddmanual", description="レイドクリア記録を手動で追加します。")
-    @app_commands.checks.has_any_role("Admin", "Officer") # 役職名をギルドに合わせて変更してください
+    @app_commands.checks.has_any_role("MEMBER") # 役職名をギルドに合わせて変更してください
     @app_commands.describe(
         raid_type="レイドの種類 (tna, tcc, nol, nog)",
         member1="メンバー1", member2="メンバー2", member3="メンバー3", member4="メンバー4"
