@@ -1,7 +1,36 @@
 import discord
 import os
+import psycopg2
 from flask import Flask
 from threading import Thread
+from urllib.parse import urlparse
+
+# --- Database Connection ---
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+def setup_database():
+    # データベースに接続
+    conn = psycopg2.connect(DATABASE_URL)
+    # カーソル（操作を行うためのもの）を取得
+    cur = conn.cursor()
+    
+    # クリア記録を保存するテーブルがなければ作成するSQL
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS clear_records (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT NOT NULL,
+            user_name VARCHAR(255) NOT NULL,
+            content_name VARCHAR(255) NOT NULL,
+            cleared_at TIMESTAMP NOT NULL DEFAULT current_timestamp
+        );
+    """)
+    
+    # 変更を確定
+    conn.commit()
+    # 接続を閉じる
+    cur.close()
+    conn.close()
+    print("データベースのセットアップが完了しました。")
 
 # --- Discord Botの基本設定 ---
 TOKEN = os.getenv('DISCORD_TOKEN')
