@@ -1,7 +1,8 @@
 import discord
 from discord.ext import commands
 import os
-import asyncio # asyncioをインポート
+import asyncio
+import sys # プログラムを終了させるためにインポート
 
 from keep_alive import keep_alive
 from database import setup_database
@@ -18,6 +19,8 @@ intents.presences = True
 class MyBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix='!', intents=intents)
+        # 準備完了を知らせるための合図（イベント）を作成
+        self.ready_event = asyncio.Event()
 
     async def setup_hook(self):
         print("--- setup_hook: Cogsの読み込みを開始 ---")
@@ -35,6 +38,8 @@ class MyBot(commands.Bot):
         print(f"ログイン成功: {self.user} (ID: {self.user.id})")
         print("Botは正常に起動し、準備が完了しました。")
         print("==================================================")
+        # 準備が完了したことを合図する
+        self.ready_event.set()
 
 bot = MyBot()
 
@@ -52,23 +57,23 @@ async def sync(ctx):
 # ▼▼▼【最終修正箇所】▼▼▼
 async def main():
     # データベースとWebサーバーを先に準備
-    print("データベースのセットアップを開始します...")
     setup_database()
-    print("Webサーバーを起動します...")
     keep_alive()
 
-    async with bot:
-        try:
-            print("Botを起動し、Discordへの接続を開始します...")
-            # bot.run()の代わりに、制御可能なbot.start()を使用
-            await bot.start(TOKEN)
-        except discord.errors.LoginFailure:
-            print("エラー: 不正なトークンです。Renderの環境変数を確認してください。")
-        except Exception as e:
-            print(f"Botの起動中に予期せぬエラーが発生しました: {e}")
+    try:
+        print("Botを起動し、Discordへの接続を開始します...")
+        # 90秒以内に on_ready が呼ばれなければ、タイムアウトエラーを発生させる
+        await asyncio.wait_for(bot.start(TOKEN), timeout=90.0)
+    except asyncio.TimeoutError:
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("!!! 起動タイムアウト: 90秒以内にBotが準備完了になりませんでした。")
+        print("!!! Renderの自動再起動機能により、プロセスを再起動します。")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        # 異常終了コードでプログラムを終了し、Renderに再起動を促す
+        sys.exit(1)
+    except discord.errors.LoginFailure:
+        print("エラー: 不正なトークンです。Renderの環境変数を確認してください。")
+        sys.exit(1)
 
 if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("Botを手動で停止します。")
+    asyncio.run(main())
