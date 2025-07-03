@@ -18,17 +18,29 @@ intents.members = True
 
 class MyBot(commands.Bot):
     """
-    Bot本体のメインクラス。非同期のセットアップを担当する。
+    Bot本体のメインクラス。起動時のセットアップを担当する。
     """
     def __init__(self):
-        super().__init__(command_prefix="!", intents=intents)
+        # スラッシュコマンドのみを使用するため、プレフィックスは不要
+        super().__init__(command_prefix=commands.when_mentioned_or("!"), intents=intents)
 
     async def setup_hook(self):
         """
+        Botの非同期セットアップを管理する特別なメソッド。
         BotがDiscordにログインする前に一度だけ実行される。
-        Cogs（機能部品）の読み込みに専念させる。
         """
-        print("--- [司令塔] Cogs（受付係）の配属を開始します...")
+        print("--- [司令塔] 起動準備を開始します ---")
+        
+        # 1. データベースをセットアップ
+        print("--- [司令塔] -> データベース担当にセットアップを依頼...")
+        setup_database()
+        
+        # 2. 24時間稼働用のWebサーバーを起動
+        print("--- [司令塔] -> Webサーバーを起動...")
+        keep_alive()
+
+        # 3. cogsフォルダから全ての「受付係」を読み込む
+        print("--- [司令塔] -> 全ての受付係（Cogs）を配属させます...")
         for filename in os.listdir('./cogs'):
             if filename.endswith('.py'):
                 try:
@@ -36,7 +48,8 @@ class MyBot(commands.Bot):
                     print(f"--- [司令塔] ✅ 受付係 '{filename}' の配属完了。")
                 except Exception as e:
                     print(f"--- [司令塔] ❌ 受付係 '{filename}' の配属に失敗しました: {e}")
-        print("--- [司令塔] 全ての受付係の配属が完了しました。")
+        
+        print("--- [司令塔] 全ての起動準備が完了しました。")
 
     async def on_ready(self):
         """Botの準備が完了したときに呼ばれるイベント"""
@@ -58,6 +71,7 @@ async def sync(ctx: commands.Context):
         
     guild = discord.Object(id=GUILD_ID_INT)
     try:
+        # コマンドを特定のサーバーに即時反映
         bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
         await ctx.send(f"`{len(synced)}`個のコマンドをこのサーバーに同期しました。")
@@ -67,18 +81,11 @@ async def sync(ctx: commands.Context):
 
 # メインの実行ブロック
 if __name__ == '__main__':
-    # Botの非同期ループが始まる前に、全ての同期的な準備を完了させる
-    print("--- [起動シーケンス] データベースをセットアップします...")
-    setup_database()
-    
-    print("--- [起動シーケンス] 24時間稼働用のWebサーバーを起動します...")
-    keep_alive()
-
     if not TOKEN:
         print("致命的エラー: `DISCORD_TOKEN`が設定されていません。")
     else:
         try:
-            print("--- [起動シーケンス] Botの起動を開始します... ---")
+            print("--- [司令塔] Botの起動を開始します... ---")
             bot.run(TOKEN)
         except Exception as e:
             print(f"Botの起動中に予期せぬエラーが発生しました: {e}")
