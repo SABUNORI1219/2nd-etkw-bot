@@ -5,11 +5,8 @@ import asyncio
 from datetime import datetime, timezone
 import uuid
 
+from config import GUILD_API_URL, PLAYER_API_URL, RAID_TYPES, EMBED_COLOR_GOLD
 from database import add_raid_records
-
-GUILD_API_URL = "https://nori.fish/api/guild/Empire%20of%20TKW"
-PLAYER_API_URL = "https://api.wynncraft.com/v3/player/{}"
-RAID_TYPES = ["tna", "tcc", "nol", "nog"]
 
 class RaidTracker(commands.Cog):
     def __init__(self, bot):
@@ -140,7 +137,7 @@ class RaidTracker(commands.Cog):
             embed = discord.Embed(
                 title=f"🎉 ギルドレイドクリア！ [{party['raid_type'].upper()}]",
                 description="以下のメンバーがクリアしました！",
-                color=discord.Color.gold(),
+                color=EMBED_COLOR_GOLD,
                 timestamp=cleared_at
             )
             embed.add_field(name="メンバー", value="\n".join(player_display_names), inline=False)
