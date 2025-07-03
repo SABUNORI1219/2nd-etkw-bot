@@ -1,24 +1,26 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from datetime import datetime, timezone
+# timedeltaをdatetimeからインポート
+from datetime import datetime, timezone, timedelta 
 import uuid
 import aiohttp
 import asyncio
 
-from config import RAID_TYPES, EMBED_COLOR_BLUE, PLAYER_API_URL
+# 他のファイルから必要なものをインポート
+from config import RAID_TYPES, EMBED_COLOR_BLUE
 from database import add_raid_records, get_raid_counts
 
-# プレイヤー名からUUIDを取得するヘルパー関数
+# Wynncraft公式のUUID検索API
+UUID_API_URL = "https://api.wynncraft.com/v3/player/{}"
+
 async def get_uuid_from_name(player_name: str):
     """プレイヤー名からハイフン付きのUUIDを取得する。見つからなければNoneを返す。"""
     try:
-        # v3 APIはプレイヤー名で検索可能
         async with aiohttp.ClientSession() as session:
-            async with session.get(PLAYER_API_URL.format(player_name)) as response:
+            async with session.get(UUID_API_URL.format(player_name)) as response:
                 if response.status == 200:
                     data = await response.json()
-                    # ハイフン付きUUIDを返す
                     return data.get('uuid')
                 else:
                     return None
@@ -41,7 +43,8 @@ class GameCommands(commands.Cog):
                 await interaction.followup.send("日付の形式が正しくありません。`YYYY-MM-DD`形式で入力してください。")
                 return
         else:
-            since_date = datetime.now() - discord.Timedelta(days=30)
+            # ▼▼▼【エラー修正箇所】discord.Timedelta -> timedelta に修正▼▼▼
+            since_date = datetime.now() - timedelta(days=30)
             
         player_uuid = await get_uuid_from_name(player_name)
         if not player_uuid:
@@ -53,7 +56,7 @@ class GameCommands(commands.Cog):
         embed = discord.Embed(
             title=f"{player_name}のレイドクリア回数",
             description=f"{since_date.strftime('%Y年%m月%d日')}以降の記録",
-            color=discord.Color.blue()
+            color=EMBED_COLOR_BLUE
         )
 
         if not records:
@@ -70,48 +73,52 @@ class GameCommands(commands.Cog):
 
     @app_commands.command(name="raidaddmanual", description="レイドクリア記録を手動で追加します。(MCID指定)")
     @app_commands.checks.has_any_role("おーなー")
+    # ▼▼▼【機能改善】ここから選択肢の定義を追加▼▼▼
+    @app_commands.choices(raid_type=[
+        app_commands.Choice(name="The Nameless Anomaly (TNA)", value="tna"),
+        app_commands.Choice(name="The Canyon Colossus (TCC)", value="tcc"),
+        app_commands.Choice(name="Orphion's Nexus of Light (NOL)", value="nol"),
+        app_commands.Choice(name="Nest of the Grootslangs (NOG)", value="nog"),
+    ])
+    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
     @app_commands.describe(
-        raid_type="レイドの種類 (tna, tcc, nol, nog)",
+        raid_type="レイドの種類を選択",
         player1="プレイヤー1のMCID",
         player2="プレイヤー2のMCID",
         player3="プレイヤー3のMCID",
         player4="プレイヤー4のMCID"
     )
-    async def raid_add_manual(self, interaction: discord.Interaction, raid_type: str, 
+    # raid_typeの型ヒントを app_commands.Choice[str] に変更
+    async def raid_add_manual(self, interaction: discord.Interaction, raid_type: app_commands.Choice[str], 
                               player1: str, player2: str, player3: str, player4: str):
-        
-        raid_type = raid_type.lower()
-        if raid_type not in RAID_TYPES:
-            await interaction.response.send_message("レイドの種類が正しくありません。", ephemeral=True)
-            return
             
         await interaction.response.defer()
+
+        # 選択肢の値を取得
+        raid_type_value = raid_type.value
 
         player_names = [player1, player2, player3, player4]
         group_id = f"manual-{uuid.uuid4()}"
         cleared_at = datetime.now(timezone.utc)
         db_records = []
         
-        # 各プレイヤーのUUIDを非同期で取得
         uuid_tasks = [get_uuid_from_name(name) for name in player_names]
         player_uuids = await asyncio.gather(*uuid_tasks)
 
-        # 見つからなかったプレイヤーをチェック
         not_found_players = [player_names[i] for i, u in enumerate(player_uuids) if not u]
         if not_found_players:
             await interaction.followup.send(f"以下のプレイヤーが見つかりませんでした: {', '.join(not_found_players)}")
             return
 
         for i, player_uuid in enumerate(player_uuids):
-            # Discord IDは不明なので0として保存
-            db_records.append((group_id, 0, player_uuid, raid_type, cleared_at))
+            db_records.append((group_id, 0, player_uuid, raid_type_value, cleared_at))
 
         add_raid_records(db_records)
 
         embed = discord.Embed(
-            title=f"📝 手動で記録追加 [{raid_type.upper()}]",
+            title=f"📝 手動で記録追加 [{raid_type_value.upper()}]",
             description="以下のメンバーのクリア記録が手動で追加されました。",
-            color=discord.Color.green(),
+            color=0x00FF00, # 直接指定 or configから読み込む
             timestamp=cleared_at
         )
         embed.add_field(name="メンバー", value="\n".join(player_names), inline=False)
@@ -122,9 +129,12 @@ class GameCommands(commands.Cog):
     @raid_add_manual.error
     async def on_raid_add_manual_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingAnyRole):
-            await interaction.response.send_message("このコマンドを実行する権限がありません。", ephemeral=True)
+            if not interaction.response.is_done():
+                await interaction.response.send_message("このコマンドを実行する権限がありません。", ephemeral=True)
         else:
-            await interaction.response.send_message(f"エラーが発生しました: {error}", ephemeral=True)
+            if not interaction.response.is_done():
+                # エラーオブジェクト全体ではなく、メッセージ部分だけを表示するとより親切
+                await interaction.response.send_message(f"エラーが発生しました: {error}", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(GameCommands(bot))
