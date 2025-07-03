@@ -4,7 +4,7 @@ from discord.ext import commands
 from datetime import datetime, timezone
 import uuid
 import aiohttp
-import asyncio  # ⬅️ この行を追加
+import asyncio
 
 from database import add_raid_records, get_raid_counts
 
