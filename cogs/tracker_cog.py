@@ -8,7 +8,7 @@ from lib.wynncraft_api import WynncraftAPI
 from lib.database_handler import add_raid_records
 from lib.raid_logic import RaidLogicHandler
 # configから設定をインポート
-from config import TRACKING_CHANNEL_ID, TARGET_GUILDS, RAID_TYPES
+from config import TRACKING_CHANNEL_ID, GUILD_NAME, RAID_TYPES
 
 # Playerクラスをインポート（あとでPlayerの状態を保持するために使います）
 from player import Player 
