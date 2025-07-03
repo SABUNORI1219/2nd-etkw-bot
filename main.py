@@ -86,16 +86,15 @@ def get_raid_counts(player_uuid, since_date):
 # --- MODELS ---
 print("--- [Models] データモデルクラスの準備 ---")
 class Player:
-    def __init__(self, uuid, api_data):
-        self.uuid, self.data = uuid, api_data
+    def __init__(self, uuid, api_data): self.uuid, self.data = uuid, api_data
     @property
     def username(self) -> str: return self.data.get('username', 'Unknown')
     def get_raid_count(self, name: str) -> int: return self.data.get("guild",{}).get("raids",{}).get(name, 0)
 
 class Guild:
     def __init__(self, api_data): self.data = api_data
-    def get_all_member_uuids(self) -> list: return [m['uuid'] for m in self.data.get("members",[]) if isinstance(m, dict) and 'uuid' in m]
-    def get_online_members_info(self) -> dict: return {m['uuid']:{'server':m.get('server')} for m in self.data.get("members",[]) if isinstance(m,dict) and m.get('online')}
+    def get_all_member_uuids(self) -> list: return [m['uuid'] for m in self.data.get("members", []) if isinstance(m, dict) and 'uuid' in m]
+    def get_online_members_info(self) -> dict: return {m['uuid']:{'server':m.get('server')} for m in self.data.get("members", []) if isinstance(m,dict) and m.get('online')}
 
 # --- COGS ---
 print("--- [Cog] RaidTrackerクラスの準備 ---")
@@ -161,36 +160,52 @@ class GameCommands(commands.Cog):
             async with aiohttp.ClientSession() as s:
                 async with s.get(PLAYER_API_URL.format(name)) as r: return (await r.json()).get('uuid') if r.status==200 else None
         except Exception: return None
+
     @app_commands.command(name="graidcount",description="レイドクリア回数を集計します。")
     @app_commands.describe(player_name="Minecraftのプレイヤー名",since="集計開始日 (YYYY-MM-DD)")
-    async def raid_count(self,ix:discord.Interaction,player_name:str,since:str=None):
-        await ix.response.defer()
-        s_date=datetime.now()-timedelta(days=30)
+    async def raid_count(self,interaction:discord.Interaction,player_name:str,since:str=None):
+        await interaction.response.defer()
+        since_date=datetime.now()-timedelta(days=30)
         if since:
-            try: s_date=datetime.strptime(since,"%Y-%m-%d")
-            except ValueError: await ix.followup.send("日付形式が不正です。`YYYY-MM-DD`で入力してください。"); return
-        uuid=await self.get_uuid_from_name(player_name)
-        if not uuid: await ix.followup.send(f"プレイヤー「{player_name}」が見つかりません。"); return
-        recs=get_raid_counts(uuid,s_date)
-        e=discord.Embed(title=f"{player_name}のレイドクリア回数",description=f"{s_date.strftime('%Y年%m月%d日')}以降の記録",color=EMBED_COLOR_BLUE)
-        if not recs: e.description+="\n\nクリア記録はありません。"
-        else: e.set_footer(text=f"合計: {sum(r[1] for r in recs)} 回"); [e.add_field(name=r[0].upper(),value=f"{r[1]} 回",inline=True) for r in recs]
-        await ix.followup.send(embed=e)
+            try: since_date=datetime.strptime(since,"%Y-%m-%d")
+            except ValueError: await interaction.followup.send("日付形式が不正です。`YYYY-MM-DD`で入力してください。"); return
+        
+        player_uuid=await self.get_uuid_from_name(player_name)
+        if not player_uuid: await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりません。"); return
+
+        records=get_raid_counts(player_uuid,since_date)
+        embed=discord.Embed(title=f"{player_name}のレイドクリア回数",description=f"{since_date.strftime('%Y年%m月%d日')}以降の記録",color=EMBED_COLOR_BLUE)
+        if not records: embed.description+="\n\nクリア記録はありません。"
+        else:
+            total = sum(rec[1] for rec in records)
+            for r_type, count in records: embed.add_field(name=r_type.upper(),value=f"{count} 回",inline=True)
+            embed.set_footer(text=f"合計: {total} 回")
+        await interaction.followup.send(embed=embed)
+
     @app_commands.command(name="raidaddmanual",description="レイド記録を手動追加します。(MCID指定)")
     @app_commands.checks.has_any_role("Admin","Officer")
     @app_commands.choices(raid_type=[app_commands.Choice(name=n.upper(),value=n) for n in RAID_TYPES])
     @app_commands.describe(raid_type="レイドの種類",player1="MCID 1",player2="MCID 2",player3="MCID 3",player4="MCID 4")
-    async def raid_add_manual(self,ix:discord.Interaction,raid_type:app_commands.Choice[str],p1:str,p2:str,p3:str,p4:str):
-        await ix.response.defer()
-        names=[p1,p2,p3,p4]; uuids=await asyncio.gather(*[self.get_uuid_from_name(n) for n in names])
-        not_found=[names[i] for i,u in enumerate(uuids) if not u]
-        if not_found: await ix.followup.send(f"プレイヤーが見つかりません: {', '.join(not_found)}"); return
-        gid,cat=f"manual-{uuid.uuid4()}",datetime.now(timezone.utc); add_raid_records([(gid,0,u,raid_type.value,cat) for u in uuids])
-        e=discord.Embed(title=f"📝 手動で記録追加 [{raid_type.name}]",description="クリア記録が手動で追加されました。",color=EMBED_COLOR_GREEN,timestamp=cat)
-        e.add_field(name="メンバー",value="\n".join(names),inline=False); e.set_footer(text=f"実行者: {ix.user.display_name}"); await ix.followup.send(embed=e)
+    # ▼▼▼【エラー修正箇所】 p1, p2... を player1, player2... に修正 ▼▼▼
+    async def raid_add_manual(self,interaction:discord.Interaction,raid_type:app_commands.Choice[str],player1:str,player2:str,player3:str,player4:str):
+        await interaction.response.defer()
+        player_names = [player1, player2, player3, player4]
+        uuids = await asyncio.gather(*[self.get_uuid_from_name(name) for name in player_names])
+        
+        not_found = [player_names[i] for i, u in enumerate(uuids) if not u]
+        if not_found:
+            await interaction.followup.send(f"プレイヤーが見つかりません: {', '.join(not_found)}"); return
+        
+        group_id, cleared_at = f"manual-{uuid.uuid4()}", datetime.now(timezone.utc)
+        records = [(group_id, 0, u, raid_type.value, cleared_at) for u in uuids]
+        add_raid_records(records)
+
+        embed = discord.Embed(title=f"📝 手動で記録追加 [{raid_type.name}]",description="クリア記録が手動で追加されました。",color=EMBED_COLOR_GREEN,timestamp=cleared_at)
+        embed.add_field(name="メンバー",value="\n".join(player_names),inline=False); embed.set_footer(text=f"実行者: {interaction.user.display_name}"); await interaction.followup.send(embed=embed)
+
     @raid_add_manual.error
-    async def on_raid_add_manual_error(self,ix:discord.Interaction,error:app_commands.AppCommandError):
-        if not ix.response.is_done(): await ix.response.send_message("権限がありません。" if isinstance(error,app_commands.MissingAnyRole) else f"エラー: {error}",ephemeral=True)
+    async def on_raid_add_manual_error(self,interaction:discord.Interaction,error:app_commands.AppCommandError):
+        if not interaction.response.is_done(): await interaction.response.send_message("権限がありません。" if isinstance(error,app_commands.MissingAnyRole) else f"エラー: {error}",ephemeral=True)
 
 # --- BOTのメインクラスと起動処理 ---
 intents = discord.Intents.default(); intents.message_content=True; intents.members=True; intents.presences=True
@@ -212,6 +227,7 @@ async def sync(ctx):
         ctx.bot.tree.copy_global_to(guild=guild); synced=await ctx.bot.tree.sync(guild=guild)
         await ctx.send(f"{len(synced)}個のコマンドを同期しました。")
     except Exception as e: await ctx.send(f"同期に失敗: {e}")
+
 if __name__ == '__main__':
     try: print("--- Botの起動を開始します ---"); bot.run(TOKEN)
     except Exception as e: print(f"致命的エラー: {e}"); sys.exit(1)
