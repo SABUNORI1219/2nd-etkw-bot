@@ -23,21 +23,24 @@ class MyBot(commands.Bot):
     """
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents)
-        # 準備完了を知らせるための合図（イベント）を作成
-        self.ready_event = asyncio.Event()
 
     async def setup_hook(self):
         """
         Botの非同期セットアップを管理する。
+        BotがDiscordにログインする前に一度だけ実行される。
         """
         print("--- [司令塔] 起動準備を開始します ---")
         
+        loop = asyncio.get_running_loop()
+
+        # 同期的なセットアップ処理を非同期イベントループで安全に実行
         print("--- [司令塔] -> データベース担当にセットアップを依頼...")
-        setup_database()
+        await loop.run_in_executor(None, setup_database)
         
         print("--- [司令塔] -> Webサーバーを起動...")
-        keep_alive()
+        await loop.run_in_executor(None, keep_alive)
 
+        # cogsフォルダから全ての「受付係」を読み込む
         print("--- [司令塔] -> 全ての受付係（Cogs）を配属させます...")
         for filename in os.listdir('./cogs'):
             if filename.endswith('.py'):
@@ -55,8 +58,6 @@ class MyBot(commands.Bot):
         print(f"ログイン成功: {self.user} (ID: {self.user.id})")
         print("Botは正常に起動し、命令待機状態に入りました。")
         print("==================================================")
-        # 準備が完了したことを他の処理に合図する
-        self.ready_event.set()
 
 # Botのインスタンスを作成
 bot = MyBot()
@@ -79,33 +80,14 @@ async def sync(ctx: commands.Context):
         await ctx.send(f"コマンドの同期に失敗しました: {e}")
 
 # メインの実行ブロック
-async def main():
-    try:
-        # Botの起動処理をバックグラウンドタスクとして開始
-        bot_task = asyncio.create_task(bot.start(TOKEN))
-        
-        # on_readyで合図が送られるのを、90秒のタイムアウト付きで待つ
-        await asyncio.wait_for(bot.ready_event.wait(), timeout=90.0)
-        
-        # Botが正常に終了するまで待機
-        await bot_task
-
-    except asyncio.TimeoutError:
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        print("!!! 起動タイムアウト: 90秒以内にBotが準備完了になりませんでした。")
-        print("!!! Renderの自動再起動機能により、プロセスを再起動します。")
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        # 異常終了コードでプログラムを終了し、Renderに再起動を促す
-        sys.exit(1)
-    except discord.errors.LoginFailure:
-        print("エラー: 不正なトークンです。Renderの環境変数を確認してください。")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Botの実行中に予期せぬエラーが発生しました: {e}")
-        sys.exit(1)
-
 if __name__ == '__main__':
+    if not TOKEN:
+        print("致命的エラー: `DISCORD_TOKEN`が設定されていません。")
+        sys.exit(1)
+        
     try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("Botを手動で停止します。")
+        print("--- [司令塔] Botの起動を開始します... ---")
+        bot.run(TOKEN)
+    except Exception as e:
+        print(f"Botの起動中に予期せぬエラーが発生しました: {e}")
+        sys.exit(1)
