@@ -4,7 +4,9 @@ from discord.ext import commands
 from datetime import datetime, timezone
 import uuid
 import aiohttp
+import asyncio
 
+from config import RAID_TYPES, EMBED_COLOR_BLUE, PLAYER_API_URL
 from database import add_raid_records, get_raid_counts
 
 # Wynncraft公式のUUID検索API
@@ -16,7 +18,7 @@ async def get_uuid_from_name(player_name: str):
     try:
         # v3 APIはプレイヤー名で検索可能
         async with aiohttp.ClientSession() as session:
-            async with session.get(UUID_API_URL.format(player_name)) as response:
+            async with session.get(PLAYER_API_URL.format(player_name)) as response:
                 if response.status == 200:
                     data = await response.json()
                     # ハイフン付きUUIDを返す
@@ -82,7 +84,7 @@ class GameCommands(commands.Cog):
                               player1: str, player2: str, player3: str, player4: str):
         
         raid_type = raid_type.lower()
-        if raid_type not in ["tna", "tcc", "nol", "nog"]:
+        if raid_type not in RAID_TYPES:
             await interaction.response.send_message("レイドの種類が正しくありません。", ephemeral=True)
             return
             
