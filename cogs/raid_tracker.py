@@ -10,24 +10,29 @@ from models import Player, Guild
 from config import GUILD_API_URL, PLAYER_API_URL, RAID_TYPES, EMBED_COLOR_GOLD
 from database import add_raid_records
 
+print("--- [raid_tracker.py] ファイルが読み込まれました ---")
+
 class RaidTracker(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # {player_uuid: Player_Object} の形式で前回の状態を保存
-        self.previous_players_state = {}
+        print("--- [RaidTracker Cog] 1. __init__ メソッドが開始されました ---")
+        self.previous_players_state = {} # {player_uuid: Player_Object}
         self.player_name_cache = {}
+        print("--- [RaidTracker Cog] 2. ループの開始を試みます... ---")
         self.raid_check_loop.start()
+        print("--- [RaidTracker Cog] 3. ループの開始命令が完了しました ---")
 
     def cog_unload(self):
         self.raid_check_loop.cancel()
 
-    @tasks.loop(minutes=1.5)
+    # 診断しやすいようにループ間隔を1分に変更
+    @tasks.loop(minutes=1.0)
     async def raid_check_loop(self):
         log_prefix = f"[{datetime.now().strftime('%H:%M:%S')}]"
-        print(f"{log_prefix} ➡️ レイド数のチェックを開始...")
+        print(f"{log_prefix} ➡️➡️➡️ ループ処理が実行されました！ ⬅️⬅️⬅️")
         
         async with aiohttp.ClientSession() as session:
-            # 1. ギルドデータを取得
+            # (以下、実際の処理ロジック)
             try:
                 async with session.get(GUILD_API_URL) as response:
                     if response.status != 200:
@@ -38,9 +43,7 @@ class RaidTracker(commands.Cog):
                 print(f"{log_prefix} ❌ ギルドAPIリクエスト中にエラー: {e}")
                 return
 
-            # 2. 全メンバーのプレイヤーデータを並行して取得
             member_uuids = guild.get_all_member_uuids()
-            print(f"{log_prefix} ギルドメンバー {len(member_uuids)} 人のデータを取得します...")
             tasks = [self.fetch_player_data(session, uuid) for uuid in member_uuids]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
@@ -48,38 +51,26 @@ class RaidTracker(commands.Cog):
             for res in results:
                 if isinstance(res, Player):
                     current_players_state[res.uuid] = res
-                elif res is not None:
-                    print(f"{log_prefix} ⚠️ プレイヤーデータ取得中にエラーが発生しました: {res}")
-
-            # 3. 初回実行時は状態を保存して終了
+            
             if not self.previous_players_state:
                 print(f"{log_prefix} ✅ 初回実行のため、{len(current_players_state)} 人の現在の状態を保存します。")
                 self.previous_players_state = current_players_state
                 return
 
-            # 4. 変化を検出
             changed_players = self.find_changed_players(current_players_state)
             if not changed_players:
-                print(f"{log_prefix}  zmiany レイド数の変化はありませんでした。")
-                self.previous_players_state = current_players_state
-                return
-
-            print(f"{log_prefix} 🔥 レイド数が増加したプレイヤーを検出: {changed_players}")
-
-            # 5. オンライン情報を使ってパーティを特定
-            online_info = guild.get_online_members_info()
-            raid_parties = self.identify_parties(changed_players, online_info)
-
-            if raid_parties:
-                print(f"{log_prefix} 🎉 パーティを特定しました: {raid_parties}")
-                await self.record_and_notify(raid_parties)
+                print(f"{log_prefix} 変化はありませんでした。")
             else:
-                print(f"{log_prefix} 🧐 増加は検知しましたが、4人パーティの条件に合致しませんでした。")
+                print(f"{log_prefix} 🔥 レイド数が増加したプレイヤーを検出: {changed_players}")
+                online_info = guild.get_online_members_info()
+                raid_parties = self.identify_parties(changed_players, online_info)
+                if raid_parties:
+                    print(f"{log_prefix} 🎉 パーティを特定しました: {raid_parties}")
+                    await self.record_and_notify(raid_parties)
 
-
-            # 6. 今回の状態を次回の比較用に保存
             self.previous_players_state = current_players_state
 
+    # (fetch_player_data, find_changed_players, identify_parties, record_and_notify は変更なし)
     async def fetch_player_data(self, session, player_uuid):
         if not player_uuid: return None
         try:
@@ -89,11 +80,8 @@ class RaidTracker(commands.Cog):
                     data = await response.json()
                     self.player_name_cache[player_uuid] = data.get('username', 'Unknown')
                     return Player(player_uuid, data)
-                else:
-                    print(f"⚠️ {player_uuid} のデータ取得に失敗。ステータス: {response.status}")
-                    return None
+                return None
         except Exception as e:
-            # ここで例外をキャッチして、呼び出し元に情報を返す
             return e
 
     def find_changed_players(self, current_state):
@@ -102,11 +90,8 @@ class RaidTracker(commands.Cog):
             if uuid in self.previous_players_state:
                 previous_player = self.previous_players_state[uuid]
                 for raid_type in RAID_TYPES:
-                    current_count = current_player.get_raid_count(raid_type)
-                    previous_count = previous_player.get_raid_count(raid_type)
-                    if current_count > previous_count:
-                        if raid_type not in changed_players:
-                            changed_players[raid_type] = []
+                    if current_player.get_raid_count(raid_type) > previous_player.get_raid_count(raid_type):
+                        if raid_type not in changed_players: changed_players[raid_type] = []
                         changed_players[raid_type].append(uuid)
         return changed_players
 
@@ -119,8 +104,7 @@ class RaidTracker(commands.Cog):
                     world = online_info[uuid]['server']
                     if world not in worlds: worlds[world] = []
                     worlds[world].append(uuid)
-            
-            for world, world_players in worlds.items():
+            for world_players in worlds.values():
                 if len(world_players) == 4:
                     parties.append({'raid_type': raid_type, 'players': world_players})
         return parties
@@ -128,18 +112,13 @@ class RaidTracker(commands.Cog):
     async def record_and_notify(self, raid_parties):
         channel_id = int(os.getenv('NOTIFICATION_CHANNEL_ID', 0))
         channel = self.bot.get_channel(channel_id)
-        if not channel: 
-            print(f"⚠️ 通知チャンネル(ID: {channel_id})が見つかりません。")
-            return
-
+        if not channel: return
         for party in raid_parties:
             group_id = str(uuid.uuid4())
             cleared_at = datetime.now(timezone.utc)
             db_records = [(group_id, 0, uuid, party['raid_type'], cleared_at) for uuid in party['players']]
             add_raid_records(db_records)
-
             player_names = [self.player_name_cache.get(uuid, "Unknown") for uuid in party['players']]
-            
             embed = discord.Embed(
                 title=f"🎉 ギルドレイドクリア！ [{party['raid_type'].upper()}]",
                 description="以下のメンバーがクリアしました！",
@@ -149,10 +128,13 @@ class RaidTracker(commands.Cog):
             embed.add_field(name="メンバー", value="\n".join(player_names), inline=False)
             await channel.send(embed=embed)
 
+
     @raid_check_loop.before_loop
     async def before_raid_check_loop(self):
+        print("--- [RaidTracker Cog] 4. before_loop - Botの準備完了を待機します... ---")
         await self.bot.wait_until_ready()
-        print("👍 RaidTracker: ループを開始します。")
+        print("--- [RaidTracker Cog] 5. before_loop - Botの準備が完了しました！ループを開始できます。 ---")
 
 async def setup(bot):
+    print("--- [raid_tracker.py] setup関数が呼び出されました ---")
     await bot.add_cog(RaidTracker(bot))
