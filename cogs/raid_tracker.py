@@ -48,6 +48,8 @@ class RaidTracker(commands.Cog):
                 for res in results:
                     if isinstance(res, Player):
                         current_players_state[res.uuid] = res
+                    elif res is not None:
+                        print(f"{log_prefix} ⚠️ プレイヤーデータ取得中にエラーが発生しました: {res}")
 
                 # 状態比較
                 if not self.previous_players_state:
@@ -78,7 +80,6 @@ class RaidTracker(commands.Cog):
         print("--- [RaidTracker] 待機完了: Botの準備が整ったため、ループを開始します。 ---")
 
     async def fetch_player_data(self, session, player_uuid):
-        # (この関数の中身は変更なし)
         if not player_uuid: return None
         try:
             formatted_uuid = player_uuid.replace('-', '')
@@ -92,7 +93,6 @@ class RaidTracker(commands.Cog):
             return e
 
     def find_changed_players(self, current_state):
-        # (この関数の中身は変更なし)
         changed_players = {}
         for uuid, current_player in current_state.items():
             if uuid in self.previous_players_state:
@@ -104,7 +104,6 @@ class RaidTracker(commands.Cog):
         return changed_players
 
     def identify_parties(self, changed_players, online_info):
-        # (この関数の中身は変更なし)
         parties = []
         for raid_type, player_uuids in changed_players.items():
             worlds = {}
@@ -119,7 +118,6 @@ class RaidTracker(commands.Cog):
         return parties
 
     async def record_and_notify(self, raid_parties):
-        # (この関数の中身は変更なし)
         channel_id = int(os.getenv('NOTIFICATION_CHANNEL_ID', 0))
         channel = self.bot.get_channel(channel_id)
         if not channel: return
