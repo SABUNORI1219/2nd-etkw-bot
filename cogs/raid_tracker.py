@@ -5,14 +5,16 @@ import asyncio
 from datetime import datetime, timezone
 import uuid
 
+# 新しく作成したモデルと設定をインポート
+from models import Player, Guild
 from config import GUILD_API_URL, PLAYER_API_URL, RAID_TYPES, EMBED_COLOR_GOLD
 from database import add_raid_records
 
 class RaidTracker(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.previous_raid_counts = {}
-        self.player_name_cache = {} # UUIDと名前をキャッシュ
+        self.previous_players_state = {} # {player_uuid: Player, ...}
+        self.player_name_cache = {}
         self.raid_check_loop.start()
 
     def cog_unload(self):
@@ -23,94 +25,83 @@ class RaidTracker(commands.Cog):
         print(f"[{datetime.now()}] ➡️ レイド数のチェックを開始...")
         
         async with aiohttp.ClientSession() as session:
+            # 1. ギルドデータを取得
             try:
                 async with session.get(GUILD_API_URL) as response:
                     if response.status != 200:
                         print(f"❌ ギルドAPIエラー: {response.status}")
                         return
-                    guild_data = await response.json()
+                    guild_data = Guild(await response.json())
             except Exception as e:
                 print(f"❌ ギルドAPIリクエスト中にエラー: {e}")
                 return
 
-            all_members_data = guild_data.get("members", [])
-            if not all_members_data:
-                print("⚠️ ギルドメンバーが見つかりませんでした。")
-                return
-
-            online_member_info = {m['uuid']: m['server'] for m in all_members_data if isinstance(m, dict) and m.get('online')}
-            all_member_uuids = [m['uuid'] for m in all_members_data if isinstance(m, dict)]
+            # 2. 全メンバーのプレイヤーデータを取得
+            member_uuids = guild_data.get_all_member_uuids()
+            tasks = [self.fetch_player_data(session, uuid) for uuid in member_uuids]
+            results = await asyncio.gather(*tasks)
             
-            # 名前をキャッシュに保存
-            for member in all_members_data:
-                if isinstance(member, dict):
-                    self.player_name_cache[member['uuid']] = member.get('name', 'N/A')
+            current_players_state = {player.uuid: player for player in results if player}
 
-            current_raid_counts = {}
-            tasks = [self.fetch_player_raids(session, uuid) for uuid in all_member_uuids]
-            player_raid_data_list = await asyncio.gather(*tasks)
-
-            for player_data in player_raid_data_list:
-                if player_data:
-                    current_raid_counts[player_data['uuid']] = player_data['raids']
-
-            if not self.previous_raid_counts:
-                print("初回実行のため、現在のレイド数を保存して終了します。")
-                self.previous_raid_counts = current_raid_counts
+            # 3. 変化を検出
+            if not self.previous_players_state:
+                print("初回実行のため、現在の状態を保存します。")
+                self.previous_players_state = current_players_state
                 return
 
-            changed_players = self.find_changed_players(current_raid_counts)
+            changed_players = self.find_changed_players(current_players_state)
             if not changed_players:
-                self.previous_raid_counts = current_raid_counts
+                self.previous_players_state = current_players_state
                 return
 
             print(f"🔥 レイド数が増加したプレイヤー: {changed_players}")
-            raid_parties = self.identify_parties(changed_players, online_member_info)
+
+            # 4. パーティを特定
+            online_info = guild_data.get_online_members_info()
+            raid_parties = self.identify_parties(changed_players, online_info)
 
             if raid_parties:
                 print(f"🎉 パーティを特定しました: {raid_parties}")
                 await self.record_and_notify(raid_parties)
 
-            self.previous_raid_counts = current_raid_counts
+            self.previous_players_state = current_players_state
 
-    async def fetch_player_raids(self, session, player_uuid):
+    async def fetch_player_data(self, session, player_uuid):
         if not player_uuid: return None
         try:
             formatted_uuid = player_uuid.replace('-', '')
             async with session.get(PLAYER_API_URL.format(formatted_uuid)) as response:
                 if response.status == 200:
-                    player_data = await response.json()
-                    raids = player_data.get("guild", {}).get("raids", {})
-                    raid_counts = {raid: raids.get(raid, 0) for raid in RAID_TYPES}
-                    # 名前もキャッシュしておく
-                    self.player_name_cache[player_uuid] = player_data.get('username', 'N/A')
-                    return {'uuid': player_uuid, 'raids': raid_counts}
+                    data = await response.json()
+                    self.player_name_cache[player_uuid] = data.get('username', 'N/A')
+                    return Player(player_uuid, data)
                 return None
         except Exception:
             return None
 
-    def find_changed_players(self, current_counts):
+    def find_changed_players(self, current_state):
         changed_players = {}
-        for player_uuid, current_raids in current_counts.items():
-            if player_uuid in self.previous_raid_counts:
-                previous_raids = self.previous_raid_counts[player_uuid]
+        for uuid, current_player in current_state.items():
+            if uuid in self.previous_players_state:
+                previous_player = self.previous_players_state[uuid]
                 for raid_type in RAID_TYPES:
-                    if current_raids.get(raid_type, 0) > previous_raids.get(raid_type, 0):
-                        if raid_type not in changed_players: changed_players[raid_type] = []
-                        changed_players[raid_type].append(player_uuid)
+                    if current_player.get_raid_count(raid_type) > previous_player.get_raid_count(raid_type):
+                        if raid_type not in changed_players:
+                            changed_players[raid_type] = []
+                        changed_players[raid_type].append(uuid)
         return changed_players
 
     def identify_parties(self, changed_players, online_info):
         parties = []
-        for raid_type, players in changed_players.items():
+        for raid_type, player_uuids in changed_players.items():
             worlds = {}
-            for player_uuid in players:
-                if player_uuid in online_info:
-                    world = online_info[player_uuid]
+            for uuid in player_uuids:
+                if uuid in online_info:
+                    world = online_info[uuid]['server']
                     if world not in worlds: worlds[world] = []
-                    worlds[world].append(player_uuid)
+                    worlds[world].append(uuid)
             
-            for world, world_players in worlds.items():
+            for world_players in worlds.values():
                 if len(world_players) == 4:
                     parties.append({'raid_type': raid_type, 'players': world_players})
         return parties
@@ -118,29 +109,22 @@ class RaidTracker(commands.Cog):
     async def record_and_notify(self, raid_parties):
         channel_id = int(os.getenv('NOTIFICATION_CHANNEL_ID', 0))
         channel = self.bot.get_channel(channel_id)
-        if not channel:
-            print(f"⚠️ 通知チャンネル(ID: {channel_id})が見つかりません。")
-            return
-            
+        if not channel: return
+
         for party in raid_parties:
             group_id = str(uuid.uuid4())
             cleared_at = datetime.now(timezone.utc)
-            db_records = []
-            
-            player_display_names = [self.player_name_cache.get(p_uuid, p_uuid) for p_uuid in party['players']]
-            
-            for player_uuid in party['players']:
-                db_records.append((group_id, 0, player_uuid, party['raid_type'], cleared_at))
-
+            db_records = [(group_id, 0, uuid, party['raid_type'], cleared_at) for uuid in party['players']]
             add_raid_records(db_records)
 
+            player_names = [self.player_name_cache.get(uuid, "Unknown") for uuid in party['players']]
             embed = discord.Embed(
                 title=f"🎉 ギルドレイドクリア！ [{party['raid_type'].upper()}]",
                 description="以下のメンバーがクリアしました！",
                 color=EMBED_COLOR_GOLD,
                 timestamp=cleared_at
             )
-            embed.add_field(name="メンバー", value="\n".join(player_display_names), inline=False)
+            embed.add_field(name="メンバー", value="\n".join(player_names), inline=False)
             await channel.send(embed=embed)
 
     @raid_check_loop.before_loop
