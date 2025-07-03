@@ -9,9 +9,6 @@ import asyncio
 from config import RAID_TYPES, EMBED_COLOR_BLUE, PLAYER_API_URL
 from database import add_raid_records, get_raid_counts
 
-# Wynncraft公式のUUID検索API
-UUID_API_URL = "https://api.wynncraft.com/v3/player/{}"
-
 # プレイヤー名からUUIDを取得するヘルパー関数
 async def get_uuid_from_name(player_name: str):
     """プレイヤー名からハイフン付きのUUIDを取得する。見つからなければNoneを返す。"""
@@ -72,7 +69,7 @@ class GameCommands(commands.Cog):
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="raidaddmanual", description="レイドクリア記録を手動で追加します。(MCID指定)")
-    @app_commands.checks.has_any_role("Admin", "Officer")
+    @app_commands.checks.has_any_role("おーなー")
     @app_commands.describe(
         raid_type="レイドの種類 (tna, tcc, nol, nog)",
         player1="プレイヤー1のMCID",
