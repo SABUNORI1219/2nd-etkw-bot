@@ -1,5 +1,5 @@
 # =================================================================================
-# main.py - 全機能統合・最終安定版
+# main.py - 全機能統合・最終安定版 Ver.3
 # =================================================================================
 
 # --- 必要なライブラリを全てインポート ---
@@ -24,12 +24,9 @@ GUILD_NAME = "Empire of TKW"
 GUILD_API_URL = f"https://nori.fish/api/guild/{GUILD_NAME.replace(' ', '%20')}"
 PLAYER_API_URL = "https://api.wynncraft.com/v3/player/{}"
 RAID_TYPES = ["tna", "tcc", "nol", "nog"]
-
 EMBED_COLOR_GOLD = 0xFFD700
 EMBED_COLOR_GREEN = 0x00FF00
 EMBED_COLOR_BLUE = 0x0000FF
-
-# 環境変数から設定を読み込み
 TOKEN = os.getenv('DISCORD_TOKEN')
 DATABASE_URL = os.getenv('DATABASE_URL')
 GUILD_ID_INT = int(os.getenv('GUILD_ID', 0))
@@ -56,7 +53,6 @@ def keep_alive():
 print("--- [Database] データベース関数の準備 ---")
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
-
 def setup_database():
     print("--- [Database] データベースのテーブルをセットアップします...")
     try:
@@ -78,8 +74,6 @@ def setup_database():
         print("--- [Database] テーブルのセットアップが完了しました。")
     except Exception as e:
         print(f"--- [Database] セットアップ中にエラーが発生しました: {e}")
-
-
 def add_raid_records(records):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -88,7 +82,6 @@ def add_raid_records(records):
     conn.commit()
     cur.close()
     conn.close()
-
 def get_raid_counts(player_uuid, since_date):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -108,7 +101,10 @@ class Player:
         self.uuid = uuid; self.data = api_data
     @property
     def username(self) -> str: return self.data.get('username', 'Unknown')
-    def get_raid_count(self, name: str) -> int: return self.data.get("guild",{}).get("raids",{}).get(name, 0)
+    def get_all_raid_counts(self) -> dict:
+        """プレイヤーの全レイドクリア数を辞書として返す"""
+        raids_dict = self.data.get("guild", {}).get("raids", {})
+        return {raid: raids_dict.get(raid, 0) for raid in RAID_TYPES}
 
 class Guild:
     def __init__(self, api_data): self.data = api_data
@@ -135,39 +131,38 @@ class RaidTracker(commands.Cog):
         try:
             async with aiohttp.ClientSession() as session:
                 guild_data = await self.fetch_guild_data(session)
-                if not guild_data: print(f"{log_prefix} ⚠️ ギルドデータ取得失敗。スキップします。"); return
+                if not guild_data: return
                 
                 guild = Guild(guild_data)
-                member_uuids = guild.get_all_member_uuids()
-                print(f"{log_prefix} メンバー {len(member_uuids)} 人のデータを順次取得開始...")
-
                 current_players_state = {}
-                for i, uuid in enumerate(member_uuids):
+                member_uuids = guild.get_all_member_uuids()
+                
+                for uuid in member_uuids:
                     player_obj = await self.fetch_player_data(session, uuid)
                     if player_obj: current_players_state[uuid] = player_obj
                     await asyncio.sleep(0.1)
                 
-                print(f"{log_prefix} ✅ {len(current_players_state)}人分のデータ取得完了。")
-
                 if not self.previous_players_state:
-                    print(f"{log_prefix} ✅ 初回実行のため、現在の状態を保存します。")
+                    print(f"{log_prefix} ✅ 初回実行。{len(current_players_state)}人の状態を保存。")
                     self.previous_players_state = current_players_state
                     return
 
-                changed = self.find_changed_players(current_players_state)
-                if not changed: print(f"{log_prefix} 変化はありませんでした。")
+                changed_players_data = self.find_changed_players(current_players_state)
+                if not changed_players_data:
+                    print(f"{log_prefix} 変化はありませんでした。")
                 else:
-                    print(f"{log_prefix} 🔥 変化を検出: {changed}")
-                    parties = self.identify_parties(changed, guild.get_online_members_info())
-                    if parties: print(f"{log_prefix} 🎉 パーティ特定: {parties}"); await self.record_and_notify(parties)
+                    print(f"{log_prefix} 🔥 変化を検出: {changed_players_data}")
+                    online_info = guild.get_online_members_info()
+                    raid_parties = self.identify_parties(changed_players_data, online_info)
+                    if raid_parties:
+                        print(f"{log_prefix} 🎉 パーティ特定: {raid_parties}")
+                        await self.record_and_notify(raid_parties)
 
                 self.previous_players_state = current_players_state
-                print(f"{log_prefix} ✅ チェック完了。次回のループを待ちます。")
         except Exception as e: print(f"{log_prefix} ❌ ループ内部で致命的エラー: {e}")
 
     @raid_check_loop.before_loop
     async def before_raid_check_loop(self):
-        print("--- [RaidTracker] ループ開始待機: Botの準備完了を待ちます... ---")
         await self.bot.wait_until_ready()
         print("--- [RaidTracker] 待機完了: ループを開始します。 ---")
 
@@ -175,8 +170,8 @@ class RaidTracker(commands.Cog):
         try:
             async with s.get(GUILD_API_URL) as r:
                 if r.status==200: return await r.json()
-                print(f"❌ ギルドAPIエラー: {r.status}"); return None
-        except Exception as e: print(f"❌ ギルドAPIリクエストエラー: {e}"); return None
+                return None
+        except Exception: return None
 
     async def fetch_player_data(self, s, uuid):
         if not uuid: return None
@@ -187,13 +182,44 @@ class RaidTracker(commands.Cog):
                 return None
         except Exception as e: return e
 
-    def find_changed_players(self,current):
-        changed={}; [changed.setdefault(r,[]).append(u) for u,c in current.items() if u in self.previous_players_state for r in RAID_TYPES if c.get_raid_count(r)>self.previous_players_state[u].get_raid_count(r)]; return changed
-    
-    def identify_parties(self,changed,online):
-        parties=[]; [parties.append({'raid_type':r,'players':w_p}) for r,u in changed.items() for w,w_p in (lambda d: (d.update({online[uuid]['server']:d.get(online[uuid]['server'],[])+[uuid] for uuid in u if uuid in online}),d)[1])({}).items() if len(w_p)==4]; return parties
+    # ▼▼▼【ロジック修正箇所】▼▼▼
+    def find_changed_players(self, current_state):
+        """レイドクリア数に変化があったプレイヤーとその変化内容を返す"""
+        changed_players = []
+        for uuid, current_player in current_state.items():
+            if uuid in self.previous_players_state:
+                previous_player = self.previous_players_state[uuid]
+                
+                # レイドデータの辞書全体を比較
+                if current_player.get_all_raid_counts() != previous_player.get_all_raid_counts():
+                    # 変化があった場合、どのレイドが増えたか特定
+                    for raid_type in RAID_TYPES:
+                        if current_player.get_all_raid_counts().get(raid_type, 0) > previous_player.get_all_raid_counts().get(raid_type, 0):
+                            changed_players.append({'uuid': uuid, 'raid_type': raid_type})
+                            # 1回のチェックで1プレイヤー1レイドの変化と仮定
+                            break 
+        return changed_players
 
-    async def record_and_notify(self,parties):
+    def identify_parties(self, changed_players, online_info):
+        """変化したプレイヤーをレイドとワールドでグループ化し、4人パーティを特定する"""
+        # {raid_type: {world: [uuid, ...]}}
+        raid_world_groups = defaultdict(lambda: defaultdict(list))
+        for change in changed_players:
+            uuid = change['uuid']
+            raid_type = change['raid_type']
+            if uuid in online_info:
+                world = online_info[uuid]['server']
+                raid_world_groups[raid_type][world].append(uuid)
+
+        parties = []
+        for raid_type, worlds in raid_world_groups.items():
+            for world, players in worlds.items():
+                if len(players) == 4:
+                    parties.append({'raid_type': raid_type, 'players': players})
+        return parties
+    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+    async def record_and_notify(self, parties):
         ch=self.bot.get_channel(NOTIFICATION_CHANNEL_ID);
         if not ch: return
         for p in parties:
@@ -223,7 +249,7 @@ class GameCommands(commands.Cog):
             except ValueError: await ix.followup.send("日付形式が不正です。`YYYY-MM-DD`で入力してください。"); return
         
         uuid=await self.get_uuid_from_name(player_name)
-        if not uuid: await ix.followup.send(f"プレイヤー「{player_name}」が見つかりません。"); return
+        if not uuid: await ix.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。"); return
         recs=get_raid_counts(uuid,s_date)
         e=discord.Embed(title=f"{player_name}のレイドクリア回数",description=f"{s_date.strftime('%Y年%m月%d日')}以降の記録",color=EMBED_COLOR_BLUE)
         if not recs: e.description+="\n\nクリア記録はありません。"
@@ -257,10 +283,9 @@ class MyBot(commands.Bot):
     def __init__(self): super().__init__(command_prefix='!', intents=intents)
     async def setup_hook(self):
         print("--- [Bot] 準備処理を開始します ---")
-        setup_database()
-        keep_alive()
-        await self.add_cog(RaidTracker(self)); print("--- [Bot] ✅ Cog 'RaidTracker' を登録しました。 ---")
+        setup_database(); keep_alive()
         await self.add_cog(GameCommands(self)); print("--- [Bot] ✅ Cog 'GameCommands' を登録しました。 ---")
+        await self.add_cog(RaidTracker(self)); print("--- [Bot] ✅ Cog 'RaidTracker' を登録しました。 ---")
     async def on_ready(self): print(f"=================\nログイン成功: {self.user}\n=================")
 bot = MyBot()
 @bot.command()
@@ -274,10 +299,5 @@ async def sync(ctx):
     except Exception as e: await ctx.send(f"同期に失敗: {e}")
 
 if __name__ == '__main__':
-    try:
-        print("--- Botの起動を開始します ---")
-        bot.run(TOKEN)
-    except Exception as e:
-        print(f"致命的エラー: {e}")
-        # Renderが自動で再起動してくれるので、sys.exitは不要な場合が多い
-        # sys.exit(1)
+    try: print("--- Botの起動を開始します ---"); bot.run(TOKEN)
+    except Exception as e: print(f"致命的エラー: {e}"); sys.exit(1)
