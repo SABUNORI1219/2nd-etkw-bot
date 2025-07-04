@@ -52,13 +52,13 @@ class GameCommandsCog(commands.Cog):
         guild_prefix = self._safe_get(data, ['guild', 'prefix'], "")
         guild_rank = self._safe_get(data, ['guild', 'rank'], "")
         guild_rank_stars = self._safe_get(data, ['guild', 'rankStars'], "")
-        guild_display = f"[{guild_prefix}] {guild_name} / {guild_rank}{guild_rank_stars}" if guild_name != "N/A" else "N/A"
+        guild_display = f"[{guild_prefix}] {guild_name} / {guild_rank}f"[{guild_rank_stars}] if guild_name != "N/A" else "N/A"
 
         first_join = self._safe_get(data, ['firstJoin'], "N/A").split('T')[0]
         last_join_str = self._safe_get(data, ['lastJoin'], "1970-01-01T00:00:00.000Z")
         last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
         time_diff = datetime.now(timezone.utc) - last_join_dt
-        stream_status = "🟢 Stream" if time_diff.total_seconds() < 300 else "❌ Stream"
+        stream_status = "🟢 Stream" if time_diff.total_seconds() < 300 and not is_online else "❌ Stream"
         last_join_display = f"{last_join_str.split('T')[0]} [{stream_status}]"
         
         active_char_uuid = self._safe_get(data, ['characters', 'activeCharacter'])
@@ -72,7 +72,7 @@ class GameCommandsCog(commands.Cog):
 
         killed_mobs = self._safe_get(data, ['globalData', 'killedMobs'], 0)
         chests_found = self._safe_get(data, ['globalData', 'chestsFound'], 0)
-        playtime = round(self._safe_get(data, ['playtime'], 0) / 60, 2) # 分を時間に変換
+        playtime = self._safe_get(data, ['playtime'], 0)
         wars = self._safe_get(data, ['globalData', 'wars'], 0)
         war_rank = self._safe_get(data, ['ranking', 'warsCompletion'], 'N/A')
         pvp_kills = self._safe_get(data, ['globalData', 'pvp', 'kills'], 0)
@@ -90,6 +90,7 @@ class GameCommandsCog(commands.Cog):
 
         # 3. 指定された書式で埋め込みを作成
         description = f"""
+```python
 [`{support_rank}`] **{username}** is **{'online' if is_online else 'offline'}**
 **UUID**: `{uuid}`
 **Active Character**: {active_char_info}
@@ -113,6 +114,7 @@ class GameCommandsCog(commands.Cog):
 ║ Dungeons  ║ {dungeons:>6,} ║
 ║ All Raids ║ {total_raids:>6,} ║
 ╚═══════════╩════════╝
+```
 """
         embed = discord.Embed(
             description=description,
@@ -124,7 +126,7 @@ class GameCommandsCog(commands.Cog):
             icon_url=f"https://www.mc-heads.net/avatar/{username}"
         )
         embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{username}/right")
-        embed.set_footer(text=f"Data from Nori API | Requested by {interaction.user.display_name}")
+        embed.set_footer(text=f"Minister Chikuwa | Requested by {interaction.user.display_name}")
 
         await interaction.followup.send(embed=embed)
 
