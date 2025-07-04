@@ -1,13 +1,16 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
+import uuid
+import aiohttp
+import asyncio
 
 # libフォルダから専門家たちをインポート
 from lib.wynncraft_api import WynncraftAPI
-from lib.database_handler import get_raid_counts
+from lib.database_handler import add_raid_records, get_raid_counts
 # configから設定をインポート
-from config import RAID_TYPES
+from config import RAID_TYPES, EMBED_COLOR_BLUE, EMBED_COLOR_GREEN
 
 class GameCommandsCog(commands.Cog):
     """
@@ -18,16 +21,122 @@ class GameCommandsCog(commands.Cog):
         self.wynn_api = WynncraftAPI()
         print("--- [CommandsCog] ゲームコマンドCogが読み込まれました。")
 
+    # 指定されたデータを安全に取得するためのヘルパー関数
+    def _safe_get(self, data: dict, keys: list, default: any = "N/A"):
+        for key in keys:
+            if not isinstance(data, dict):
+                return default
+            data = data.get(key)
+        return data if data is not None else default
+
+    @app_commands.command(name="player", description="Nori APIからプレイヤーの詳細情報を表示します。")
+    @app_commands.describe(player_name="Minecraftのプレイヤー名")
+    async def player(self, interaction: discord.Interaction, player_name: str):
+        await interaction.response.defer()
+
+        # 1. API担当にデータ取得を依頼
+        data = await self.wynn_api.get_nori_player_data(player_name)
+
+        if not data:
+            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
+            return
+
+        # 2. データを各変数に安全に格納
+        username = self._safe_get(data, ['username'])
+        uuid = self._safe_get(data, ['uuid'])
+        support_rank = self._safe_get(data, ['supportRank'], "Player").capitalize()
+        is_online = self._safe_get(data, ['online'], False)
+        server = self._safe_get(data, ['server'], "Unknown")
+        
+        guild_name = self._safe_get(data, ['guild', 'name'], "N/A")
+        guild_prefix = self._safe_get(data, ['guild', 'prefix'], "")
+        guild_rank = self._safe_get(data, ['guild', 'rank'], "")
+        guild_rank_stars = self._safe_get(data, ['guild', 'rankStars'], "")
+        guild_display = f"[{guild_prefix}] {guild_name} / {guild_rank}{guild_rank_stars}" if guild_name != "N/A" else "N/A"
+
+        first_join = self._safe_get(data, ['firstJoin'], "N/A").split('T')[0]
+        last_join_str = self._safe_get(data, ['lastJoin'], "1970-01-01T00:00:00.000Z")
+        last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
+        time_diff = datetime.now(timezone.utc) - last_join_dt
+        stream_status = "🟢 Stream" if time_diff.total_seconds() < 300 else "❌ Stream"
+        last_join_display = f"{last_join_str.split('T')[0]} [{stream_status}]"
+        
+        active_char_uuid = self._safe_get(data, ['characters', 'activeCharacter'])
+        active_char_info = "N/A"
+        if active_char_uuid != "N/A":
+            char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
+            char_type = self._safe_get(char_obj, ['type'])
+            nickname = self._safe_get(char_obj, ['nickname'])
+            reskin = f" ({char_obj['reskin']})" if self._safe_get(char_obj, ['reskin']) else ""
+            active_char_info = f"{char_type} ({nickname}){reskin} on {server}"
+
+        killed_mobs = self._safe_get(data, ['globalData', 'killedMobs'], 0)
+        chests_found = self._safe_get(data, ['globalData', 'chestsFound'], 0)
+        playtime = round(self._safe_get(data, ['playtime'], 0) / 60, 2) # 分を時間に変換
+        wars = self._safe_get(data, ['globalData', 'wars'], 0)
+        war_rank = self._safe_get(data, ['ranking', 'warsCompletion'], 'N/A')
+        pvp_kills = self._safe_get(data, ['globalData', 'pvp', 'kills'], 0)
+        pvp_deaths = self._safe_get(data, ['globalData', 'pvp', 'deaths'], 0)
+        quests = self._safe_get(data, ['globalData', 'completedQuests'], 0)
+        total_level = self._safe_get(data, ['globalData', 'totalLevel'], 0)
+
+        raid_list = self._safe_get(data, ['globalData', 'raids', 'list'], {})
+        notg = self._safe_get(raid_list, ["Nest of the Grootslangs"], 0)
+        nol = self._safe_get(raid_list, ["Orphion's Nexus of Light"], 0)
+        tcc = self._safe_get(raid_list, ["The Canyon Colossus"], 0)
+        tna = self._safe_get(raid_list, ["The Nameless Anomaly"], 0)
+        dungeons = self._safe_get(data, ['globalData', 'dungeons', 'total'], 0)
+        total_raids = self._safe_get(data, ['globalData', 'raids', 'total'], 0)
+
+        # 3. 指定された書式で埋め込みを作成
+        description = f"""
+[`{support_rank}`] **{username}** is **{'online' if is_online else 'offline'}**
+**UUID**: `{uuid}`
+**Active Character**: {active_char_info}
+**Guild**: {guild_display}
+**First Joined**: {first_join}
+**Last Seen**: {last_join_display}
+**Mobs Killed**: {killed_mobs:,}
+**Chests Looted**: {chests_found:,}
+**Playtime**: {playtime:,} hours
+**War Count**: {wars:,} [#{war_rank:,}]
+**PvP**: {pvp_kills:,} K / {pvp_deaths:,} D
+**Quests Total**: {quests:,}
+**Total Level**: {total_level:,}
+╔═══════════╦════════╗
+║  Content  ║ Clears ║
+╠═══════════╬════════╣
+║ NOTG      ║ {notg:>6,} ║
+║ NOL       ║ {nol:>6,} ║
+║ TCC       ║ {tcc:>6,} ║
+║ TNA       ║ {tna:>6,} ║
+║ Dungeons  ║ {dungeons:>6,} ║
+║ All Raids ║ {total_raids:>6,} ║
+╚═══════════╩════════╝
+"""
+        embed = discord.Embed(
+            description=description,
+            color=discord.Color.dark_green()
+        )
+        embed.set_author(
+            name=f"{username}'s Stats",
+            url=f"https://wynncraft.com/stats/player/{username}",
+            icon_url=f"https://www.mc-heads.net/avatar/{username}"
+        )
+        embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{username}/right")
+        embed.set_footer(text=f"Data from Nori API | Requested by {interaction.user.display_name}")
+
+        await interaction.followup.send(embed=embed)
+
+
     @app_commands.command(name="graidcount", description="プレイヤーのレイドクリア回数を集計します。")
     @app_commands.describe(
         player_name="Minecraftのプレイヤー名",
         since="集計開始日 (例: 2024-01-01)"
     )
-    async def raid_count(self, interaction: discord.Interaction, player_name: str, since: str = None):
-        """指定されたプレイヤーのレイドクリア回数を表示するコマンド"""
-        await interaction.response.defer(ephemeral=True) # 他の人に見えないように考え中...
+    async def graidcount(self, interaction: discord.Interaction, player_name: str, since: str = None):
+        await interaction.response.defer(ephemeral=True)
 
-        # 日付が指定されていない場合は、過去30日間に設定
         if since:
             try:
                 since_date = datetime.strptime(since, "%Y-%m-%d")
@@ -37,20 +146,17 @@ class GameCommandsCog(commands.Cog):
         else:
             since_date = datetime.now() - timedelta(days=30)
 
-        # 1. API担当に、プレイヤー名からUUIDの取得を依頼
         player_uuid = await self.wynn_api.get_uuid_from_name(player_name)
         if not player_uuid:
             await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
             return
 
-        # 2. データベース担当に、レイドクリア回数の取得を依頼
         raid_counts = get_raid_counts(player_uuid, since_date)
 
-        # 3. 結果を整形してユーザーに返信
         embed = discord.Embed(
             title=f"{player_name} のレイドクリア回数",
             description=f"{since_date.strftime('%Y年%m月%d日')} 以降の記録",
-            color=discord.Color.blue()
+            color=EMBED_COLOR_BLUE
         )
 
         if not raid_counts:
@@ -58,14 +164,13 @@ class GameCommandsCog(commands.Cog):
         else:
             total_clears = 0
             for raid_type, count in raid_counts:
-                embed.add_field(name=raid_type, value=f"{count} 回", inline=True)
+                embed.add_field(name=raid_type.upper(), value=f"{count} 回", inline=True)
                 total_clears += count
             embed.set_footer(text=f"合計クリア回数: {total_clears} 回")
 
         await interaction.followup.send(embed=embed)
-
-    # 他のコマンドも必要に応じてこのクラスに追加していきます。
-    # 例えば、/guildinfo や /itemsearch など。
+    
+    # 手動追加コマンドなどの他のコマンドもここに追加できます
 
 # BotにCogを登録するためのセットアップ関数
 async def setup(bot: commands.Bot):
