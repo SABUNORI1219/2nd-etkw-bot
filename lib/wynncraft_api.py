@@ -50,16 +50,22 @@ class WynncraftAPI:
         except Exception:
             return None
 
-    async def get_nori_player_data(self, player_name: str) -> dict | None:
-        """Nori APIからプレイヤーのデータを取得する"""
+    async def get_nori_player_data(self, player_name: str) -> dict | list | None:
+        """Nori APIからプレイヤーのデータを取得する。衝突の場合はリストを返す。"""
         try:
             url = NORI_PLAYER_API_URL.format(player_name)
             async with self.session.get(url) as response:
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    print(f"--- [API Handler] Nori Player APIエラー: {response.status}")
-                    return None
+                # ▼▼▼【修正点】▼▼▼
+                # ステータスコードに関わらず、まずJSONを読み込む
+                data = await response.json()
+                
+                # 正常な応答、または衝突応答（リスト形式）の場合はデータをそのまま返す
+                if response.status == 200 or isinstance(data, list):
+                    return data
+                
+                # それ以外のエラー
+                print(f"--- [API Handler] Nori Player APIから予期せぬ応答: {response.status}, {data}")
+                return None
         except Exception as e:
             print(f"--- [API Handler] Nori Player APIリクエスト中にエラー: {e}")
             return None
