@@ -91,7 +91,7 @@ class GameCommandsCog(commands.Cog):
         # ▼▼▼【修正点2】UUID以降をコードブロックで囲む ▼▼▼
         description = f"""
 [公式サイトへのリンク](https://wynncraft.com/stats/player/username)
-**UUID: {uuid}**
+UUID: {uuid}
 ```
 [{support_rank}] {username} is {'online' if is_online else 'offline'}
 Active Character: {active_char_info}
@@ -119,7 +119,10 @@ Total Level: {total_level:,}
 """
         embed = discord.Embed(
             description=description,
-            color=discord.Color.dark_green()
+            if is_online:
+                color=discord.Color.green()
+            else:
+                color=discord.Color.red()
         )
         # ▼▼▼【修正点1】公式ウェブサイトへのリンクを設定 ▼▼▼
         embed.title = username
