@@ -90,6 +90,7 @@ class GameCommandsCog(commands.Cog):
 
         # ▼▼▼【修正点2】UUID以降をコードブロックで囲む ▼▼▼
         description = f"""
+```
 [`{support_rank}`] **{username}** is **{'online' if is_online else 'offline'}**
 UUID: {uuid}
 Active Character: {active_char_info}
@@ -113,7 +114,7 @@ Total Level: {total_level:,}
 ║ Dungeons  ║ {dungeons:>6,} ║
 ║ All Raids ║ {total_raids:>6,} ║
 ╚═══════════╩════════╝
-
+```
 """
         embed = discord.Embed(
             description=description,
