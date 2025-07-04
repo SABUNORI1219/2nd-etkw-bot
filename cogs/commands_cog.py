@@ -117,12 +117,10 @@ Total Level: {total_level:,}
 ╚═══════════╩════════╝
 ```
 """
+        color = discord.Color.green() if is_online else discord.Color.red()
         embed = discord.Embed(
             description=description,
-            if is_online:
-                color=discord.Color.green()
-            else:
-                color=discord.Color.red()
+            color=color
         )
         # ▼▼▼【修正点1】公式ウェブサイトへのリンクを設定 ▼▼▼
         embed.title = username
