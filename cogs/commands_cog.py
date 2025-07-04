@@ -89,11 +89,11 @@ class GameCommandsCog(commands.Cog):
         total_raids = self._safe_get(data, ['globalData', 'raids', 'total'], 0)
 
         # ▼▼▼【修正点2】UUID以降をコードブロックで囲む ▼▼▼
-        title = f"[公式サイトへのリンク](https://wynncraft.com/stats/player/username)"
         description = f"""
+[公式サイトへのリンク](https://wynncraft.com/stats/player/username)
+**UUID: {uuid}**
 ```
 [{support_rank}] {username} is {'online' if is_online else 'offline'}
-UUID: {uuid}
 Active Character: {active_char_info}
 Guild: {guild_display}
 First Joined: {first_join}
@@ -122,14 +122,12 @@ Total Level: {total_level:,}
             color=discord.Color.dark_green()
         )
         # ▼▼▼【修正点1】公式ウェブサイトへのリンクを設定 ▼▼▼
-        embed.title = title
-        
-        embed.set_author(name=f"{username}")
+        embed.title = username
         
         embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{username}/right")
         
         embed.set_footer(
-            text=f"Minister Chikuwa | {username}'s Stats",
+            text=f"{username}'s Stats | Minister Chikuwa",
             icon_url=f"https://www.mc-heads.net/avatar/{username}"
         )
 
