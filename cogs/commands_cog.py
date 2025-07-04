@@ -9,6 +9,44 @@ from lib.database_handler import get_raid_counts
 # configから設定をインポート
 from config import RAID_TYPES, EMBED_COLOR_BLUE, EMBED_COLOR_GREEN
 
+class PlayerSelectView(discord.ui.View):
+    def __init__(self, player_options: list, cog_instance):
+        super().__init__(timeout=60.0)  # 60秒で操作不能になる
+        self.cog_instance = cog_instance # commands_cogのインスタンスを保持
+
+        # ドロップダウンメニューの選択肢を作成
+        options = [
+            discord.SelectOption(label=p['storedName'], value=p['uuid'])
+            for p in player_options
+        ]
+        
+        # ドロップダウンメニューを作成
+        self.select_menu = discord.ui.Select(placeholder="プレイヤーを選択してください...", options=options)
+        self.select_menu.callback = self.select_callback # コールバック関数を登録
+        self.add_item(self.select_menu)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        # ユーザーが選択肢を選ぶと、この関数が実行される
+        selected_uuid = self.select_menu.values[0] # 選択されたUUIDを取得
+        
+        # ドロップダウンを無効化し、「考え中...」を表示
+        self.select_menu.disabled = True
+        await interaction.response.edit_message(view=self)
+        
+        # UUIDを使って再度APIから詳細データを取得
+        # Nori APIはUUIDでも検索できる
+        data = await self.cog_instance.wynn_api.get_nori_player_data(selected_uuid)
+        
+        if not data or 'uuid' not in data:
+            await interaction.followup.send("選択されたプレイヤーの情報を取得できませんでした。")
+            return
+            
+        # 取得したデータから埋め込みメッセージを作成
+        embed = self.cog_instance._create_player_embed(data)
+        
+        # 元のメッセージを、完成した埋め込みに置き換える
+        await interaction.message.edit(content=None, embed=embed, view=None)
+
 class GameCommandsCog(commands.Cog):
     """
     プレイヤーが直接実行するゲーム関連のスラッシュコマンドを担当するCog。
@@ -26,18 +64,7 @@ class GameCommandsCog(commands.Cog):
             data = data.get(key)
         return data if data is not None else default
 
-    @app_commands.command(name="player", description="Nori APIからプレイヤーの詳細情報を表示します。")
-    @app_commands.describe(player_name="Minecraftのプレイヤー名")
-    async def player(self, interaction: discord.Interaction, player_name: str):
-        await interaction.response.defer()
-
-        data = await self.wynn_api.get_nori_player_data(player_name)
-
-        if not data or 'uuid' not in data:
-            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
-            return
-
-        # データを各変数に安全に格納
+    def _create_player_embed(self, data: dict) -> discord.Embed:
         username = self._safe_get(data, ['username'])
         uuid = self._safe_get(data, ['uuid'])
         support_rank = self._safe_get(data, ['supportRank'], "Player").capitalize()
@@ -125,7 +152,7 @@ Total Level: {total_level:,}
 ```
 **UUID: {uuid}**
 """
-        color = discord.Color.green() if is_online else discord.Color.dark_red()
+    color = discord.Color.green() if is_online else discord.Color.dark_red()
         embed = discord.Embed(
             description=description,
             color=color
@@ -140,9 +167,29 @@ Total Level: {total_level:,}
             icon_url=f"https://www.mc-heads.net/avatar/{username}"
         )
 
-        await interaction.followup.send(embed=embed)
+        return Embed
 
-    # (既存のgraidcountコマンドなどは、この下に続きます)
+    @app_commands.command(name="player", description="Nori APIからプレイヤーの詳細情報を表示します。")
+    @app_commands.describe(player_name="Minecraftのプレイヤー名")
+    async def player(self, interaction: discord.Interaction, player_name: str):
+        await interaction.response.defer()
+
+        data = await self.wynn_api.get_nori_player_data(player_name)
+
+        if not data or 'uuid' not in data:
+            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
+            return
+        if isinstance(data, list):
+            # 衝突した場合、ドロップダウンメニューを表示
+            view = PlayerSelectView(player_options=data, cog_instance=self)
+            await interaction.followup.send("複数のプレイヤーが見つかりました。どちらのプレイヤーの情報を表示しますか？", view=view)
+        elif isinstance(data, dict) and 'uuid' in data:
+            # 衝突しなかった場合、通常通り埋め込みを作成して送信
+            embed = self._create_player_embed(data)
+            await interaction.followup.send(embed=embed)
+        else:
+            # 予期せぬデータ形式の場合
+            await interaction.followup.send(f"プレイヤー「{player_name}」の情報を正しく取得できませんでした。")
 
 # BotにCogを登録するためのセットアップ関数
 async def setup(bot: commands.Bot):
