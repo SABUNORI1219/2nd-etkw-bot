@@ -61,7 +61,7 @@ class GameCommandsCog(commands.Cog):
         stream_status = "🟢Stream" if not is_online and time_diff.total_seconds() < 300 else "❌Stream"
         last_join_display = f"{last_join_str.split('T')[0]} [{stream_status}]"
         
-        active_char_uuid = self._safe_get(data, ['characters', 'activeCharacter'])
+        active_char_uuid = self._safe_get(data, ['activeCharacter'])
         active_char_info = "N/A"
         if active_char_uuid != "N/A":
             char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
@@ -91,7 +91,7 @@ class GameCommandsCog(commands.Cog):
         # ▼▼▼【修正点2】UUID以降をコードブロックで囲む ▼▼▼
         description = f"""
 [公式サイトへのリンク](https://wynncraft.com/stats/player/username)
-UUID: {uuid}
+### UUID: {uuid}
 ```
 [{support_rank}] {username} is {'online' if is_online else 'offline'}
 Active Character: {active_char_info}
@@ -117,7 +117,7 @@ Total Level: {total_level:,}
 ╚═══════════╩════════╝
 ```
 """
-        color = discord.Color.green() if is_online else discord.Color.red()
+        color = discord.Color.green() if is_online else discord.Color.dark_red()
         embed = discord.Embed(
             description=description,
             color=color
