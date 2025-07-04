@@ -98,7 +98,7 @@ class GameCommandsCog(commands.Cog):
 
         # ▼▼▼【修正点2】UUID以降をコードブロックで囲む ▼▼▼
         description = f"""
-[公式サイトへのリンク](https://wynncraft.com/stats/player/username)
+[公式サイトへのリンク](https://wynncraft.com/stats/player/{username})
 UUID: {uuid}
 ```
 [{support_rank}] {username} is {'online' if is_online else 'offline'}
