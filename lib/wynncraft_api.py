@@ -54,22 +54,44 @@ class WynncraftAPI:
         """Nori APIからプレイヤーのデータを取得する。衝突の場合はリストを返す。"""
         try:
             url = NORI_PLAYER_API_URL.format(player_name)
+            print(f"--- [API Handler] Nori Player APIにリクエスト: {url}") # どのURLにアクセスしているかログに出す
+
             async with self.session.get(url) as response:
-                # ▼▼▼【修正点】▼▼▼
-                # ステータスコードに関わらず、まずJSONを読み込む
-                data = await response.json()
+                status = response.status
+                text = await response.text() # まずは生テキストとして応答を取得
+
+                # ▼▼▼【診断ログを追加】▼▼▼
+                print(f"--- [API Handler] Nori Player APIからの応答:")
+                print(f"--- ステータスコード: {status}")
+                print(f"--- 生データ: {text[:500]}") # 長すぎる場合を考慮し、先頭500文字だけ表示
+
+                # 応答が成功(200)で、かつ中身がJSONであれば解析を試みる
+                if status == 200:
+                    try:
+                        data = await response.json(content_type=None) # content_typeを無視して強制的にJSONとして解析
+                        # 正常なプレイヤーデータか、衝突リストかを判別して返す
+                        if (isinstance(data, dict) and 'uuid' in data) or isinstance(data, list):
+                            return data
+                    except Exception as e:
+                        print(f"--- [API Handler] JSON解析エラー: {e}")
+                        return None
                 
-                # 正常な応答、または衝突応答（リスト形式）の場合はデータをそのまま返す
-                if response.status == 200 or isinstance(data, list):
-                    return data
-                
-                # それ以外のエラー
-                print(f"--- [API Handler] Nori Player APIから予期せぬ応答: {response.status}, {data}")
+                # プレイヤーが見つからない場合、APIはリストを返すがステータスが200でない可能性がある
+                try:
+                    data = await response.json(content_type=None)
+                    if isinstance(data, list):
+                        print("--- [API Handler] 衝突（リスト形式）を検出しました。")
+                        return data
+                except Exception:
+                    pass # JSONでなければ何もしない
+
+                print("--- [API Handler] 有効なプレイヤーデータとして処理できませんでした。")
                 return None
+
         except Exception as e:
             print(f"--- [API Handler] Nori Player APIリクエスト中にエラー: {e}")
             return None
-
+            
     async def close_session(self):
         if self.session:
             await self.session.close()
