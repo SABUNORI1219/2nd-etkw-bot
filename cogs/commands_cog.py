@@ -33,7 +33,7 @@ class GameCommandsCog(commands.Cog):
 
         data = await self.wynn_api.get_nori_player_data(player_name)
 
-        if not data:
+        if not data or 'uuid' not in data:
             await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
             return
 
