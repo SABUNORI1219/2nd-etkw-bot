@@ -36,7 +36,7 @@ class RaidTrackerCog(commands.Cog):
         """
         print(f"--- [TrackerCog] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - トラッキングチェックを開始...")
         
-        guild_data = await self.wynn_api.get_guild_data()
+        guild_data = await self.wynn_api.get_nori_guild_data()
         if not guild_data:
             print("--- [TrackerCog] APIからギルドデータを取得できませんでした。")
             return
