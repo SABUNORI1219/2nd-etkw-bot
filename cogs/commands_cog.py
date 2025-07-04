@@ -121,7 +121,7 @@ Total Level: {total_level:,}
             color=discord.Color.dark_green()
         )
         # ▼▼▼【修正点1】公式ウェブサイトへのリンクを設定 ▼▼▼
-        embed.title = {username}
+        embed.title = username
         
         embed.set_author(
             name="公式サイトへのリンク",  # 表示されるテキスト
