@@ -166,7 +166,7 @@ class GameCommandsCog(commands.Cog):
             text=f"{username}'s Stats | Minister Chikuwa",
             icon_url=f"https://www.mc-heads.net/avatar/{username}"
         )
-        return Embed
+        return embed
 
     @app_commands.command(name="player", description="Nori APIからプレイヤーの詳細情報を表示します。")
     @app_commands.describe(player_name="Minecraftのプレイヤー名")
