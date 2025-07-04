@@ -99,7 +99,6 @@ class GameCommandsCog(commands.Cog):
         # ▼▼▼【修正点2】UUID以降をコードブロックで囲む ▼▼▼
         description = f"""
 [公式サイトへのリンク](https://wynncraft.com/stats/player/{username})
-**UUID: {uuid}**
 ```
 [{support_rank}] {username} is {'online' if is_online else 'offline'}
 Active Character: {active_char_info}
@@ -124,6 +123,7 @@ Total Level: {total_level:,}
 ║ All Raids ║ {total_raids:>6,} ║
 ╚═══════════╩════════╝
 ```
+**UUID: {uuid}**
 """
         color = discord.Color.green() if is_online else discord.Color.dark_red()
         embed = discord.Embed(
