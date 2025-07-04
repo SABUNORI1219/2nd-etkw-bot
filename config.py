@@ -3,7 +3,7 @@ import os
 # Wynncraft API関連
 GUILD_NAME = "Empire of TKW"
 # ギルド名にスペースが含まれる場合、URLエンコード(%20)する
-GUILD_API_URL = f"https://nori.fish/api/guild/{GUILD_NAME.replace(' ', '%20')}"
+NORI_GUILD_API_URL = f"https://nori.fish/api/guild/{GUILD_NAME.replace(' ', '%20')}"
 PLAYER_API_URL = "https://api.wynncraft.com/v3/player/{}"
 NORI_PLAYER_API_URL = "https://nori.fish/api/player/{}"
 
