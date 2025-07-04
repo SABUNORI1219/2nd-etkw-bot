@@ -125,33 +125,33 @@ class GameCommandsCog(commands.Cog):
 
         # ▼▼▼【修正点2】UUID以降をコードブロックで囲む ▼▼▼
         description = f"""
-        [公式サイトへのリンク](https://wynncraft.com/stats/player/{username})
-        ```
-        [{support_rank}] {username} is {'online' if is_online else 'offline'}
-        Active Character: {active_char_info}
-        Guild: {guild_display}
-        First Joined: {first_join}
-        Last Seen: {last_join_display}
-        Mobs Killed: {killed_mobs:,}
-        Chests Looted: {chests_found:,}
-        Playtime: {playtime:,} hours
-        War Count: {wars:,} [#{war_rank:,}]
-        PvP: {pvp_kills:,} K / {pvp_deaths:,} D
-        Quests Total: {quests:,}
-        Total Level: {total_level:,}
-        ╔═══════════╦════════╗
-        ║  Content  ║ Clears ║
-        ╠═══════════╬════════╣
-        ║ NOTG      ║ {notg:>6,} ║
-        ║ NOL       ║ {nol:>6,} ║
-        ║ TCC       ║ {tcc:>6,} ║
-        ║ TNA       ║ {tna:>6,} ║
-        ║ Dungeons  ║ {dungeons:>6,} ║
-        ║ All Raids ║ {total_raids:>6,} ║
-        ╚═══════════╩════════╝
-        ```
-        **UUID: {uuid}**
-        """
+    [公式サイトへのリンク](https://wynncraft.com/stats/player/{username})
+    ```
+    [{support_rank}] {username} is {'online' if is_online else 'offline'}
+    Active Character: {active_char_info}
+    Guild: {guild_display}
+    First Joined: {first_join}
+    Last Seen: {last_join_display}
+    Mobs Killed: {killed_mobs:,}
+    Chests Looted: {chests_found:,}
+    Playtime: {playtime:,} hours
+    War Count: {wars:,} [#{war_rank:,}]
+    PvP: {pvp_kills:,} K / {pvp_deaths:,} D
+    Quests Total: {quests:,}
+    Total Level: {total_level:,}
+    ╔═══════════╦════════╗
+    ║  Content  ║ Clears ║
+    ╠═══════════╬════════╣
+    ║ NOTG      ║ {notg:>6,} ║
+    ║ NOL       ║ {nol:>6,} ║
+    ║ TCC       ║ {tcc:>6,} ║
+    ║ TNA       ║ {tna:>6,} ║
+    ║ Dungeons  ║ {dungeons:>6,} ║
+    ║ All Raids ║ {total_raids:>6,} ║
+    ╚═══════════╩════════╝
+    ```
+    **UUID: {uuid}**
+    """
         color = discord.Color.green() if is_online else discord.Color.dark_red()
         embed = discord.Embed(
             description=description,
