@@ -1,12 +1,12 @@
 import discord
 from discord.ext import commands
 import os
-import asyncio
+import sys
 
 # 作成したモジュールから必要な関数やクラスをインポート
 from keep_alive import keep_alive
 from lib.database_handler import setup_database
-from config import GUILD_ID_INT
+# configからGUILD_IDをインポートする必要がなくなりました
 
 # 環境変数からトークンを取得
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -21,25 +21,19 @@ class MyBot(commands.Bot):
     Bot本体のメインクラス。起動時のセットアップを担当する。
     """
     def __init__(self):
-        # スラッシュコマンドのみを使用するため、プレフィックスは不要
-        super().__init__(command_prefix=commands.when_mentioned_or("!"), intents=intents)
+        super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
         """
-        Botの非同期セットアップを管理する特別なメソッド。
-        BotがDiscordにログインする前に一度だけ実行される。
+        Botの非同期セットアップを管理する。
         """
         print("--- [司令塔] 起動準備を開始します ---")
         
-        # 1. データベースをセットアップ
-        print("--- [司令塔] -> データベース担当にセットアップを依頼...")
+        # 1. データベースとWebサーバーの準備
         setup_database()
-        
-        # 2. 24時間稼働用のWebサーバーを起動
-        print("--- [司令塔] -> Webサーバーを起動...")
         keep_alive()
 
-        # 3. cogsフォルダから全ての「受付係」を読み込む
+        # 2. Cogs（機能部品）の読み込み
         print("--- [司令塔] -> 全ての受付係（Cogs）を配属させます...")
         for filename in os.listdir('./cogs'):
             if filename.endswith('.py'):
@@ -49,6 +43,14 @@ class MyBot(commands.Bot):
                 except Exception as e:
                     print(f"--- [司令塔] ❌ 受付係 '{filename}' の配属に失敗しました: {e}")
         
+        # 3. 全ての準備完了後、グローバルコマンドを同期
+        try:
+            print("--- [司令塔] -> スラッシュコマンドをグローバルに同期します...")
+            synced = await self.tree.sync()
+            print(f"--- [司令塔] ✅ {len(synced)}個のコマンドをグローバル同期しました。（反映には最大1時間かかります）")
+        except Exception as e:
+            print(f"--- [司令塔] ❌ コマンドの同期に失敗しました: {e}")
+
         print("--- [司令塔] 全ての起動準備が完了しました。")
 
     async def on_ready(self):
@@ -61,31 +63,17 @@ class MyBot(commands.Bot):
 # Botのインスタンスを作成
 bot = MyBot()
 
-@bot.command()
-@commands.is_owner()
-async def sync(ctx: commands.Context):
-    """スラッシュコマンドをDiscordに即時反映させるためのオーナー用コマンド"""
-    if GUILD_ID_INT == 0:
-        await ctx.send("エラー: `GUILD_ID`が環境変数に設定されていません。")
-        return
-        
-    guild = discord.Object(id=GUILD_ID_INT)
-    try:
-        # コマンドを特定のサーバーに即時反映
-        bot.tree.copy_global_to(guild=guild)
-        synced = await bot.tree.sync(guild=guild)
-        await ctx.send(f"`{len(synced)}`個のコマンドをこのサーバーに同期しました。")
-        print(f"{len(synced)}個のコマンドをサーバーに同期しました。")
-    except Exception as e:
-        await ctx.send(f"コマンドの同期に失敗しました: {e}")
+# !syncコマンドは不要になったため削除
 
 # メインの実行ブロック
 if __name__ == '__main__':
     if not TOKEN:
         print("致命的エラー: `DISCORD_TOKEN`が設定されていません。")
-    else:
-        try:
-            print("--- [司令塔] Botの起動を開始します... ---")
-            bot.run(TOKEN)
-        except Exception as e:
-            print(f"Botの起動中に予期せぬエラーが発生しました: {e}")
+        sys.exit(1)
+        
+    try:
+        print("--- [司令塔] Botの起動を開始します... ---")
+        bot.run(TOKEN)
+    except Exception as e:
+        print(f"Botの起動中に予期せぬエラーが発生しました: {e}")
+        sys.exit(1)
