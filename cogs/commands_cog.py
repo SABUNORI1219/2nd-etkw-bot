@@ -153,21 +153,21 @@ Total Level: {total_level:,}
 **UUID: {uuid}**
 """
     color = discord.Color.green() if is_online else discord.Color.dark_red()
-        embed = discord.Embed(
-            description=description,
-            color=color
-        )
-        # ▼▼▼【修正点1】公式ウェブサイトへのリンクを設定 ▼▼▼
-        embed.title = username
+    embed = discord.Embed(
+        description=description,
+        color=color
+    )
+    # ▼▼▼【修正点1】公式ウェブサイトへのリンクを設定 ▼▼▼
+    embed.title = username
         
-        embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{username}/right")
+    embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{username}/right")
         
-        embed.set_footer(
-            text=f"{username}'s Stats | Minister Chikuwa",
-            icon_url=f"https://www.mc-heads.net/avatar/{username}"
-        )
+    embed.set_footer(
+        text=f"{username}'s Stats | Minister Chikuwa",
+        icon_url=f"https://www.mc-heads.net/avatar/{username}"
+    )
 
-        return Embed
+    return Embed
 
     @app_commands.command(name="player", description="Nori APIからプレイヤーの詳細情報を表示します。")
     @app_commands.describe(player_name="Minecraftのプレイヤー名")
