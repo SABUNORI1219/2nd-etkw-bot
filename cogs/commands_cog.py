@@ -89,7 +89,7 @@ class GameCommandsCog(commands.Cog):
         total_raids = self._safe_get(data, ['globalData', 'raids', 'total'], 0)
 
         # ▼▼▼【修正点2】UUID以降をコードブロックで囲む ▼▼▼
-        title = [公式サイトへのリンク](https://wynncraft.com/stats/player/username)
+        title = f"[公式サイトへのリンク](https://wynncraft.com/stats/player/username)"
         description = f"""
 ```
 [{support_rank}] {username} is {'online' if is_online else 'offline'}
