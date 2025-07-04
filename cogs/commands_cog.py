@@ -89,6 +89,7 @@ class GameCommandsCog(commands.Cog):
         total_raids = self._safe_get(data, ['globalData', 'raids', 'total'], 0)
 
         # ▼▼▼【修正点2】UUID以降をコードブロックで囲む ▼▼▼
+        title = [公式サイトへのリンク](https://wynncraft.com/stats/player/username)
         description = f"""
 ```
 [{support_rank}] {username} is {'online' if is_online else 'offline'}
@@ -121,7 +122,7 @@ Total Level: {total_level:,}
             color=discord.Color.dark_green()
         )
         # ▼▼▼【修正点1】公式ウェブサイトへのリンクを設定 ▼▼▼
-        embed.title = [公式サイトへのリンク](https://wynncraft.com/stats/player/username)
+        embed.title = title
         
         embed.set_author(name=f"{username}")
         
