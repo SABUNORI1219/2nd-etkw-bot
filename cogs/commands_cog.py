@@ -121,7 +121,7 @@ Total Level: {total_level:,}
             color=discord.Color.dark_green()
         )
         # ▼▼▼【修正点1】公式ウェブサイトへのリンクを設定 ▼▼▼
-        embed.title(text=f"{username}")
+        embed.title({username})
         embed.set_author(name=f"[公式サイトへのリンク](https://wynncraft.com/stats/player/{username})")
         embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{username}/right")
         embed.set_footer(
