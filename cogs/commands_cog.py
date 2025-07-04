@@ -61,15 +61,22 @@ class GameCommandsCog(commands.Cog):
         stream_status = "🟢Stream" if not is_online and time_diff.total_seconds() < 3 else "❌Stream"
         last_join_display = f"{last_join_str.split('T')[0]} [{stream_status}]"
         
+        # ▼▼▼【ここから3点の修正を反映】▼▼▼
+        # 1. activeCharacterの取得パスを修正
         active_char_uuid = self._safe_get(data, ['activeCharacter'])
+        
+        # 2. 'N/A'チェックを削除し、常にキーが存在する前提で処理
         char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
         char_type = self._safe_get(char_obj, ['type'])
         nickname = self._safe_get(char_obj, ['nickname'])
-        reskin = f" ({char_obj['reskin']})" if self._safe_get(char_obj, ['reskin']) else ""
-        if reskin = "":
-            active_char_info = f"{char_type} ({nickname}) on {server}"
-        else:
+        reskin = self._safe_get(char_obj, ['reskin'])
+
+        # 3. reskinの有無で表示を分岐させるロジックに変更
+        if reskin != "N/A":
             active_char_info = f"{reskin} ({nickname}) on {server}"
+        else:
+            active_char_info = f"{char_type} ({nickname}) on {server}"
+        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
         killed_mobs = self._safe_get(data, ['globalData', 'killedMobs'], 0)
         chests_found = self._safe_get(data, ['globalData', 'chestsFound'], 0)
