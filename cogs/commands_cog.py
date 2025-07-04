@@ -57,18 +57,19 @@ class GameCommandsCog(commands.Cog):
         last_join_str = self._safe_get(data, ['lastJoin'], "1970-01-01T00:00:00.000Z")
         last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
         time_diff = datetime.now(timezone.utc) - last_join_dt
-        # オフラインかつ最終ログインが5分以内(300秒)の場合
-        stream_status = "🟢Stream" if not is_online and time_diff.total_seconds() < 300 else "❌Stream"
+        # オフラインかつ最終ログインが3秒以内の場合
+        stream_status = "🟢Stream" if not is_online and time_diff.total_seconds() < 3 else "❌Stream"
         last_join_display = f"{last_join_str.split('T')[0]} [{stream_status}]"
         
         active_char_uuid = self._safe_get(data, ['activeCharacter'])
-        active_char_info = "N/A"
-        if active_char_uuid != "N/A":
-            char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
-            char_type = self._safe_get(char_obj, ['type'])
-            nickname = self._safe_get(char_obj, ['nickname'])
-            reskin = f" ({char_obj['reskin']})" if self._safe_get(char_obj, ['reskin']) else ""
-            active_char_info = f"{char_type} ({nickname}){reskin} on {server}"
+        char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
+        char_type = self._safe_get(char_obj, ['type'])
+        nickname = self._safe_get(char_obj, ['nickname'])
+        reskin = f" ({char_obj['reskin']})" if self._safe_get(char_obj, ['reskin']) else ""
+        if reskin = "":
+            active_char_info = f"{char_type} ({nickname}) on {server}"
+        else:
+            active_char_info = f"{reskin} ({nickname}) on {server}"
 
         killed_mobs = self._safe_get(data, ['globalData', 'killedMobs'], 0)
         chests_found = self._safe_get(data, ['globalData', 'chestsFound'], 0)
