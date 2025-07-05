@@ -1,6 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+from datetime import datetime
 
 # libフォルダから専門家をインポート
 from lib.wynncraft_api import WynncraftAPI
@@ -39,19 +40,16 @@ class GuildCog(commands.Cog):
         if not online_players:
             return "（現在オンラインのメンバーはいません）", 0
 
-        # 各列の最大幅を計算して、テーブルの見た目を整える
         max_name_len = max(len(p['name']) for p in online_players) if online_players else 6
         max_server_len = max(len(p['server']) for p in online_players) if online_players else 2
         
-        # ヘッダー
         header = f"║ {'WC'.center(max_server_len)} ║ {'Player'.ljust(max_name_len)} ║ Rank  ║"
         divider = f"╠═{'═'*max_server_len}═╬═{'═'*max_name_len}═╬═══════╣"
         top_border = f"╔═{'═'*max_server_len}═╦═{'═'*max_name_len}═╦═══════╗"
         bottom_border = f"╚═{'═'*max_server_len}═╩═{'═'*max_name_len}═╩═══════╝"
 
-        # 各プレイヤーの行
         player_rows = []
-        for p in online_players:
+        for p in sorted(online_players, key=lambda x: x['name']): # 名前順にソート
             server = p['server'].center(max_server_len)
             name = p['name'].ljust(max_name_len)
             rank = p['rank_stars'].ljust(5)
@@ -59,8 +57,8 @@ class GuildCog(commands.Cog):
 
         return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players)
 
-    @app_commands.command(name="guild", description="ギルドのステータスを表示します。")
-    @app_commands.describe(guild_name="Name or Prefix")
+    @app_commands.command(name="guild", description="ギルドの詳細情報を表示します。")
+    @app_commands.describe(guild_name="ギルド名またはギルドプレフィックス")
     async def guild(self, interaction: discord.Interaction, guild_name: str):
         await interaction.response.defer()
 
@@ -70,31 +68,29 @@ class GuildCog(commands.Cog):
             await interaction.followup.send(f"ギルド「{guild_name}」が見つかりませんでした。")
             return
 
-        # データを取得
+        # データを正しいAPIキーで取得
         name = self._safe_get(data, ['name'])
         prefix = self._safe_get(data, ['prefix'])
-        owner = self._safe_get(data, ['owner'])
-        created_date = self._safe_get(data, ['created_date'])
+        owner = self._safe_get(data, ['owner', 'name'])
+        created_date = self._safe_get(data, ['created'], "N/A").split("T")[0]
         level = self._safe_get(data, ['level'], 0)
-        xp_percent = self._safe_get(data, ['xp_percent'], 0)
+        xp_percent = self._safe_get(data, ['xp'], 0)
         wars = self._safe_get(data, ['wars'], 0)
         territories = self._safe_get(data, ['territories'], 0)
         
-        # 最新シーズンのレーティングを取得
         season_ranks = self._safe_get(data, ['seasonRanks'], {})
         latest_season = str(max([int(k) for k in season_ranks.keys()])) if season_ranks else "N/A"
         rating = self._safe_get(season_ranks, [latest_season, 'rating'], "N/A")
         rating_display = f"{rating:,}" if isinstance(rating, int) else rating
         
-        # メンバー数を計算し、オンラインプレイヤーのテーブルを作成
-        all_members = self._safe_get(data, ['total_members'], [])
-        total_members = len(all_members)
-        online_players_table, online_count = self._create_online_players_table(all_members)
+        # メンバーのリストと総数を、それぞれ正しいキーから取得
+        member_list = self._safe_get(data, ['members'], [])
+        total_members = self._safe_get(data, ['totalMembers'], len(member_list)) # totalMembersキーを優先
+        online_players_table, online_count = self._create_online_players_table(member_list)
         
         # 埋め込みメッセージを作成
         description = f"""
-      [公式サイトへのリンク](https://wynncraft.com/stats/guild/{prefix})
-```python
+    [公式サイトへのリンク](https://wynncraft.com/stats/guild/{prefix})
 Owner: {owner}
 Created on: {created_date}
 Level: {level} [{xp_percent}%]
@@ -104,24 +100,21 @@ Territory count: {territories}
 Members: {total_members}
 Online Players: {online_count}/{total_members}
 {online_players_table}
-```
+
 """
         embed = discord.Embed(
             description=description,
             color=EMBED_COLOR_BLUE
         )
 
-        # ▼▼▼【エラー修正箇所】▼▼▼
-        # バナー画像のパスを取得し、完全なURLを組み立てる
         banner_path = self._safe_get(data, ['banner', 'tierImage'], None)
         icon_url = f"https://cdn.wynncraft.com/{banner_path}" if banner_path else None
         
         embed.set_author(
             name=f"{name} [{prefix}]",
             url=f"https://wynncraft.com/stats/guild/{name.replace(' ', '%20')}",
-            icon_url=icon_url # 修正したURLを使用
+            icon_url=icon_url
         )
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         
         embed.set_footer(text=f"Data from Nori API | Requested by {interaction.user.display_name}")
 
@@ -130,4 +123,3 @@ Online Players: {online_count}/{total_members}
 # BotにCogを登録するためのセットアップ関数
 async def setup(bot: commands.Bot):
     await bot.add_cog(GuildCog(bot))
-
