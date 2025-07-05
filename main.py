@@ -24,7 +24,7 @@ class MyBot(commands.Bot):
         """
         # cogsフォルダから全てのCogを読み込む
         print("--- [司令塔] -> 全ての受付係（Cogs）を配属させます...")
-        cogs_to_load = ['setup_cog', 'commands_cog'] # 読み込み順を定義
+        cogs_to_load = ['setup_cog', 'player_cog','guild_cog'] # 読み込み順を定義
         for cog_name in cogs_to_load:
             try:
                 await self.load_extension(f'cogs.{cog_name}')
