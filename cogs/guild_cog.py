@@ -23,20 +23,17 @@ class GuildCog(commands.Cog):
             data = data.get(key)
         return data if data is not None else default
 
-    def _create_online_players_table(self, online_players_dict: dict) -> tuple[str, int]:
-        """オンラインプレイヤーの辞書からASCIIテーブルと人数を生成する"""
+    def _create_online_players_table(self, online_players_list: list) -> tuple[str, int]:
+        """オンラインプレイヤーのリストからASCIIテーブルと人数を生成する"""
         
-        # ▼▼▼【ロジック修正箇所】辞書から直接データを読み込む▼▼▼
-        if not online_players_dict or not isinstance(online_players_dict, dict):
+        # ▼▼▼【ロジック修正箇所】APIからのonline_playersリストを直接使う▼▼▼
+        if not online_players_list:
             return "（現在オンラインのメンバーはいません）", 0
 
-        online_players = list(online_players_dict.values())
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
-        # 各列の最大幅を計算して、テーブルの見た目を整える
-        max_name_len = max(len(p.get('name', 'N/A')) for p in online_players) if online_players else 6
-        max_server_len = max(len(p.get('server', 'N/A')) for p in online_players) if online_players else 2
-        max_rank_len = max(len(p.get('rank', 'N/A')) for p in online_players) if online_players else 4
+        # 各列の最大幅を計算
+        max_name_len = max(len(p.get('name', 'N/A')) for p in online_players_list)
+        max_server_len = max(len(p.get('server', 'N/A')) for p in online_players_list)
+        max_rank_len = max(len(p.get('rank', 'N/A')) for p in online_players_list)
         
         header = f"║ {'WC'.center(max_server_len)} ║ {'Player'.ljust(max_name_len)} ║ {'Rank'.center(max_rank_len)} ║"
         divider = f"╠═{'═'*max_server_len}═╬═{'═'*max_name_len}═╬═{'═'*max_rank_len}═╣"
@@ -45,13 +42,14 @@ class GuildCog(commands.Cog):
 
         # 各プレイヤーの行を作成
         player_rows = []
-        for p in sorted(online_players, key=lambda x: x.get('name', '')): # 名前順にソート
+        # APIのリストは既にオンラインのプレイヤーだけなので、名前順にソートする
+        for p in sorted(online_players_list, key=lambda x: x.get('name', '')):
             server = p.get('server', 'N/A').center(max_server_len)
             name = p.get('name', 'N/A').ljust(max_name_len)
-            rank = p.get('rank', 'N/A').center(max_rank_len) # rankは星ではなくテキストと仮定
+            rank = p.get('rank', 'N/A').center(max_rank_len)
             player_rows.append(f"║ {server} ║ {name} ║ {rank} ║")
 
-        return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players)
+        return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players_list)
 
     @app_commands.command(name="guild", description="ギルドの詳細情報を表示します。")
     @app_commands.describe(guild_name="ギルド名またはギルドプレフィックス")
@@ -82,8 +80,8 @@ class GuildCog(commands.Cog):
         
         # ▼▼▼【ロジック修正箇所】正しいデータソースを参照する▼▼▼
         total_members = self._safe_get(data, ['total_members'], 0)
-        online_players_dict = self._safe_get(data, ['online_players'], {}) # online_players辞書を取得
-        online_players_table, online_count = self._create_online_players_table(online_players_dict)
+        online_players_list = self._safe_get(data, ['online_players'], []) # online_playersリストを直接取得
+        online_players_table, online_count = self._create_online_players_table(online_players_list)
         # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         
         # 埋め込みメッセージを作成
