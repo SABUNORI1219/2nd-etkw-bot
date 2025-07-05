@@ -15,11 +15,15 @@ class PlayerSelectView(discord.ui.View):
         self.cog_instance = cog_instance
 
         options = []
-        # ▼▼▼【エラー修正箇所】▼▼▼
-        # player_infoが辞書(dict)であるかを確認する処理を追加
         for uuid, player_info in player_collision_dict.items():
             if isinstance(player_info, dict):
-                rank = player_info.get('supportRank', 'Player').capitalize()
+                # ▼▼▼【エラー修正箇所】▼▼▼
+                # supportRankがNoneの可能性があるため、安全に処理する
+                rank_value = player_info.get('supportRank')
+                # rank_valueがNoneなら'Player'を使い、その後でcapitalize()を呼ぶ
+                rank = (rank_value or 'Player').capitalize()
+                # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+                
                 stored_name = player_info.get('storedName', 'Unknown')
                 label_text = f"{stored_name} [{rank}]"
                 
@@ -28,11 +32,11 @@ class PlayerSelectView(discord.ui.View):
                     value=uuid,
                     description=f"UUID: {uuid}"
                 ))
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-        
-        self.select_menu = discord.ui.Select(placeholder="プレイヤーを選択してください...", options=options)
-        self.select_menu.callback = self.select_callback
-        self.add_item(self.select_menu)
+
+        if options:
+            self.select_menu = discord.ui.Select(placeholder="プレイヤーを選択してください...", options=options)
+            self.select_menu.callback = self.select_callback
+            self.add_item(self.select_menu)
 
     async def select_callback(self, interaction: discord.Interaction):
         selected_uuid = self.select_menu.values[0]
