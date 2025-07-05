@@ -81,7 +81,7 @@ class GuildCog(commands.Cog):
         rating_display = f"{rating:,}" if isinstance(rating, int) else rating
         
         # ▼▼▼【ロジック修正箇所】正しいデータソースを参照する▼▼▼
-        total_members = self._safe_get(data, ['totalMembers'], 0)
+        total_members = self._safe_get(data, ['total_members'], 0)
         online_players_dict = self._safe_get(data, ['online_players'], {}) # online_players辞書を取得
         online_players_table, online_count = self._create_online_players_table(online_players_dict)
         # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
