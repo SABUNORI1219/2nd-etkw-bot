@@ -172,17 +172,23 @@ Total Level: {total_level:,}
 
         data = await self.wynn_api.get_nori_player_data(player_name)
 
-        # ▼▼▼【ロジック修正箇所】'username'の有無で単一か衝突かを判断 ▼▼▼
+        if not data:
+            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
+            return
+
+        # ▼▼▼【最終ロジック】'username'キーの有無で処理を分岐▼▼▼
         if isinstance(data, dict) and 'username' in data:
-            # usernameがあれば、単一プレイヤーとして処理
+            # 'username'キーがあれば、単一プレイヤーとして処理
             embed = self._create_player_embed(data)
             await interaction.followup.send(embed=embed)
+        
         elif isinstance(data, dict):
-            # usernameがなく、データが辞書なら、衝突と判断して選択肢を表示
+            # 'username'キーがなく、辞書であれば、衝突と判断して選択肢を表示
             view = PlayerSelectView(player_collision_dict=data, cog_instance=self)
             await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
+            
         else:
-            # 予期せぬデータ形式の場合（リストなど）
+            # 予期せぬデータ形式の場合
             await interaction.followup.send(f"プレイヤー「{player_name}」の情報を正しく取得できませんでした。")
 
 # BotにCogを登録するためのセットアップ関数
