@@ -10,41 +10,38 @@ from lib.database_handler import get_raid_counts
 from config import RAID_TYPES, EMBED_COLOR_BLUE, EMBED_COLOR_GREEN
 
 class PlayerSelectView(discord.ui.View):
-    def __init__(self, player_options: list, cog_instance):
-        super().__init__(timeout=60.0)  # 60秒で操作不能になる
-        self.cog_instance = cog_instance # commands_cogのインスタンスを保持
+    def __init__(self, player_collision_dict: dict, cog_instance):
+        super().__init__(timeout=60.0)
+        self.cog_instance = cog_instance
 
-        # ドロップダウンメニューの選択肢を作成
+        # 辞書のキー(uuid)と値(player_info)を使って選択肢を作成
         options = [
-            discord.SelectOption(label=p['storedName'], value=p['uuid'])
-            for p in player_options
+            discord.SelectOption(
+                label=player_info.get('storedName', 'Unknown'), 
+                value=uuid,
+                description=f"UUID: {uuid}"
+            )
+            for uuid, player_info in player_collision_dict.items()
         ]
         
-        # ドロップダウンメニューを作成
         self.select_menu = discord.ui.Select(placeholder="プレイヤーを選択してください...", options=options)
-        self.select_menu.callback = self.select_callback # コールバック関数を登録
+        self.select_menu.callback = self.select_callback
         self.add_item(self.select_menu)
 
     async def select_callback(self, interaction: discord.Interaction):
-        # ユーザーが選択肢を選ぶと、この関数が実行される
-        selected_uuid = self.select_menu.values[0] # 選択されたUUIDを取得
+        selected_uuid = self.select_menu.values[0]
         
-        # ドロップダウンを無効化し、「考え中...」を表示
         self.select_menu.disabled = True
-        await interaction.response.edit_message(view=self)
+        await interaction.response.edit_message(content="プレイヤー情報を取得中...", view=self)
         
-        # UUIDを使って再度APIから詳細データを取得
         # Nori APIはUUIDでも検索できる
         data = await self.cog_instance.wynn_api.get_nori_player_data(selected_uuid)
         
         if not data or 'uuid' not in data:
-            await interaction.followup.send("選択されたプレイヤーの情報を取得できませんでした。")
+            await interaction.message.edit(content="選択されたプレイヤーの情報を取得できませんでした。", embed=None, view=None)
             return
             
-        # 取得したデータから埋め込みメッセージを作成
         embed = self.cog_instance._create_player_embed(data)
-        
-        # 元のメッセージを、完成した埋め込みに置き換える
         await interaction.message.edit(content=None, embed=embed, view=None)
 
 class GameCommandsCog(commands.Cog):
@@ -175,19 +172,18 @@ Total Level: {total_level:,}
 
         data = await self.wynn_api.get_nori_player_data(player_name)
 
-        # ▼▼▼【あなたの分析に基づいた最終ロジック】▼▼▼
-        if isinstance(data, dict):
-            # データが辞書なら、単一プレイヤーとして処理
+        # ▼▼▼【ロジック修正箇所】'username'の有無で単一か衝突かを判断 ▼▼▼
+        if isinstance(data, dict) and 'username' in data:
+            # usernameがあれば、単一プレイヤーとして処理
             embed = self._create_player_embed(data)
             await interaction.followup.send(embed=embed)
-            
-        elif isinstance(data, list):
-            # データがリストなら、衝突と判断して選択肢を表示
-            view = PlayerSelectView(player_options=data, cog_instance=self)
+        elif isinstance(data, dict):
+            # usernameがなく、データが辞書なら、衝突と判断して選択肢を表示
+            view = PlayerSelectView(player_collision_dict=data, cog_instance=self)
             await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
-            
-        else: # dataがNoneの場合（本当に見つからなかった場合）
-            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
+        else:
+            # 予期せぬデータ形式の場合（リストなど）
+            await interaction.followup.send(f"プレイヤー「{player_name}」の情報を正しく取得できませんでした。")
 
 # BotにCogを登録するためのセットアップ関数
 async def setup(bot: commands.Bot):
