@@ -49,7 +49,7 @@ class GuildCog(commands.Cog):
             rank = p.get('rank', '').center(max_rank_len)
             player_rows.append(f"║ {server} ║ {name} ║ {rank} ║")
 
-        return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players)
+        return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players_list)
 
     @app_commands.command(name="guild", description="ギルドの詳細情報を表示します。")
     @app_commands.describe(guild_name="ギルド名またはギルドプレフィックス")
