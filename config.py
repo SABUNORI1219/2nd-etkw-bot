@@ -3,7 +3,8 @@ import os
 # Wynncraft API関連
 NORI_GUILD_API_URL = "https://nori.fish/api/guild/{}"
 NORI_PLAYER_API_URL = "https://nori.fish/api/player/{}"
-WYNN_PLAYER_API_URL = "https://api.wynncraft.com/v3/player/{}" # ⬅️ この一行を追加
+WYNN_PLAYER_API_URL = "https://api.wynncraft.com/v3/player/{}"
+WYNN_GUILD_API_URL = "https://api.wynncraft.com/v3/guild/{}" #Guild Name必須
 
 # 追跡対象のレイド名 (APIで使われる内部名)
 RAID_TYPES = ["tna", "tcc", "nol", "nog"]
