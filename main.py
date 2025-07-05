@@ -26,8 +26,7 @@ class MyBot(commands.Bot):
     Bot本体のメインクラス。Cogsの読み込みとステータス設定を担当する。
     """
     def __init__(self):
-        # command_prefixを削除し、代わりにactivityを初期設定
-        super().__init__(intents=intents, activity=activity)
+        super().__init__(command_prefix="!", intents=intents, activity=activity)
 
     async def setup_hook(self):
         """
