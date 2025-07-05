@@ -202,7 +202,7 @@ Total Level: {total_level:,}
         # ▼▼▼【最終修正ロジック】▼▼▼
         # APIの応答が辞書形式で、かつ"Error"というキーを持っているかチェック
         if isinstance(data, dict) and "Error" in data:
-            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。（APIエラー: {data['Error']}）")
+            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
             return
 
         # 'username'キーがあれば、単一プレイヤーとして処理
