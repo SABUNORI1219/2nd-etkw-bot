@@ -57,6 +57,7 @@ class GuildCog(commands.Cog):
         await interaction.response.defer()
 
         data = await self.wynn_api.get_nori_guild_data(guild)
+        print(data)
 
         if not data:
             await interaction.followup.send(f"ギルド「{guild}」が見つかりませんでした。")
