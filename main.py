@@ -5,7 +5,7 @@ import sys
 import asyncio
 from dotenv import load_dotenv
 
-# 作成したモジュールから必要な関数をインポート
+# 作成したモジュールから必要な関数やクラスをインポート
 from keep_alive import keep_alive
 from lib.database_handler import setup_database
 
@@ -23,7 +23,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-# activityをここで設定します。
+# Botのインスタンスを作成（プレフィックスは不要）
 bot = commands.Bot(command_prefix="!", intents=intents, activity=activity)
 
 @bot.event
@@ -31,47 +31,41 @@ async def on_ready():
     """Botの準備が完了したときに呼ばれるイベント"""
     print("==================================================")
     print(f"ログイン成功: {bot.user} (ID: {bot.user.id})")
-    # ステータスを「オンライン（緑丸）」に設定
-    await bot.change_presence(status=discord.Status.online)
-    print(f"ステータス設定完了: {bot.activity.type.name} {bot.activity.name}")
     print("Botは正常に起動し、命令待機状態に入りました。")
-    
-    # コマンドのグローバル同期をここで行う
+    # コマンドのグローバル同期
     try:
-        print("--- スラッシュコマンドをグローバルに同期します... ---")
         synced = await bot.tree.sync()
-        print(f"--- ✅ {len(synced)}個のコマンドをグローバル同期しました。（反映には最大1時間かかります）")
+        print(f"--- ✅ {len(synced)}個のスラッシュコマンドをグローバル同期しました。")
     except Exception as e:
         print(f"--- ❌ コマンドの同期に失敗しました: {e}")
-        
     print("==================================================")
 
 async def load_cogs():
     """cogsフォルダから全ての機能部品を読み込む"""
     print("--- [司令塔] -> 全ての受付係（Cogs）を配属させます...")
-    for filename in os.listdir('./cogs'):
-        if filename.endswith('.py'):
-            try:
-                await bot.load_extension(f'cogs.{filename[:-3]}')
-                print(f"--- [司令塔] ✅ 受付係 '{filename}' の配属完了。")
-            except Exception as e:
-                print(f"--- [司令塔] ❌ 受付係 '{filename}' の配属に失敗しました: {e}")
+    # setup_cogは不要になったため、リストから削除
+    cogs_to_load = ['player_cog', 'guild_cog', 'tracker_cog']
+    for cog_name in cogs_to_load:
+        try:
+            await bot.load_extension(f'cogs.{cog_name}')
+            print(f"--- [司令塔] ✅ 受付係 '{cog_name}.py' の配属完了。")
+        except Exception as e:
+            print(f"--- [司令塔] ❌ 受付係 '{cog_name}.py' の配属に失敗しました: {e}")
 
 async def main():
     """Botの起動シーケンスを管理するメイン関数"""
     async with bot:
-        # 同期的な準備処理を最初に実行
-        setup_database()
-        keep_alive()
-        
         # Botが接続する前に、非同期の準備処理（Cogs読み込み）を行う
         await load_cogs()
-        
         # Botを起動し、Discordに接続
         await bot.start(TOKEN)
 
 # メインの実行ブロック
 if __name__ == '__main__':
+    # Botの非同期ループが始まる前に、全ての同期的な準備を完了させる
+    setup_database()
+    keep_alive()
+    
     if not TOKEN:
         print("致命的エラー: `DISCORD_TOKEN`が設定されていません。")
         sys.exit(1)
