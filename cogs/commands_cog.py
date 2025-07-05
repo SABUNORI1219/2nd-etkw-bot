@@ -145,7 +145,7 @@ Last Seen: {last_join_display}
 Mobs Killed: {killed_mobs:,}
 Chests Looted: {chests_found:,}
 Playtime: {playtime:,} hours
-War Count: {wars:,} [#{war_rank:,}]
+War Count: {wars:,} [#{war_rank_display}]
 PvP: {pvp_kills:,} K / {pvp_deaths:,} D
 Quests Total: {quests:,}
 Total Level: {total_level:,}
