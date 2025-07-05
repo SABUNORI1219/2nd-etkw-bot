@@ -25,7 +25,7 @@ intents.members = True
 
 # Botのインスタンスを作成。スラッシュコマンドのみなのでcommand_prefixは不要。
 # activityをここで設定します。
-bot = commands.Bot(intents=intents, activity=activity)
+bot = commands.Bot(command_prefix="!", intents=intents, activity=activity)
 
 @bot.event
 async def on_ready():
