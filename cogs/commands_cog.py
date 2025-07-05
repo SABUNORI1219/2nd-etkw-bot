@@ -105,6 +105,7 @@ class GameCommandsCog(commands.Cog):
         killed_mobs = self._safe_get(data, ['globalData', 'killedMobs'], 0)
         chests_found = self._safe_get(data, ['globalData', 'chestsFound'], 0)
         playtime = self._safe_get(data, ['playtime'], 0)
+        wars = self._safe_get(data, ['globalData', 'wars'], 0)
         war_rank = self._safe_get(data, ['ranking', 'warsCompletion'], 'N/A')
         war_rank_display = f"#{war_rank:,}" if isinstance(war_rank, int) else war_rank
         pvp_kills = self._safe_get(data, ['globalData', 'pvp', 'kills'], 0)
