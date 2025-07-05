@@ -126,7 +126,7 @@ Online Players: {online_count}/{total_members}
             icon_url=icon_url
         )
         
-        embed.set_footer(text=f"{name} status | Minister Chikuwa")
+        embed.set_footer(text=f"{name}'s Stats | Minister Chikuwa")
 
         await interaction.followup.send(embed=embed)
 
