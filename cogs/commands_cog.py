@@ -151,7 +151,7 @@ class GameCommandsCog(commands.Cog):
         description = f"""
     [公式サイトへのリンク](https://wynncraft.com/stats/player/{username})
 ```
-[{support_rank}] {username} is {'online' if is_online else 'offline'}
+[{support_rank_display}] {username} is {'online' if is_online else 'offline'}
 Active Character: {active_char_info}
 Guild: {guild_display}
 First Joined: {first_join}
