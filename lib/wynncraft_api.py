@@ -11,17 +11,19 @@ class WynncraftAPI:
     def __init__(self):
         self.session = aiohttp.ClientSession()
 
-    async def get_nori_guild_data(self) -> dict | None:
+    async def get_nori_guild_data(self, guild_identifier: str) -> dict | None:
         """Nori APIからギルドの基本データを取得する"""
         try:
-            async with self.session.get(NORI_GUILD_API_URL) as response:
+            # ギルド名またはプレフィックスで検索
+            url = NORI_GUILD_API_URL.format(guild_identifier.replace(' ', '%20'))
+            async with self.session.get(url) as response:
                 if response.status == 200:
                     return await response.json()
                 else:
-                    print(f"--- [API Handler] ギルドAPIエラー: {response.status}")
+                    print(f"--- [API Handler] Nori Guild APIエラー: {response.status}")
                     return None
         except Exception as e:
-            print(f"--- [API Handler] ギルドAPIリクエスト中にエラー: {e}")
+            print(f"--- [API Handler] Nori Guild APIリクエスト中にエラー: {e}")
             return None
 
     async def get_wynn_player_data(self, player_uuid: str) -> dict | None:
