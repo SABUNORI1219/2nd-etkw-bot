@@ -23,44 +23,32 @@ class GuildCog(commands.Cog):
             data = data.get(key)
         return data if data is not None else default
 
-    def _create_online_players_table(self, members: list) -> tuple[str, int]:
-        """オンラインプレイヤーのリストからASCIIテーブルと人数を生成する"""
-        online_players = []
-        rank_map = {
-            "OWNER": "*****", "CHIEF": "****", "STRATEGIST": "***",
-            "CAPTAIN": "**", "RECRUITER": "*", "RECRUIT": ""
-        }
+    def _create_online_players_table(self, online_players_dict: dict) -> tuple[str, int]:
+        """オンラインプレイヤーの辞書からASCIIテーブルと人数を生成する"""
         
-        # ▼▼▼【ロジック修正箇所】▼▼▼
-        # APIから返されるメンバーリストを正しく処理する
-        for member_data in members:
-            # オンラインのメンバー（辞書形式）のみを対象とする
-            if isinstance(member_data, dict) and member_data.get('online'):
-                online_players.append({
-                    "name": self._safe_get(member_data, ['name']),
-                    "server": self._safe_get(member_data, ['server']),
-                    "rank_stars": rank_map.get(self._safe_get(member_data, ['rank']).upper(), "")
-                })
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-        
-        if not online_players:
+        # ▼▼▼【ロジック修正箇所】辞書から直接データを読み込む▼▼▼
+        if not online_players_dict or not isinstance(online_players_dict, dict):
             return "（現在オンラインのメンバーはいません）", 0
 
+        online_players = list(online_players_dict.values())
+        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
         # 各列の最大幅を計算して、テーブルの見た目を整える
-        max_name_len = max(len(p['name']) for p in online_players) if online_players else 6
-        max_server_len = max(len(p['server']) for p in online_players) if online_players else 2
+        max_name_len = max(len(p.get('name', 'N/A')) for p in online_players) if online_players else 6
+        max_server_len = max(len(p.get('server', 'N/A')) for p in online_players) if online_players else 2
+        max_rank_len = max(len(p.get('rank', 'N/A')) for p in online_players) if online_players else 4
         
-        header = f"║ {'WC'.center(max_server_len)} ║ {'Player'.ljust(max_name_len)} ║ Rank  ║"
-        divider = f"╠═{'═'*max_server_len}═╬═{'═'*max_name_len}═╬═══════╣"
-        top_border = f"╔═{'═'*max_server_len}═╦═{'═'*max_name_len}═╦═══════╗"
-        bottom_border = f"╚═{'═'*max_server_len}═╩═{'═'*max_name_len}═╩═══════╝"
+        header = f"║ {'WC'.center(max_server_len)} ║ {'Player'.ljust(max_name_len)} ║ {'Rank'.center(max_rank_len)} ║"
+        divider = f"╠═{'═'*max_server_len}═╬═{'═'*max_name_len}═╬═{'═'*max_rank_len}═╣"
+        top_border = f"╔═{'═'*max_server_len}═╦═{'═'*max_name_len}═╦═{'═'*max_rank_len}═╗"
+        bottom_border = f"╚═{'═'*max_server_len}═╩═{'═'*max_name_len}═╩═{'═'*max_rank_len}═╝"
 
         # 各プレイヤーの行を作成
         player_rows = []
-        for p in sorted(online_players, key=lambda x: x['name']):
-            server = p['server'].center(max_server_len)
-            name = p['name'].ljust(max_name_len)
-            rank = p['rank_stars'].ljust(5)
+        for p in sorted(online_players, key=lambda x: x.get('name', '')): # 名前順にソート
+            server = p.get('server', 'N/A').center(max_server_len)
+            name = p.get('name', 'N/A').ljust(max_name_len)
+            rank = p.get('rank', 'N/A').center(max_rank_len) # rankは星ではなくテキストと仮定
             player_rows.append(f"║ {server} ║ {name} ║ {rank} ║")
 
         return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players)
@@ -92,10 +80,11 @@ class GuildCog(commands.Cog):
         rating = self._safe_get(season_ranks, [latest_season, 'rating'], "N/A")
         rating_display = f"{rating:,}" if isinstance(rating, int) else rating
         
-        # メンバーのリストと総数を、それぞれ正しいキーから取得
-        member_list = self._safe_get(data, ['online_players'], [])
-        total_members = self._safe_get(data, ['total_members'], len(member_list)) # totalMembersキーを優先
-        online_players_table, online_count = self._create_online_players_table(member_list)
+        # ▼▼▼【ロジック修正箇所】正しいデータソースを参照する▼▼▼
+        total_members = self._safe_get(data, ['totalMembers'], 0)
+        online_players_dict = self._safe_get(data, ['online_players'], {}) # online_players辞書を取得
+        online_players_table, online_count = self._create_online_players_table(online_players_dict)
+        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         
         # 埋め込みメッセージを作成
         description = f"""
