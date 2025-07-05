@@ -14,10 +14,12 @@ class WynncraftAPI:
     async def get_nori_guild_data(self, guild_identifier: str) -> dict | None:
         """Nori APIからギルドの基本データを取得する"""
         try:
-            # ▼▼▼【エラー修正箇所】ハードコードされていたURLを、引数を使うように修正▼▼▼
-            # guild_identifier（ユーザーが入力したギルド名）を元に、動的にURLを生成
-            url = NORI_GUILD_API_URL.format(guild_identifier.replace(' ', '%20'))
-            # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+            # ▼▼▼【修正点】URLエンコードをここで行う▼▼▼
+            # URLセーフなギルド名を作成
+            encoded_identifier = quote(guild_identifier)
+            # テンプレートの空欄に、エンコードしたギルド名を埋める
+            url = NORI_GUILD_API_URL.format(encoded_identifier)
+            # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
             async with self.session.get(url) as response:
                 if response.status == 200:
