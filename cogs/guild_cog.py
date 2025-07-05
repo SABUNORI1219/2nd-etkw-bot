@@ -52,7 +52,7 @@ class GuildCog(commands.Cog):
         return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players_list)
 
     @app_commands.command(name="guild", description="ギルドのステータスを表示します。")
-    @app_commands.describe(guild="Name of Prefix")
+    @app_commands.describe(guild="Name or Prefix")
     async def guild(self, interaction: discord.Interaction, guild: str):
         await interaction.response.defer()
 
@@ -92,7 +92,7 @@ Owner: {owner}
 Created on: {created_date}
 Level: {level} [{xp_percent}%]
 War count: {wars}
-Rating: {rating_display} [Season {latest_season}]
+Rating: {rating_display} [Season{latest_season}]
 Territory count: {territories}
 Members: {total_members}
 Online Players: {online_count}/{total_members}
