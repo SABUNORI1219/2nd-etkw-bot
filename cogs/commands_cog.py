@@ -92,7 +92,7 @@ class GameCommandsCog(commands.Cog):
         last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
         time_diff = datetime.now(timezone.utc) - last_join_dt
         # オフラインかつ最終ログインが3秒以内の場合
-        stream_status = "🟢Stream" if not is_online and time_diff.total_seconds() < 3 else "❌Stream"
+        stream_status = "🟢Stream" if not server = null else "❌Stream"
         last_join_display = f"{last_join_str.split('T')[0]} [{stream_status}]"
         
         # ▼▼▼【ここから3点の修正を反映】▼▼▼
