@@ -104,7 +104,7 @@ Online Players: {online_count}/{total_members}
             color=EMBED_COLOR_BLUE
         )
         
-        embed.set_author(name=f"{name} [{prefix}]")
+        embed.title = [prefix] name
         
         embed.set_footer(text=f"{name}'s Stats | Minister Chikuwa")
 
