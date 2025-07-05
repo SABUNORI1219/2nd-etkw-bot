@@ -59,8 +59,8 @@ class GuildCog(commands.Cog):
 
         return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players)
 
-    @app_commands.command(name="guild", description="ギルドの詳細情報を表示します。")
-    @app_commands.describe(guild_name="ギルド名またはギルドプレフィックス")
+    @app_commands.command(name="guild", description="ギルドのステータスを表示します。")
+    @app_commands.describe(guild_name="Name or Prefix")
     async def guild(self, interaction: discord.Interaction, guild_name: str):
         await interaction.response.defer()
 
@@ -94,7 +94,7 @@ class GuildCog(commands.Cog):
         # 埋め込みメッセージを作成
         description = f"""
       [公式サイトへのリンク](https://wynncraft.com/stats/guild/{prefix})
-```
+```python
 Owner: {owner}
 Created on: {created_date}
 Level: {level} [{xp_percent}%]
