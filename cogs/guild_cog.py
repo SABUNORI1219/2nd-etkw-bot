@@ -71,10 +71,10 @@ class GuildCog(commands.Cog):
         # データを正しいAPIキーで取得
         name = self._safe_get(data, ['name'])
         prefix = self._safe_get(data, ['prefix'])
-        owner = self._safe_get(data, ['owner', 'name'])
-        created_date = self._safe_get(data, ['created'], "N/A").split("T")[0]
+        owner = self._safe_get(data, ['owner'])
+        created_date = self._safe_get(data, ['created_date'])
         level = self._safe_get(data, ['level'], 0)
-        xp_percent = self._safe_get(data, ['xp'], 0)
+        xp_percent = self._safe_get(data, ['xp_percent'], 0)
         wars = self._safe_get(data, ['wars'], 0)
         territories = self._safe_get(data, ['territories'], 0)
         
@@ -84,13 +84,14 @@ class GuildCog(commands.Cog):
         rating_display = f"{rating:,}" if isinstance(rating, int) else rating
         
         # メンバーのリストと総数を、それぞれ正しいキーから取得
-        member_list = self._safe_get(data, ['members'], [])
-        total_members = self._safe_get(data, ['totalMembers'], len(member_list)) # totalMembersキーを優先
+        member_list = self._safe_get(data, ['online_players'], [])
+        total_members = self._safe_get(data, ['total_members'], len(member_list)) # totalMembersキーを優先
         online_players_table, online_count = self._create_online_players_table(member_list)
         
         # 埋め込みメッセージを作成
         description = f"""
-    [公式サイトへのリンク](https://wynncraft.com/stats/guild/{prefix})
+    [公式サイトへのリンク](https://wynncraft.com/stats/guild/{name})
+```
 Owner: {owner}
 Created on: {created_date}
 Level: {level} [{xp_percent}%]
@@ -100,7 +101,7 @@ Territory count: {territories}
 Members: {total_members}
 Online Players: {online_count}/{total_members}
 {online_players_table}
-
+```
 """
         embed = discord.Embed(
             description=description,
