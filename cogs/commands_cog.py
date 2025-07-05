@@ -191,15 +191,15 @@ Total Level: {total_level:,}
 
     @app_commands.command(name="player", description="プレイヤーのステータスを表示します。")
     @app_commands.describe(player="MCID or UUID")
-    async def player(self, interaction: discord.Interaction, player_name: str):
+    async def player(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
 
-        data = await self.wynn_api.get_nori_player_data(player_name)
+        data = await self.wynn_api.get_nori_player_data(player)
 
         # ▼▼▼【最終修正ロジック】▼▼▼
         # APIの応答が辞書形式で、かつ"Error"というキーを持っているかチェック
         if isinstance(data, dict) and "Error" in data:
-            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
+            await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
             return
 
         # 'username'キーがあれば、単一プレイヤーとして処理
