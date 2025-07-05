@@ -38,8 +38,10 @@ class WynncraftAPI:
             formatted_uuid = player_uuid.replace('-', '')
             url = WYNN_PLAYER_API_URL.format(formatted_uuid)
             async with self.session.get(url) as response:
-                if response.status == 200: return await response.json()
-                else: return None
+                if response.status == 200: 
+                    return await response.json()
+                else: 
+                    return None
         except Exception as e:
             print(f"--- [API Handler] プレイヤーデータ取得中にエラー (UUID: {player_uuid}): {e}")
             return None
