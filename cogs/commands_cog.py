@@ -14,18 +14,21 @@ class PlayerSelectView(discord.ui.View):
         super().__init__(timeout=60.0)
         self.cog_instance = cog_instance
 
-        # 辞書のキー(uuid)と値(player_info)を使って選択肢を作成
         options = []
+        # ▼▼▼【エラー修正箇所】▼▼▼
+        # player_infoが辞書(dict)であるかを確認する処理を追加
         for uuid, player_info in player_collision_dict.items():
-            rank = player_info.get('supportRank', 'Player').capitalize()
-            stored_name = player_info.get('storedName', 'Unknown')
-            label_text = f"{stored_name} [{rank}]"
-            
-            options.append(discord.SelectOption(
-                label=label_text, 
-                value=uuid,
-                description=f"UUID: {uuid}"
-            ))
+            if isinstance(player_info, dict):
+                rank = player_info.get('supportRank', 'Player').capitalize()
+                stored_name = player_info.get('storedName', 'Unknown')
+                label_text = f"{stored_name} [{rank}]"
+                
+                options.append(discord.SelectOption(
+                    label=label_text, 
+                    value=uuid,
+                    description=f"UUID: {uuid}"
+                ))
+        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         
         self.select_menu = discord.ui.Select(placeholder="プレイヤーを選択してください...", options=options)
         self.select_menu.callback = self.select_callback
