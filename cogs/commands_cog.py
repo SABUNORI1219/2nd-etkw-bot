@@ -57,9 +57,6 @@ class PlayerSelectView(discord.ui.View):
         await interaction.message.edit(content=None, embed=embed, view=None)
 
 class GameCommandsCog(commands.Cog):
-    """
-    プレイヤーが直接実行するゲーム関連のスラッシュコマンドを担当するCog。
-    """
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
@@ -150,7 +147,7 @@ class GameCommandsCog(commands.Cog):
         # ▼▼▼【修正点2】UUID以降をコードブロックで囲む ▼▼▼
         description = f"""
     [公式サイトへのリンク](https://wynncraft.com/stats/player/{username})
-```
+```python
 [{support_rank_display}] {username} is {'online' if is_online else 'offline'}
 Active Character: {active_char_info}
 Guild: {guild_display}
@@ -192,8 +189,8 @@ Total Level: {total_level:,}
         )
         return embed
 
-    @app_commands.command(name="player", description="Nori APIからプレイヤーの詳細情報を表示します。")
-    @app_commands.describe(player_name="Minecraftのプレイヤー名")
+    @app_commands.command(name="player", description="プレイヤーのステータスを表示します。")
+    @app_commands.describe(player="MCID or UUID")
     async def player(self, interaction: discord.Interaction, player_name: str):
         await interaction.response.defer()
 
