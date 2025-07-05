@@ -51,15 +51,15 @@ class GuildCog(commands.Cog):
 
         return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players_list)
 
-    @app_commands.command(name="guild", description="ギルドの詳細情報を表示します。")
-    @app_commands.describe(guild_name="ギルド名またはギルドプレフィックス")
-    async def guild(self, interaction: discord.Interaction, guild_name: str):
+    @app_commands.command(name="guild", description="ギルドのステータスを表示します。")
+    @app_commands.describe(guild="Name of Prefix")
+    async def guild(self, interaction: discord.Interaction, guild: str):
         await interaction.response.defer()
 
-        data = await self.wynn_api.get_nori_guild_data(guild_name)
+        data = await self.wynn_api.get_nori_guild_data(guild)
 
         if not data or 'name' not in data:
-            await interaction.followup.send(f"ギルド「{guild_name}」が見つかりませんでした。")
+            await interaction.followup.send(f"ギルド「{guild}」が見つかりませんでした。")
             return
 
         # データを正しいAPIキーで取得
