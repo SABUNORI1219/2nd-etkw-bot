@@ -199,19 +199,18 @@ Total Level: {total_level:,}
 
         data = await self.wynn_api.get_nori_player_data(player_name)
 
-        # ▼▼▼【あなたの提案に基づいた最終ロジック】▼▼▼
-
-        # 1. APIから返ってきたのが辞書で、かつ特定のエラーメッセージを含むかチェック
-        if isinstance(data, dict) and "No player found" in self._safe_get(data, ['Error'], ""):
-            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
+        # ▼▼▼【最終修正ロジック】▼▼▼
+        # APIの応答が辞書形式で、かつ"Error"というキーを持っているかチェック
+        if isinstance(data, dict) and "Error" in data:
+            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。（APIエラー: {data['Error']}）")
             return
 
-        # 2. 単一プレイヤーのデータ（'username'キーを持つ辞書）かチェック
+        # 'username'キーがあれば、単一プレイヤーとして処理
         if isinstance(data, dict) and 'username' in data:
             embed = self._create_player_embed(data)
             await interaction.followup.send(embed=embed)
         
-        # 3. 衝突データ（'username'キーを持たない辞書）かチェック
+        # 'username'キーがなく、辞書であれば、衝突と判断
         elif isinstance(data, dict):
             view = PlayerSelectView(player_collision_dict=data, cog_instance=self)
             await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
