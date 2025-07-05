@@ -10,36 +10,28 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 from config import NORI_GUILD_API_URL, WYNN_PLAYER_API_URL, NORI_PLAYER_API_URL
 
 class WynncraftAPI:
-    """
-    Wynncraft APIとの全ての通信を担当する専門クラス。
-    """
     def __init__(self):
-        self.session = aiohttp.ClientSession()
+        # ▼▼▼【修正点1】身分証（User-Agentヘッダー）を定義▼▼▼
+        self.headers = {'User-Agent': 'DiscordBot/1.0 (Contact: YourDiscord#1234)'}
+        self.session = aiohttp.ClientSession(headers=self.headers)
 
     async def get_nori_guild_data(self, guild_identifier: str) -> dict | None:
         """Nori APIからギルドの基本データを取得する"""
-        
-        # ▼▼▼【最終診断ロジック】▼▼▼
-        # 1. URLを組み立てる
-        encoded_identifier = quote(guild_identifier)
-        url = NORI_GUILD_API_URL.format(encoded_identifier)
-        
-        # 2. 組み立てたURLをメッセージに含めて、意図的にエラーを発生させる
-        # これにより、RenderのログにURLが強制的に表示される
-        error_message = f"最終診断：APIへのリクエストURLは「{url}」です。"
-        logging.error(error_message) # loggingを使えば、より確実に出力される
-        raise ValueError(error_message)
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
-        # ここから下のコードは、エラーを発生させるため一時的に実行されない
         try:
+            encoded_identifier = quote(guild_identifier)
+            url = NORI_GUILD_API_URL.format(encoded_identifier)
+            
+            # ▼▼▼【修正点2】リクエストにヘッダーを添付▼▼▼
             async with self.session.get(url) as response:
-                if 200 <= response.status < 300 and response.content_length != 0:
+                if response.status == 200:
                     return await response.json()
                 else:
+                    # サーバーからの応答内容もログに出力して、何が起きているか確認する
+                    error_text = await response.text()
+                    print(f"--- [API Handler] Nori Guild APIエラー: Status {response.status}, Body: {error_text[:200]}")
                     return None
         except Exception as e:
-            logging.error(f"--- [API Handler] Nori Guild APIリクエスト中にエラー: {e}")
+            print(f"--- [API Handler] Nori Guild APIリクエスト中にエラー: {e}")
             return None
 
     async def get_wynn_player_data(self, player_uuid: str) -> dict | None:
@@ -70,19 +62,15 @@ class WynncraftAPI:
         except Exception:
             return None
 
-    async def get_nori_player_data(self, player_name: str) -> dict | None:
-        """
-        Nori APIからプレイヤーのデータを取得する。
-        成功すればデータ(辞書)、失敗すればNoneを返す。
-        """
+    async def get_nori_player_data(self, player_identifier: str) -> dict | list | None:
+        """Nori APIからプレイヤーのデータを取得する"""
         try:
-            url = NORI_PLAYER_API_URL.format(player_name)
+            url = NORI_PLAYER_API_URL.format(player_identifier)
+            # ▼▼▼【修正点2】リクエストにヘッダーを添付▼▼▼
             async with self.session.get(url) as response:
-                # 応答が成功(200番台)で、かつ中身があればJSONとして返す
                 if 200 <= response.status < 300 and response.content_length != 0:
                     return await response.json()
                 else:
-                    # それ以外はすべて「見つからなかった」と判断する
                     return None
         except Exception as e:
             print(f"--- [API Handler] Nori Player APIリクエスト中にエラー: {e}")
