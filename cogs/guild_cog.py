@@ -87,12 +87,12 @@ class GuildCog(commands.Cog):
         # 埋め込みメッセージを作成
         description = f"""
     [公式サイトへのリンク](https://wynncraft.com/stats/guild/{encoded_name})
-```
+```python
 Owner: {owner}
 Created on: {created_date}
 Level: {level} [{xp_percent}%]
 War count: {wars}
-Rating: {rating_display} [Season{latest_season}]
+Latest SR: {rating_display} [Season{latest_season}]
 Territory count: {territories}
 Members: {total_members}
 Online Players: {online_count}/{total_members}
