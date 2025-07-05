@@ -179,7 +179,7 @@ Total Level: {total_level:,}
             color=color
         )
         # ▼▼▼【修正点1】公式ウェブサイトへのリンクを設定 ▼▼▼
-        embed.title = username
+        embed.title = f"{username}"
         
         embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{username}/right")
         
