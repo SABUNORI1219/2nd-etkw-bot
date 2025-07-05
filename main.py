@@ -15,8 +15,7 @@ intents = discord.Intents.default()
 intents.message_content = True # 将来的にメッセージ内容を読み取る機能のために維持
 intents.members = True       # メンバーの参加などを検知するために維持
 
-activity = discord.Activity(
-    type=discord.ActivityType.listening,
+activity = discord.Streaming(
     name="ちくちくちくわ",
     url="https://youtu.be/E6O3-hAwJDY?si=uQnbzsJSHSvMJ9Db"
 )
