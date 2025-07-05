@@ -15,6 +15,26 @@ class WynncraftAPI:
         self.headers = {'User-Agent': 'DiscordBot/1.0 (Contact: YourDiscord#1234)'}
         self.session = aiohttp.ClientSession(headers=self.headers)
 
+    async def get_guild_by_name(self, guild_name: str) -> dict | None:
+        """Wynncraft公式APIから、フルネームでギルドデータを取得する"""
+        try:
+            url = WYNN_GUILD_BY_NAME_API_URL.format(quote(guild_name))
+            async with self.session.get(url) as response:
+                return await response.json() if response.status == 200 else None
+        except Exception as e:
+            print(f"--- [API Handler] Wynncraft Guild (Name) APIリクエスト中にエラー: {e}")
+            return None
+
+    async def get_guild_by_prefix(self, guild_prefix: str) -> dict | None:
+        """Wynncraft公式APIから、プレフィックスでギルドデータを取得する"""
+        try:
+            url = WYNN_GUILD_BY_PREFIX_API_URL.format(quote(guild_prefix))
+            async with self.session.get(url) as response:
+                return await response.json() if response.status == 200 else None
+        except Exception as e:
+            print(f"--- [API Handler] Wynncraft Guild (Prefix) APIリクエスト中にエラー: {e}")
+            return None
+
     async def get_nori_guild_data(self, guild_identifier: str) -> dict | None:
         """Nori APIからギルドの基本データを取得する"""
         try:
