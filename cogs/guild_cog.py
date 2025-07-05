@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
+from urllib.parse import quote
 
 # libフォルダから専門家をインポート
 from lib.wynncraft_api import WynncraftAPI
@@ -29,17 +30,23 @@ class GuildCog(commands.Cog):
             "OWNER": "*****", "CHIEF": "****", "STRATEGIST": "***",
             "CAPTAIN": "**", "RECRUITER": "*", "RECRUIT": ""
         }
+        
+        # ▼▼▼【ロジック修正箇所】▼▼▼
+        # APIから返されるメンバーリストを正しく処理する
         for member_data in members:
+            # オンラインのメンバー（辞書形式）のみを対象とする
             if isinstance(member_data, dict) and member_data.get('online'):
                 online_players.append({
-                    "name": member_data.get("name", "N/A"),
-                    "server": member_data.get("server", "N/A"),
-                    "rank_stars": rank_map.get(member_data.get("rank", "").upper(), "")
+                    "name": self._safe_get(member_data, ['name']),
+                    "server": self._safe_get(member_data, ['server']),
+                    "rank_stars": rank_map.get(self._safe_get(member_data, ['rank']).upper(), "")
                 })
+        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         
         if not online_players:
             return "（現在オンラインのメンバーはいません）", 0
 
+        # 各列の最大幅を計算して、テーブルの見た目を整える
         max_name_len = max(len(p['name']) for p in online_players) if online_players else 6
         max_server_len = max(len(p['server']) for p in online_players) if online_players else 2
         
@@ -48,8 +55,9 @@ class GuildCog(commands.Cog):
         top_border = f"╔═{'═'*max_server_len}═╦═{'═'*max_name_len}═╦═══════╗"
         bottom_border = f"╚═{'═'*max_server_len}═╩═{'═'*max_name_len}═╩═══════╝"
 
+        # 各プレイヤーの行を作成
         player_rows = []
-        for p in sorted(online_players, key=lambda x: x['name']): # 名前順にソート
+        for p in sorted(online_players, key=lambda x: x['name']):
             server = p['server'].center(max_server_len)
             name = p['name'].ljust(max_name_len)
             rank = p['rank_stars'].ljust(5)
@@ -70,6 +78,7 @@ class GuildCog(commands.Cog):
 
         # データを正しいAPIキーで取得
         name = self._safe_get(data, ['name'])
+        encoded_name = quote(name)
         prefix = self._safe_get(data, ['prefix'])
         owner = self._safe_get(data, ['owner'])
         created_date = self._safe_get(data, ['created_date'])
@@ -90,7 +99,7 @@ class GuildCog(commands.Cog):
         
         # 埋め込みメッセージを作成
         description = f"""
-    [公式サイトへのリンク](https://wynncraft.com/stats/guild/{name})
+    [公式サイトへのリンク](https://wynncraft.com/stats/guild/{encoded_name})
 ```
 Owner: {owner}
 Created on: {created_date}
@@ -117,7 +126,7 @@ Online Players: {online_count}/{total_members}
             icon_url=icon_url
         )
         
-        embed.set_footer(text=f"Data from Nori API | Requested by {interaction.user.display_name}")
+        embed.set_footer(text=f"{name} status | Minister Chikuwa")
 
         await interaction.followup.send(embed=embed)
 
