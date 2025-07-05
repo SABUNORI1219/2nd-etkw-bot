@@ -192,30 +192,32 @@ Total Level: {total_level:,}
         )
         return embed
 
-    @app_commands.command(name="player", description="プレイヤーのステータスを表示します。")
-    @app_commands.describe(player_name="MCID or UUID")
+    @app_commands.command(name="player", description="Nori APIからプレイヤーの詳細情報を表示します。")
+    @app_commands.describe(player_name="Minecraftのプレイヤー名")
     async def player(self, interaction: discord.Interaction, player_name: str):
         await interaction.response.defer()
 
         data = await self.wynn_api.get_nori_player_data(player_name)
 
-        if not data:
+        # ▼▼▼【あなたの提案に基づいた最終ロジック】▼▼▼
+
+        # 1. APIから返ってきたのが辞書で、かつ特定のエラーメッセージを含むかチェック
+        if isinstance(data, dict) and "No player found" in self._safe_get(data, ['Error'], ""):
             await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
             return
 
-        # ▼▼▼【最終ロジック】'username'キーの有無で処理を分岐▼▼▼
+        # 2. 単一プレイヤーのデータ（'username'キーを持つ辞書）かチェック
         if isinstance(data, dict) and 'username' in data:
-            # 'username'キーがあれば、単一プレイヤーとして処理
             embed = self._create_player_embed(data)
             await interaction.followup.send(embed=embed)
         
+        # 3. 衝突データ（'username'キーを持たない辞書）かチェック
         elif isinstance(data, dict):
-            # 'username'キーがなく、辞書であれば、衝突と判断して選択肢を表示
             view = PlayerSelectView(player_collision_dict=data, cog_instance=self)
             await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
             
         else:
-            # 予期せぬデータ形式の場合
+            # それ以外の予期せぬ応答（Noneなど）
             await interaction.followup.send(f"プレイヤー「{player_name}」の情報を正しく取得できませんでした。")
 
 # BotにCogを登録するためのセットアップ関数
