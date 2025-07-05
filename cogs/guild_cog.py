@@ -43,7 +43,7 @@ class GuildCog(commands.Cog):
         # 各プレイヤーの行を作成
         player_rows = []
         # ▼▼▼【修正箇所】rank（星）の文字数で降順（多い順）にソートする▼▼▼
-        for p in sorted(online_players, key=lambda x: len(x.get('rank', '')), reverse=True):
+        for p in sorted(online_players_list, key=lambda x: len(x.get('rank', '')), reverse=True):
             server = p.get('server', 'N/A').center(max_server_len)
             name = p.get('name', 'N/A').ljust(max_name_len)
             rank = p.get('rank', '').center(max_rank_len)
