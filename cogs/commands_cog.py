@@ -17,13 +17,11 @@ class PlayerSelectView(discord.ui.View):
         options = []
         for uuid, player_info in player_collision_dict.items():
             if isinstance(player_info, dict):
-                # ▼▼▼【エラー修正箇所】▼▼▼
-                # supportRankがNoneの可能性があるため、安全に処理する
-                rank_value = player_info.get('supportRank')
-                # rank_valueがNoneなら'Player'を使い、その後でcapitalize()を呼ぶ
-                rank = (rank_value or 'Player').capitalize()
-                # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-                
+                raw_support_rank = player_info.get('supportRank')
+                if raw_support_rank and raw_support_rank.lower() == "vipplus":
+                    rank_display = "Vip+"
+                else:
+                    rank_display = (raw_support_rank or 'Player').capitalize()
                 stored_name = player_info.get('storedName', 'Unknown')
                 label_text = f"{stored_name} [{rank}]"
                 
@@ -190,8 +188,8 @@ Total Level: {total_level:,}
         )
         return embed
 
-    @app_commands.command(name="player", description="Nori APIからプレイヤーの詳細情報を表示します。")
-    @app_commands.describe(player_name="Minecraftのプレイヤー名")
+    @app_commands.command(name="player", description="プレイヤーのステータスを表示します。")
+    @app_commands.describe(player_name="MCID or UUID")
     async def player(self, interaction: discord.Interaction, player_name: str):
         await interaction.response.defer()
 
