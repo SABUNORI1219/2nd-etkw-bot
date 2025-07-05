@@ -87,13 +87,16 @@ class GameCommandsCog(commands.Cog):
 
         first_join = self._safe_get(data, ['firstJoin'], "N/A").split('T')[0]
         
-        # ▼▼▼【修正点4】Streamの表示ロジックを修正 ▼▼▼
-        last_join_str = self._safe_get(data, ['lastJoin'], "1970-01-01T00:00:00.000Z")
-        last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
-        time_diff = datetime.now(timezone.utc) - last_join_dt
-        # オフラインかつ最終ログインが3秒以内の場合
-        stream_status = "🟢Stream" if not server = null else "❌Stream"
-        last_join_display = f"{last_join_str.split('T')[0]} [{stream_status}]"
+        # ▼▼▼【Stream機能のロジックを修正】▼▼▼
+        last_join_str = self._safe_get(data, ['lastJoin'], "N/A").split('T')[0]
+        
+        # APIからserverの値を生で取得（デフォルトはNone）
+        server_value_for_stream = self._safe_get(data, ['server'], None)
+        # serverの値がNone（APIでnull）の場合にストリーム中と判断
+        stream_status = "🟢 Stream" if server_value_for_stream is None else "❌ Stream"
+        
+        last_join_display = f"{last_join_str} [{stream_status}]"
+        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         
         # ▼▼▼【ここから3点の修正を反映】▼▼▼
         # 1. activeCharacterの取得パスを修正
