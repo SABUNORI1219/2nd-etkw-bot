@@ -73,10 +73,10 @@ class GuildCog(commands.Cog):
         # データを取得
         name = self._safe_get(data, ['name'])
         prefix = self._safe_get(data, ['prefix'])
-        owner = self._safe_get(data, ['owner', 'name'])
-        created_date = self._safe_get(data, ['created'], "N/A").split("T")[0]
+        owner = self._safe_get(data, ['owner'])
+        created_date = self._safe_get(data, ['created_date'])
         level = self._safe_get(data, ['level'], 0)
-        xp_percent = self._safe_get(data, ['xp'], 0)
+        xp_percent = self._safe_get(data, ['xp_percent'], 0)
         wars = self._safe_get(data, ['wars'], 0)
         territories = self._safe_get(data, ['territories'], 0)
         
@@ -87,7 +87,7 @@ class GuildCog(commands.Cog):
         rating_display = f"{rating:,}" if isinstance(rating, int) else rating
         
         # メンバー数を計算し、オンラインプレイヤーのテーブルを作成
-        all_members = self._safe_get(data, ['members'], [])
+        all_members = self._safe_get(data, ['total_members'], [])
         total_members = len(all_members)
         online_players_table, online_count = self._create_online_players_table(all_members)
         
