@@ -17,13 +17,17 @@ class PlayerSelectView(discord.ui.View):
         options = []
         for uuid, player_info in player_collision_dict.items():
             if isinstance(player_info, dict):
+                
+                # ▼▼▼【supportRankの表示を修正】▼▼▼
                 raw_support_rank = player_info.get('supportRank')
                 if raw_support_rank and raw_support_rank.lower() == "vipplus":
                     rank_display = "Vip+"
                 else:
                     rank_display = (raw_support_rank or 'Player').capitalize()
+                # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
                 stored_name = player_info.get('storedName', 'Unknown')
-                label_text = f"{stored_name} [{rank}]"
+                label_text = f"{stored_name} [{rank_display}]"
                 
                 options.append(discord.SelectOption(
                     label=label_text, 
@@ -35,7 +39,7 @@ class PlayerSelectView(discord.ui.View):
             self.select_menu = discord.ui.Select(placeholder="プレイヤーを選択してください...", options=options)
             self.select_menu.callback = self.select_callback
             self.add_item(self.select_menu)
-
+            
     async def select_callback(self, interaction: discord.Interaction):
         selected_uuid = self.select_menu.values[0]
         
