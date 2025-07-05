@@ -35,21 +35,21 @@ class GuildCog(commands.Cog):
         max_server_len = max(len(p.get('server', 'N/A')) for p in online_players_list)
         max_rank_len = max(len(p.get('rank', 'N/A')) for p in online_players_list)
         
-        header = f"║ {'WC'.center(max_server_len)} ║ {'Player'.ljust(max_name_len)} ║ {'Rank'.center(max_rank_len)} ║"
+        header = f"║ {'WC'.center(max_server_len)} ║ {'Player'.center(max_name_len)} ║ {'Rank'.center(max_rank_len)} ║"
         divider = f"╠═{'═'*max_server_len}═╬═{'═'*max_name_len}═╬═{'═'*max_rank_len}═╣"
         top_border = f"╔═{'═'*max_server_len}═╦═{'═'*max_name_len}═╦═{'═'*max_rank_len}═╗"
         bottom_border = f"╚═{'═'*max_server_len}═╩═{'═'*max_name_len}═╩═{'═'*max_rank_len}═╝"
 
         # 各プレイヤーの行を作成
         player_rows = []
-        # APIのリストは既にオンラインのプレイヤーだけなので、名前順にソートする
-        for p in sorted(online_players_list, key=lambda x: x.get('name', '')):
+        # ▼▼▼【修正箇所】rank（星）の文字数で降順（多い順）にソートする▼▼▼
+        for p in sorted(online_players, key=lambda x: len(x.get('rank', '')), reverse=True):
             server = p.get('server', 'N/A').center(max_server_len)
             name = p.get('name', 'N/A').ljust(max_name_len)
-            rank = p.get('rank', 'N/A').center(max_rank_len)
+            rank = p.get('rank', '').center(max_rank_len)
             player_rows.append(f"║ {server} ║ {name} ║ {rank} ║")
 
-        return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players_list)
+        return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players)
 
     @app_commands.command(name="guild", description="ギルドの詳細情報を表示します。")
     @app_commands.describe(guild_name="ギルド名またはギルドプレフィックス")
