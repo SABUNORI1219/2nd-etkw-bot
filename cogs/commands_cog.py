@@ -15,14 +15,17 @@ class PlayerSelectView(discord.ui.View):
         self.cog_instance = cog_instance
 
         # 辞書のキー(uuid)と値(player_info)を使って選択肢を作成
-        options = [
-            discord.SelectOption(
-                label=player_info.get('storedName', 'Unknown'), 
+        options = []
+        for uuid, player_info in player_collision_dict.items():
+            rank = player_info.get('supportRank', 'Player').capitalize()
+            stored_name = player_info.get('storedName', 'Unknown')
+            label_text = f"{stored_name} [{rank}]"
+            
+            options.append(discord.SelectOption(
+                label=label_text, 
                 value=uuid,
                 description=f"UUID: {uuid}"
-            )
-            for uuid, player_info in player_collision_dict.items()
-        ]
+            ))
         
         self.select_menu = discord.ui.Select(placeholder="プレイヤーを選択してください...", options=options)
         self.select_menu.callback = self.select_callback
@@ -106,8 +109,10 @@ class GameCommandsCog(commands.Cog):
         chests_found = self._safe_get(data, ['globalData', 'chestsFound'], 0)
         playtime = self._safe_get(data, ['playtime'], 0)
         wars = self._safe_get(data, ['globalData', 'wars'], 0)
+        # ▼▼▼【エラー修正箇所】▼▼▼
         war_rank = self._safe_get(data, ['ranking', 'warsCompletion'], 'N/A')
         war_rank_display = f"#{war_rank:,}" if isinstance(war_rank, int) else war_rank
+        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         pvp_kills = self._safe_get(data, ['globalData', 'pvp', 'kills'], 0)
         pvp_deaths = self._safe_get(data, ['globalData', 'pvp', 'deaths'], 0)
         quests = self._safe_get(data, ['globalData', 'completedQuests'], 0)
