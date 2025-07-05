@@ -23,7 +23,6 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-# Botのインスタンスを作成。スラッシュコマンドのみなのでcommand_prefixは不要。
 # activityをここで設定します。
 bot = commands.Bot(command_prefix="!", intents=intents, activity=activity)
 
