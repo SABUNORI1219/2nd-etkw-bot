@@ -74,7 +74,11 @@ class GameCommandsCog(commands.Cog):
     def _create_player_embed(self, data: dict) -> discord.Embed:
         username = self._safe_get(data, ['username'])
         uuid = self._safe_get(data, ['uuid'])
-        support_rank = self._safe_get(data, ['supportRank'], "Player").capitalize()
+        raw_support_rank = self._safe_get(data, ['supportRank'], "Player")
+        if raw_support_rank.lower() == "vipplus":
+            support_rank_display = "Vip+"
+        else:
+            support_rank_display = raw_support_rank.capitalize()
         is_online = self._safe_get(data, ['online'], False)
         server = self._safe_get(data, ['server'], "Unknown")
         
@@ -96,9 +100,9 @@ class GameCommandsCog(commands.Cog):
 
         # serverがnull、かつ最終ログインが5分以内(300秒)の場合のみストリーム中と判断
         if server_value_for_stream is None and time_diff.total_seconds() < 300:
-            stream_status = "🟢 Stream"
+            stream_status = "🟢Stream"
         else:
-            stream_status = "❌ Stream"
+            stream_status = "❌Stream"
         
         last_join_display = f"{last_join_str.split('T')[0]} [{stream_status}]"
         # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
@@ -153,7 +157,7 @@ Last Seen: {last_join_display}
 Mobs Killed: {killed_mobs:,}
 Chests Looted: {chests_found:,}
 Playtime: {playtime:,} hours
-War Count: {wars:,} [#{war_rank_display}]
+War Count: {wars:,} [{war_rank_display}]
 PvP: {pvp_kills:,} K / {pvp_deaths:,} D
 Quests Total: {quests:,}
 Total Level: {total_level:,}
