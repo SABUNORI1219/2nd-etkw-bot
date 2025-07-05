@@ -45,8 +45,8 @@ class GuildCog(commands.Cog):
         # ▼▼▼【修正箇所】rank（星）の文字数で降順（多い順）にソートする▼▼▼
         for p in sorted(online_players_list, key=lambda x: len(x.get('rank', '')), reverse=True):
             server = p.get('server', 'N/A').center(max_server_len)
-            name = p.get('name', 'N/A').ljust(max_name_len)
-            rank = p.get('rank', '').center(max_rank_len)
+            name = p.get('name', 'N/A').center(max_name_len)
+            rank = p.get('rank', '').ljust(max_rank_len)
             player_rows.append(f"║ {server} ║ {name} ║ {rank} ║")
 
         return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players_list)
