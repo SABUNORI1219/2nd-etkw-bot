@@ -103,15 +103,6 @@ Online Players: {online_count}/{total_members}
             description=description,
             color=EMBED_COLOR_BLUE
         )
-
-        banner_path = self._safe_get(data, ['banner', 'tierImage'], None)
-        icon_url = f"https://cdn.wynncraft.com/{banner_path}" if banner_path else None
-        
-        embed.set_author(
-            name=f"{name} [{prefix}]",
-            url=f"https://wynncraft.com/stats/guild/{name.replace(' ', '%20')}",
-            icon_url=icon_url
-        )
         
         embed.set_footer(text=f"{name}'s Stats | Minister Chikuwa")
 
