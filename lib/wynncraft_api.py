@@ -1,5 +1,10 @@
 import aiohttp
 import asyncio
+from urllib.parse import quote
+import logging # printより確実なロギングモジュールをインポート
+
+# ロギングの設定
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # 設定ファイルからAPIのURLをインポート
 from config import NORI_GUILD_API_URL, WYNN_PLAYER_API_URL, NORI_PLAYER_API_URL
@@ -13,23 +18,28 @@ class WynncraftAPI:
 
     async def get_nori_guild_data(self, guild_identifier: str) -> dict | None:
         """Nori APIからギルドの基本データを取得する"""
+        
+        # ▼▼▼【最終診断ロジック】▼▼▼
+        # 1. URLを組み立てる
+        encoded_identifier = quote(guild_identifier)
+        url = NORI_GUILD_API_URL.format(encoded_identifier)
+        
+        # 2. 組み立てたURLをメッセージに含めて、意図的にエラーを発生させる
+        # これにより、RenderのログにURLが強制的に表示される
+        error_message = f"最終診断：APIへのリクエストURLは「{url}」です。"
+        logging.error(error_message) # loggingを使えば、より確実に出力される
+        raise ValueError(error_message)
+        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+        # ここから下のコードは、エラーを発生させるため一時的に実行されない
         try:
-            encoded_identifier = quote(guild_identifier)
-            url = NORI_GUILD_API_URL.format(encoded_identifier)
-
-            # ▼▼▼【最終診断ログ】▼▼▼
-            # 実際にAPIサーバーへ送られるURLを、ログに表示します
-            print(f"--- [API Handler] Requesting Guild URL: {url}")
-            # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
             async with self.session.get(url) as response:
-                if response.status == 200:
+                if 200 <= response.status < 300 and response.content_length != 0:
                     return await response.json()
                 else:
-                    print(f"--- [API Handler] API Error Status: {response.status}")
                     return None
         except Exception as e:
-            print(f"--- [API Handler] Nori Guild APIリクエスト中にエラー: {e}")
+            logging.error(f"--- [API Handler] Nori Guild APIリクエスト中にエラー: {e}")
             return None
 
     async def get_wynn_player_data(self, player_uuid: str) -> dict | None:
