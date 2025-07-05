@@ -51,43 +51,25 @@ class WynncraftAPI:
             return None
 
     async def get_nori_player_data(self, player_name: str) -> dict | list | None:
-        """Nori APIからプレイヤーのデータを取得する。衝突の場合はリストを返す。"""
+        """Nori APIからプレイヤーのデータを取得する。衝突の場合はリストを、見つからない場合はNoneを返す。"""
         try:
             url = NORI_PLAYER_API_URL.format(player_name)
-            print(f"--- [API Handler] Nori Player APIにリクエスト: {url}") # どのURLにアクセスしているかログに出す
-
             async with self.session.get(url) as response:
-                status = response.status
-                text = await response.text() # まずは生テキストとして応答を取得
+                data = await response.json()
 
-                # ▼▼▼【診断ログを追加】▼▼▼
-                print(f"--- [API Handler] Nori Player APIからの応答:")
-                print(f"--- ステータスコード: {status}")
-                print(f"--- 生データ: {text[:500]}") # 長すぎる場合を考慮し、先頭500文字だけ表示
-
-                # 応答が成功(200)で、かつ中身がJSONであれば解析を試みる
-                if status == 200:
-                    try:
-                        data = await response.json(content_type=None) # content_typeを無視して強制的にJSONとして解析
-                        # 正常なプレイヤーデータか、衝突リストかを判別して返す
-                        if (isinstance(data, dict) and 'uuid' in data) or isinstance(data, list):
-                            return data
-                    except Exception as e:
-                        print(f"--- [API Handler] JSON解析エラー: {e}")
-                        return None
+                # ▼▼▼【修正点】APIからの応答を厳密に判別する ▼▼▼
+                # 応答がリスト形式（衝突）か、有効な辞書形式（単一プレイヤー）の場合
+                if isinstance(data, list) or (isinstance(data, dict) and 'uuid' in data):
+                    return data
                 
-                # プレイヤーが見つからない場合、APIはリストを返すがステータスが200でない可能性がある
-                try:
-                    data = await response.json(content_type=None)
-                    if isinstance(data, list):
-                        print("--- [API Handler] 衝突（リスト形式）を検出しました。")
-                        return data
-                except Exception:
-                    pass # JSONでなければ何もしない
+                # "No player found" という意図されたエラーの場合
+                if isinstance(data, dict) and "Error" in data and "No player found" in data["Error"]:
+                    return None # この場合のみ「見つからなかった(None)」と判断
 
-                print("--- [API Handler] 有効なプレイヤーデータとして処理できませんでした。")
+                # その他の予期せぬエラー
+                print(f"--- [API Handler] Nori Player APIから予期せぬ応答: {response.status}, {data}")
                 return None
-
+                
         except Exception as e:
             print(f"--- [API Handler] Nori Player APIリクエスト中にエラー: {e}")
             return None
