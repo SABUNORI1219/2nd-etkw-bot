@@ -116,9 +116,8 @@ class GameCommandsCog(commands.Cog):
         chests_found = self._safe_get(data, ['globalData', 'chestsFound'], 0)
         playtime = self._safe_get(data, ['playtime'], 0)
         wars = self._safe_get(data, ['globalData', 'wars'], 0)
-        # ▼▼▼【エラーの最終修正箇所】▼▼▼
+        # ▼▼▼【この部分が重要です】▼▼▼
         war_rank = self._safe_get(data, ['ranking', 'warsCompletion'], 'N/A')
-        # war_rankが整数(int)の場合のみカンマ区切りを適用し、それ以外はそのまま表示する
         war_rank_display = f"#{war_rank:,}" if isinstance(war_rank, int) else war_rank
         # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
         pvp_kills = self._safe_get(data, ['globalData', 'pvp', 'kills'], 0)
