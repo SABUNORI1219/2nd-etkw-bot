@@ -4,15 +4,24 @@ import os
 import sys
 import asyncio
 from dotenv import load_dotenv
+import logging # loggingをインポート
 
 # 作成したモジュールから必要な関数やクラスをインポート
 from keep_alive import keep_alive
 from lib.database_handler import setup_database
+from logger_setup import setup_logger # ロガー設定関数をインポート
 
 # .envファイルから環境変数を読み込む
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
+# --- ▼▼▼ ロガーのセットアップ ▼▼▼ ---
+# printより先にロガーを準備する
+setup_logger()
+logger = logging.getLogger(__name__)
+# --- ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+# Botのステータス（アクティビティ）を定義
 activity = discord.Streaming(
     name="ちくちくちくわ",
     url="https://www.youtube.com/watch?v=E6O3-hAwJDY&list=RDE6O3-hAwJDY&start_radio=1"
@@ -23,56 +32,55 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-# Botのインスタンスを作成（プレフィックスは不要）
+# Botのインスタンスを作成
 bot = commands.Bot(command_prefix="!", intents=intents, activity=activity)
 
 @bot.event
 async def on_ready():
     """Botの準備が完了したときに呼ばれるイベント"""
-    print("==================================================")
-    print(f"ログイン成功: {bot.user} (ID: {bot.user.id})")
-    print("Botは正常に起動し、命令待機状態に入りました。")
+    logger.info("==================================================")
+    logger.info(f"ログイン成功: {bot.user} (ID: {bot.user.id})")
+    await bot.change_presence(status=discord.Status.online)
+    logger.info(f"ステータス設定完了: {bot.activity.type.name} {bot.activity.name}")
+    logger.info("Botは正常に起動し、命令待機状態に入りました。")
+    
     # コマンドのグローバル同期
     try:
+        logger.info("--- スラッシュコマンドをグローバルに同期します... ---")
         synced = await bot.tree.sync()
-        print(f"--- ✅ {len(synced)}個のスラッシュコマンドをグローバル同期しました。")
+        logger.info(f"--- ✅ {len(synced)}個のコマンドをグローバル同期しました。")
     except Exception as e:
-        print(f"--- ❌ コマンドの同期に失敗しました: {e}")
-    print("==================================================")
+        logger.error(f"--- ❌ コマンドの同期に失敗しました: {e}")
+        
+    logger.info("==================================================")
 
 async def load_cogs():
     """cogsフォルダから全ての機能部品を読み込む"""
-    print("--- [司令塔] -> 全ての受付係（Cogs）を配属させます...")
-    # setup_cogは不要になったため、リストから削除
-    cogs_to_load = ['player_cog', 'guild_cog', 'tracker_cog']
-    for cog_name in cogs_to_load:
-        try:
-            await bot.load_extension(f'cogs.{cog_name}')
-            print(f"--- [司令塔] ✅ 受付係 '{cog_name}.py' の配属完了。")
-        except Exception as e:
-            print(f"--- [司令塔] ❌ 受付係 '{cog_name}.py' の配属に失敗しました: {e}")
+    logger.info("--- [司令塔] -> 全ての受付係（Cogs）を配属させます...")
+    for filename in os.listdir('./cogs'):
+        if filename.endswith('.py'):
+            try:
+                await bot.load_extension(f'cogs.{filename[:-3]}')
+                logger.info(f"--- [司令塔] ✅ 受付係 '{filename}' の配属完了。")
+            except Exception as e:
+                logger.error(f"--- [司令塔] ❌ 受付係 '{filename}' の配属に失敗しました: {e}")
 
 async def main():
     """Botの起動シーケンスを管理するメイン関数"""
     async with bot:
-        # Botが接続する前に、非同期の準備処理（Cogs読み込み）を行う
+        setup_database()
+        keep_alive()
         await load_cogs()
-        # Botを起動し、Discordに接続
         await bot.start(TOKEN)
 
-# メインの実行ブロック
 if __name__ == '__main__':
-    # Botの非同期ループが始まる前に、全ての同期的な準備を完了させる
-    setup_database()
-    keep_alive()
-    
     if not TOKEN:
-        print("致命的エラー: `DISCORD_TOKEN`が設定されていません。")
+        logger.critical("致命的エラー: `DISCORD_TOKEN`が設定されていません。")
         sys.exit(1)
         
     try:
-        print("--- [司令塔] Botの起動を開始します... ---")
+        logger.info("--- [司令塔] Botの起動を開始します... ---")
         asyncio.run(main())
     except Exception as e:
-        print(f"Botの起動中に予期せぬエラーが発生しました: {e}")
+        logger.critical(f"Botの起動中に予期せぬエラーが発生しました: {e}")
         sys.exit(1)
