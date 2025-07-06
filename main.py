@@ -22,7 +22,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 # Botのステータス（アクティビティ）を定義
 activity = discord.Streaming(
     name="ちくちくちくわ",
-    url="https://www.youtube.com/watch?v=E6O3-hAwJDY&list=RDE6O3-hAwJDY&start_radio=1"
+    url="https://www.youtube.com/watch?v=E6O3-hAwJDY"
 )
 
 # Botが必要とする権限（Intents）を定義
