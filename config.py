@@ -7,9 +7,6 @@ WYNN_PLAYER_API_URL = "https://api.wynncraft.com/v3/player/{}"
 WYNN_GUILD_BY_NAME_API_URL = "https://api.wynncraft.com/v3/guild/{}"
 WYNN_GUILD_BY_PREFIX_API_URL = "https://api.wynncraft.com/v3/guild/prefix/{}"
 
-# 追跡対象のレイド名 (APIで使われる内部名)
-RAID_TYPES = ["tna", "tcc", "nol", "nog"]
-
 # Discord関連 (環境変数から読み込み)
 GUILD_ID_INT = int(os.getenv('GUILD_ID', 0))
 TRACKING_CHANNEL_ID = int(os.getenv('NOTIFICATION_CHANNEL_ID', 0))
