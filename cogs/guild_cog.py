@@ -3,6 +3,9 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
 from urllib.parse import quote
+import logging
+
+logger = logging.getLogger(__name__)
 
 # libフォルダから専門家をインポート
 from lib.wynncraft_api import WynncraftAPI
@@ -13,7 +16,7 @@ class GuildCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
-        print("--- [CommandsCog] ギルドコマンドCogが読み込まれました。")
+        logger.info("--- [CommandsCog] ギルドコマンドCogが読み込まれました。")
 
     def _safe_get(self, data: dict, keys: list, default: any = "N/A"):
         """辞書から安全に値を取得するヘルパー関数"""
