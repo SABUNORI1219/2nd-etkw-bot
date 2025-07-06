@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from lib.wynncraft_api import WynncraftAPI
 from lib.database_handler import get_raid_counts
 # configから設定をインポート
-from config import RAID_TYPES, EMBED_COLOR_BLUE, EMBED_COLOR_GREEN
+from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN
 
 class PlayerSelectView(discord.ui.View):
     def __init__(self, player_collision_dict: dict, cog_instance):
