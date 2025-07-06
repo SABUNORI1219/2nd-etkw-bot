@@ -2,6 +2,9 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timezone, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 # libフォルダから専門家たちをインポート
 from lib.wynncraft_api import WynncraftAPI
@@ -60,7 +63,7 @@ class GameCommandsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
-        print("--- [CommandsCog] ゲームコマンドCogが読み込まれました。")
+        logger.info("--- [CommandsCog] ゲームコマンドCogが読み込まれました。")
 
     # 指定されたデータを安全に取得するためのヘルパー関数
     def _safe_get(self, data: dict, keys: list, default: any = "N/A"):
