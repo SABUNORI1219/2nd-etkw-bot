@@ -5,6 +5,7 @@ import logging # printより確実なロギングモジュールをインポー�
 
 # ロギングの設定
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # 設定ファイルからAPIのURLをインポート
 from config import NORI_GUILD_API_URL, WYNN_PLAYER_API_URL, NORI_PLAYER_API_URL
@@ -22,7 +23,7 @@ class WynncraftAPI:
             async with self.session.get(url) as response:
                 return await response.json() if response.status == 200 else None
         except Exception as e:
-            print(f"--- [API Handler] Wynncraft Guild (Name) APIリクエスト中にエラー: {e}")
+            logger.error(f"--- [API Handler] Wynncraft Guild (Name) APIリクエスト中にエラー: {e}")
             return None
 
     async def get_guild_by_prefix(self, guild_prefix: str) -> dict | None:
@@ -32,7 +33,7 @@ class WynncraftAPI:
             async with self.session.get(url) as response:
                 return await response.json() if response.status == 200 else None
         except Exception as e:
-            print(f"--- [API Handler] Wynncraft Guild (Prefix) APIリクエスト中にエラー: {e}")
+            logger.error(f"--- [API Handler] Wynncraft Guild (Prefix) APIリクエスト中にエラー: {e}")
             return None
 
     async def get_nori_guild_data(self, guild_identifier: str) -> dict | None:
@@ -48,10 +49,10 @@ class WynncraftAPI:
                 else:
                     # サーバーからの応答内容もログに出力して、何が起きているか確認する
                     error_text = await response.text()
-                    print(f"--- [API Handler] Nori Guild APIエラー: Status {response.status}, Body: {error_text[:200]}")
+                    logger.error(f"--- [API Handler] Nori Guild APIエラー: Status {response.status}, Body: {error_text[:200]}")
                     return None
         except Exception as e:
-            print(f"--- [API Handler] Nori Guild APIリクエスト中にエラー: {e}")
+            logger.error(f"--- [API Handler] Nori Guild APIリクエスト中にエラー: {e}")
             return None
 
     async def get_wynn_player_data(self, player_uuid: str) -> dict | None:
@@ -66,7 +67,7 @@ class WynncraftAPI:
                 else: 
                     return None
         except Exception as e:
-            print(f"--- [API Handler] プレイヤーデータ取得中にエラー (UUID: {player_uuid}): {e}")
+            logger.error(f"--- [API Handler] プレイヤーデータ取得中にエラー (UUID: {player_uuid}): {e}")
             return None
     
     async def get_uuid_from_name(self, player_name: str) -> str | None:
@@ -93,7 +94,7 @@ class WynncraftAPI:
                 else:
                     return None
         except Exception as e:
-            print(f"--- [API Handler] Nori Player APIリクエスト中にエラー: {e}")
+            logger.error(f"--- [API Handler] Nori Player APIリクエスト中にエラー: {e}")
             return None
             
     async def close_session(self):
