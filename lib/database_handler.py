@@ -1,6 +1,9 @@
 import os
 import psycopg2
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 # 環境変数からデータベースURLを取得
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -11,14 +14,14 @@ def get_db_connection():
         conn = psycopg2.connect(DATABASE_URL)
         return conn
     except psycopg2.OperationalError as e:
-        print(f"データベース接続エラー: {e}")
+        logger.error(f"データベース接続エラー: {e}")
         return None
 
 def setup_database():
     """
     データベースに 'clear_records' テーブルが存在しない場合に作成する。
     """
-    print("--- [DB Handler] データベースのテーブルをセットアップします...")
+    logger.info("--- [DB Handler] データベースのテーブルをセットアップします...")
     conn = get_db_connection()
     if conn is None:
         return
@@ -36,9 +39,9 @@ def setup_database():
                 );
             """)
             conn.commit()
-        print("--- [DB Handler] テーブルのセットアップが完了しました。")
+        logger.info("--- [DB Handler] テーブルのセットアップが完了しました。")
     except Exception as e:
-        print(f"--- [DB Handler] テーブルセットアップ中にエラー: {e}")
+        logger.error(f"--- [DB Handler] テーブルセットアップ中にエラー: {e}")
     finally:
         if conn:
             conn.close()
@@ -57,9 +60,9 @@ def add_raid_records(records: list):
         with conn.cursor() as cur:
             cur.executemany(sql, records)
             conn.commit()
-        print(f"--- [DB Handler] {len(records)}件のレイド記録をデータベースに保存しました。")
+        logger.info(f"--- [DB Handler] {len(records)}件のレイド記録をデータベースに保存しました。")
     except Exception as e:
-        print(f"--- [DB Handler] レイド記録の保存中にエラー: {e}")
+        logger.error(f"--- [DB Handler] レイド記録の保存中にエラー: {e}")
     finally:
         if conn:
             conn.close()
@@ -79,7 +82,7 @@ def get_raid_counts(player_uuid: str, since_date: datetime) -> list:
             cur.execute(sql, (player_uuid, since_date))
             results = cur.fetchall()
     except Exception as e:
-        print(f"--- [DB Handler] レイド回数の取得中にエラー: {e}")
+        logger.error(f"--- [DB Handler] レイド回数の取得中にエラー: {e}")
     finally:
         if conn:
             conn.close()
