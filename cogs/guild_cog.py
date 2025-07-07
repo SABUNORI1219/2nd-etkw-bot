@@ -95,7 +95,7 @@ Owner: {owner}
 Created on: {created_date}
 Level: {level} [{xp_percent}%]
 War count: {wars}
-Latest SR: {rating_display} [Season{latest_season}]
+Latest SR: {rating_display} [Season {latest_season}]
 Territory count: {territories}
 Members: {total_members}
 Online Players: {online_count}/{total_members}
