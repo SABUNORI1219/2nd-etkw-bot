@@ -100,8 +100,8 @@ class GameCommandsCog(commands.Cog):
         
         server_value_for_stream = self._safe_get(data, ['server'], None)
 
-        # serverがnull、かつ最終ログインが5分以内(300秒)の場合のみストリーム中と判断
-        if server_value_for_stream is None and time_diff.total_seconds() < 300:
+        # serverがnull、かつ最終ログインが1分以内(60秒)の場合のみストリーム中と判断
+        if server_value_for_stream is None and time_diff.total_seconds() < 60:
             stream_status = "🟢Stream"
         else:
             stream_status = "❌Stream"
