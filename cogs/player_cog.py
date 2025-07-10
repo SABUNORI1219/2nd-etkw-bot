@@ -187,24 +187,24 @@ Total Level: {total_level:,}
 
         # ▼▼▼【キャッシュ機能の実装】▼▼▼
         # 1. まずキャッシュ担当者に問い合わせる
-        cached_data = self.cache.get_cache(f"player_{player_name.lower()}")
+        cached_data = self.cache.get_cache(f"player_{player.lower()}")
         if cached_data:
-            print(f"--- [Cache] プレイヤー'{player_name}'のキャッシュを使用しました。")
+            print(f"--- [Cache] プレイヤー'{player}'のキャッシュを使用しました。")
             embed = self._create_player_embed(cached_data)
             embed.set_footer(text=f"Data from Cache | Requested by {interaction.user.display_name}")
             await interaction.followup.send(embed=embed)
             return
 
         # 2. キャッシュがない場合のみ、API担当者に問い合わせる
-        print(f"--- [API] プレイヤー'{player_name}'のデータをAPIから取得します。")
-        api_data = await self.wynn_api.get_nori_player_data(player_name)
+        print(f"--- [API] プレイヤー'{player}'のデータをAPIから取得します。")
+        api_data = await self.wynn_api.get_nori_player_data(player)
 
         if not api_data:
-            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
+            await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
             return
         
         # 3. 取得したデータをキャッシュに保存
-        self.cache.set_cache(f"player_{player_name.lower()}", api_data)
+        self.cache.set_cache(f"player_{player.lower()}", api_data)
 
         # 4. APIからのデータで応答
         if isinstance(api_data, dict) and 'username' in api_data:
@@ -214,7 +214,7 @@ Total Level: {total_level:,}
             view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self)
             await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
         else:
-            await interaction.followup.send(f"プレイヤー「{player_name}」の情報を正しく取得できませんでした。")
+            await interaction.followup.send(f"プレイヤー「{player}」の情報を正しく取得できませんでした。")
 
 # BotにCogを登録するためのセットアップ関数
 async def setup(bot: commands.Bot):
