@@ -7,15 +7,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# libフォルダから専門家をインポート
 from lib.wynncraft_api import WynncraftAPI
-# configから設定をインポート
-from config import EMBED_COLOR_BLUE # 色は好みに合わせて変更できます
+from lib.cache_handler import CacheHandler
+from config import EMBED_COLOR_BLUE
 
 class GuildCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
+        self.cache = CacheHandler()
         logger.info("--- [CommandsCog] ギルドコマンドCogが読み込まれました。")
 
     def _safe_get(self, data: dict, keys: list, default: any = "N/A"):
@@ -33,19 +33,21 @@ class GuildCog(commands.Cog):
         if not online_players_list:
             return "（現在オンラインのメンバーはいません）", 0
 
-        # 各列の最大幅を計算
-        max_name_len = max(len(p.get('name', 'N/A')) for p in online_players_list)
-        max_server_len = max(len(p.get('server', 'N/A')) for p in online_players_list)
-        max_rank_len = max(len(p.get('rank', 'N/A')) for p in online_players_list)
+        # 安全なデータアクセスに修正
+        max_name_len = max((len(p.get('name','')) for p in online_players_list), default=6)
+        max_server_len = max((len(p.get('server','')) for p in online_players_list), default=2)
+        max_rank_len = max((len(p.get('rank','')) for p in online_players_list), default=5)
+        
+        max_name_len = max(max_name_len, 6)
+        max_server_len = max(max_server_len, 2)
+        max_rank_len = max(max_rank_len, 5)
         
         header = f"║ {'WC'.center(max_server_len)} ║ {'Player'.center(max_name_len)} ║ {'Rank'.center(max_rank_len)} ║"
         divider = f"╠═{'═'*max_server_len}═╬═{'═'*max_name_len}═╬═{'═'*max_rank_len}═╣"
         top_border = f"╔═{'═'*max_server_len}═╦═{'═'*max_name_len}═╦═{'═'*max_rank_len}═╗"
         bottom_border = f"╚═{'═'*max_server_len}═╩═{'═'*max_name_len}═╩═{'═'*max_rank_len}═╝"
 
-        # 各プレイヤーの行を作成
         player_rows = []
-        # ▼▼▼【修正箇所】rank（星）の文字数で降順（多い順）にソートする▼▼▼
         for p in sorted(online_players_list, key=lambda x: len(x.get('rank', '')), reverse=True):
             server = p.get('server', 'N/A').center(max_server_len)
             name = p.get('name', 'N/A').center(max_name_len)
@@ -54,18 +56,7 @@ class GuildCog(commands.Cog):
 
         return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players_list)
 
-    @app_commands.command(name="guild", description="ギルドのステータスを表示します。")
-    @app_commands.describe(guild="Name or Prefix")
-    async def guild(self, interaction: discord.Interaction, guild: str):
-        await interaction.response.defer()
-
-        data = await self.wynn_api.get_nori_guild_data(guild)
-
-        if not data or 'name' not in data:
-            await interaction.followup.send(f"ギルド「{guild}」が見つかりませんでした。")
-            return
-
-        # データを正しいAPIキーで取得
+    def _create_guild_embed(self, data: dict, from_cache: bool = False, is_stale: bool = False) -> discord.Embed:
         name = self._safe_get(data, ['name'])
         encoded_name = quote(name)
         prefix = self._safe_get(data, ['prefix'])
@@ -111,7 +102,45 @@ Online Players: {online_count}/{total_members}
         
         embed.set_footer(text=f"{name}'s Stats | Minister Chikuwa")
 
-        await interaction.followup.send(embed=embed)
+        return embed
+
+    @app_commands.command(name="guild", description="ギルドの詳細情報を表示します。")
+    @app_commands.describe(guild="ギルド名またはプレフィックス")
+    async def guild(self, interaction: discord.Interaction, guild: str):
+        await interaction.response.defer()
+
+        cache_key = f"guild_{guild.upper()}"
+        
+        # 1. まずキャッシュ担当者に新鮮なデータを問い合わせる
+        cached_data = self.cache.get_cache(cache_key)
+        if cached_data:
+            logger.info(f"--- [Cache] ギルド'{guild}'の新鮮なキャッシュを使用しました。")
+            embed = self._create_guild_embed(cached_data, from_cache=True)
+            await interaction.followup.send(embed=embed)
+            return
+
+        # 2. キャッシュがない場合、API担当者に問い合わせる
+        logger.info(f"--- [API] ギルド'{guild}'のデータをAPIから取得します。")
+        api_data = await self.wynn_api.get_nori_guild_data(guild)
+
+        # 3. APIから正常にデータを取得できた場合
+        if api_data and 'name' in api_data:
+            self.cache.set_cache(cache_key, api_data) # データをキャッシュに保存
+            embed = self._create_guild_embed(api_data)
+            await interaction.followup.send(embed=embed)
+            return
+
+        # 4. APIがエラーを返した場合、古いキャッシュでもいいので探す
+        logger.warning(f"--- [API] ギルド'{guild}'のAPIアクセスに失敗。古いキャッシュを探します。")
+        stale_cache = self.cache.get_cache(cache_key, ignore_freshness=True)
+        if stale_cache:
+            logger.info(f"--- [Cache] ギルド'{guild}'の古いキャッシュを使用しました。")
+            embed = self._create_guild_embed(stale_cache, from_cache=True, is_stale=True)
+            await interaction.followup.send(embed=embed)
+            return
+            
+        # 5. APIもダメ、キャッシュも全くない場合の最終手段
+        await interaction.followup.send(f"ギルド「{guild}」が見つかりませんでした。APIが応答しないか、存在しないギルドです。")
 
 # BotにCogを登録するためのセットアップ関数
 async def setup(bot: commands.Bot):
