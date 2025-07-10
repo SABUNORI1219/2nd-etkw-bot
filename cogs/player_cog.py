@@ -55,12 +55,12 @@ class PlayerSelectView(discord.ui.View):
         embed = self.cog_instance._create_player_embed(data)
         await interaction.message.edit(content=None, embed=embed, view=None)
 
-class GameCommandsCog(commands.Cog):
+class PlayerCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
         self.cache = CacheHandler()
-        logger.info("--- [CommandsCog] ゲームコマンドCogが読み込まれました。")
+        logger.info("--- [CommandsCog] プレイヤーCogが読み込まれました。")
 
     # 指定されたデータを安全に取得するためのヘルパー関数
     def _safe_get(self, data: dict, keys: list, default: any = "N/A"):
@@ -224,4 +224,4 @@ Total Level: {total_level:,}
 
 # BotにCogを登録するためのセットアップ関数
 async def setup(bot: commands.Bot):
-    await bot.add_cog(GameCommandsCog(bot))
+    await bot.add_cog(PlayerCog(bot))
