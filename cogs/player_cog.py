@@ -185,28 +185,33 @@ Total Level: {total_level:,}
     async def player(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
 
-        # ▼▼▼【キャッシュ機能の実装】▼▼▼
-        # 1. まずキャッシュ担当者に問い合わせる
-        cached_data = self.cache.get_cache(f"player_{player.lower()}")
+        cache_key = f"player_{player.lower()}"
+        
+        # 1. まずキャッシュ担当者に新鮮なデータを問い合わせる
+        cached_data = self.cache.get_cache(cache_key)
         if cached_data:
-            print(f"--- [Cache] プレイヤー'{player}'のキャッシュを使用しました。")
+            logger.info(f"--- [Cache] プレイヤー'{player}'のキャッシュを使用しました。")
+            # キャッシュから埋め込みを作成
             embed = self._create_player_embed(cached_data)
-            embed.set_footer(text=f"Data from Cache | Requested by {interaction.user.display_name}")
             await interaction.followup.send(embed=embed)
             return
 
         # 2. キャッシュがない場合のみ、API担当者に問い合わせる
-        print(f"--- [API] プレイヤー'{player}'のデータをAPIから取得します。")
+        logger.info(f"--- [API] プレイヤー'{player}'のデータをAPIから取得します。")
         api_data = await self.wynn_api.get_nori_player_data(player)
 
-        if not api_data:
+        # 3. APIからの応答を処理
+        
+        # 3-1. プレイヤーが見つからない、または明確なエラーの場合
+        if not api_data or (isinstance(api_data, dict) and "Error" in api_data):
+            # この場合、キャッシュは更新せず、エラーメッセージを返す
             await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
             return
         
-        # 3. 取得したデータをキャッシュに保存
-        self.cache.set_cache(f"player_{player.lower()}", api_data)
-
-        # 4. APIからのデータで応答
+        # 3-2. データ取得に成功した場合（単一または衝突）
+        # 取得した新しいデータをキャッシュに保存する
+        self.cache.set_cache(cache_key, api_data)
+        
         if isinstance(api_data, dict) and 'username' in api_data:
             embed = self._create_player_embed(api_data)
             await interaction.followup.send(embed=embed)
@@ -214,6 +219,7 @@ Total Level: {total_level:,}
             view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self)
             await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
         else:
+            # ここは通常通らないはずだが、念のため
             await interaction.followup.send(f"プレイヤー「{player}」の情報を正しく取得できませんでした。")
 
 # BotにCogを登録するためのセットアップ関数
