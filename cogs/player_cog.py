@@ -6,11 +6,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# libフォルダから専門家たちをインポート
 from lib.wynncraft_api import WynncraftAPI
 from lib.database_handler import get_raid_counts
-# configから設定をインポート
 from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN
+from lib.cache_handler import CacheHandler
 
 class PlayerSelectView(discord.ui.View):
     def __init__(self, player_collision_dict: dict, cog_instance):
@@ -21,13 +20,11 @@ class PlayerSelectView(discord.ui.View):
         for uuid, player_info in player_collision_dict.items():
             if isinstance(player_info, dict):
                 
-                # ▼▼▼【supportRankの表示を修正】▼▼▼
                 raw_support_rank = player_info.get('supportRank')
                 if raw_support_rank and raw_support_rank.lower() == "vipplus":
                     rank_display = "Vip+"
                 else:
                     rank_display = (raw_support_rank or 'Player').capitalize()
-                # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
                 stored_name = player_info.get('storedName', 'Unknown')
                 label_text = f"{stored_name} [{rank_display}]"
@@ -49,7 +46,6 @@ class PlayerSelectView(discord.ui.View):
         self.select_menu.disabled = True
         await interaction.response.edit_message(content="プレイヤー情報を取得中...", view=self)
         
-        # Nori APIはUUIDでも検索できる
         data = await self.cog_instance.wynn_api.get_nori_player_data(selected_uuid)
         
         if not data or 'uuid' not in data:
@@ -63,6 +59,7 @@ class GameCommandsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
+        self.cache = CacheHandler()
         logger.info("--- [CommandsCog] ゲームコマンドCogが読み込まれました。")
 
     # 指定されたデータを安全に取得するためのヘルパー関数
@@ -84,7 +81,6 @@ class GameCommandsCog(commands.Cog):
         is_online = self._safe_get(data, ['online'], False)
         server = self._safe_get(data, ['server'], "Unknown")
         
-        # ▼▼▼【修正点3】ギルドの星を[]で囲む ▼▼▼
         guild_name = self._safe_get(data, ['guild', 'name'], "N/A")
         guild_prefix = self._safe_get(data, ['guild', 'prefix'], "")
         guild_rank = self._safe_get(data, ['guild', 'rank'], "")
@@ -92,8 +88,7 @@ class GameCommandsCog(commands.Cog):
         guild_display = f"[{guild_prefix}] {guild_name} / {guild_rank}[{guild_rank_stars}]" if guild_name != "N/A" else "N/A"
 
         first_join = self._safe_get(data, ['firstJoin'], "N/A").split('T')[0]
-        
-        # ▼▼▼【Stream機能のロジックを修正】▼▼▼
+
         last_join_str = self._safe_get(data, ['lastJoin'], "1970-01-01T00:00:00.000Z")
         last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
         time_diff = datetime.now(timezone.utc) - last_join_dt
@@ -107,33 +102,27 @@ class GameCommandsCog(commands.Cog):
             stream_status = "❌Stream"
         
         last_join_display = f"{last_join_str.split('T')[0]} [{stream_status}]"
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-        
-        # ▼▼▼【ここから3点の修正を反映】▼▼▼
-        # 1. activeCharacterの取得パスを修正
+
         active_char_uuid = self._safe_get(data, ['activeCharacter'])
         
-        # 2. 'N/A'チェックを削除し、常にキーが存在する前提で処理
         char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
         char_type = self._safe_get(char_obj, ['type'])
         nickname = self._safe_get(char_obj, ['nickname'])
         reskin = self._safe_get(char_obj, ['reskin'])
 
-        # 3. reskinの有無で表示を分岐させるロジックに変更
         if reskin != "N/A":
             active_char_info = f"{reskin} ({nickname}) on {server}"
         else:
             active_char_info = f"{char_type} ({nickname}) on {server}"
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
         killed_mobs = self._safe_get(data, ['globalData', 'killedMobs'], 0)
         chests_found = self._safe_get(data, ['globalData', 'chestsFound'], 0)
         playtime = self._safe_get(data, ['playtime'], 0)
         wars = self._safe_get(data, ['globalData', 'wars'], 0)
-        # ▼▼▼【この部分が重要です】▼▼▼
+
         war_rank = self._safe_get(data, ['ranking', 'warsCompletion'], 'N/A')
         war_rank_display = f"#{war_rank:,}" if isinstance(war_rank, int) else war_rank
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
         pvp_kills = self._safe_get(data, ['globalData', 'pvp', 'kills'], 0)
         pvp_deaths = self._safe_get(data, ['globalData', 'pvp', 'deaths'], 0)
         quests = self._safe_get(data, ['globalData', 'completedQuests'], 0)
@@ -147,7 +136,6 @@ class GameCommandsCog(commands.Cog):
         dungeons = self._safe_get(data, ['globalData', 'dungeons', 'total'], 0)
         total_raids = self._safe_get(data, ['globalData', 'raids', 'total'], 0)
 
-        # ▼▼▼【修正点2】UUID以降をコードブロックで囲む ▼▼▼
         description = f"""
     [公式サイトへのリンク](https://wynncraft.com/stats/player/{username})
 ```python
@@ -181,7 +169,7 @@ Total Level: {total_level:,}
             description=description,
             color=color
         )
-        # ▼▼▼【修正点1】公式ウェブサイトへのリンクを設定 ▼▼▼
+        
         embed.title = f"{username}"
         
         embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{username}/right")
@@ -197,26 +185,35 @@ Total Level: {total_level:,}
     async def player(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
 
-        data = await self.wynn_api.get_nori_player_data(player)
-
-        # ▼▼▼【最終修正ロジック】▼▼▼
-        # APIの応答が辞書形式で、かつ"Error"というキーを持っているかチェック
-        if isinstance(data, dict) and "Error" in data:
-            await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
+        # ▼▼▼【キャッシュ機能の実装】▼▼▼
+        # 1. まずキャッシュ担当者に問い合わせる
+        cached_data = self.cache.get_cache(f"player_{player_name.lower()}")
+        if cached_data:
+            print(f"--- [Cache] プレイヤー'{player_name}'のキャッシュを使用しました。")
+            embed = self._create_player_embed(cached_data)
+            embed.set_footer(text=f"Data from Cache | Requested by {interaction.user.display_name}")
+            await interaction.followup.send(embed=embed)
             return
 
-        # 'username'キーがあれば、単一プレイヤーとして処理
-        if isinstance(data, dict) and 'username' in data:
-            embed = self._create_player_embed(data)
-            await interaction.followup.send(embed=embed)
+        # 2. キャッシュがない場合のみ、API担当者に問い合わせる
+        print(f"--- [API] プレイヤー'{player_name}'のデータをAPIから取得します。")
+        api_data = await self.wynn_api.get_nori_player_data(player_name)
+
+        if not api_data:
+            await interaction.followup.send(f"プレイヤー「{player_name}」が見つかりませんでした。")
+            return
         
-        # 'username'キーがなく、辞書であれば、衝突と判断
-        elif isinstance(data, dict):
-            view = PlayerSelectView(player_collision_dict=data, cog_instance=self)
+        # 3. 取得したデータをキャッシュに保存
+        self.cache.set_cache(f"player_{player_name.lower()}", api_data)
+
+        # 4. APIからのデータで応答
+        if isinstance(api_data, dict) and 'username' in api_data:
+            embed = self._create_player_embed(api_data)
+            await interaction.followup.send(embed=embed)
+        elif isinstance(api_data, dict):
+            view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self)
             await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
-            
         else:
-            # それ以外の予期せぬ応答（Noneなど）
             await interaction.followup.send(f"プレイヤー「{player_name}」の情報を正しく取得できませんでした。")
 
 # BotにCogを登録するためのセットアップ関数
