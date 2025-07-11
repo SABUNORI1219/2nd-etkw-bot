@@ -6,7 +6,7 @@ from io import BytesIO
 logger = logging.getLogger(__name__)
 
 PATTERN_MAP = {
-    'BASE': 'b', 'STRIPE_BOTTOM': 'bs', 'STRIPE_TOP': 'ts', 'STRIPE_LEFT': 'ls',
+    'BASE': 'background', 'STRIPE_BOTTOM': 'bs', 'STRIPE_TOP': 'ts', 'STRIPE_LEFT': 'ls',
     'STRIPE_RIGHT': 'rs', 'STRIPE_CENTER': 'cs', 'STRIPE_MIDDLE': 'ms',
     'STRIPE_DOWNRIGHT': 'drs', 'STRIPE_DOWNLEFT': 'dls', 'STRIPE_SMALL': 'ss',
     'CROSS': 'cr', 'STRAIGHT_CROSS': 'sc', 'DIAGONAL_LEFT': 'ld',
