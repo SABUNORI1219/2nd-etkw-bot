@@ -172,11 +172,11 @@ Total Level: {total_level:,}
         
         embed.title = f"{username}"
         
-        embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{username}/right")
+        embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{uuid}/right")
         
         embed.set_footer(
             text=f"{username}'s Stats | Minister Chikuwa",
-            icon_url=f"https://www.mc-heads.net/avatar/{username}"
+            icon_url=f"https://www.mc-heads.net/avatar/{uuid}"
         )
         return embed
 
