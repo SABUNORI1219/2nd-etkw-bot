@@ -3,12 +3,14 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
 from urllib.parse import quote
+from io import BytesIO
 import logging
 
 logger = logging.getLogger(__name__)
 
 from lib.wynncraft_api import WynncraftAPI
 from lib.cache_handler import CacheHandler
+from lib.banner_renderer import BannerRenderer
 from config import EMBED_COLOR_BLUE
 
 class GuildCog(commands.Cog):
@@ -16,6 +18,7 @@ class GuildCog(commands.Cog):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
         self.cache = CacheHandler()
+        self.banner_renderer = BannerRenderer()
         logger.info("--- [CommandsCog] ギルドコマンドCogが読み込まれました。")
 
     def _safe_get(self, data: dict, keys: list, default: any = "N/A"):
@@ -99,12 +102,18 @@ Online Players: {online_count}/{total_members}
         )
         
         embed.title = f"[{prefix}] {name}"
+
+        banner_bytes = self.banner_renderer.create_banner_image(data.get('banner'))
+        banner_file = None
+        if banner_bytes:
+            banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
+            embed.set_thumbnail(url="attachment://guild_banner.png")
         
         embed.set_footer(text=f"{name}'s Stats | Minister Chikuwa")
 
-        return embed
+        return embed, banner_file
 
-    @app_commands.command(name="guild", description="ギルドの詳細情報を表示します。")
+    @app_commands.command(name="guild", description="ギルドのステータスを表示します。")
     @app_commands.describe(guild="Name or Prefix")
     async def guild(self, interaction: discord.Interaction, guild: str):
         await interaction.response.defer()
