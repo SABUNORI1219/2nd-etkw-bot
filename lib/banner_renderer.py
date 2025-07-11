@@ -5,7 +5,6 @@ from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
-# あなたが作成してくれた、API名とファイル名の対応表
 PATTERN_MAP = {
     'base': 'b', 'STRIPE_BOTTOM': 'bs', 'STRIPE_TOP': 'ts', 'STRIPE_LEFT': 'ls',
     'STRIPE_RIGHT': 'rs', 'STRIPE_CENTER': 'cs', 'STRIPE_MIDDLE': 'ms',
