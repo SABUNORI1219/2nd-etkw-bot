@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timedelta
 
 CACHE_DIR = "cache" # キャッシュファイルを保存するフォルダ名
-CACHE_EXPIRATION_MINUTES = 5 # キャッシュの有効期間（分）
+CACHE_EXPIRATION_MINUTES = 1 # キャッシュの有効期間（分）
 
 class CacheHandler:
     """
