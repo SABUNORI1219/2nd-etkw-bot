@@ -1,10 +1,10 @@
 from PIL import Image
 import os
 import logging
-from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
+# あなたが作成してくれた、API名とファイル名の対応表
 PATTERN_MAP = {
     'base': 'b', 'STRIPE_BOTTOM': 'bs', 'STRIPE_TOP': 'ts', 'STRIPE_LEFT': 'ls',
     'STRIPE_RIGHT': 'rs', 'STRIPE_CENTER': 'cs', 'STRIPE_MIDDLE': 'ms',
@@ -19,11 +19,10 @@ PATTERN_MAP = {
     'CIRCLE_MIDDLE': 'mc', 'RHOMBUS_MIDDLE': 'mr', 'BORDER': 'bo',
     'CURLY_BORDER': 'cbo', 'GRADIENT': 'gra', 'GRADIENT_UP': 'gru',
     'CREEPER': 'cre', 'SKULL': 'sku', 'FLOWER': 'flo', 'MOJANG': 'moj',
-    'GLOBE': 'glb', 'PIGLIN': 'pig' # APIは'Piglin'を返す可能性があるため追加
+    'GLOBE': 'glb', 'PIGLIN': 'pig'
 }
 
-# 色の名前をファイルで使われる小文字に変換する
-# (Wynncraftのバナーで使われる16色)
+# APIの色名を、ファイルで使われる小文字に変換する対応表
 COLOR_MAP = {
     'WHITE': 'white', 'ORANGE': 'orange', 'MAGENTA': 'magenta', 'LIGHT_BLUE': 'light_blue',
     'YELLOW': 'yellow', 'LIME': 'lime', 'PINK': 'pink', 'GRAY': 'gray',
@@ -47,12 +46,12 @@ class BannerRenderer:
             return None
 
         try:
-            # 1. ベースとなる色の画像パスを特定
+            # 1. ベースとなる画像パスを特定
             base_color_name = banner_data.get('base', 'WHITE').upper()
             base_color_file = COLOR_MAP.get(base_color_name, 'white')
-            base_image_path = os.path.join(ASSETS_DIR, "base", f"{base_color_file}.png")
+            # ベース画像は模様がないため、'b' (base) を使う
+            base_image_path = os.path.join(ASSETS_DIR, "patterns", f"{base_color_file}-b.png")
             
-            # ベース画像を開く
             banner_image = Image.open(base_image_path).convert("RGBA")
 
             # 2. レイヤーを順番に重ねていく
@@ -61,7 +60,6 @@ class BannerRenderer:
                 pattern_api_name = layer.get('pattern')
                 color_api_name = layer.get('colour')
 
-                # 対応表を使って、ファイル名用の略称と色名を取得
                 pattern_abbr = PATTERN_MAP.get(pattern_api_name)
                 color_file_name = COLOR_MAP.get(color_api_name)
 
@@ -69,17 +67,17 @@ class BannerRenderer:
                     logger.warning(f"不明なパターンまたは色です: {pattern_api_name}, {color_api_name}")
                     continue
 
-                # 正しいファイルパスを組み立てる
+                # 正しいファイルパスを組み立てる (例: red-cbo.png)
                 pattern_path = os.path.join(ASSETS_DIR, "patterns", f"{color_file_name}-{pattern_abbr}.png")
                 
                 if os.path.exists(pattern_path):
                     pattern_image = Image.open(pattern_path).convert("RGBA")
-                    # ベース画像の上にパターンを重ねる（マスクとしてパターン画像を使用）
+                    # ベース画像の上にパターンを重ねる
                     banner_image.paste(pattern_image, (0, 0), pattern_image)
                 else:
                     logger.warning(f"アセットファイルが見つかりません: {pattern_path}")
 
-            # 3. 完成した画像をファイルではなく、メモリ上のバイトデータに保存
+            # 3. 完成した画像をメモリ上のバイトデータに保存
             final_buffer = BytesIO()
             banner_image.save(final_buffer, format='PNG')
             final_buffer.seek(0) # ポインタを先頭に戻す
