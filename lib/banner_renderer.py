@@ -1,17 +1,17 @@
 from PIL import Image
 import os
 import logging
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
-# あなたが作成してくれた、API名とファイル名の対応表
 PATTERN_MAP = {
-    'base': 'b', 'STRIPE_BOTTOM': 'bs', 'STRIPE_TOP': 'ts', 'STRIPE_LEFT': 'ls',
+    'BASE': 'b', 'STRIPE_BOTTOM': 'bs', 'STRIPE_TOP': 'ts', 'STRIPE_LEFT': 'ls',
     'STRIPE_RIGHT': 'rs', 'STRIPE_CENTER': 'cs', 'STRIPE_MIDDLE': 'ms',
     'STRIPE_DOWNRIGHT': 'drs', 'STRIPE_DOWNLEFT': 'dls', 'STRIPE_SMALL': 'ss',
     'CROSS': 'cr', 'STRAIGHT_CROSS': 'sc', 'DIAGONAL_LEFT': 'ld',
     'DIAGONAL_RIGHT_MIRROR': 'rud', 'DIAGONAL_LEFT_MIRROR': 'lud',
-    'DIAGONAL_RIGHT': 'rd', 'HALF_VERTICAL_LEFT': 'vh', 'HALF_VERTICAL_RIGHT': 'vhr',
+    'DIAGONAL_RIGHT': 'rd', 'HALF_VERTICAL': 'vh', 'HALF_VERTICAL_RIGHT': 'vhr',
     'HALF_HORIZONTAL': 'hh', 'HALF_HORIZONTAL_MIRROR': 'hhb',
     'SQUARE_BOTTOM_LEFT': 'bl', 'SQUARE_BOTTOM_RIGHT': 'br',
     'SQUARE_TOP_LEFT': 'tl', 'SQUARE_TOP_RIGHT': 'tr', 'TRIANGLE_BOTTOM': 'bt',
@@ -22,7 +22,6 @@ PATTERN_MAP = {
     'GLOBE': 'glb', 'PIGLIN': 'pig'
 }
 
-# APIの色名を、ファイルで使われる小文字に変換する対応表
 COLOR_MAP = {
     'WHITE': 'white', 'ORANGE': 'orange', 'MAGENTA': 'magenta', 'LIGHT_BLUE': 'light_blue',
     'YELLOW': 'yellow', 'LIME': 'lime', 'PINK': 'pink', 'GRAY': 'gray',
@@ -30,63 +29,44 @@ COLOR_MAP = {
     'BROWN': 'brown', 'GREEN': 'green', 'RED': 'red', 'BLACK': 'black'
 }
 
-ASSETS_DIR = "assets/banners"
+ASSETS_DIR = "assets/banners" # フォルダ構造の変更に合わせて修正
 
 class BannerRenderer:
-    """
-    Wynncraftのギルドバナーデータを元に、画像を生成する担当者。
-    """
     def create_banner_image(self, banner_data: dict) -> BytesIO | None:
-        """
-        バナーデータを受け取り、Pillowを使って画像を合成し、
-        Discordに送信可能なバイトデータとして返す。
-        """
         if not banner_data or 'base' not in banner_data:
-            logger.warning("無効なバナーデータが渡されました。")
             return None
 
         try:
-            # 1. ベースとなる画像パスを特定
-            base_color_name = banner_data.get('base', 'WHITE').upper()
-            base_color_file = COLOR_MAP.get(base_color_name, 'white')
-            # ベース画像は模様がないため、'b' (base) を使う
-            base_image_path = os.path.join(ASSETS_DIR, "patterns", f"{base_color_file}-b.png")
+            # 1. ベース画像を特定
+            base_color = COLOR_MAP.get(banner_data.get('base', 'WHITE').upper(), 'white')
+            base_abbr = PATTERN_MAP.get('BASE', 'b')
+            base_image_path = os.path.join(ASSETS_DIR, f"{base_color}-{base_abbr}.png")
             
             banner_image = Image.open(base_image_path).convert("RGBA")
 
-            # 2. レイヤーを順番に重ねていく
-            layers = banner_data.get('layers', [])
-            for layer in layers:
-                pattern_api_name = layer.get('pattern')
-                color_api_name = layer.get('colour')
+            # 2. レイヤーを重ねる
+            for layer in banner_data.get('layers', []):
+                pattern_abbr = PATTERN_MAP.get(layer.get('pattern'))
+                color_name = COLOR_MAP.get(layer.get('colour'))
 
-                pattern_abbr = PATTERN_MAP.get(pattern_api_name)
-                color_file_name = COLOR_MAP.get(color_api_name)
-
-                if not pattern_abbr or not color_file_name:
-                    logger.warning(f"不明なパターンまたは色です: {pattern_api_name}, {color_api_name}")
+                if not pattern_abbr or not color_name:
+                    logger.warning(f"不明なパターン/色: {layer.get('pattern')}, {layer.get('colour')}")
                     continue
 
-                # 正しいファイルパスを組み立てる (例: red-cbo.png)
-                pattern_path = os.path.join(ASSETS_DIR, "patterns", f"{color_file_name}-{pattern_abbr}.png")
+                pattern_path = os.path.join(ASSETS_DIR, f"{color_name}-{pattern_abbr}.png")
                 
                 if os.path.exists(pattern_path):
                     pattern_image = Image.open(pattern_path).convert("RGBA")
-                    # ベース画像の上にパターンを重ねる
                     banner_image.paste(pattern_image, (0, 0), pattern_image)
                 else:
                     logger.warning(f"アセットファイルが見つかりません: {pattern_path}")
 
-            # 3. 完成した画像をメモリ上のバイトデータに保存
+            # 3. 完成画像をバイトデータとして返す
             final_buffer = BytesIO()
             banner_image.save(final_buffer, format='PNG')
-            final_buffer.seek(0) # ポインタを先頭に戻す
-
+            final_buffer.seek(0)
             return final_buffer
 
-        except FileNotFoundError as e:
-            logger.error(f"バナーのベース画像が見つかりません: {e}")
-            return None
         except Exception as e:
             logger.error(f"バナー生成中に予期せぬエラー: {e}")
             return None
