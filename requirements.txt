@@ -3,3 +3,4 @@ Flask
 psycopg2-binary
 aiohttp
 python-dotenv
+Pillow
