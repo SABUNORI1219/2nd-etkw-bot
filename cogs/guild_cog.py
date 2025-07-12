@@ -111,7 +111,7 @@ Online Players: {online_count}/{total_members}
         
         embed.set_footer(text=f"{name}'s Stats | Minister Chikuwa")
 
-        return embed, banner_file
+        return embed
 
     @app_commands.command(name="guild", description="ギルドのステータスを表示します。")
     @app_commands.describe(guild="Name or Prefix")
