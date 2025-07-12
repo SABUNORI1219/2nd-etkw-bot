@@ -24,7 +24,7 @@ class RouletteCog(commands.Cog):
     @app_commands.command(name="roulette", description="ルーレットを回してランダムに一つを選びます。")
     @app_commands.describe(
         title="ルーレットのタイトル",
-        options="候補をスペースで区切って入力してください。"
+        options="候補をスペースで区切って入力(候補は10文字以内で入力)"
     )
     async def roulette(self, interaction: discord.Interaction, title: str, options: str):
         await interaction.response.defer()
@@ -75,7 +75,8 @@ class RouletteCog(commands.Cog):
             result_embed = discord.Embed(
                 title=title,
                 description=f"🎉 **{winner}** が選ばれました！",
-                color=discord.Color.gold()
+                color=discord.Color.gold(),
+                embed.set_footer(text=f"ルーレット | Minister Chikuwa")
             )
             result_embed.set_image(url="attachment://roulette.gif") # GIFはそのまま表示し続ける
             
