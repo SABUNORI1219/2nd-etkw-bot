@@ -150,6 +150,7 @@ Online Players: {online_count}/{total_members}
         
         # 6. バナー担当者に、バナー画像の生成を依頼
         banner_bytes = self.banner_renderer.create_banner_image(data_to_use.get('banner'))
+        await interaction.followup.send(f"「{guild_data.get('name')}」のバナー生成に成功しました。", file=banner_file)
         
         # 7. バナー画像を添付して送信
         if banner_bytes:
