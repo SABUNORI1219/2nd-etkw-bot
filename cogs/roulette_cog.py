@@ -22,7 +22,7 @@ class RouletteCog(commands.Cog):
     # ▼▼▼【コマンドの定義を修正】▼▼▼
     @app_commands.command(name="roulette", description="ルーレットを回してランダムに一つを選びます。")
     @app_commands.describe(
-        title="ルーレットのタイトル", # ⬅️ title引数を追加
+        title="ルーレットのタイトル",
         options="候補をスペースで区切って入力してください。"
     )
     async def roulette(self, interaction: discord.Interaction, title: str, options: str):
@@ -47,14 +47,14 @@ class RouletteCog(commands.Cog):
         logger.info(f"ルーレットを実行します。タイトル: {title}, 候補: {candidate_list}, 当選者: {winner}")
 
         # 3. 描画担当者にGIFの生成を依頼
-        gif_buffer = self.renderer.create_roulette_gif(candidate_list, winner_index, title)
+        gif_buffer = self.renderer.create_roulette_gif(candidate_list, winner_index)
 
         # 4. 生成されたGIFを送信
         if gif_buffer:
             gif_file = discord.File(fp=gif_buffer, filename="roulette.gif")
             
             embed = discord.Embed(
-                title="ルーレットの結果！",
+                title=(title),
                 description=f"🎉 **{winner}** が選ばれました！",
                 color=discord.Color.gold()
             )
