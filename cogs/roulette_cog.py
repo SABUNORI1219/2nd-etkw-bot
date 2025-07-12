@@ -19,47 +19,34 @@ class RouletteCog(commands.Cog):
         self.renderer = RouletteRenderer() # ルーレット描画担当者のインスタンスを作成
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
+    # ▼▼▼【コマンドの定義を修正】▼▼▼
     @app_commands.command(name="roulette", description="ルーレットを回してランダムに一つを選びます。")
     @app_commands.describe(
-        option1="候補1",
-        option2="候補2",
-        option3="候補3 (任意)",
-        option4="候補4 (任意)",
-        option5="候補5 (任意)",
-        option6="候補6 (任意)",
-        option7="候補7 (任意)",
-        option8="候補8 (任意)",
+        options="候補をスペースで区切って入力してください。"
     )
-    async def roulette(
-        self, 
-        interaction: discord.Interaction, 
-        option1: str, 
-        option2: str,
-        option3: Optional[str] = None,
-        option4: Optional[str] = None,
-        option5: Optional[str] = None,
-        option6: Optional[str] = None,
-        option7: Optional[str] = None,
-        option8: Optional[str] = None,
-    ):
-        """ユーザーが入力した候補でルーレットを回すコマンド"""
+    async def roulette(self, interaction: discord.Interaction, options: str):
         await interaction.response.defer()
 
-        # 1. ユーザーが入力した候補をリストにまとめる
-        options = [opt for opt in [option1, option2, option3, option4, option5, option6, option7, option8] if opt is not None]
+        # 1. 受け取った文字列をスペースで分割し、候補リストを作成
+        candidate_list = options.split()
 
-        if len(options) < 2:
+        if len(candidate_list) < 2:
             await interaction.followup.send("候補は2つ以上指定してください。")
+            return
+        
+        # Discordの選択肢の最大数である25個に制限する
+        if len(candidate_list) > 25:
+            await interaction.followup.send("候補が多すぎます！25個以下にしてください。")
             return
 
         # 2. 当選者をランダムに決定
-        winner = random.choice(options)
-        winner_index = options.index(winner)
+        winner = random.choice(candidate_list)
+        winner_index = candidate_list.index(winner)
         
-        logger.info(f"ルーレットを実行します。候補: {options}, 当選者: {winner}")
+        logger.info(f"ルーレットを実行します。候補: {candidate_list}, 当選者: {winner}")
 
         # 3. 描画担当者にGIFの生成を依頼
-        gif_buffer = self.renderer.create_roulette_gif(options, winner_index)
+        gif_buffer = self.renderer.create_roulette_gif(candidate_list, winner_index)
 
         # 4. 生成されたGIFを送信
         if gif_buffer:
@@ -75,6 +62,7 @@ class RouletteCog(commands.Cog):
             await interaction.followup.send(embed=embed, file=gif_file)
         else:
             await interaction.followup.send("エラー：GIF画像の生成に失敗しました。")
+    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
 # BotにCogを登録するためのセットアップ関数
 async def setup(bot: commands.Bot):
