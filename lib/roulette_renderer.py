@@ -72,36 +72,32 @@ class RouletteRenderer:
         draw.text((text_x, text_y), text, font=self.font, fill="black", anchor="mm")
 
     def create_roulette_gif(self, candidates: list, winner_index: int, title: str) -> BytesIO | None:
-        """
-        候補リスト、当選者のインデックス、そしてタイトルを受け取り、GIFアニメーションを生成する。
-        """
         logger.info(f"ルーレットGIF生成開始。タイトル: {title}, 候補: {candidates}, 当選者: {candidates[winner_index]}")
         num_candidates = len(candidates)
-        if num_candidates == 0:
-            return None
+        if num_candidates == 0: return None
 
         angle_per_candidate = 360 / num_candidates
         colors = ["royalblue", "salmon", "palegreen", "wheat", "lightcoral", "skyblue", "gold", "plum"]
-        
-        frames = []
         total_rotation_degrees = 360 * 4
-        
         stop_angle = 270 - (angle_per_candidate * winner_index) - (angle_per_candidate / 2)
         total_rotation_degrees += stop_angle
-
-        num_frames = 120
-
-        title_font = ImageFont.truetype(FONT_PATH, 40) # タイトル用フォント
+        num_frames = 100 # フレーム数を少し減らして処理を軽量化
+        
+        frames = []
+        try:
+            title_font = ImageFont.truetype(FONT_PATH, 40)
+        except IOError:
+            title_font = ImageFont.load_default(size=40)
 
         for i in range(num_frames):
+            global frame # グローバル変数としてframeを定義
             progress = i / (num_frames - 1)
             ease_out_progress = 1 - (1 - progress) ** 4
             current_rotation = total_rotation_degrees * ease_out_progress
-
+            
             frame = Image.new("RGBA", (self.size, self.size), (0, 0, 0, 0))
             draw = ImageDraw.Draw(frame)
 
-            # タイトルを描画
             if title:
                 draw.text((self.center, 45), title, font=title_font, fill="white", anchor="ms")
 
@@ -115,8 +111,7 @@ class RouletteRenderer:
             frames.append(frame)
 
         gif_buffer = BytesIO()
-        imageio.mimsave(gif_buffer, frames, format="GIF", duration=50, loop=0)
+        imageio.mimsave(gif_buffer, frames, format="GIF", duration=60, loop=0)
         gif_buffer.seek(0)
-        
         logger.info("✅ ルーレットGIF生成完了。")
         return gif_buffer
