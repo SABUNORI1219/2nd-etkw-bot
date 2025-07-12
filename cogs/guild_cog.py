@@ -105,42 +105,57 @@ Online Players: {online_count}/{total_members}
         return embed
 
     @app_commands.command(name="guild", description="ギルドの詳細情報を表示します。")
-    @app_commands.describe(guild="ギルド名またはプレフィックス")
+    @app_commands.describe(guild="Name or Prefix")
     async def guild(self, interaction: discord.Interaction, guild: str):
         await interaction.response.defer()
 
         cache_key = f"guild_{guild.upper()}"
-        
-        # 1. まずキャッシュ担当者に新鮮なデータを問い合わせる
+        data_to_use = None
+        from_cache = False
+        is_stale = False
+
+        # 1. キャッシュを探す
         cached_data = self.cache.get_cache(cache_key)
         if cached_data:
-            logger.info(f"--- [Cache] ギルド'{guild}'の新鮮なキャッシュを使用しました。")
-            embed = self._create_guild_embed(cached_data, from_cache=True)
-            await interaction.followup.send(embed=embed)
+            logger.info(f"--- [Cache] ギルド'{guild}'のキャッシュを使用しました。")
+            data_to_use = cached_data
+            from_cache = True
+        else:
+            # 2. キャッシュがなければAPIを叩く
+            logger.info(f"--- [API] ギルド'{guild}'のデータをAPIから取得します。")
+            api_data = await self.wynn_api.get_nori_guild_data(guild)
+            if api_data and 'name' in api_data:
+                self.cache.set_cache(cache_key, api_data)
+                data_to_use = api_data
+            else:
+                # 3. APIがダメなら古いキャッシュを探す
+                stale_cache = self.cache.get_cache(cache_key, ignore_freshness=True)
+                if stale_cache:
+                    logger.warning(f"--- [API] APIアクセスに失敗。ギルド'{guild}'の古いキャッシュを使用。")
+                    data_to_use = stale_cache
+                    from_cache = True
+                    is_stale = True
+
+        # 4. データが何もなければ、ここで終了
+        if not data_to_use:
+            await interaction.followup.send(f"ギルド「{guild}」が見つかりませんでした。")
             return
 
-        # 2. キャッシュがない場合、API担当者に問い合わせる
-        logger.info(f"--- [API] ギルド'{guild}'のデータをAPIから取得します。")
-        api_data = await self.wynn_api.get_nori_guild_data(guild)
-
-        # 3. APIから正常にデータを取得できた場合
-        if api_data and 'name' in api_data:
-            self.cache.set_cache(cache_key, api_data) # データをキャッシュに保存
-            embed = self._create_guild_embed(api_data)
+        # --- ▼▼▼【ここからがバナー生成と送信の統一ロジック】▼▼▼
+        # 5. 取得したデータから、テキスト部分の埋め込みを作成
+        embed = self._create_guild_embed(data_to_use, interaction, from_cache, is_stale)
+        
+        # 6. バナー担当者に、バナー画像の生成を依頼
+        banner_bytes = self.banner_renderer.create_banner_image(data_to_use.get('banner'))
+        
+        # 7. バナー画像を添付して送信
+        if banner_bytes:
+            banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
+            embed.set_thumbnail(url="attachment://guild_banner.png")
+            await interaction.followup.send(embed=embed, file=banner_file)
+        else:
+            # 画像生成に失敗した場合は、埋め込みだけを送信
             await interaction.followup.send(embed=embed)
-            return
-
-        # 4. APIがエラーを返した場合、古いキャッシュでもいいので探す
-        logger.warning(f"--- [API] ギルド'{guild}'のAPIアクセスに失敗。古いキャッシュを探します。")
-        stale_cache = self.cache.get_cache(cache_key, ignore_freshness=True)
-        if stale_cache:
-            logger.info(f"--- [Cache] ギルド'{guild}'の古いキャッシュを使用しました。")
-            embed = self._create_guild_embed(stale_cache, from_cache=True, is_stale=True)
-            await interaction.followup.send(embed=embed)
-            return
-            
-        # 5. APIもダメ、キャッシュも全くない場合の最終手段
-        await interaction.followup.send(f"ギルド「{guild}」が見つかりませんでした。APIが応答しないか、存在しないギルドです。")
 
 # BotにCogを登録するためのセットアップ関数
 async def setup(bot: commands.Bot):
