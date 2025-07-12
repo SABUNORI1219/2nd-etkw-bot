@@ -27,7 +27,11 @@ class WynncraftAPI:
         try:
             url = WYNN_GUILD_BY_NAME_API_URL.format(quote(guild_name))
             async with self.session.get(url) as response:
-                return await response.json() if response.status == 200 else None
+                if response.status == 200:
+                    data = await response.json()
+                    # 公式APIはデータが見つかるとリストで返すため、最初の要素を取得
+                    return data if data else None
+                return None
         except Exception as e:
             logger.error(f"--- [API Handler] Wynncraft Guild (Name) APIリクエスト中にエラー: {e}")
             return None
@@ -37,7 +41,11 @@ class WynncraftAPI:
         try:
             url = WYNN_GUILD_BY_PREFIX_API_URL.format(quote(guild_prefix))
             async with self.session.get(url) as response:
-                return await response.json() if response.status == 200 else None
+                if response.status == 200:
+                    data = await response.json()
+                    # プレフィックス検索は単一の結果を返すことが多い
+                    return data if data else None
+                return None
         except Exception as e:
             logger.error(f"--- [API Handler] Wynncraft Guild (Prefix) APIリクエスト中にエラー: {e}")
             return None
