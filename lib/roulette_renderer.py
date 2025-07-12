@@ -17,7 +17,7 @@ class RouletteRenderer:
     """
     ルーレットのGIFアニメーションを生成する専門家。
     """
-    def __init__(self, size=400, pointer_color=(0, 0, 0)):
+    def __init__(self, size=400, pointer_color=(255, 0, 0)):
         self.size = size
         self.center = size // 2
         self.radius = size // 2 - 20  # 少し余白を持たせる
@@ -114,6 +114,13 @@ class RouletteRenderer:
             # 固定要素（ポインタなど）を描画
             self._draw_static_elements(draw)
             frames.append(frame)
+
+        last_frame = frames[-1]
+        for _ in range(40):
+            frames.append(last_frame)
+        
+        # アニメーションの合計時間を計算（秒単位）
+        animation_duration = (num_frames * duration_ms) / 1000.0
 
         # フレームをGIFに変換
         gif_buffer = BytesIO()
