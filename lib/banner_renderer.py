@@ -70,6 +70,8 @@ class BannerRenderer:
             
             # NEARESTフィルタを使って、ピクセルアートの質感を保ったまま拡大
             resized_image = banner_image.resize(new_size, resample=Image.Resampling.NEAREST)
+
+            logger.info(f"--- [Banner] 画像を {scale_factor} 倍に拡大しました。新しいサイズ: {resized_image}")
             
             # 4. 拡大した画像をバイトデータとして返す
             final_buffer = BytesIO()
