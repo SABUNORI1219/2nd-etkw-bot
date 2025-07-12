@@ -51,18 +51,14 @@ class RouletteRenderer:
             fill=self.pointer_color,
         )
 
-    def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text):
+    def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text, frame_image):
         """ルーレットの扇形一つ分と、その中のテキストを描画する"""
-        # 扇形を描画
         draw.pieslice(
             [(20, 20), (self.size - 20, self.size - 20)],
-            start=start_angle,
-            end=end_angle,
-            fill=color,
-            outline="white",
-            width=2,
+            start=start_angle, end=end_angle, fill=color, outline="white", width=2
         )
-
+        
+        # ▼▼▼【ここから追加】▼▼▼
         # テキストが扇形の幅に収まるようにフォントサイズを自動調整
         font = self.base_font
         # 扇形の描画可能なおおよその幅を計算
@@ -73,14 +69,24 @@ class RouletteRenderer:
             except IOError:
                 # フォントファイルが見つからない場合はデフォルトフォントでサイズ変更
                 font = ImageFont.load_default(size=font.size - 2)
+        # ▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-        # テキストを描画する角度と位置を計算
         text_angle = math.radians(start_angle + (end_angle - start_angle) / 2)
-        text_x = self.center + int(self.radius * 0.6 * math.cos(text_angle))
-        text_y = self.center + int(self.radius * 0.6 * math.sin(text_angle))
+        
+        # テキストを画像として一度描き、それを回転させて貼り付ける
+        text_image = Image.new('RGBA', font.getbbox(text)[2:], (255, 255, 255, 0))
+        text_draw = ImageDraw.Draw(text_image)
+        text_draw.text((0, 0), text, font=font, fill="black")
+        
+        # 文字が円の外側を向くように90度加算して回転
+        rotated_text = text_image.rotate(math.degrees(-text_angle) + 90, expand=True)
+        
+        # 貼り付け位置を計算
+        paste_radius = self.radius * 0.6
+        paste_x = self.center + int(paste_radius * math.cos(text_angle)) - rotated_text.width // 2
+        paste_y = self.center + int(paste_radius * math.sin(text_angle)) - rotated_text.height // 2
 
-        # テキストを描画
-        draw.text((text_x, text_y), text, font=self.font, fill="black", anchor="mm")
+        frame_image.paste(rotated_text, (paste_x, paste_y), rotated_text)
 
     def create_roulette_gif(self, candidates: list, winner_index: int) -> BytesIO | None:
         """
