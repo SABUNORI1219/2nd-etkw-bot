@@ -60,7 +60,7 @@ class RouletteRenderer:
         
         # ▼▼▼【ここから追加】▼▼▼
         # テキストが扇形の幅に収まるようにフォントサイズを自動調整
-        font = self.base_font
+        font = self.font
         # 扇形の描画可能なおおよその幅を計算
         sector_width = self.radius * 0.8 
         while font.getbbox(text)[2] > sector_width and font.size > 10:
