@@ -63,6 +63,17 @@ class RouletteRenderer:
             width=2,
         )
 
+        # テキストが扇形の幅に収まるようにフォントサイズを自動調整
+        font = self.base_font
+        # 扇形の描画可能なおおよその幅を計算
+        sector_width = self.radius * 0.8 
+        while font.getbbox(text)[2] > sector_width and font.size > 10:
+            try:
+                font = ImageFont.truetype(FONT_PATH, font.size - 2)
+            except IOError:
+                # フォントファイルが見つからない場合はデフォルトフォントでサイズ変更
+                font = ImageFont.load_default(size=font.size - 2)
+
         # テキストを描画する角度と位置を計算
         text_angle = math.radians(start_angle + (end_angle - start_angle) / 2)
         text_x = self.center + int(self.radius * 0.6 * math.cos(text_angle))
