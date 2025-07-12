@@ -8,7 +8,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # 設定ファイルからAPIのURLをインポート
-from config import NORI_GUILD_API_URL, WYNN_PLAYER_API_URL, NORI_PLAYER_API_URL
+from config import (
+    NORI_GUILD_API_URL,
+    NORI_PLAYER_API_URL,
+    WYNN_PLAYER_API_URL,
+    WYNN_GUILD_BY_NAME_API_URL,
+    WYNN_GUILD_BY_PREFIX_API_URL
+)
 
 class WynncraftAPI:
     def __init__(self):
