@@ -1,5 +1,4 @@
 from PIL import Image, ImageDraw, ImageFont
-import imageio
 import math
 from io import BytesIO
 import os
@@ -125,7 +124,9 @@ class RouletteRenderer:
 
         # フレームをGIFに変換
         gif_buffer = BytesIO()
-        imageio.mimsave(gif_buffer, frames, format="GIF", duration=50, loop=0) # durationはフレーム間の時間(ミリ秒)
+
+        import imageio
+        imageio.mimsave(gif_buffer, frames, format="GIF", duration=(duration_ms/1000), loop=0)
         gif_buffer.seek(0)
         
         logger.info("✅ ルーレットGIF生成完了。")
