@@ -41,6 +41,11 @@ class RouletteCog(commands.Cog):
             await interaction.followup.send("候補が多すぎます！25個以下にしてください。")
             return
 
+        for candidate in candidate_list:
+            if len(candidate) > 10:
+                await interaction.followup.send(f"候補「{candidate}」が長すぎます。各候補は10文字以内にしてください。")
+                return
+
         # 2. 当選者をランダムに決定
         winner = random.choice(candidate_list)
         winner_index = candidate_list.index(winner)
