@@ -117,6 +117,9 @@ Online Players: {online_count}/{total_members}
         from_cache = False
         is_stale = False
 
+        logger.info(f"--- [Test] 公式APIから '{prefix}' のデータを取得します。")
+        guild_data = await self.wynn_api.get_guild_by_prefix(prefix)
+
         # 1. キャッシュを探す
         cached_data = self.cache.get_cache(cache_key)
         if cached_data:
@@ -144,11 +147,7 @@ Online Players: {online_count}/{total_members}
             await interaction.followup.send(f"ギルド「{guild}」が見つかりませんでした。")
             return
 
-        # --- ▼▼▼【ここからがバナー生成と送信の統一ロジック】▼▼▼
-        # 5. 取得したデータから、テキスト部分の埋め込みを作成
         embed = self._create_guild_embed(data_to_use, interaction, from_cache, is_stale)
-        
-        # 6. バナー担当者に、バナー画像の生成を依頼
         banner_bytes = self.banner_renderer.create_banner_image(data_to_use.get('banner'))
 
         if banner_bytes:
