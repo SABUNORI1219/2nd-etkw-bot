@@ -58,7 +58,7 @@ class GuildCog(commands.Cog):
 
         return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players_list)
 
-    def _create_guild_embed(self, data: dict, from_cache: bool = False, is_stale: bool = False) -> discord.Embed:
+    def _create_guild_embed(self, data: dict, interaction: discord.Interaction, from_cache: bool = False, is_stale: bool = False) -> discord.Embed:
         name = self._safe_get(data, ['name'])
         encoded_name = quote(name)
         prefix = self._safe_get(data, ['prefix'])
@@ -148,7 +148,7 @@ Online Players: {online_count}/{total_members}
         embed = self._create_guild_embed(data_to_use, interaction, from_cache, is_stale)
         
         # 6. バナー担当者に、バナー画像の生成を依頼
-        banner_bytes = self.banner_renderer.create_banner_image(data_to_use.get('banner'))
+        banner_bytes = self.banner_renderer.create_banner_image(data_to_use.get('banner')))
         
         # 7. バナー画像を添付して送信
         if banner_bytes:
