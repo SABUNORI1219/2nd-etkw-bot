@@ -154,8 +154,10 @@ Online Players: {online_count}/{total_members}
         if banner_bytes:
             banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
             embed.set_thumbnail(url="attachment://guild_banner.png")
+            logger.info(f"--- [ばなー] バナーの画像生成に成功！")
             await interaction.followup.send(embed=embed, file=banner_file)
         else:
+            logger.error(f"--- [ばなー] バナーの画像生成に失敗！")
             await interaction.followup.send(embed=embed)
 
             
