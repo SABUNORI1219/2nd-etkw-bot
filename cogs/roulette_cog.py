@@ -22,9 +22,10 @@ class RouletteCog(commands.Cog):
     # ▼▼▼【コマンドの定義を修正】▼▼▼
     @app_commands.command(name="roulette", description="ルーレットを回してランダムに一つを選びます。")
     @app_commands.describe(
+        title="ルーレットのタイトル", # ⬅️ title引数を追加
         options="候補をスペースで区切って入力してください。"
     )
-    async def roulette(self, interaction: discord.Interaction, options: str):
+    async def roulette(self, interaction: discord.Interaction, title: str, options: str):
         await interaction.response.defer()
 
         # 1. 受け取った文字列をスペースで分割し、候補リストを作成
@@ -43,10 +44,10 @@ class RouletteCog(commands.Cog):
         winner = random.choice(candidate_list)
         winner_index = candidate_list.index(winner)
         
-        logger.info(f"ルーレットを実行します。候補: {candidate_list}, 当選者: {winner}")
+        logger.info(f"ルーレットを実行します。タイトル: {title}, 候補: {candidate_list}, 当選者: {winner}")
 
         # 3. 描画担当者にGIFの生成を依頼
-        gif_buffer = self.renderer.create_roulette_gif(candidate_list, winner_index)
+        gif_buffer = self.renderer.create_roulette_gif(candidate_list, winner_index, title)
 
         # 4. 生成されたGIFを送信
         if gif_buffer:
