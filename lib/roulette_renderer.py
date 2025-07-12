@@ -127,7 +127,7 @@ class RouletteRenderer:
                 start_angle = angle_per_candidate * j + current_rotation
                 end_angle = angle_per_candidate * (j + 1) + current_rotation
                 color = colors[j % len(colors)]
-                self._draw_wheel_sector(draw, start_angle, end_angle, color, candidate)
+                self._draw_wheel_sector(draw, start_angle, end_angle, color, candidate, frame)
 
             # 固定要素（ポインタなど）を描画
             self._draw_static_elements(draw)
