@@ -112,8 +112,8 @@ Online Players: {online_count}/{total_members}
     async def guild(self, interaction: discord.Interaction, guild: str):
         await interaction.response.defer()
 
-        cache_key = f"guild_{guild.upper()}" # のりAPIの方のキャッシュ
-        cache_guild = f"guild_{guild.upper()}" # 公式APIの方のキャッシュ
+        cache_key = f"nori_{guild.upper()}" # のりAPIの方のキャッシュ
+        cache_guild = f"official_{guild.upper()}" # 公式APIの方のキャッシュ
         
         data_to_use = None
         from_cache = False
