@@ -61,6 +61,15 @@ class BannerRenderer:
                 else:
                     logger.warning(f"アセットファイルが見つかりません: {pattern_path}")
 
+            # 3. 完成した画像を拡大する
+            scale_factor = 5  # 拡大率（この数字を大きくすると、画像も大きくなります）
+            
+            original_width, original_height = banner_image.size
+            new_size = (original_width * scale_factor, original_height * scale_factor)
+            
+            # NEARESTフィルタを使って、ピクセルアートの質感を保ったまま拡大
+            resized_image = banner_image.resize(new_size, resample=Image.Resampling.NEAREST)
+
             # 3. 完成画像をバイトデータとして返す
             final_buffer = BytesIO()
             banner_image.save(final_buffer, format='PNG')
