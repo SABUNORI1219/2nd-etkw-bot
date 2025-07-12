@@ -20,6 +20,7 @@ class RouletteRenderer:
         self.size = size
         self.center = size // 2
         self.radius = size // 2 - 20  # 少し余白を持たせる
+        self.polygon_color = polygon_color
         self.pointer_color = pointer_color
         try:
             # フォントを読み込む。サイズは後で調整
