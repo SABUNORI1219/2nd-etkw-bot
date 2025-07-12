@@ -46,24 +46,36 @@ class RouletteCog(commands.Cog):
         
         logger.info(f"ルーレットを実行します。タイトル: {title}, 候補: {candidate_list}, 当選者: {winner}")
 
-        # 3. 描画担当者にGIFの生成を依頼
-        gif_buffer = self.renderer.create_roulette_gif(candidate_list, winner_index)
+        # 1. 描画担当者にGIFの生成を依頼（アニメーション時間も受け取る）
+        gif_buffer, animation_duration = self.renderer.create_roulette_gif(candidate_list, winner_index)
 
-        # 4. 生成されたGIFを送信
         if gif_buffer:
             gif_file = discord.File(fp=gif_buffer, filename="roulette.gif")
             
+            # 2. まず「回転中」のメッセージとGIFを送信
             embed = discord.Embed(
                 title=(title),
-                description=f"🎉 **{winner}** が選ばれました！",
-                color=discord.Color.gold()
+                description="ルーレットを回しています...",
+                color=discord.Color.light_gray()
             )
             embed.set_image(url="attachment://roulette.gif")
             
-            await interaction.followup.send(embed=embed, file=gif_file)
+            message = await interaction.followup.send(embed=embed, file=gif_file)
+
+            # 3. アニメーション時間分だけ待機
+            await asyncio.sleep(animation_duration + 0.5) # 0.5秒の余韻
+
+            # 4. メッセージを編集して結果を発表
+            result_embed = discord.Embed(
+                title=title,
+                description=f"🎉 **{winner}** が選ばれました！",
+                color=discord.Color.gold()
+            )
+            result_embed.set_image(url="attachment://roulette.gif") # GIFはそのまま表示し続ける
+            
+            await message.edit(embed=result_embed)
         else:
             await interaction.followup.send("エラー：GIF画像の生成に失敗しました。")
-    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
 # BotにCogを登録するためのセットアップ関数
 async def setup(bot: commands.Bot):
