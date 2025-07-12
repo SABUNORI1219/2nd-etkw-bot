@@ -112,26 +112,40 @@ Online Players: {online_count}/{total_members}
     async def guild(self, interaction: discord.Interaction, guild: str):
         await interaction.response.defer()
 
-        cache_key = f"guild_{guild.upper()}"
+        cache_key = f"guild_{guild.upper()}" # のりAPIの方のキャッシュ
+        cache_guild = f"guild_{guild.upper()}" # 公式APIの方のキャッシュ
+        
         data_to_use = None
         from_cache = False
         is_stale = False
-
         guild_data = None
-
-        logger.info(f"--- [GuildCmd] プレフィックス '{guild}' として検索します...")
-        data_as_prefix = await self.wynn_api.get_guild_by_prefix(guild)
-        if data_as_prefix and data_as_prefix.get('name'): # データがあり、nameキーを持つか
-            guild_data = data_as_prefix
-            logger.info(f"--- [GuildCmd] ✅ プレフィックスとして'{guild}'が見つかりました。")
-
-        # ステップ2：プレフィックスで見つからなければ、フルネームとして再検索
+        
+        # --- ステップ1: まずキャッシュを確認 ---
+        cached_guild_data = self.cache.get_cache(cache_guild)
+        if cached_guild_data:
+            logger.info(f"--- [Cache] ギルド'{guild}'のキャッシュを使用します。")
+            guild_data = cached_guild_data
+            from_cache = True
+        
+        # --- ステップ2: キャッシュがなければ、二段構えでAPIを検索 ---
         if not guild_data:
-            logger.info(f"--- [GuildCmd] プレフィックスとして見つからず。フルネーム '{guild}' として再検索します...")
-            data_as_name = await self.wynn_api.get_guild_by_name(guild)
-            if data_as_name and data_as_name.get('name'):
-                guild_data = data_as_name
-                logger.info(f"--- [GuildCmd] ✅ フルネームとして'{guild}'が見つかりました。")
+            # まずプレフィックスとして検索
+            logger.info(f"--- [API] プレフィックス '{guild}' として検索します...")
+            data_as_prefix = await self.wynn_api.get_guild_by_prefix(guild)
+            if data_as_prefix and data_as_prefix.get('name'):
+                guild_data = data_as_prefix
+                logger.info(f"--- [GuildCmd] ✅ プレフィックスとして'{guild}'が見つかりました。")
+            else:
+                # 見つからなければフルネームで再検索
+                logger.info(f"--- [API] プレフィックスとして見つからず。フルネーム '{guild}' として再検索します...")
+                data_as_name = await self.wynn_api.get_guild_by_name(guild)
+                if data_as_name and data_as_name.get('name'):
+                    guild_data = data_as_name
+                    logger.info(f"--- [GuildCmd] ✅ フルネームとして'{guild}'が見つかりました。")
+
+            # APIでデータが取得できたら、キャッシュに保存
+            if guild_data:
+                self.cache.set_cache(cache_guild, guild_data)
 
         # 1. キャッシュを探す
         cached_data = self.cache.get_cache(cache_key)
