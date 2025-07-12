@@ -91,6 +91,7 @@ class RouletteRenderer:
         total_rotation_degrees += stop_angle
 
         num_frames = 120  # GIFのフレーム数（アニメーションの滑らかさ）
+        duration_ms = 50 # 1フレームあたりの時間（ミリ秒）
 
         for i in range(num_frames):
             # アニメーションの進行度 (0.0 -> 1.0)
