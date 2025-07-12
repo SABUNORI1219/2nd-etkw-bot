@@ -17,7 +17,7 @@ class RouletteRenderer:
     """
     ルーレットのGIFアニメーションを生成する専門家。
     """
-    def __init__(self, size=540, pointer_color=(0, 0, 0)):
+    def __init__(self, size=480, pointer_color=(0, 0, 0)):
         self.size = size
         self.center = size // 2
         self.radius = size // 2 - 20  # 少し余白を持たせる
@@ -34,9 +34,9 @@ class RouletteRenderer:
         # ポインタ（三角形）を描画
         draw.polygon(
             [
-                (self.center, 2),
-                (self.center - 15, 35),
-                (self.center + 15, 35),
+                (self.center, self.size - 2),          # 下の頂点
+                (self.center - 15, self.size - 35),    # 左上の頂点
+                (self.center + 15, self.size - 35),    # 右上の頂点
             ],
             fill=self.pointer_color,
         )
@@ -103,6 +103,9 @@ class RouletteRenderer:
             # 新しいフレームを作成
             frame = Image.new("RGBA", (self.size, self.size), (0, 0, 0, 0))
             draw = ImageDraw.Draw(frame)
+
+            title_font = ImageFont.truetype(FONT_PATH, 40)
+            draw.text((self.center, 40), title, font=title_font, fill="white", anchor="ms")
 
             # 各セクターを描画
             for j, candidate in enumerate(candidates):
