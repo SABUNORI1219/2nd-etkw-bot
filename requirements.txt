@@ -4,3 +4,5 @@ psycopg2-binary
 aiohttp
 python-dotenv
 Pillow
+imageio
+imageio-ffmpeg
