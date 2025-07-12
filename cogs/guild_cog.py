@@ -151,19 +151,13 @@ Online Players: {online_count}/{total_members}
         # 6. バナー担当者に、バナー画像の生成を依頼
         banner_bytes = self.banner_renderer.create_banner_image(data_to_use.get('banner'))
 
-        # ▼▼▼【ここからが画像送信のコードです】▼▼▼
-
-        # 7. バナー画像が正常に生成されたか（Noneでないか）をチェック
         if banner_bytes:
-            # 成功した場合、メモリ上の画像データからdiscord.Fileオブジェクトを作成します
-            # filenameは、Discord上で表示されるファイル名です
             banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
-    
-            # 作成したファイルを、メッセージとして送信します
-            await interaction.followup.send("バナーの生成に成功しました！", file=banner_file)
+            embed.set_thumbnail(url="attachment://guild_banner.png")
+            await interaction.followup.send(embed=embed, file=banner_file)
         else:
-            # 画像生成に失敗した場合
-            await interaction.followup.send("バナー画像の生成に失敗しました。")
+            await interaction.followup.send(embed=embed)
+
             
 # BotにCogを登録するためのセットアップ関数
 async def setup(bot: commands.Bot):
