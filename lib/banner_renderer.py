@@ -33,63 +33,40 @@ ASSETS_DIR = "assets/banners" # フォルダ構造の変更に合わせて修正
 
 class BannerRenderer:
     def create_banner_image(self, banner_data: dict) -> BytesIO | None:
-        logger.info("--- [Banner] バナー生成プロセスを開始します。")
-
         if not banner_data or 'base' not in banner_data:
-            logger.warning("--- [Banner] 警告: 無効なバナーデータ、または 'base' キーが存在しません。")
             return None
 
         try:
             # 1. ベース画像を特定
-            base_color_name = banner_data.get('base', 'WHITE').upper()
-            base_color_file = COLOR_MAP.get(base_color_name)
-            if not base_color_file:
-                logger.error(f"--- [Banner] エラー: 不明なベース色名です: {base_color_name}")
-                return None
-            
+            base_color = COLOR_MAP.get(banner_data.get('base', 'WHITE').upper(), 'white')
             base_abbr = PATTERN_MAP.get('BASE', 'b')
-            base_image_path = os.path.join(ASSETS_DIR, f"{base_color_file}-{base_abbr}.png")
-            
-            logger.info(f"--- [Banner] ステップ1: ベース画像を読み込みます → {base_image_path}")
-            if not os.path.exists(base_image_path):
-                logger.error(f"--- [Banner] エラー: ベース画像ファイルが見つかりません！ パス: {base_image_path}")
-                return None
+            base_image_path = os.path.join(ASSETS_DIR, f"{base_color}-{base_abbr}.png")
             
             banner_image = Image.open(base_image_path).convert("RGBA")
 
             # 2. レイヤーを重ねる
-            layers = banner_data.get('layers', [])
-            logger.info(f"--- [Banner] ステップ2: {len(layers)}層のレイヤー処理を開始します。")
-            for i, layer in enumerate(layers):
-                pattern_api_name = layer.get('pattern')
-                color_api_name = layer.get('colour')
+            for layer in banner_data.get('layers', []):
+                pattern_abbr = PATTERN_MAP.get(layer.get('pattern'))
+                color_name = COLOR_MAP.get(layer.get('colour'))
 
-                pattern_abbr = PATTERN_MAP.get(pattern_api_name)
-                color_file_name = COLOR_MAP.get(color_api_name)
-
-                if not pattern_abbr or not color_file_name:
-                    logger.warning(f"--- [Banner] レイヤー{i+1}: 不明なパターン/色のためスキップします: {pattern_api_name}, {color_api_name}")
+                if not pattern_abbr or not color_name:
+                    logger.warning(f"不明なパターン/色: {layer.get('pattern')}, {layer.get('colour')}")
                     continue
 
-                pattern_path = os.path.join(ASSETS_DIR, f"{color_file_name}-{pattern_abbr}.png")
-                logger.info(f"--- [Banner] レイヤー{i+1}: 模様画像を読み込みます → {pattern_path}")
+                pattern_path = os.path.join(ASSETS_DIR, f"{color_name}-{pattern_abbr}.png")
                 
                 if os.path.exists(pattern_path):
                     pattern_image = Image.open(pattern_path).convert("RGBA")
                     banner_image.paste(pattern_image, (0, 0), pattern_image)
-                    pattern_image.close()
                 else:
-                    logger.error(f"--- [Banner] エラー: レイヤー{i+1}のアセットファイルが見つかりません！ パス: {pattern_path}")
-                    # 1つでもファイルが見つからない場合は、不完全なバナーになるため生成を中止
-                    return None
+                    logger.warning(f"アセットファイルが見つかりません: {pattern_path}")
 
             # 3. 完成画像をバイトデータとして返す
             final_buffer = BytesIO()
             banner_image.save(final_buffer, format='PNG')
             final_buffer.seek(0)
-            logger.info("--- [Banner] ✅ バナー画像の生成に成功しました。")
             return final_buffer
 
         except Exception as e:
-            logger.error(f"--- [Banner] 予期せぬエラーでバナー生成に失敗: {e}", exc_info=True)
+            logger.error(f"バナー生成中に予期せぬエラー: {e}")
             return None
