@@ -130,4 +130,4 @@ class RouletteRenderer:
         gif_buffer.seek(0)
         
         logger.info("✅ ルーレットGIF生成完了。")
-        return gif_buffer
+        return gif_buffer, animation_duration
