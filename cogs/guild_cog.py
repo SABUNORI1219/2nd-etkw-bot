@@ -3,12 +3,14 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
 from urllib.parse import quote
+from io import BytesIO
 import logging
 
 logger = logging.getLogger(__name__)
 
 from lib.wynncraft_api import WynncraftAPI
 from lib.cache_handler import CacheHandler
+from lib.banner_renderer import BannerRenderer
 from config import EMBED_COLOR_BLUE
 
 class GuildCog(commands.Cog):
@@ -152,9 +154,11 @@ Online Players: {online_count}/{total_members}
         if banner_bytes:
             banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
             embed.set_thumbnail(url="attachment://guild_banner.png")
+            logger.info(f"--- [ばなー] バナーの生成に成功し、サムネイルに設定しました！")
             await interaction.followup.send(embed=embed, file=banner_file)
         else:
             # 画像生成に失敗した場合は、埋め込みだけを送信
+            logger.error(f"--- [ばなー] バナーの生成に失敗しました！")
             await interaction.followup.send(embed=embed)
 
 # BotにCogを登録するためのセットアップ関数
