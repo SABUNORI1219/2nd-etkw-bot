@@ -127,7 +127,7 @@ class RouletteRenderer:
         gif_buffer = BytesIO()
 
         import imageio
-        imageio.mimsave(gif_buffer, frames, format="GIF", duration=(duration_ms/1000), loop=0)
+        imageio.mimsave(gif_buffer, frames, format="GIF", duration=(duration_ms/1000))
         gif_buffer.seek(0)
         
         logger.info("✅ ルーレットGIF生成完了。")
