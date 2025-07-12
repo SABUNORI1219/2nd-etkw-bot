@@ -61,20 +61,25 @@ class BannerRenderer:
                 else:
                     logger.warning(f"アセットファイルが見つかりません: {pattern_path}")
 
-            # 3. 完成した画像を拡大する
+            # ▼▼▼【画像の拡大処理を再調整】▼▼▼
             scale_factor = 5  # 拡大率（この数字を大きくすると、画像も大きくなります）
-            
+
             original_width, original_height = banner_image.size
             new_size = (original_width * scale_factor, original_height * scale_factor)
-            
-            # NEARESTフィルタを使って、ピクセルアートの質感を保ったまま拡大
+
+            # NEARESTフィルタを使って、ピクセル数をそのまま拡大
             resized_image = banner_image.resize(new_size, resample=Image.Resampling.NEAREST)
 
-            # 3. 完成画像をバイトデータとして返す
+            # 拡大後のサイズをログに出力
+            logger.info(f"--- [Banner] 画像を {scale_factor} 倍に拡大しました。新しいサイズ: {resized_image.size}")
+
+            # 拡大した画像をバイトデータとして返す
             final_buffer = BytesIO()
-            banner_image.save(final_buffer, format='PNG')
+            resized_image.save(final_buffer, format='PNG')
             final_buffer.seek(0)
+            logger.info("--- [Banner] ✅ バナー画像の生成と拡大に成功しました。")
             return final_buffer
+            # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
         except Exception as e:
             logger.error(f"バナー生成中に予期せぬエラー: {e}")
