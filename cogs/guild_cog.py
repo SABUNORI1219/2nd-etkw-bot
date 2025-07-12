@@ -117,8 +117,21 @@ Online Players: {online_count}/{total_members}
         from_cache = False
         is_stale = False
 
-        logger.info(f"--- [Test] 公式APIから '{prefix}' のデータを取得します。")
-        guild_data = await self.wynn_api.get_guild_by_prefix(prefix)
+        guild_data = None
+
+        logger.info(f"--- [GuildCmd] プレフィックス '{guild}' として検索します...")
+        data_as_prefix = await self.wynn_api.get_guild_by_prefix(guild)
+        if data_as_prefix and data_as_prefix.get('name'): # データがあり、nameキーを持つか
+            guild_data = data_as_prefix
+            logger.info(f"--- [GuildCmd] ✅ プレフィックスとして'{guild}'が見つかりました。")
+
+        # ステップ2：プレフィックスで見つからなければ、フルネームとして再検索
+        if not guild_data:
+            logger.info(f"--- [GuildCmd] プレフィックスとして見つからず。フルネーム '{guild}' として再検索します...")
+            data_as_name = await self.wynn_api.get_guild_by_name(guild)
+            if data_as_name and data_as_name.get('name'):
+                guild_data = data_as_name
+                logger.info(f"--- [GuildCmd] ✅ フルネームとして'{guild}'が見つかりました。")
 
         # 1. キャッシュを探す
         cached_data = self.cache.get_cache(cache_key)
@@ -148,7 +161,7 @@ Online Players: {online_count}/{total_members}
             return
 
         embed = self._create_guild_embed(data_to_use, interaction, from_cache, is_stale)
-        banner_bytes = self.banner_renderer.create_banner_image(data_to_use.get('banner'))
+        banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner'))
 
         if banner_bytes:
             banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
