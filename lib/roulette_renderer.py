@@ -58,35 +58,24 @@ class RouletteRenderer:
             start=start_angle, end=end_angle, fill=color, outline="white", width=2
         )
         
-        # ▼▼▼【ここから追加】▼▼▼
-        # テキストが扇形の幅に収まるようにフォントサイズを自動調整
         font = self.font
-        # 扇形の描画可能なおおよその幅を計算
-        sector_width = self.radius * 0.8 
+        sector_width = self.radius * 0.8
         while font.getbbox(text)[2] > sector_width and font.size > 10:
             try:
                 font = ImageFont.truetype(FONT_PATH, font.size - 2)
             except IOError:
-                # フォントファイルが見つからない場合はデフォルトフォントでサイズ変更
                 font = ImageFont.load_default(size=font.size - 2)
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲
 
+        # ▼▼▼【ここから修正】▼▼▼
+        # テキストを描画する中心の座標を計算
         text_angle = math.radians(start_angle + (end_angle - start_angle) / 2)
+        text_radius = self.radius * 0.6
+        text_x = self.center + int(text_radius * math.cos(text_angle))
+        text_y = self.center + int(text_radius * math.sin(text_angle))
         
-        # テキストを画像として一度描き、それを回転させて貼り付ける
-        text_image = Image.new('RGBA', font.getbbox(text)[2:], (255, 255, 255, 0))
-        text_draw = ImageDraw.Draw(text_image)
-        text_draw.text((0, 0), text, font=font, fill="black")
-        
-        # 文字が円の外側を向くように90度加算して回転
-        rotated_text = text_image.rotate(math.degrees(-text_angle) + 90, expand=True)
-        
-        # 貼り付け位置を計算
-        paste_radius = self.radius * 0.6
-        paste_x = self.center + int(paste_radius * math.cos(text_angle)) - rotated_text.width // 2
-        paste_y = self.center + int(paste_radius * math.sin(text_angle)) - rotated_text.height // 2
-
-        frame_image.paste(rotated_text, (paste_x, paste_y), rotated_text)
+        # 計算した座標に、テキストを水平に直接描画する
+        # anchor="mm" は、指定した座標をテキストの中心にする設定
+        draw.text((text_x, text_y), text, font=font, fill="black", anchor="mm")
 
     def create_roulette_gif(self, candidates: list, winner_index: int) -> BytesIO | None:
         """
