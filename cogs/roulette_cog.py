@@ -65,6 +65,7 @@ class RouletteCog(commands.Cog):
                 color=discord.Color.light_gray()
             )
             embed.set_image(url="attachment://roulette.gif")
+            embed.set_footer(text=f"ルーレット | Minister Chikuwa")
             
             message = await interaction.followup.send(embed=embed, file=gif_file)
 
@@ -76,9 +77,9 @@ class RouletteCog(commands.Cog):
                 title=title,
                 description=f"🎉 **{winner}** が選ばれました！",
                 color=discord.Color.gold(),
-                embed.set_footer(text=f"ルーレット | Minister Chikuwa")
             )
             result_embed.set_image(url="attachment://roulette.gif") # GIFはそのまま表示し続ける
+            result_embed.set_footer(text=f"ルーレット | Minister Chikuwa")
             
             await message.edit(embed=result_embed)
         else:
