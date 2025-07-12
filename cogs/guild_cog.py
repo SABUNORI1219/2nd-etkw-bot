@@ -148,7 +148,7 @@ Online Players: {online_count}/{total_members}
         embed = self._create_guild_embed(data_to_use, interaction, from_cache, is_stale)
         
         # 6. バナー担当者に、バナー画像の生成を依頼
-        banner_bytes = self.banner_renderer.create_banner_image(data_to_use.get('banner')))
+        banner_bytes = self.banner_renderer.create_banner_image(data_to_use.get('banner'))
         
         # 7. バナー画像を添付して送信
         if banner_bytes:
