@@ -4,6 +4,7 @@ from discord.ext import commands
 import random
 import logging
 from typing import Optional
+import asyncio
 
 # libフォルダから専門家をインポート
 from lib.roulette_renderer import RouletteRenderer
