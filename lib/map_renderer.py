@@ -100,30 +100,32 @@ class MapRenderer:
                     continue
             # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-            for name, info in territories_to_render.items():
+            # --- 2. 全てのテリトリーを描画 ---
+            for name, info in territory_data.items():
                 if 'location' not in info or 'guild' not in info: continue
                 
-                prefix = info["guild"]["prefix"]
-                color_hex = guild_color_map.get(prefix, "#FFFFFF")
-                color_rgb = self._hex_to_rgb(color_hex)
-                
-                start_x, start_z = info["location"]["start"]
-                end_x, end_z = info["location"]["end"]
-                px1, py1 = self._coord_to_pixel(start_x, start_z)
-                px2, py2 = self._coord_to_pixel(end_x, end_z)
+                px1, py1 = self._coord_to_pixel(*info["location"]["start"])
+                px2, py2 = self._coord_to_pixel(*info["location"]["end"])
                 
                 # クロップ後の相対座標に変換
-                if is_zoomed:
-                    px1, px2 = px1 - box[0], px2 - box[0]
-                    py1, py2 = py1 - box[1], py2 - box[1]
-
-                x_min, x_max = sorted([px1, px2])
-                y_min, y_max = sorted([py1, py2])
+                if crop_box:
+                    px1_rel, px2_rel = px1 - crop_box[0], px2 - crop_box[0]
+                    py1_rel, py2_rel = py1 - crop_box[1], py2 - crop_box[1]
+                else:
+                    px1_rel, py1_rel, px2_rel, py2_rel = px1, py1, px2, py2
                 
-                overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
-                draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=4)
-                text_x, text_y = (x_min + x_max) / 2, (y_min + y_max) / 2
-                draw.text((text_x, text_y), prefix, font=self.font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
+                x_min, x_max = sorted([px1_rel, px2_rel])
+                y_min, y_max = sorted([py1_rel, py2_rel])
+
+                # 描画範囲がクロップ後の画像内に収まっているかチェック
+                if x_max > 0 and y_max > 0 and x_min < map_to_draw_on.width and y_min < map_to_draw_on.height:
+                    prefix = info["guild"]["prefix"]
+                    color_hex = guild_color_map.get(prefix, "#FFFFFF")
+                    color_rgb = self._hex_to_rgb(color_hex)
+
+                    overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
+                    draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=4)
+                    draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=self.font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
 
             final_map = Image.alpha_composite(map_to_draw_on, overlay)
 
