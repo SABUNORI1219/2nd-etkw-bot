@@ -4,7 +4,7 @@ import os
 import logging
 import json
 import discord
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -133,10 +133,17 @@ class MapRenderer:
             map_bytes = BytesIO()
             final_map.save(map_bytes, format='PNG')
             map_bytes.seek(0)
+
+            jst_tz = timezone(timedelta(hours=9))
+            jst_now = datetime.now(jst_z)
+
+            # "年/月/日 時:分:秒" の形式に変換
+            formatted_time = jst_now.strftime("%Y/%m/%d %H:%M:%S")
             
             file = discord.File(map_bytes, filename="wynn_map.png")
             embed = discord.Embed(title="Wynncraft Territory Map", color=discord.Color.green())
             embed.set_image(url="attachment://wynn_map.png")
+            embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
             
             return file, embed
 
