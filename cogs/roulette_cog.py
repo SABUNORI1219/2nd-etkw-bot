@@ -21,7 +21,7 @@ class RouletteCog(commands.Cog):
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
     @app_commands.checks.cooldown(1, 60.0)
-    @app_commands.command(name="roulette", description="ルーレットを回してランダムに一つを選びます。")
+    @app_commands.command(name="roulette", description="ルーレットを回してランダムに一つを当選")
     @app_commands.describe(
         title="ルーレットのタイトル",
         options="候補をスペースで区切って入力(候補は10文字以内で入力)"
