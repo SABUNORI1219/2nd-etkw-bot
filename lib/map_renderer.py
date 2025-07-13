@@ -45,6 +45,12 @@ class MapRenderer:
                 end_x, end_z = info["location"]["end"]
                 px1, py1 = self._coord_to_pixel(start_x, start_z)
                 px2, py2 = self._coord_to_pixel(end_x, end_z)
+
+                # ▼▼▼【エラー修正箇所】座標の大小を揃える▼▼▼
+                # x座標の小さい方をx_min、大きい方をx_maxとする
+                x_min, x_max = sorted([px1, px2])
+                # y座標の小さい方をy_min、大きい方をy_maxとする
+                y_min, y_max = sorted([py1, py2])
                 
                 # 半透明のオーバーレイを描画
                 overlay_draw.rectangle([px1, py1, px2, py2], fill=(128, 128, 128, 64))
