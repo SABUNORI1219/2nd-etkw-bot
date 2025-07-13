@@ -88,7 +88,8 @@ class Territory(commands.GroupCog, name="territory"):
         loop = asyncio.get_running_loop()
         file, embed = await loop.run_in_executor(
             None, 
-            self.map_renderer.create_territory_map, 
+            self.map_renderer.create_territory_map,
+            territory_data,
             territories_to_render, 
             guild_color_map
         )
