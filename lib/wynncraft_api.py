@@ -110,6 +110,18 @@ class WynncraftAPI:
         except Exception as e:
             logger.error(f"--- [API Handler] Nori Player APIリクエスト中にエラー: {e}")
             return None
+    async def get_territory_list(self) -> dict | None:
+        """Wynncraft公式APIから、現在の全テリトリー所有者リストを取得する"""
+        try:
+            # このURLはconfig.pyで定義しても良いが、一箇所でしか使わないため直接記述
+            url = "https://api.wynncraft.com/v3/guild/list/territory"
+            async with self.session.get(url) as response:
+                if response.status == 200:
+                    return await response.json()
+                return None
+        except Exception as e:
+            logger.error(f"--- [API Handler] Wynncraft Territory APIリクエスト中にエラー: {e}")
+            return None
             
     async def close_session(self):
         if self.session:
