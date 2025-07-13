@@ -52,9 +52,9 @@ class Territory(commands.GroupCog, name="territory"):
             for name in self.territory_guilds_cache if current.lower() in name.lower()
         ][:25]
 
-    @app_commands.command(name="map", description="現在のWynncraftテリトリーマップを生成します。")
+    @app_commands.command(name="map", description="現在のWynncraftのテリトリーマップを生成")
     @app_commands.autocomplete(guild=guild_autocomplete) # guild引数にオートコンプリートを適用
-    @app_commands.describe(guild="ギルドのプレフィックス（任意）")
+    @app_commands.describe(guild="マップ上のギルドのPrefix(任意)")
     async def map(self, interaction: discord.Interaction, guild: str = None):
         await interaction.response.defer()
         logger.info(f"--- [TerritoryCmd] /territory map が実行されました by {interaction.user}")
