@@ -122,6 +122,19 @@ class WynncraftAPI:
         except Exception as e:
             logger.error(f"--- [API Handler] Wynncraft Territory APIリクエスト中にエラー: {e}")
             return None
+    async def get_guild_color_map(self) -> dict | None:
+        """Wynntils APIから、全ギルドのプレフィックスと色の対応表を取得する"""
+        try:
+            url = "https://athena.wynntils.com/cache/get/guildList"
+            async with self.session.get(url) as response:
+                if response.status == 200:
+                    # {"BSF": "#f41414", ...} のような辞書に変換して返す
+                    guild_list = await response.json()
+                    return {g["prefix"]: g.get("color", "#FFFFFF") for g in guild_list if g.get("prefix")}
+                return None
+        except Exception as e:
+            logger.error(f"--- [API Handler] Wynntils Guild List APIリクエスト中にエラー: {e}")
+            return None
             
     async def close_session(self):
         if self.session:
