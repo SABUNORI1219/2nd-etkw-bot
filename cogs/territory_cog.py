@@ -34,12 +34,14 @@ class Territory(commands.GroupCog, name="territory"):
             return
 
         # 地図職人に、非同期で画像の生成を依頼
-        # run_in_executorに複数の引数を渡すには、functools.partialを使う
-        import functools
+        # ▼▼▼【エラー修正箇所】run_in_executorの呼び出し方を修正▼▼▼
         loop = asyncio.get_running_loop()
+        # partialを使わず、引数を直接渡すためにlambda式を使用する
         file, embed = await loop.run_in_executor(
-            None, 
-            functools.partial(self.map_renderer.create_territory_map, territory_data, guild_color_map)
+            None,
+            self.map_renderer.create_territory_map,
+            territory_data,
+            guild_color_map
         )
         # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
