@@ -135,7 +135,7 @@ class MapRenderer:
             map_bytes.seek(0)
 
             jst_tz = timezone(timedelta(hours=9))
-            jst_now = datetime.now(jst_z)
+            jst_now = datetime.now(jst_tz)
 
             # "年/月/日 時:分:秒" の形式に変換
             formatted_time = jst_now.strftime("%Y/%m/%d %H:%M:%S")
