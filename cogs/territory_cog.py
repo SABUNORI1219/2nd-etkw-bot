@@ -23,18 +23,25 @@ class Territory(commands.GroupCog, name="territory"):
         await interaction.response.defer()
         logger.info(f"--- [TerritoryCmd] /territory map が実行されました by {interaction.user}")
 
-        # API担当者にテリトリー情報を依頼
+        # ▼▼▼【修正箇所】必要なデータを2種類取得する▼▼▼
+        # 1. テリトリー所有者リストを取得
         territory_data = await self.wynn_api.get_territory_list()
-        if not territory_data:
+        # 2. ギルドカラーの対応表を取得
+        guild_color_map = await self.wynn_api.get_guild_color_map()
+
+        if not territory_data or not guild_color_map:
             await interaction.followup.send("テリトリー情報の取得に失敗しました。")
             return
 
         # 地図職人に、非同期で画像の生成を依頼
-        # map_renderer.create_territory_mapは同期的なので、to_threadで実行
+        # run_in_executorに複数の引数を渡すには、functools.partialを使う
+        import functools
         loop = asyncio.get_running_loop()
         file, embed = await loop.run_in_executor(
-            None, self.map_renderer.create_territory_map, territory_data
+            None, 
+            functools.partial(self.map_renderer.create_territory_map, territory_data, guild_color_map)
         )
+        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
         if file and embed:
             await interaction.followup.send(file=file, embed=embed)
