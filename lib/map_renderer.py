@@ -109,8 +109,8 @@ class MapRenderer:
                 
                 # クロップ後の相対座標に変換
                 if is_zoomed:
-                    px1_rel, px2_rel = px1 - crop_box[0], px2 - crop_box[0]
-                    py1_rel, py2_rel = py1 - crop_box[1], py2 - crop_box[1]
+                    px1_rel, px2_rel = px1 - box[0], px2 - box[0]
+                    py1_rel, py2_rel = py1 - box[1], py2 - box[1]
                 else:
                     px1_rel, py1_rel, px2_rel, py2_rel = px1, py1, px2, py2
                 
