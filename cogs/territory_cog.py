@@ -18,32 +18,39 @@ class Territory(commands.GroupCog, name="territory"):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
         self.map_renderer = MapRenderer()
-        self.territory_guilds_cache = [] # オートコンプリート用のギルドリストを一時的に保存
+        self.territory_guilds_cache = [] # ギルド名のリスト
+        self.update_territory_cache.start() # 定期更新タスクを開始
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
-    # guild引数のためのオートコンプリートハンドラー
+    def cog_unload(self):
+        self.update_territory_cache.cancel()
+
+    # ▼▼▼【キャッシュを10分おきに更新するタスクを追加】▼▼▼
+    @tasks.loop(minutes=10.0)
+    async def update_territory_cache(self):
+        logger.info("--- [TerritoryCache] テリトリー所有ギルドのキャッシュを更新します...")
+        territory_data = await self.wynn_api.get_territory_list()
+        if territory_data:
+            guild_names = set(data['guild']['prefix'] for data in territory_data.values())
+            self.territory_guilds_cache = sorted(list(guild_names))
+            logger.info(f"--- [TerritoryCache] ✅ {len(self.territory_guilds_cache)}個のギルドをキャッシュしました。")
+
+    @update_territory_cache.before_loop
+    async def before_cache_update(self):
+        await self.bot.wait_until_ready() # Botの準備が完了するまで待つ
+
+    # ▼▼▼【オートコンプリートは、APIではなくキャッシュを参照するように修正】▼▼▼
     async def guild_autocomplete(
         self,
         interaction: discord.Interaction,
         current: str,
     ) -> list[app_commands.Choice[str]]:
         
-        # APIからテリトリーを持つギルドの全リストを取得
-        territory_data = await self.wynn_api.get_territory_list()
-        if not territory_data:
-            return []
-
-        # プレフィックスと名前のリストを作成し、重複をなくす
-        guild_names = set()
-        for terri in territory_data.values():
-            guild_names.add(terri['guild']['prefix'])
-        
-        # ユーザーの入力に基づいて候補を絞り込む
+        # APIではなく、メモリ上のキャッシュから候補を検索する
         return [
             app_commands.Choice(name=name, value=name)
-            for name in sorted(list(guild_names)) if current.lower() in name.lower()
-        ][:25] # 選択肢は最大25個まで
-
+            for name in self.territory_guilds_cache if current.lower() in name.lower()
+        ][:25]
 
     @app_commands.command(name="map", description="現在のWynncraftテリトリーマップを生成します。")
     @app_commands.autocomplete(guild=guild_autocomplete) # guild引数にオートコンプリートを適用
