@@ -3,6 +3,7 @@ from discord.ext import commands
 import os
 import sys
 import asyncio
+import math
 from dotenv import load_dotenv
 import logging
 
@@ -73,6 +74,21 @@ class MyBot(commands.Bot):
 
 # Botのインスタンスを作成
 bot = MyBot()
+
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        # 残り時間を秒単位で取得し、小数点以下を切り上げ
+        remaining_seconds = math.ceil(error.retry_after)
+        await interaction.response.send_message(
+            f"現在クールダウン中です。あと **{remaining_seconds}秒** 待ってからもう一度お試しください。",
+            ephemeral=True # コマンドを実行した本人にだけ見えるメッセージ
+        )
+    else:
+        # 他のエラーはコンソールに出力（これまで通り）
+        logger.error(f"--- [司令塔] 予期せぬエラーが発生: {error}", exc_info=True)
+        # 必要であれば、ユーザーにエラーが発生したことを伝えるメッセージを送信
+        # await interaction.response.send_message("コマンドの実行中にエラーが発生しました。", ephemeral=True)
 
 # メインの実行ブロック
 if __name__ == '__main__':
