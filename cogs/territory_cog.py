@@ -67,7 +67,10 @@ class Territory(commands.GroupCog, name="territory"):
         guild_color_map = await self.wynn_api.get_guild_color_map()
 
         if not territory_data or not guild_color_map:
-            await interaction.followup.send("テリトリーまたはギルドカラー情報の取得に失敗しました。")
+            await interaction.followup.send(
+                "テリトリーまたはギルドカラー情報の取得に失敗しました。",
+                ephemeral=True
+            )
             return
 
         # ギルドが指定されているかによって、描画するデータを切り替える
@@ -78,7 +81,10 @@ class Territory(commands.GroupCog, name="territory"):
                 if data['guild']['prefix'].upper() == guild.upper()
             }
             if not territories_to_render:
-                await interaction.followup.send(f"ギルド「{guild}」は現在テリトリーを所有していません。")
+                await interaction.followup.send(
+                    f"ギルド「{guild}」は現在テリトリーを所有していません。",
+                    ephemeral=True
+                )
                 return
         else:
             # 指定がなければ、全てのテリトリーを描画
@@ -99,8 +105,10 @@ class Territory(commands.GroupCog, name="territory"):
         if file and embed:
             await interaction.followup.send(file=file, embed=embed)
         else:
-            await interaction.followup.send("マップの生成中にエラーが発生しました。")
-
+            await interaction.followup.send(
+                "マップの生成中にエラーが発生しました。",
+                ephemeral=True
+            )
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Territory(bot))
