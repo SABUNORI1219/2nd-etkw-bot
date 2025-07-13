@@ -174,7 +174,7 @@ Online Players: {online_count}/{total_members}
         if not data_to_use:
             await interaction.followup.send(
                 f"ギルド「{guild}」が見つかりませんでした。",
-                Ephemeral=true
+                ephemeral=True
             )
             return
 
