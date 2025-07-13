@@ -172,7 +172,10 @@ Online Players: {online_count}/{total_members}
 
         # 4. データが何もなければ、ここで終了
         if not data_to_use:
-            await interaction.followup.send(f"ギルド「{guild}」が見つかりませんでした。")
+            await interaction.followup.send(
+                f"ギルド「{guild}」が見つかりませんでした。",
+                Ephemeral=true
+            )
             return
 
         embed = self._create_guild_embed(data_to_use, interaction, from_cache, is_stale)
