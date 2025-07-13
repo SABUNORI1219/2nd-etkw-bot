@@ -180,7 +180,8 @@ Total Level: {total_level:,}
         )
         return embed
 
-    @app_commands.command(name="player", description="プレイヤーのステータスを表示します。")
+    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.command(name="player", description="プレイヤーのステータスを表示")
     @app_commands.describe(player="MCID or UUID")
     async def player(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
