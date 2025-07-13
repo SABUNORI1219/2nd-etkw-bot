@@ -108,7 +108,7 @@ class MapRenderer:
                 px2, py2 = self._coord_to_pixel(*info["location"]["end"])
                 
                 # クロップ後の相対座標に変換
-                if crop_box:
+                if is_zoomed:
                     px1_rel, px2_rel = px1 - crop_box[0], px2 - crop_box[0]
                     py1_rel, py2_rel = py1 - crop_box[1], py2 - crop_box[1]
                 else:
