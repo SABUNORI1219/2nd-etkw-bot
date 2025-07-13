@@ -59,29 +59,40 @@ class Territory(commands.GroupCog, name="territory"):
         await interaction.response.defer()
         logger.info(f"--- [TerritoryCmd] /territory map が実行されました by {interaction.user}")
 
+        # ▼▼▼【修正点】必要なAPIデータを両方取得する▼▼▼
+        # 1. テリトリー所有者リストを取得
         territory_data = await self.wynn_api.get_territory_list()
-        if not territory_data:
-            await interaction.followup.send("テリトリー情報の取得に失敗しました。")
+        # 2. ギルドカラーの対応表を取得
+        guild_color_map = await self.wynn_api.get_guild_color_map()
+
+        if not territory_data or not guild_color_map:
+            await interaction.followup.send("テリトリーまたはギルドカラー情報の取得に失敗しました。")
             return
 
-        # 指定されたギルドのテリトリーのみをフィルタリングする
+        # ギルドが指定されているかによって、描画するデータを切り替える
         if guild:
-            filtered_territories = {
+            # 指定されたギルドのテリトリーのみをフィルタリング
+            territories_to_render = {
                 name: data for name, data in territory_data.items()
                 if data['guild']['prefix'].upper() == guild.upper()
             }
-            if not filtered_territories:
+            if not territories_to_render:
                 await interaction.followup.send(f"ギルド「{guild}」は現在テリトリーを所有していません。")
                 return
-            territory_data_to_render = filtered_territories
         else:
-            territory_data_to_render = territory_data
+            # 指定がなければ、全てのテリトリーを描画
+            territories_to_render = territory_data
             
         # 地図職人に、非同期で画像の生成を依頼
+        # 必要な情報を全て渡す
         loop = asyncio.get_running_loop()
         file, embed = await loop.run_in_executor(
-            None, self.map_renderer.create_territory_map, territory_data_to_render, {} # カラーマップは後で実装
+            None, 
+            self.map_renderer.create_territory_map, 
+            territories_to_render, 
+            guild_color_map
         )
+        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
         if file and embed:
             await interaction.followup.send(file=file, embed=embed)
