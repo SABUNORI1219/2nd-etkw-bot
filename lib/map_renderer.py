@@ -27,8 +27,7 @@ class MapRenderer:
         """ゲーム内座標を画像上のピクセル座標に変換する"""
         return x + 2383, z + 6572
 
-    def create_territory_map(self, territory_data: dict) -> tuple[BytesIO | None, discord.Embed | None]:
-        """テリトリーデータを受け取り、地図画像とEmbedを生成する"""
+    def create_territory_map(self, territory_data: dict) -> tuple[discord.File | None, discord.Embed | None]:
         if not territory_data: return None, None
         
         try:
@@ -40,33 +39,25 @@ class MapRenderer:
             for name, info in territory_data.items():
                 if 'location' not in info: continue
                 
-                # テリトリー領域を描画
                 start_x, start_z = info["location"]["start"]
                 end_x, end_z = info["location"]["end"]
                 px1, py1 = self._coord_to_pixel(start_x, start_z)
                 px2, py2 = self._coord_to_pixel(end_x, end_z)
-
+                
                 # ▼▼▼【エラー修正箇所】座標の大小を揃える▼▼▼
-                # x座標の小さい方をx_min、大きい方をx_maxとする
                 x_min, x_max = sorted([px1, px2])
-                # y座標の小さい方をy_min、大きい方をy_maxとする
                 y_min, y_max = sorted([py1, py2])
                 
-                # 半透明のオーバーレイを描画
-                overlay_draw.rectangle([px1, py1, px2, py2], fill=(128, 128, 128, 64))
-                # 枠線を描画
-                draw.rectangle([px1, py1, px2, py2], outline="white", width=8)
+                overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(128, 128, 128, 64))
+                draw.rectangle([x_min, y_min, x_max, y_max], outline="white", width=8)
 
-                # ギルドのプレフィックスを描画
                 prefix = info["guild"]["prefix"]
-                text_x = (px1 + px2) / 2
-                text_y = (py1 + py2) / 2
+                text_x = (x_min + x_max) / 2
+                text_y = (y_min + y_max) / 2
                 draw.text((text_x, text_y), prefix, font=self.font, fill="white", anchor="mm", stroke_width=2, stroke_fill="black")
 
-            # オーバーレイと地図を合成
             final_map = Image.alpha_composite(map_copy, overlay)
 
-            # 画像をバイトデータに変換
             map_bytes = BytesIO()
             final_map.save(map_bytes, format='PNG', optimize=True)
             map_bytes.seek(0)
@@ -78,7 +69,6 @@ class MapRenderer:
                 color=discord.Color.green()
             )
             embed.set_image(url="attachment://wynn_map.png")
-            embed.set_footer(text=f"Generated at {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
             
             return file, embed
 
