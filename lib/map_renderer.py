@@ -35,7 +35,7 @@ class MapRenderer:
             return (255, 255, 255)
 
     # ▼▼▼【関数全体を、クロップと色分けに対応するように修正】▼▼▼
-    def create_territory_map(self, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
+    def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
         if not territories_to_render: return None, None
         
         try:
