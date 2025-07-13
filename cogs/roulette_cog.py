@@ -33,17 +33,26 @@ class RouletteCog(commands.Cog):
         candidate_list = options.split()
 
         if len(candidate_list) < 2:
-            await interaction.followup.send("候補は2つ以上指定してください。")
+            await interaction.followup.send(
+                f"候補は2つ以上指定してください。",
+                ephemeral=True
+            )
             return
         
         # Discordの選択肢の最大数である25個に制限する
         if len(candidate_list) > 25:
-            await interaction.followup.send("候補が多すぎます！25個以下にしてください。")
+            await interaction.followup.send(
+                f"候補は25個以下にしてください。",
+                ephemeral=True
+            )
             return
 
         for candidate in candidate_list:
             if len(candidate) > 10:
-                await interaction.followup.send(f"候補「{candidate}」が長すぎます。各候補は10文字以内にしてください。")
+                await interaction.followup.send(
+                    f"候補「{candidate}」が長すぎます。各候補は10文字以内にしてください。",
+                    ephemeral=True
+                )
                 return
 
         # 2. 当選者をランダムに決定
