@@ -64,6 +64,27 @@ class MapRenderer:
                            min(self.map_img.height, max(all_y) + padding))
                     map_to_draw_on = map_to_draw_on.crop(box)
 
+            # --- コネクション（交易路）の線を描画 ---
+            for name, data in self.local_territories.items():
+                if "Trading Routes" not in data or "Location" not in data: continue
+                
+                try:
+                    x1 = (data["Location"]["start"][0] + data["Location"]["end"][0]) // 2
+                    z1 = (data["Location"]["start"][1] + data["Location"]["end"][1]) // 2
+                    px1, py1 = self._coord_to_pixel(x1, z1)
+
+                    for destination_name in data["Trading Routes"]:
+                        dest_data = self.local_territories.get(destination_name)
+                        if not dest_data or "Location" not in dest_data: continue
+                        
+                        x2 = (dest_data["Location"]["start"][0] + dest_data["Location"]["end"][0]) // 2
+                        z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
+                        px2, py2 = self._coord_to_pixel(x2, z2)
+                        
+                        draw.line([(px1, py1), (px2, py2)], fill=(10, 10, 10, 128), width=5)
+                except KeyError:
+                    continue
+
             # --- 描画処理 ---
             overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
             overlay_draw = ImageDraw.Draw(overlay)
