@@ -141,7 +141,7 @@ class MapRenderer:
             formatted_time = jst_now.strftime("%Y/%m/%d %H:%M:%S")
             
             file = discord.File(map_bytes, filename="wynn_map.png")
-            embed = discord.Embed(title="Wynncraft Territory Map", color=discord.Color.green())
+            embed = discord.Embed(color=discord.Color.green())
             embed.set_image(url="attachment://wynn_map.png")
             embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
             
