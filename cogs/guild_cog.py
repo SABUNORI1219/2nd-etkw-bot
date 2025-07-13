@@ -108,7 +108,7 @@ Online Players: {online_count}/{total_members}
         return embed
 
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
-    @app_commands.command(name="guild", description="ギルドの詳細情報を表示します。")
+    @app_commands.command(name="guild", description="ギルドの詳細情報を表示")
     @app_commands.describe(guild="Name or Prefix")
     async def guild(self, interaction: discord.Interaction, guild: str):
         await interaction.response.defer()
