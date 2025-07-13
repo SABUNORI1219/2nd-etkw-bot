@@ -142,7 +142,7 @@ class MapRenderer:
             
             file = discord.File(map_bytes, filename="wynn_map.png")
             embed = discord.Embed(
-                title=""
+                title="",
                 color=discord.Color.green()
             )
             embed.set_image(url="attachment://wynn_map.png")
