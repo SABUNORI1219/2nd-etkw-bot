@@ -64,11 +64,18 @@ class MapRenderer:
                            min(self.map_img.height, max(all_y) + padding))
                     map_to_draw_on = map_to_draw_on.crop(box)
 
-            # --- コネクション（交易路）の線を描画 ---
+            # --- 描画処理 ---
+            overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
+            overlay_draw = ImageDraw.Draw(overlay)
+            draw = ImageDraw.Draw(map_to_draw_on)
+
+            # ▼▼▼【ここからコネクション線描画のロジックを追加】▼▼▼
+            # 1. 全ての交易路を地図の裏側に薄く描画する
             for name, data in self.local_territories.items():
                 if "Trading Routes" not in data or "Location" not in data: continue
                 
                 try:
+                    # 出発点の中心座標を計算
                     x1 = (data["Location"]["start"][0] + data["Location"]["end"][0]) // 2
                     z1 = (data["Location"]["start"][1] + data["Location"]["end"][1]) // 2
                     px1, py1 = self._coord_to_pixel(x1, z1)
@@ -77,18 +84,21 @@ class MapRenderer:
                         dest_data = self.local_territories.get(destination_name)
                         if not dest_data or "Location" not in dest_data: continue
                         
+                        # 到着点の中心座標を計算
                         x2 = (dest_data["Location"]["start"][0] + dest_data["Location"]["end"][0]) // 2
                         z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
                         px2, py2 = self._coord_to_pixel(x2, z2)
                         
-                        draw.line([(px1, py1), (px2, py2)], fill=(10, 10, 10, 128), width=5)
+                        # クロップ後の相対座標に変換
+                        if is_zoomed:
+                            px1_rel, px2_rel = px1 - box[0], px2 - box[0]
+                            py1_rel, py2_rel = py1 - box[1], py2 - box[1]
+                            draw.line([(px1_rel, py1_rel), (px2_rel, py2_rel)], fill=(10, 10, 10, 128), width=3)
+                        else:
+                            draw.line([(px1, py1), (px2, py2)], fill=(10, 10, 10, 128), width=3)
                 except KeyError:
                     continue
-
-            # --- 描画処理 ---
-            overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
-            overlay_draw = ImageDraw.Draw(overlay)
-            draw = ImageDraw.Draw(map_to_draw_on)
+            # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
             for name, info in territories_to_render.items():
                 if 'location' not in info or 'guild' not in info: continue
