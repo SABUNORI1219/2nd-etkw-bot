@@ -236,7 +236,7 @@ Total Level: {total_level:,}
         else:
             # ここは通常通らないはずだが、念のため
             await interaction.edit_original_response(
-                content=f"プレイヤー「{player}」の情報を正しく取得できませんでした。",
+                content=f"プレイヤー「{player}」の情報を正しく取得できませんでした。コマンドをもう一度お試しください。",
                 ephemeral=True
             )
 
