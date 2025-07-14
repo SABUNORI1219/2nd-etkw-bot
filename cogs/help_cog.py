@@ -16,7 +16,10 @@ class HelpCog(commands.Cog):
         # 埋め込みメッセージの器を作成
         embed = discord.Embed(
             title="💡 ヘルプメニュー",
-            description="このBotで利用できるコマンドの一覧です。",
+            description="""
+            このBotで利用できるコマンドの一覧です。
+            引数に<>があるものは必須、[]があるものは任意です。
+            """,
             color=discord.Color.blurple() # Discordのブランドカラー
         )
 
