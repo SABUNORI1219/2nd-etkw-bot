@@ -67,8 +67,8 @@ class Territory(commands.GroupCog, name="territory"):
         guild_color_map = await self.wynn_api.get_guild_color_map()
 
         if not territory_data or not guild_color_map:
-            await interaction.followup.send(
-                "テリトリーまたはギルドカラー情報の取得に失敗しました。",
+            await interaction.edit_original_response(
+                content="テリトリーまたはギルドカラー情報の取得に失敗しました。コマンドをもう一度お試しください。",
                 ephemeral=True
             )
             return
@@ -81,8 +81,8 @@ class Territory(commands.GroupCog, name="territory"):
                 if data['guild']['prefix'].upper() == guild.upper()
             }
             if not territories_to_render:
-                await interaction.followup.send(
-                    f"ギルド「{guild}」は現在テリトリーを所有していません。",
+                await interaction.edit_original_response(
+                    content=f"ギルド「{guild}」は現在テリトリーを所有していません。",
                     ephemeral=True
                 )
                 return
@@ -105,8 +105,8 @@ class Territory(commands.GroupCog, name="territory"):
         if file and embed:
             await interaction.followup.send(file=file, embed=embed)
         else:
-            await interaction.followup.send(
-                "マップの生成中にエラーが発生しました。",
+            await interaction.edit_original_response(
+                content="マップの生成中にエラーが発生しました。コマンドをもう一度お試しください。",
                 ephemeral=True
             )
 
