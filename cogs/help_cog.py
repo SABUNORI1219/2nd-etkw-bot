@@ -10,11 +10,12 @@ class HelpCog(commands.Cog):
         self.bot = bot
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
-    @app_commands.command(name="help", description="Botのコマンド一覧を表示します。")
+    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.command(name="help", description="Botのコマンド一覧を表示")
     async def help(self, interaction: discord.Interaction):
         # 埋め込みメッセージの器を作成
         embed = discord.Embed(
-            title="💡 Minister Chikuwa ヘルプメニュー",
+            title="💡 ヘルプメニュー",
             description="このBotで利用できるコマンドの一覧です。",
             color=discord.Color.blurple() # Discordのブランドカラー
         )
@@ -41,7 +42,7 @@ class HelpCog(commands.Cog):
             inline=False
         )
 
-        embed.set_footer(text="引数に<>があるものは必須、[]があるものは任意です。")
+        embed.set_footer("ヘルプメニュー | Minister Chikuwa")
 
         # ephemeral=True にすることで、コマンドを実行した本人にしか見えないメッセージになる
         await interaction.response.send_message(embed=embed, ephemeral=True)
