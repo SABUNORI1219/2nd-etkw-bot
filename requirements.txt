@@ -3,6 +3,6 @@ Flask
 psycopg2-binary
 aiohttp
 python-dotenv
-Pillow
+Pillow>=9.5.0
 imageio
 imageio-ffmpeg
