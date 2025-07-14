@@ -24,34 +24,30 @@ class WynncraftAPI:
 
     async def _make_request(self, url: str) -> dict | list | None:
         """APIにリクエストを送信し、失敗した場合は再試行する共通メソッド"""
-        session = await self._get_session()
-        max_retries = 5
+        session = await self._get_session() # ⬅️ ここで取得したsessionを…
+        max_retries = 3
         for i in range(max_retries):
             try:
-                async with self._session.get(url, timeout=10) as response:
-                    # 成功した場合
+                # ▼▼▼【あなたの修正を反映】…ここで正しく使う▼▼▼
+                async with session.get(url, timeout=10) as response:
                     if 200 <= response.status < 300:
-                        return await response.json()
+                        if response.content_length != 0:
+                            return await response.json()
+                        return None
                     
-                    # 再試行すべきエラーコードか判定
                     retryable_codes = [408, 429, 500, 502, 503, 504]
                     if response.status in retryable_codes:
-                        logger.warning(f"--- [API Handler] APIがステータス{response.status}を返しました。再試行します... ({i+1}/{max_retries}) URL: {url}")
-                        await asyncio.sleep(2) # 2秒待ってから再試行
+                        logger.warning(f"APIがステータス{response.status}を返しました。再試行します... ({i+1}/{max_retries})")
+                        await asyncio.sleep(2)
                         continue
                     
-                    # 再試行しないエラー
-                    logger.error(f"--- [API Handler] APIから予期せぬエラー: Status {response.status}, URL: {url}")
+                    logger.error(f"APIから予期せぬエラー: Status {response.status}, URL: {url}")
                     return None
-
-            except asyncio.TimeoutError:
-                logger.warning(f"--- [API Handler] APIリクエストがタイムアウトしました。再試行します... ({i+1}/{max_retries}) URL: {url}")
-                await asyncio.sleep(2)
             except Exception as e:
-                logger.error(f"--- [API Handler] リクエスト中に予期せぬエラー: {e}", exc_info=True)
-                return None
+                logger.error(f"リクエスト中に予期せぬエラー: {e}")
+                await asyncio.sleep(2)
         
-        logger.error(f"--- [API Handler] 最大再試行回数({max_retries}回)に達しました。URL: {url}")
+        logger.error(f"最大再試行回数({max_retries}回)に達しました。URL: {url}")
         return None
     
     async def get_guild_by_name(self, guild_name: str) -> dict | None:
