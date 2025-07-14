@@ -22,7 +22,6 @@ class WynncraftAPI:
             self._session = aiohttp.ClientSession(headers=self.headers)
         return self._session
 
-    # ▼▼▼【ここからが新しいリトライ機能の心臓部】▼▼▼
     async def _make_request(self, url: str) -> dict | list | None:
         """APIにリクエストを送信し、失敗した場合は再試行する共通メソッド"""
         session = await self._get_session()
@@ -54,31 +53,36 @@ class WynncraftAPI:
         
         logger.error(f"--- [API Handler] 最大再試行回数({max_retries}回)に達しました。URL: {url}")
         return None
-    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-
-    # ▼▼▼【ここから下の全てのメソッドを、新しいリトライ機能を使うように修正】▼▼▼
     
     async def get_guild_by_name(self, guild_name: str) -> dict | None:
+        """Wynncraft公式APIから、フルネームでギルドデータを取得する"""
         url = WYNN_GUILD_BY_NAME_API_URL.format(quote(guild_name))
         data = await self._make_request(url)
-        return data[0] if isinstance(data, list) and data else None
+        # "data"キーがあり、その中身が空でないことを確認
+        return data['data'][0] if isinstance(data, dict) and data.get('data') else None
 
     async def get_guild_by_prefix(self, guild_prefix: str) -> dict | None:
+        """Wynncraft公式APIから、プレフィックスでギルドデータを取得する"""
         url = WYNN_GUILD_BY_PREFIX_API_URL.format(quote(guild_prefix))
         data = await self._make_request(url)
+        # 返ってきたリストが空でないことを確認
         return data[0] if isinstance(data, list) and data else None
         
     async def get_nori_guild_data(self, guild_identifier: str) -> dict | list | None:
         url = NORI_GUILD_API_URL.format(quote(guild_identifier))
-        return await self._make_request(url)
+        data = await self._make_request(url)
+        # 返ってきたデータが空の辞書やリストでないことを確認
+        return data if data else None
 
     async def get_nori_player_data(self, player_identifier: str) -> dict | list | None:
         url = NORI_PLAYER_API_URL.format(quote(player_identifier))
-        return await self._make_request(url)
+        data = await self._make_request(url)
+        return data if data else None
 
     async def get_territory_list(self) -> dict | None:
         url = "https://api.wynncraft.com/v3/guild/list/territory"
-        return await self._make_request(url)
+        data = await self._make_request(url)
+        return data if data else None
 
     async def get_guild_color_map(self) -> dict | None:
         url = "https://athena.wynntils.com/cache/get/guildList"
@@ -88,5 +92,6 @@ class WynncraftAPI:
         return None
     
     async def close_session(self):
-        if self.session:
-            await self.session.close()
+        if self._session:
+            await self._session.close()
+            
