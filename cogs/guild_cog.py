@@ -108,7 +108,7 @@ Online Players: {online_count}/{total_members}
         return embed
 
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
-    @app_commands.command(name="guild", description="ギルドの詳細情報を表示")
+    @app_commands.command(name="guild", description="ギルドのステータスを表示")
     @app_commands.describe(guild="Name or Prefix")
     async def guild(self, interaction: discord.Interaction, guild: str):
         await interaction.response.defer()
@@ -172,10 +172,7 @@ Online Players: {online_count}/{total_members}
 
         # 4. データが何もなければ、ここで終了
         if not data_to_use:
-            await interaction.edit_original_response(
-                content=f"ギルド「{guild}」が見つかりませんでした。",
-                ephemeral=True
-            )
+            await interaction.followup.send(f"ギルド「{guild}」が見つかりませんでした。")
             return
 
         embed = self._create_guild_embed(data_to_use, interaction, from_cache, is_stale)
