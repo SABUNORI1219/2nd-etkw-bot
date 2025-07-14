@@ -44,12 +44,20 @@ class PlayerSelectView(discord.ui.View):
         selected_uuid = self.select_menu.values[0]
         
         self.select_menu.disabled = True
-        await interaction.response.edit_message(content="プレイヤー情報を取得中...", view=self)
+        await interaction.edit_original_response(
+            content="プレイヤー情報を取得中...",
+            ephemeral=True,
+            view=self)
         
         data = await self.cog_instance.wynn_api.get_nori_player_data(selected_uuid)
         
         if not data or 'uuid' not in data:
-            await interaction.message.edit(content="選択されたプレイヤーの情報を取得できませんでした。", embed=None, view=None)
+            await interaction.interaction.edit_original_response(
+                content="選択されたプレイヤーの情報を取得できませんでした。",
+                ephemeral=True,
+                embed=None,
+                view=None
+            )
             return
             
         embed = self.cog_instance._create_player_embed(data)
@@ -206,8 +214,8 @@ Total Level: {total_level:,}
         # 3-1. プレイヤーが見つからない、または明確なエラーの場合
         if not api_data or (isinstance(api_data, dict) and "Error" in api_data):
             # この場合、キャッシュは更新せず、エラーメッセージを返す
-            await interaction.followup.send(
-                f"プレイヤー「{player}」が見つかりませんでした。",
+            await interaction.edit_original_response(
+                content=f"プレイヤー「{player}」が見つかりませんでした。",
                 ephemeral=True
             )
             return
@@ -221,11 +229,14 @@ Total Level: {total_level:,}
             await interaction.followup.send(embed=embed)
         elif isinstance(api_data, dict):
             view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self)
-            await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
+            await interaction.edit_original_response(
+                content="複数のプレイヤーが見つかりました。どちらの情報を表示しますか？",
+                ephemeral=True,
+                view=view)
         else:
             # ここは通常通らないはずだが、念のため
-            await interaction.followup.send(
-                f"プレイヤー「{player}」の情報を正しく取得できませんでした。",
+            await interaction.edit_original_response(
+                content=f"プレイヤー「{player}」の情報を正しく取得できませんでした。",
                 ephemeral=True
             )
 
