@@ -29,7 +29,7 @@ class WynncraftAPI:
         max_retries = 5
         for i in range(max_retries):
             try:
-                async with self.session.get(url, timeout=10) as response:
+                async with self._session.get(url, timeout=10) as response:
                     # 成功した場合
                     if 200 <= response.status < 300:
                         return await response.json()
