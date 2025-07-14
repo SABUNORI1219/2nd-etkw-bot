@@ -14,11 +14,18 @@ from config import (
 class WynncraftAPI:
     def __init__(self):
         self.headers = {'User-Agent': 'DiscordBot/1.0'}
-        self.session = aiohttp.ClientSession(headers=self.headers)
+        self._session = None # ⬅️ 最初はセッションを空にしておく
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """非同期にセッションを初期化、または既存のものを返す"""
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(headers=self.headers)
+        return self._session
 
     # ▼▼▼【ここからが新しいリトライ機能の心臓部】▼▼▼
     async def _make_request(self, url: str) -> dict | list | None:
         """APIにリクエストを送信し、失敗した場合は再試行する共通メソッド"""
+        session = await self._get_session()
         max_retries = 5
         for i in range(max_retries):
             try:
