@@ -34,11 +34,19 @@ class MapRenderer:
         except (ValueError, IndexError):
             return (255, 255, 255)
 
-    # ▼▼▼【関数全体を、クロップと色分けに対応するように修正】▼▼▼
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
         if not territories_to_render: return None, None
         
         try:
+            TARGET_WIDTH = 1600  # 最終的な画像の横幅
+            original_w, original_h = self.map_img.size
+            scale_factor = TARGET_WIDTH / original_w
+            new_h = int(original_h * scale_factor)
+            
+            # 高品質なアルゴリズムで、最初に地図を縮小
+            resized_map = self.map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
+            logger.info(f"--- [MapRenderer] ベースマップを {TARGET_WIDTH}x{new_h} に縮小しました。")
+            
             map_to_draw_on = self.map_img.copy()
             
             # --- クロップ処理 ---
