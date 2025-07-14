@@ -45,7 +45,7 @@ class HelpCog(commands.Cog):
             inline=False
         )
 
-        embed.set_footer("ヘルプメニュー | Minister Chikuwa")
+        embed.set_footer(text="ヘルプメニュー | Minister Chikuwa")
 
         # ephemeral=True にすることで、コマンドを実行した本人にしか見えないメッセージになる
         await interaction.response.send_message(embed=embed, ephemeral=True)
