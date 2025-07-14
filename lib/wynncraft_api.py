@@ -57,7 +57,7 @@ class WynncraftAPI:
         
         # "data"キーがあり、その中身(リスト)が空でないことを確認して、最初の要素を返す
         if isinstance(data, dict) and data.get('data'):
-            return data['data'][0]
+            return data if data else None
         return None
 
     async def get_guild_by_prefix(self, guild_prefix: str) -> dict | None:
@@ -67,7 +67,7 @@ class WynncraftAPI:
         
         # 返ってきたリストが空でないことを確認して、最初の要素を返す
         if isinstance(data, list) and data:
-            return data[0]
+            return data if data else None
         return None
         
     async def get_nori_guild_data(self, guild_identifier: str) -> dict | list | None:
