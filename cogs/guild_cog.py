@@ -172,8 +172,8 @@ Online Players: {online_count}/{total_members}
 
         # 4. データが何もなければ、ここで終了
         if not data_to_use:
-            await interaction.followup.send(
-                f"ギルド「{guild}」が見つかりませんでした。",
+            await interaction.edit_original_response(
+                content=f"ギルド「{guild}」が見つかりませんでした。",
                 ephemeral=True
             )
             return
