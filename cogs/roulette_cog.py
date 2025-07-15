@@ -24,7 +24,7 @@ class RouletteCog(commands.Cog):
     @app_commands.command(name="roulette", description="ルーレットを回してランダムに一つを当選")
     @app_commands.describe(
         title="ルーレットのタイトル",
-        options="候補をスペースで区切って入力(候補は10文字以内で入力)"
+        options="候補をスペースで区切って入力(候補は10文字以内、6個以内で入力)"
     )
     async def roulette(self, interaction: discord.Interaction, title: str, options: str):
         await interaction.response.defer()
@@ -36,9 +36,9 @@ class RouletteCog(commands.Cog):
             await interaction.followup.send("候補は2つ以上指定してください。")
             return
         
-        # Discordの選択肢の最大数である25個に制限する
-        if len(candidate_list) > 25:
-            await interaction.followup.send("候補は25個以下にしてください。")
+        # Discordの選択肢の最大数である25個に制限する (現在は6個)
+        if len(candidate_list) > 6:
+            await interaction.followup.send("候補は6個以下にしてください。")
             return
 
         for candidate in candidate_list:
