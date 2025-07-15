@@ -110,7 +110,7 @@ class MapRenderer:
                     continue
 
             # Font Scaling dayo!
-            scaled_font_size = max(12, int(self.font.size * scale_factor))
+            scaled_font_size = max(12, int(self.font.size * self.scale_factor))
             try:
                 scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
             except IOError:
