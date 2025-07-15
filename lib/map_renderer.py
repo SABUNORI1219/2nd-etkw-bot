@@ -86,8 +86,8 @@ class MapRenderer:
                     # 出発点の中心座標を計算
                     x1 = (data["Location"]["start"][0] + data["Location"]["end"][0]) // 2
                     z1 = (data["Location"]["start"][1] + data["Location"]["end"][1]) // 2
-                    px1, py1 = self._coord_to_pixel(x1, z1)
-                    scaled_px1, scaled_py1 = px1 * self.scale_factor, py1 * self.scale_factor
+                    l_px1, l_py1 = self._coord_to_pixel(x1, z1)
+                    l_scaled_px1, l_scaled_py1 = l_px1 * self.scale_factor, l_py1 * self.scale_factor
 
                     for destination_name in data["Trading Routes"]:
                         dest_data = self.local_territories.get(destination_name)
@@ -96,16 +96,16 @@ class MapRenderer:
                         # 到着点の中心座標を計算
                         x2 = (dest_data["Location"]["start"][0] + dest_data["Location"]["end"][0]) // 2
                         z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
-                        px2, py2 = self._coord_to_pixel(x2, z2)
-                        scaled_px2, scaled_py2 = px2 * self.scale_factor, py2 * self.scale_factor
+                        l_px2, l_py2 = self._coord_to_pixel(x2, z2)
+                        l_scaled_px2, l_scaled_py2 = l_px2 * self.scale_factor, l_py2 * self.scale_factor
                         
                         # クロップ後の相対座標に変換
                         if is_zoomed and box:
-                            px1_rel, px2_rel = scaled_px1 - box[:2][0], scaled_px2 - box[:2][0]
-                            py1_rel, py2_rel = scaled_py1 - box[:2][1], scaled_py2 - box[:2][1]
-                            draw.line([(px1_rel, py1_rel), (px2_rel, py2_rel)], fill=(10, 10, 10, 128), width=3)
+                            l_px1_rel, l_px2_rel = l_scaled_px1 - box[:2][0], l_scaled_px2 - box[:2][0]
+                            l_py1_rel, l_py2_rel = l_scaled_py1 - box[:2][1], l_scaled_py2 - box[:2][1]
+                            draw.line([(l_px1_rel, l_py1_rel), (l_px2_rel, l_py2_rel)], fill=(10, 10, 10, 128), width=3)
                         else:
-                            draw.line([(scaled_px1, scaled_py1), (scaled_px2, scaled_py2)], fill=(10, 10, 10, 128), width=3)
+                            draw.line([(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)], fill=(10, 10, 10, 128), width=3)
                 except KeyError:
                     continue
 
@@ -120,20 +120,20 @@ class MapRenderer:
             for name, info in territory_data.items():
                 if 'location' not in info or 'guild' not in info: continue
                 
-                px1, py1 = self._coord_to_pixel(*info["location"]["start"])
-                px2, py2 = self._coord_to_pixel(*info["location"]["end"])
-                scaled_px1, scaled_py1 = px1 * self.scale_factor, py1 * self.scale_factor
-                scaled_px2, scaled_py2 = px2 * self.scale_factor, py2 * self.scale_factor
+                t_px1, t_py1 = self._coord_to_pixel(*info["location"]["start"])
+                t_px2, t_py2 = self._coord_to_pixel(*info["location"]["end"])
+                t_scaled_px1, t_scaled_py1 = t_px1 * self.scale_factor, t_py1 * self.scale_factor
+                t_scaled_px2, t_scaled_py2 = t_px2 * self.scale_factor, t_py2 * self.scale_factor
                 
                 # クロップ後の相対座標に変換
                 if is_zoomed and box:
-                    px1_rel, px2_rel = scaled_px1 - box[:2][0], scaled_px2 - box[:2][0]
-                    py1_rel, py2_rel = scaled_py1 - box[:2][1], scaled_py2 - box[:2][1]
+                    t_px1_rel, t_px2_rel = t_scaled_px1 - box[:2][0], t_scaled_px2 - box[:2][0]
+                    t_py1_rel, t_py2_rel = t_scaled_py1 - box[:2][1], t_scaled_py2 - box[:2][1]
                 else:
-                    px1_rel, py1_rel, px2_rel, py2_rel = scaled_px1, scaled_py1, scaled_px2, scaled_py2
+                    t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
                 
-                x_min, x_max = sorted([px1_rel, px2_rel])
-                y_min, y_max = sorted([py1_rel, py2_rel])
+                x_min, x_max = sorted([t_px1_rel, t_px2_rel])
+                y_min, y_max = sorted([t_py1_rel, t_py2_rel])
 
                 # 描画範囲がクロップ後の画像内に収まっているかチェック
                 if x_max > 0 and y_max > 0 and x_min < map_to_draw_on.width and y_min < map_to_draw_on.height:
