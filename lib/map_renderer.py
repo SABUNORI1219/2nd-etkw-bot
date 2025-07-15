@@ -47,7 +47,7 @@ class MapRenderer:
             resized_map = self.map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
             logger.info(f"--- [MapRenderer] ベースマップを {TARGET_WIDTH}x{new_h} に縮小しました。")
             
-            map_to_draw_on = self.map_img.copy()
+            map_to_draw_on = resized_map.copy()
             
             # --- クロップ処理 ---
             all_x = []
