@@ -25,7 +25,7 @@ class MapRenderer:
             original_w, original_h = self.original_map.size
             scale_factor = TARGET_WIDTH / original_w
             new_h = int(original_h * scale_factor)
-            self.map_img = self.original_map.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
+            self.resized_map = self.map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
             self.scale_factor = scale_factor # 初期リサイズ時のスケールファクターを保存
             logger.info(f"--- [MapRenderer] ベースマップを初期リサイズしました: {TARGET_WIDTH}x{new_h}")
         
@@ -47,7 +47,7 @@ class MapRenderer:
         if not territories_to_render: return None, None
         
         try:
-            map_to_draw_on = resized_map.copy()
+            map_to_draw_on = self.resized_map.copy()
             box = None
             
             # --- クロップ処理 ---
