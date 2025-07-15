@@ -68,8 +68,8 @@ class MapRenderer:
                     padding = 200 # 切り取る領域の周囲の余白
                     box = (max(0, min(all_x) - padding), 
                            max(0, min(all_y) - padding),
-                           min(self.map_img.width, max(all_x) + padding),
-                           min(self.map_img.height, max(all_y) + padding))
+                           min(self.resized_map.width, max(all_x) + padding),
+                           min(self.resized_map.height, max(all_y) + padding))
                     map_to_draw_on = map_to_draw_on.crop(box)
 
             # --- 描画処理 ---
