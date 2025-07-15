@@ -105,9 +105,16 @@ class MapRenderer:
                             py1_rel, py2_rel = scaled_py1 - box[:2][1], scaled_py2 - box[:2][1]
                             draw.line([(px1_rel, py1_rel), (px2_rel, py2_rel)], fill=(10, 10, 10, 128), width=3)
                         else:
-                            draw.line([(px1, py1), (px2, py2)], fill=(10, 10, 10, 128), width=3)
+                            draw.line([(scaled_px1, scaled_py1), (scaled_px2, scaled_py2)], fill=(10, 10, 10, 128), width=3)
                 except KeyError:
                     continue
+
+            # Font Scaling dayo!
+            scaled_font_size = max(12, int(self.font.size * scale_factor))
+            try:
+                scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
+            except IOError:
+                scaled_font = ImageFont.load_default()
 
             # --- 2. 全てのテリトリーを描画 ---
             for name, info in territory_data.items():
