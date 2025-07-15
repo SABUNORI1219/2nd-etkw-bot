@@ -16,7 +16,7 @@ class RouletteRenderer:
     """
     ルーレットのGIFアニメーションを生成する専門家。
     """
-    def __init__(self, size=400, polygon_color=(255, 0, 0), pointer_color=(0, 0, 0)):
+    def __init__(self, size=360, polygon_color=(255, 0, 0), pointer_color=(0, 0, 0)):
         self.size = size
         self.center = size // 2
         self.radius = size // 2 - 20  # 少し余白を持たせる
