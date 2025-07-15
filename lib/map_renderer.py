@@ -20,6 +20,15 @@ class MapRenderer:
             with open(os.path.join(ASSETS_PATH, "territories.json"), "r", encoding='utf-8') as f:
                 self.local_territories = json.load(f)
             self.font = ImageFont.truetype(FONT_PATH, 40)
+
+            TARGET_WIDTH = 1600
+            original_w, original_h = self.original_map.size
+            scale_factor = TARGET_WIDTH / original_w
+            new_h = int(original_h * scale_factor)
+            self.map_img = self.original_map.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
+            self.scale_factor = scale_factor # 初期リサイズ時のスケールファクターを保存
+            logger.info(f"--- [MapRenderer] ベースマップを初期リサイズしました: {TARGET_WIDTH}x{new_h}")
+        
         except FileNotFoundError as e:
             logger.error(f"マップ生成に必要なアセットが見つかりません: {e}")
             raise
@@ -38,16 +47,8 @@ class MapRenderer:
         if not territories_to_render: return None, None
         
         try:
-            TARGET_WIDTH = 1600  # 最終的な画像の横幅
-            original_w, original_h = self.map_img.size
-            scale_factor = TARGET_WIDTH / original_w
-            new_h = int(original_h * scale_factor)
-            
-            # 高品質なアルゴリズムで、最初に地図を縮小
-            resized_map = self.map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
-            logger.info(f"--- [MapRenderer] ベースマップを {TARGET_WIDTH}x{new_h} に縮小しました。")
-            
             map_to_draw_on = resized_map.copy()
+            box = None
             
             # --- クロップ処理 ---
             all_x = []
@@ -77,7 +78,6 @@ class MapRenderer:
             overlay_draw = ImageDraw.Draw(overlay)
             draw = ImageDraw.Draw(map_to_draw_on)
 
-            # ▼▼▼【ここからコネクション線描画のロジックを追加】▼▼▼
             # 1. 全ての交易路を地図の裏側に薄く描画する
             for name, data in self.local_territories.items():
                 if "Trading Routes" not in data or "Location" not in data: continue
@@ -87,6 +87,7 @@ class MapRenderer:
                     x1 = (data["Location"]["start"][0] + data["Location"]["end"][0]) // 2
                     z1 = (data["Location"]["start"][1] + data["Location"]["end"][1]) // 2
                     px1, py1 = self._coord_to_pixel(x1, z1)
+                    scaled_px1, scaled_py1 = px1 * self.scale_factor, py1 * self.scale_factor
 
                     for destination_name in data["Trading Routes"]:
                         dest_data = self.local_territories.get(destination_name)
@@ -96,17 +97,17 @@ class MapRenderer:
                         x2 = (dest_data["Location"]["start"][0] + dest_data["Location"]["end"][0]) // 2
                         z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
                         px2, py2 = self._coord_to_pixel(x2, z2)
+                        scaled_px2, scaled_py2 = px2 * self.scale_factor, py2 * self.scale_factor
                         
                         # クロップ後の相対座標に変換
-                        if is_zoomed:
-                            px1_rel, px2_rel = px1 - box[0], px2 - box[0]
-                            py1_rel, py2_rel = py1 - box[1], py2 - box[1]
+                        if is_zoomed and box:
+                            px1_rel, px2_rel = scaled_px1 - box[:2][0], scaled_px2 - box[:2][0]
+                            py1_rel, py2_rel = scaled_py1 - box[:2][1], scaled_py2 - box[:2][1]
                             draw.line([(px1_rel, py1_rel), (px2_rel, py2_rel)], fill=(10, 10, 10, 128), width=3)
                         else:
                             draw.line([(px1, py1), (px2, py2)], fill=(10, 10, 10, 128), width=3)
                 except KeyError:
                     continue
-            # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
             # --- 2. 全てのテリトリーを描画 ---
             for name, info in territory_data.items():
@@ -114,13 +115,15 @@ class MapRenderer:
                 
                 px1, py1 = self._coord_to_pixel(*info["location"]["start"])
                 px2, py2 = self._coord_to_pixel(*info["location"]["end"])
+                scaled_px1, scaled_py1 = px1 * self.scale_factor, py1 * self.scale_factor
+                scaled_px2, scaled_py2 = px2 * self.scale_factor, py2 * self.scale_factor
                 
                 # クロップ後の相対座標に変換
-                if is_zoomed:
-                    px1_rel, px2_rel = px1 - box[0], px2 - box[0]
-                    py1_rel, py2_rel = py1 - box[1], py2 - box[1]
+                if is_zoomed and box:
+                    px1_rel, px2_rel = scaled_px1 - box[:2][0], scaled_px2 - box[:2][0]
+                    py1_rel, py2_rel = scaled_py1 - box[:2][1], scaled_py2 - box[:2][1]
                 else:
-                    px1_rel, py1_rel, px2_rel, py2_rel = px1, py1, px2, py2
+                    px1_rel, py1_rel, px2_rel, py2_rel = scaled_px1, scaled_py1, scaled_px2, scaled_py2
                 
                 x_min, x_max = sorted([px1_rel, px2_rel])
                 y_min, y_max = sorted([py1_rel, py2_rel])
