@@ -22,7 +22,7 @@ class MapRenderer:
             self.font = ImageFont.truetype(FONT_PATH, 40)
 
             TARGET_WIDTH = 1600
-            original_w, original_h = self.original_map.size
+            original_w, original_h = self.map_img.size
             scale_factor = TARGET_WIDTH / original_w
             new_h = int(original_h * scale_factor)
             self.resized_map = self.map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
