@@ -143,7 +143,7 @@ class MapRenderer:
 
                     overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                     draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=4)
-                    draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=self.font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
+                    draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
 
             final_map = Image.alpha_composite(map_to_draw_on, overlay)
 
