@@ -72,6 +72,8 @@ class PlayerCog(commands.Cog):
 
     def _create_player_embed(self, data: dict) -> discord.Embed:
         username = self._safe_get(data, ['username'])
+        escaped_username = discord.utils.escape_markdown(username)
+        
         uuid = self._safe_get(data, ['uuid'])
         raw_support_rank = self._safe_get(data, ['supportRank'], "Player")
         if raw_support_rank.lower() == "vipplus":
@@ -170,7 +172,7 @@ Total Level: {total_level:,}
             color=color
         )
         
-        embed.title = f"\{username}"
+        embed.title = f"{escaped_username}"
         
         embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{uuid}/right")
         
