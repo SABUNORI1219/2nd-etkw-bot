@@ -17,7 +17,7 @@ PATTERN_MAP = {
     'SQUARE_TOP_LEFT': 'tl', 'SQUARE_TOP_RIGHT': 'tr', 'TRIANGLE_BOTTOM': 'bt',
     'TRIANGLE_TOP': 'tt', 'TRIANGLES_BOTTOM': 'bts', 'TRIANGLES_TOP': 'tts',
     'CIRCLE_MIDDLE': 'mc', 'RHOMBUS_MIDDLE': 'mr', 'BORDER': 'bo',
-    'CURLY_BORDER': 'cbo', 'GRADIENT': 'gra', 'GRADIENT_UP': 'gru',
+    'CURLY_BORDER': 'cbo', 'BRICKS': 'bri', 'GRADIENT': 'gra', 'GRADIENT_UP': 'gru',
     'CREEPER': 'cre', 'SKULL': 'sku', 'FLOWER': 'flo', 'MOJANG': 'moj',
     'GLOBE': 'glb', 'PIGLIN': 'pig'
 }
