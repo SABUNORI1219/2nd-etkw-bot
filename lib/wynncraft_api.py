@@ -34,6 +34,11 @@ class WynncraftAPI:
                         if response.content_length != 0:
                             return await response.json()
                         return None
+
+                    # 404 (Not Found) は確定的な失敗なので、再試行せずに即座に終了
+                    if response.status == 404:
+                        logger.warning(f"APIが404 Not Foundを返しました。対象が見つかりません。URL: {url}")
+                        return None
                     
                     retryable_codes = [408, 429, 500, 502, 503, 504]
                     if response.status in retryable_codes:
