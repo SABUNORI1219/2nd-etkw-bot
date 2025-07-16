@@ -52,7 +52,7 @@ class Territory(commands.GroupCog, name="territory"):
             for name in self.territory_guilds_cache if current.lower() in name.lower()
         ][:25]
 
-    @app_commands.checks.cooldown(1, 60.0)
+    @app_commands.checks.cooldown(1, 20.0)
     @app_commands.command(name="map", description="現在のWynncraftのテリトリーマップを生成")
     @app_commands.autocomplete(guild=guild_autocomplete) # guild引数にオートコンプリートを適用
     @app_commands.describe(guild="マップ上のギルドのPrefix(任意)")
