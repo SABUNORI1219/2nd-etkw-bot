@@ -62,8 +62,8 @@ class MapRenderer:
                     end_x, end_z = loc.get("end", [0,0])
                     px1, py1 = self._coord_to_pixel(start_x, start_z)
                     px2, py2 = self._coord_to_pixel(end_x, end_z)
-                    all_x.extend([px1 * scale_factor, px2 * scale_factor])
-                    all_y.extend([py1 * scale_factor, py2 * scale_factor])
+                    all_x.extend([px1 * self.scale_factor, px2 * self.scale_factor])
+                    all_y.extend([py1 * self.scale_factor, py2 * self.scale_factor])
                 
                 if all_x and all_y:
                     padding = 200 # 切り取る領域の周囲の余白
