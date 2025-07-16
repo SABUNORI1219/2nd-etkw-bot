@@ -41,7 +41,7 @@ class HelpCog(commands.Cog):
         # カテゴリー3: その他
         embed.add_field(
             name="🎲 その他",
-            value="`/roulette <title> <options>`: ルーレットを回します。"
+            value="`/roulette <title> <options>`: ルーレットを回します。\n"
                   "`各候補は10文字以内で入力、候補数は6つまでです。`",
             inline=False
         )
