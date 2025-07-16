@@ -66,7 +66,7 @@ class MapRenderer:
                     all_y.extend([py1 * self.scale_factor, py2 * self.scale_factor])
                 
                 if all_x and all_y:
-                    padding = 20 # 切り取る領域の周囲の余白
+                    padding = 30 # 切り取る領域の周囲の余白
                     box = (max(0, min(all_x) - padding), 
                            max(0, min(all_y) - padding),
                            min(self.resized_map.width, max(all_x) + padding),
