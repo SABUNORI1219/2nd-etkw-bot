@@ -103,7 +103,7 @@ Online Players: {online_count}/{total_members}
         
         embed.title = f"[{prefix}] {name}"
         
-        embed.set_footer(text=f"{name}'s Stats | Minister Chikuwa")
+        embed.set_footer(text=f"{prefix}'s Stats | Minister Chikuwa")
 
         return embed
 
