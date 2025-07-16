@@ -25,7 +25,7 @@ class WynncraftAPI:
     async def _make_request(self, url: str) -> dict | list | None:
         """APIにリクエストを送信し、失敗した場合は再試行する共通メソッド"""
         session = await self._get_session() # ⬅️ ここで取得したsessionを…
-        max_retries = 3
+        max_retries = 5
         for i in range(max_retries):
             try:
                 # ▼▼▼【あなたの修正を反映】…ここで正しく使う▼▼▼
@@ -38,7 +38,7 @@ class WynncraftAPI:
                     retryable_codes = [408, 429, 500, 502, 503, 504]
                     if response.status in retryable_codes:
                         logger.warning(f"APIがステータス{response.status}を返しました。再試行します... ({i+1}/{max_retries})")
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(5)
                         continue
                     
                     logger.error(f"APIから予期せぬエラー: Status {response.status}, URL: {url}")
