@@ -20,7 +20,7 @@ class RouletteCog(commands.Cog):
         self.renderer = RouletteRenderer() # ルーレット描画担当者のインスタンスを作成
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
-    @app_commands.checks.cooldown(1, 60.0)
+    @app_commands.checks.cooldown(1, 20.0)
     @app_commands.command(name="roulette", description="ルーレットを回してランダムに一つを当選")
     @app_commands.describe(
         title="ルーレットのタイトル",
