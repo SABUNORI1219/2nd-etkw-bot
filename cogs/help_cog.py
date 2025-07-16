@@ -17,9 +17,9 @@ class HelpCog(commands.Cog):
         embed = discord.Embed(
             title="💡 ヘルプメニュー",
             description="""
-            このBotで利用できるコマンドの一覧です。
-        引数に<>があるものは必須、[]があるものは任意です。
-        """,
+    このBotで利用できるコマンドの一覧です。
+引数に<>があるものは必須、[]があるものは任意です。
+""",
             color=discord.Color.blurple() # Discordのブランドカラー
         )
 
