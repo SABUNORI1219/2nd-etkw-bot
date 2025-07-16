@@ -170,7 +170,7 @@ Total Level: {total_level:,}
             color=color
         )
         
-        embed.title = f"{username}"
+        embed.title = f"\{username}"
         
         embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{uuid}/right")
         
