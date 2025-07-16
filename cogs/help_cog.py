@@ -18,8 +18,8 @@ class HelpCog(commands.Cog):
             title="💡 ヘルプメニュー",
             description="""
             このBotで利用できるコマンドの一覧です。
-            引数に<>があるものは必須、[]があるものは任意です。
-            """,
+        引数に<>があるものは必須、[]があるものは任意です。
+        """,
             color=discord.Color.blurple() # Discordのブランドカラー
         )
 
