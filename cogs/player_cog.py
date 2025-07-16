@@ -210,11 +210,11 @@ Total Level: {total_level:,}
             return
         
         # 3-2. データ取得に成功した場合（単一または衝突）
-        # 取得した新しいデータをキャッシュに保存する
-        self.cache.set_cache(cache_key, api_data)
         
         if isinstance(api_data, dict) and 'username' in api_data:
             embed = self._create_player_embed(api_data)
+            # 取得した新しいデータをキャッシュに保存する-複数プレイヤーはキャッシュ化しない(バグる)
+            self.cache.set_cache(cache_key, api_data)
             await interaction.followup.send(embed=embed)
         elif isinstance(api_data, dict):
             view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self)
