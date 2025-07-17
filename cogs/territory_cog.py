@@ -215,8 +215,9 @@ class Territory(commands.GroupCog, name="territory"):
         # --- ステップ3: 画像の生成と送信 ---
         image_bytes = self.map_renderer.create_single_territory_image(territory)
         if image_bytes:
-            image_file = discord.File(fp=image_bytes, filename=f"{territory}.png")
-            embed.set_image(url=f"attachment://{territory}.png")
+            filename = f"{territory.replace(' ', '_')}.png"
+            image_file = discord.File(fp=image_bytes, filename=filename)
+            embed.set_image(url=f"attachment://{filename}")
             await interaction.followup.send(embed=embed, file=image_file)
         else:
             await interaction.followup.send(embed=embed)
