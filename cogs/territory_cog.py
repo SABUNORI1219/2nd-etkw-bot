@@ -207,7 +207,7 @@ class Territory(commands.GroupCog, name="territory"):
         # --- ステップ2: データの整形 ---
         target_territory_live_data = territory_list_data.get(territory)
         if not target_territory_live_data:
-            await interaction.followup.send(f"テリトリー「{territory}」は現在どのギルドも所有していません。")
+            await interaction.followup.send(f"「{territory}」は無効なテリトリーか、現在どのギルドも所有していません。")
             return
 
         embed = self._create_status_embed(interaction, territory, target_territory_live_data, static_data)
