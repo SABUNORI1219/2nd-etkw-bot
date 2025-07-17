@@ -97,7 +97,7 @@ class MapRenderer:
             x_min, x_max = sorted([final_px1, final_px2])
             y_min, y_max = sorted([final_py1, final_py2])
 
-            if x_max > 0 and y_max > 0 and x_min < base_image.width and y_min < map_to_draw_on.height:
+            if x_max > 0 and y_max > 0 and x_min < map_to_draw_on.width and y_min < map_to_draw_on.height:
                 prefix = info["guild"]["prefix"]
                 color_rgb = self._hex_to_rgb(guild_color_map.get(prefix, "#FFFFFF"))
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
