@@ -32,8 +32,22 @@ class GuildCog(commands.Cog):
     def _create_online_players_table(self, online_players_list: list) -> tuple[str, int]:
         """オンラインプレイヤーのリストからASCIIテーブルと人数を生成する"""
         
-        # ▼▼▼【ロジック修正箇所】APIからのonline_playersリストを直接使う▼▼▼
-        if not online_players_list:
+        online_players = []
+        
+        # ▼▼▼【公式APIの構造に合わせて修正】▼▼▼
+        # 'owner', 'chief'などの各ランクの辞書をループ
+        for rank_group in members_data.values():
+            if isinstance(rank_group, dict):
+                # 各ランク内のプレイヤー情報をループ
+                for player_name, player_data in rank_group.items():
+                    if isinstance(player_data, dict) and player_data.get('online'):
+                        online_players.append({
+                            "name": player_name,
+                            "server": player_data.get("server", "N/A"),
+                            "rank": player_data.get("rank", "N/A")
+                        })
+        
+        if not online_players:
             return "（現在オンラインのメンバーはいません）", 0
 
         # 安全なデータアクセスに修正
@@ -63,23 +77,24 @@ class GuildCog(commands.Cog):
         name = self._safe_get(data, ['name'])
         encoded_name = quote(name)
         prefix = self._safe_get(data, ['prefix'])
-        owner = self._safe_get(data, ['owner'])
-        created_date = self._safe_get(data, ['created_date'])
+        
+        owner_list = self._safe_get(data, ['members', 'owner'], {})
+        owner = list(owner_list.keys())[0] if owner_list else "N/A"
+        
+        created_date = self._safe_get(data, ['created'], "N/A").split("T")[0]
         level = self._safe_get(data, ['level'], 0)
-        xp_percent = self._safe_get(data, ['xp_percent'], 0)
+        xp_percent = self._safe_get(data, ['xpPercent'], 0)
         wars = self._safe_get(data, ['wars'], 0)
-        territories = self._safe_get(data, ['territories'], 0)
+        territories = len(self._safe_get(data, ['territories'], []))
         
         season_ranks = self._safe_get(data, ['seasonRanks'], {})
         latest_season = str(max([int(k) for k in season_ranks.keys()])) if season_ranks else "N/A"
         rating = self._safe_get(season_ranks, [latest_season, 'rating'], "N/A")
         rating_display = f"{rating:,}" if isinstance(rating, int) else rating
         
-        # ▼▼▼【ロジック修正箇所】正しいデータソースを参照する▼▼▼
-        total_members = self._safe_get(data, ['total_members'], 0)
-        online_players_list = self._safe_get(data, ['online_players'], []) # online_playersリストを直接取得
-        online_players_table, online_count = self._create_online_players_table(online_players_list)
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+        total_members = self._safe_get(data, ['members', 'total'], 0)
+        members_data = self._safe_get(data, ['members'], {})
+        online_players_table, online_count = self._create_online_players_table(members_data)
         
         # 埋め込みメッセージを作成
         description = f"""
@@ -112,72 +127,56 @@ Online Players: {online_count}/{total_members}
     @app_commands.describe(guild="Name or Prefix")
     async def guild(self, interaction: discord.Interaction, guild: str):
         await interaction.response.defer()
-
-        cache_key = f"nori_{guild.upper()}" # のりAPIの方のキャッシュ
-        cache_guild = f"official_{guild.upper()}" # 公式APIの方のキャッシュ
         
+        # 公式APIのキャッシュだと分かるようにキーを設定
+        cache_key = f"wynn_guild_{guild.upper()}"
         data_to_use = None
         from_cache = False
         is_stale = False
-        guild_data = None
-        
+
         # --- ステップ1: まずキャッシュを確認 ---
-        cached_guild_data = self.cache.get_cache(cache_guild)
-        if cached_guild_data:
-            logger.info(f"--- [Cache] ギルド'{guild}'のキャッシュを使用します。")
-            guild_data = cached_guild_data
-            from_cache = True
-        
-        # --- ステップ2: キャッシュがなければ、二段構えでAPIを検索 ---
-        if not guild_data:
-            # まずプレフィックスとして検索
-            logger.info(f"--- [API] プレフィックス '{guild}' として検索します...")
-            data_as_prefix = await self.wynn_api.get_guild_by_prefix(guild)
-            if data_as_prefix and data_as_prefix.get('name'):
-                guild_data = data_as_prefix
-                logger.info(f"--- [GuildCmd] ✅ プレフィックスとして'{guild}'が見つかりました。")
-            else:
-                # 見つからなければフルネームで再検索
-                logger.info(f"--- [API] プレフィックスとして見つからず。フルネーム '{guild}' として再検索します...")
-                data_as_name = await self.wynn_api.get_guild_by_name(guild)
-                if data_as_name and data_as_name.get('name'):
-                    guild_data = data_as_name
-                    logger.info(f"--- [GuildCmd] ✅ フルネームとして'{guild}'が見つかりました。")
-
-            # APIでデータが取得できたら、キャッシュに保存
-            if guild_data:
-                self.cache.set_cache(cache_guild, guild_data)
-
-        # 1. キャッシュを探す
         cached_data = self.cache.get_cache(cache_key)
         if cached_data:
-            logger.info(f"--- [Cache] ギルド'{guild}'のキャッシュを使用しました。")
+            logger.info(f"--- [Cache] ギルド'{guild}'のキャッシュを使用します。")
             data_to_use = cached_data
             from_cache = True
-        else:
-            # 2. キャッシュがなければAPIを叩く
-            logger.info(f"--- [API] ギルド'{guild}'のデータをAPIから取得します。")
-            api_data = await self.wynn_api.get_nori_guild_data(guild)
-            if api_data and 'name' in api_data:
-                self.cache.set_cache(cache_key, api_data)
-                data_to_use = api_data
+        
+        # --- ステップ2: キャッシュがなければ、公式APIで二段構えの検索 ---
+        if not data_to_use:
+            # まずプレフィックスとして検索
+            logger.info(f"--- [API] 公式API（プレフィックス）で '{guild}' を検索します...")
+            data_as_prefix = await self.wynn_api.get_guild_by_prefix(guild)
+
+            if data_as_prefix and data_as_prefix.get('name'):
+                data_to_use = data_as_prefix
+                logger.info(f"--- [GuildCmd] ✅ プレフィックスとして'{guild}'が見つかりました。")
             else:
-                # 3. APIがダメなら古いキャッシュを探す
-                stale_cache = self.cache.get_cache(cache_key, ignore_freshness=True)
+                logger.info(f"--- [API] プレフィックスとして見つからず。フルネームの '{guild}' として再検索します...")
+                data_as_name = await self.wynn_api.get_guild_by_name(guild)
+                if data_as_name and data_as_name.get('name'):
+                    data_to_use = data_as_name
+                    logger.info(f"--- [GuildCmd] ✅ フルネームとして'{guild}'が見つかりました。")
+
+            if data_to_use:
+                self.cache.set_cache(cache_key, data_to_use)
+
+        else:
+            stale_cache = self.cache.get_cache(cache_key, ignore_freshness=True)
                 if stale_cache:
                     logger.warning(f"--- [API] APIアクセスに失敗。ギルド'{guild}'の古いキャッシュを使用。")
                     data_to_use = stale_cache
                     from_cache = True
                     is_stale = True
 
-        # 4. データが何もなければ、ここで終了
+        # --- ステップ4: データが何もなければ、ここで終了 ---
         if not data_to_use:
             await interaction.followup.send(f"ギルド「{guild}」が見つかりませんでした。")
             return
 
+        # --- ステップ5: 取得したデータで、埋め込みとバナーを生成・送信 ---
         embed = self._create_guild_embed(data_to_use, interaction, from_cache, is_stale)
         banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner'))
-
+        
         if banner_bytes:
             banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
             embed.set_thumbnail(url="attachment://guild_banner.png")
