@@ -51,9 +51,9 @@ class GuildCog(commands.Cog):
             return "（現在オンラインのメンバーはいません）", 0
 
         # 安全なデータアクセスに修正
-        max_name_len = max((len(p.get('name','')) for p in online_players_list), default=6)
-        max_server_len = max((len(p.get('server','')) for p in online_players_list), default=2)
-        max_rank_len = max((len(p.get('rank','')) for p in online_players_list), default=5)
+        max_name_len = max((len(p.get('name','')) for p in members_data), default=6)
+        max_server_len = max((len(p.get('server','')) for p in members_data), default=2)
+        max_rank_len = max((len(p.get('rank','')) for p in members_data), default=5)
         
         max_name_len = max(max_name_len, 6)
         max_server_len = max(max_server_len, 2)
@@ -65,13 +65,13 @@ class GuildCog(commands.Cog):
         bottom_border = f"╚═{'═'*max_server_len}═╩═{'═'*max_name_len}═╩═{'═'*max_rank_len}═╝"
 
         player_rows = []
-        for p in sorted(online_players_list, key=lambda x: len(x.get('rank', '')), reverse=True):
+        for p in sorted(members_data, key=lambda x: len(x.get('rank', '')), reverse=True):
             server = p.get('server', 'N/A').center(max_server_len)
             name = p.get('name', 'N/A').center(max_name_len)
             rank = p.get('rank', '').ljust(max_rank_len)
             player_rows.append(f"║ {server} ║ {name} ║ {rank} ║")
 
-        return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(online_players_list)
+        return "\n".join([top_border, header, divider] + player_rows + [bottom_border]), len(members_data)
 
     def _create_guild_embed(self, data: dict, interaction: discord.Interaction, from_cache: bool = False, is_stale: bool = False) -> discord.Embed:
         name = self._safe_get(data, ['name'])
