@@ -43,7 +43,7 @@ class MapRenderer:
         except (ValueError, IndexError):
             return (255, 255, 255)
 
-    def _draw_overlays(self, map_to_draw_on: Image.Image, territory_data: dict, guild_color_map: dict, self.scale_factor: float, crop_box: tuple | None) -> Image.Image:
+    def _draw_overlays(self, map_to_draw_on: Image.Image, territory_data: dict, guild_color_map: dict, scale_factor: float, crop_box: tuple | None) -> Image.Image:
         """与えられた画像の上に、コネクション線とテリトリーを描画する共通の専門家"""
         overlay = Image.new("RGBA", base_image.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
