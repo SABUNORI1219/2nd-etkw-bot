@@ -43,7 +43,7 @@ class MapRenderer:
         except (ValueError, IndexError):
             return (255, 255, 255)
 
-    def _draw_overlays(self, base_image: Image.Image, territory_data: dict, guild_color_map: dict, scale_factor: float, crop_box: tuple | None) -> Image.Image:
+    def _draw_overlays(self, map_to_draw_on: Image.Image, territory_data: dict, guild_color_map: dict, self.scale_factor: float, crop_box: tuple | None) -> Image.Image:
         """与えられた画像の上に、コネクション線とテリトリーを描画する共通の専門家"""
         overlay = Image.new("RGBA", base_image.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
@@ -104,7 +104,7 @@ class MapRenderer:
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
                 draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=1, stroke_fill="black")
                 
-        return Image.alpha_composite(base_image, overlay)
+        return Image.alpha_composite(map_to_draw_on, overlay)
 
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
         if not territories_to_render: return None, None
