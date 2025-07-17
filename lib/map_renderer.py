@@ -83,7 +83,7 @@ class MapRenderer:
         except IOError:
             scaled_font = ImageFont.load_default()
                 
-        for info in territory_data.values():
+        for info in territory_data.items():
             if 'location' not in info or 'guild' not in info: continue
             
             px1_orig, py1_orig = self._coord_to_pixel(*info["location"]["start"])
