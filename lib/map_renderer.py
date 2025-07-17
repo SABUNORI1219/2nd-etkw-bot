@@ -64,8 +64,8 @@ class MapRenderer:
                     z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
                     px2_orig, py2_orig = self._coord_to_pixel(x2, z2)
                     
-                    spx1, spy1 = int(px1_orig * scale_factor), int(py1_orig * scale_factor)
-                    spx2, spy2 = int(px2_orig * scale_factor), int(py2_orig * scale_factor)
+                    spx1, spy1 = int(px1_orig * self.scale_factor), int(py1_orig * self.scale_factor)
+                    spx2, spy2 = int(px2_orig * self.scale_factor), int(py2_orig * self.scale_factor)
                     
                     final_px1, final_py1 = spx1 - offset_x, spy1 - offset_y
                     final_px2, final_py2 = spx2 - offset_x, spy2 - offset_y
@@ -79,13 +79,13 @@ class MapRenderer:
                 continue
         
         # --- テリトリーの描画 ---
-        scaled_font = ImageFont.truetype(FONT_PATH, max(12, int(self.font_large.size * scale_factor)))
+        scaled_font = ImageFont.truetype(FONT_PATH, max(12, int(self.font_large.size * self.scale_factor)))
         for info in territory_data.values():
             if 'location' not in info or 'guild' not in info: continue
             px1_orig, py1_orig = self._coord_to_pixel(*info["location"]["start"])
             px2_orig, py2_orig = self._coord_to_pixel(*info["location"]["end"])
-            spx1, spy1 = int(px1_orig * scale_factor), int(py1_orig * scale_factor)
-            spx2, spy2 = int(px2_orig * scale_factor), int(py2_orig * scale_factor)
+            spx1, spy1 = int(px1_orig * self.scale_factor), int(py1_orig * self.scale_factor)
+            spx2, spy2 = int(px2_orig * self.scale_factor), int(py2_orig * self.scale_factor)
             
             final_px1, final_py1 = spx1 - offset_x, spy1 - offset_y
             final_px2, final_py2 = spx2 - offset_x, spy2 - offset_y
@@ -132,7 +132,7 @@ class MapRenderer:
                     map_to_draw_on = map_to_draw_on.crop(box)
 
             # --- 最終出力 ---
-            final_map = self._draw_overlays(map_to_draw_on, territory_data, guild_color_map, scale_factor, crop_box)
+            final_map = self._draw_overlays(map_to_draw_on, territory_data, guild_color_map, self.scale_factor, crop_box)
             map_bytes = BytesIO()
             final_map.save(map_bytes, format='PNG')
             map_bytes.seek(0)
