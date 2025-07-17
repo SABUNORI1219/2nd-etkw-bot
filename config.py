@@ -18,9 +18,9 @@ EMBED_COLOR_BLUE = 0x0000FF
 
 # テリトリーリソースと絵文字の対応表
 RESOURCE_EMOJIS = {
-    "EMERALD": "<:wynn_emerald:1395325625522458654>",
+    "EMERALDS": "<:wynn_emerald:1395325625522458654>",
     "ORE": "<:wynn_ore:1395325664508383262>",
     "WOOD": "<:wynn_wood:1395325681440788621>",
     "FISH": "<:wynn_fish:1395325644899881011>",
-    "CROP": "<:wynn_crop:1395325604806656032>"
+    "CROPS": "<:wynn_crop:1395325604806656032>"
 }
