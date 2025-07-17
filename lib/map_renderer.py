@@ -72,7 +72,7 @@ class MapRenderer:
                     if (final_px1 > 0 or final_px2 > 0) and (final_py1 > 0 or final_py2 > 0) and \
                        (final_px1 < map_to_draw_on.width or final_px2 < map_to_draw_on.width) and \
                        (final_py1 < map_to_draw_on.height or final_py2 < map_to_draw_on.height):
-                        draw.line([(final_px1, final_py1), (final_px2, final_py2)], fill=(10, 10, 10, 128), width=2)
+                        draw.line([(final_px1, final_py1), (final_px2, final_py2)], fill=(10, 10, 10, 128), width=1)
             except KeyError:
                 continue
         
@@ -104,7 +104,7 @@ class MapRenderer:
                 
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
-                draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="white")
+                draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
                 
         return Image.alpha_composite(map_to_draw_on, overlay)
 
