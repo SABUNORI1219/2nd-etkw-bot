@@ -190,13 +190,16 @@ class Territory(commands.GroupCog, name="territory"):
         minutes, _ = divmod(remainder, 60)
         held_for = f"{days} days {hours} hours {minutes} mins"
 
-        # 生産情報を整形
+        # --- 生産情報を整形 ---
         production_data = static_data.get('resources', {})
         production_text_list = []
+        # ▼▼▼【修正点1】amountを数値に変換して比較▼▼▼
         for res_name, amount in production_data.items():
-            if amount != 0: # 生産量が0より大きいものだけを追加
+            if int(amount) > 0: # amountが0より大きいものだけを追加
                 emoji = RESOURCE_EMOJIS.get(res_name.upper(), '❓')
                 production_text_list.append(f"{emoji} {res_name.capitalize()} `+{amount}/h`")
+        
+        production_text = "\n".join(production_text_list) if production_text_list else "なし"
         
         production_text = "\n".join(production_text_list) if production_text_list else "なし"
         
