@@ -174,6 +174,8 @@ class Territory(commands.GroupCog, name="territory"):
     async def status(self, interaction: discord.Interaction, territory: str):
         await interaction.response.defer()
 
+        static_data = self.local_territories.get(territory)
+
         # --- ステップ1: データの取得 ---
         cache_key = "wynn_territory_list"
         territory_list_data = self.cache.get_cache(cache_key)
@@ -193,7 +195,7 @@ class Territory(commands.GroupCog, name="territory"):
             await interaction.followup.send(f"テリトリー「{territory}」は現在どのギルドも所有していません。")
             return
 
-        embed = self._create_status_embed(interaction, territory, target_territory_live_data, territory_list_data)
+        embed = self._create_status_embed(interaction, territory, target_territory_live_data, static_data)
 
         # --- ステップ3: 画像の生成と送信 ---
         image_bytes = self.map_renderer.create_single_territory_image(territory)
