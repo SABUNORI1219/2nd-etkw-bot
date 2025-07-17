@@ -29,7 +29,7 @@ class GuildCog(commands.Cog):
             data = data.get(key)
         return data if data is not None else default
 
-    def _create_online_players_table(self, online_players_list: list) -> tuple[str, int]:
+    def _create_online_players_table(self, self, members_data: dict) -> tuple[str, int]:
         """オンラインプレイヤーのリストからASCIIテーブルと人数を生成する"""
         
         online_players = []
