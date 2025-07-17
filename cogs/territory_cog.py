@@ -87,7 +87,7 @@ class Territory(commands.GroupCog, name="territory"):
                 if display_res_name.endswith('s'):
                     display_res_name = display_res_name[:-1]
                     
-                production_text_list.append(f"{emoji} {display_res_name} `+{amount}/h`")
+                production_text_list.append(f"{emoji} {display_res_name}: `+{amount}/h`")
         
         production_text = "\n".join(production_text_list) if production_text_list else "None"
         
@@ -99,7 +99,7 @@ class Territory(commands.GroupCog, name="territory"):
         guild_name = live_data['guild']['name']
         guild_prefix = live_data['guild']['prefix']
         embed.add_field(name="Guild", value=f"[{guild_prefix}] {guild_name}", inline=False)
-        embed.add_field(name="Have Held for", value=held_for, inline=False)
+        embed.add_field(name="Have Held for", value=f"`{held_for}`", inline=False)
         embed.add_field(name="Production", value=production_text, inline=False)
         embed.add_field(name="Original Conns", value=f"{conns_count} Conns", inline=False)
         embed.set_footer(text="Territory Status | Minister Chikuwa")
