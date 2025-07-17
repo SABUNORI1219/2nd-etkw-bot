@@ -172,10 +172,10 @@ class MapRenderer:
             logger.error(f"マップ生成中にエラー: {e}", exc_info=True)
             return None, None
 
-    def create_single_territory_image(self, territory_name: str) -> BytesIO | None:
+    def create_single_territory_image(self, territory: str) -> BytesIO | None:
         """指定された単一のテリトリー画像を切り出して返す"""
         try:
-            terri_data = self.local_territories.get(territory_name)
+            terri_data = self.local_territories.get(territory)
             if not terri_data or 'location' not in terri_data:
                 return None
             
