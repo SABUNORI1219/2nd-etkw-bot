@@ -3,10 +3,15 @@ from discord import app_commands
 from discord.ext import commands, tasks
 import asyncio
 import logging
+import json
+import os
+from datetime import datetime, timezone
 
 # libフォルダから専門家たちをインポート
 from lib.wynncraft_api import WynncraftAPI
 from lib.map_renderer import MapRenderer
+from lib.cache_handler import CacheHandler
+from config import EMBED_COLOR_BLUE, RESOURCE_EMOJIS
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +105,95 @@ class Territory(commands.GroupCog, name="territory"):
             await interaction.followup.send(file=file, embed=embed)
         else:
             await interaction.followup.send("マップの生成中にエラーが発生しました。コマンドをもう一度お試しください。")
+
+    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    @app_commands.command(name="status", description="指定されたテリトリーのステータスを表示")
+    @app_commands.autocomplete(territory=territory_autocomplete)
+    @app_commands.describe(territory="Territory Name")
+    async def status(self, interaction: discord.Interaction, territory: str):
+        await interaction.response.defer()
+
+        # --- ステップ1: データの取得 ---
+        cache_key = "wynn_territory_list"
+        territory_list_data = self.cache.get_cache(cache_key)
+        if not territory_list_data:
+            logger.info("--- [API] テリトリーリストのキャッシュがないため、APIから取得します。")
+            territory_list_data = await self.wynn_api.get_territory_list()
+            if territory_list_data:
+                self.cache.set_cache(cache_key, territory_list_data)
+
+        if not territory_list_data:
+            await interaction.followup.send("テリトリー情報の取得に失敗しました。")
+            return
+            
+        # --- ステップ2: データの整形 ---
+        target_territory_live_data = territory_list_data.get(territory)
+        if not target_territory_live_data:
+            await interaction.followup.send(f"テリトリー「{territory}」は現在どのギルドも所有していません。")
+            return
+        
+        # --- ステップ3: Embedの作成と送信 ---
+        try:
+            static_data = self.map_renderer.local_territories.get(territory)
+        except Exception:
+            static_data = None
+        
+        cache_key = "wynn_territory_list"
+        live_data_all = self.cache.get_cache(cache_key)
+        if not live_data_all:
+            live_data_all = await self.wynn_api.get_territory_list()
+            if live_data_all:
+                self.cache.set_cache(cache_key, live_data_all)
+
+        if not static_data or not live_data_all:
+            await interaction.followup.send("テリトリー情報の取得に失敗しました。")
+            return
+            
+        live_data = live_data_all.get(territory)
+        if not live_data:
+            await interaction.followup.send(f"テリトリー「{territory_name}」は現在どのギルドも所有していません。")
+            return
+        
+        # --- ステップ4: Embedの作成 ---
+        # 所有期間を計算
+        acquired_dt = datetime.fromisoformat(live_data['acquired'].replace("Z", "+00:00"))
+        duration = datetime.now(timezone.utc) - acquired_dt
+        days, remainder = divmod(duration.total_seconds(), 86400)
+        hours, _ = divmod(remainder, 3600)
+        held_for = f"{int(days)}日と{int(hours)}時間"
+
+        # 生産情報を整形
+        production_data = static_data.get('resources', {})
+        production_text = "\n".join(
+            f"{RESOURCE_EMOJIS.get(res_name, '❓')} {res_name.capitalize()} `+{amount}/h`"
+            for res_name, amount in production_data.items()
+        ) or "なし"
+        
+        # 接続数を計算
+        conns_count = len(static_data.get('Trading Routes', []))
+
+        # 埋め込みを作成
+        embed = discord.Embed(
+            title=f"Territory: {territory_name}",
+            color=discord.Color.dark_teal()
+        )
+        guild_name = live_data['guild']['name']
+        guild_prefix = live_data['guild']['prefix']
+        embed.add_field(name="Guild", value=f"[{guild_prefix}] {guild_name}", inline=False)
+        embed.add_field(name="Have Held for", value=held_for, inline=False)
+        embed.add_field(name="Production", value=production_text, inline=False)
+        embed.add_field(name="Original Conns", value=f"{conns_count}Conns", inline=False)
+        embed.set_footer(text="Territory Status | Minister Chikuwa")
+
+        # --- ステップ3: 画像の生成と送信 ---
+        image_bytes = self.map_renderer.create_single_territory_image(territory_name)
+        if image_bytes:
+            image_file = discord.File(fp=image_bytes, filename=f"{territory_name}.png")
+            embed.set_image(url=f"attachment://{territory_name}.png")
+            await interaction.followup.send(embed=embed, file=image_file)
+        else:
+            await interaction.followup.send(embed=embed)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Territory(bot))
