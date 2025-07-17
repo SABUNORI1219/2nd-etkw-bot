@@ -31,25 +31,25 @@ class GuildCog(commands.Cog):
 
     def _create_online_players_table(self, members_data: dict) -> tuple[str, int]:
         """オンラインプレイヤーのリストからASCIIテーブルと人数を生成する"""
-        
         online_players = []
-        
-        # ▼▼▼【公式APIの構造に合わせて修正】▼▼▼
-        # 'owner', 'chief'などの各ランクの辞書をループ
-        for rank_group in members_data.values():
-            if isinstance(rank_group, dict):
-                # 各ランク内のプレイヤー情報をループ
-                for player_name, player_data in rank_group.items():
-                    if isinstance(player_data, dict) and player_data.get('online'):
-                        online_players.append({
-                            "name": player_name,
-                            "server": player_data.get("server", "N/A"),
-                            "rank": player_data.get("rank", "N/A")
-                        })
+
+        for rank_name, rank_group in members_data.items():
+            # 'total'キーは辞書ではないので、チェックしてスキップ
+            if not isinstance(rank_group, dict):
+                continue
+                
+            # 各ランク内のプレイヤー情報をループ
+            for player_name, player_data in rank_group.items():
+                if isinstance(player_data, dict) and player_data.get('online'):
+                    online_players.append({
+                        "name": player_name,
+                        "server": player_data.get("server", "N/A"),
+                        "rank": rank_name.capitalize() # ランク名を整形して追加
+                    })
         
         if not online_players:
             return "（現在オンラインのメンバーはいません）", 0
-
+            
         # 安全なデータアクセスに修正
         max_name_len = max((len(p.get('name','')) for p in online_players), default=6)
         max_server_len = max((len(p.get('server','')) for p in online_players), default=2)
@@ -65,7 +65,7 @@ class GuildCog(commands.Cog):
         bottom_border = f"╚═{'═'*max_server_len}═╩═{'═'*max_name_len}═╩═{'═'*max_rank_len}═╝"
 
         player_rows = []
-        for p in sorted(members_data, key=lambda x: len(x.get('rank', '')), reverse=True):
+        for p in sorted(online_players, key=lambda x: len(x.get('rank', '')), reverse=True):
             server = p.get('server', 'N/A').center(max_server_len)
             name = p.get('name', 'N/A').center(max_name_len)
             rank = p.get('rank', '').ljust(max_rank_len)
