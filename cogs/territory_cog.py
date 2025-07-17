@@ -150,20 +150,6 @@ class Territory(commands.GroupCog, name="territory"):
         if not territory_data or not guild_color_map:
             await interaction.followup.send("テリトリーまたはギルドカラー情報の取得に失敗しました。コマンドをもう一度お試しください。")
             return
-
-        # ギルドが指定されているかによって、描画するデータを切り替える
-        if guild:
-            # 指定されたギルドのテリトリーのみをフィルタリング
-            territories_to_render = {
-                name: data for name, data in territory_data.items()
-                if data['guild']['prefix'].upper() == guild.upper()
-            }
-            if not territories_to_render:
-                await interaction.followup.send(f"ギルド「{guild}」は現在テリトリーを所有していません。")
-                return
-        else:
-            # 指定がなければ、全てのテリトリーを描画
-            territories_to_render = territory_data
             
         # 地図職人に、非同期で画像の生成を依頼
         # 必要な情報を全て渡す
@@ -172,7 +158,7 @@ class Territory(commands.GroupCog, name="territory"):
             None, 
             self.map_renderer.create_territory_map,
             territory_data,
-            territories_to_render, 
+            guild, 
             guild_color_map
         )
         # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
