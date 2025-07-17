@@ -85,7 +85,7 @@ class GuildCog(commands.Cog):
         level = self._safe_get(data, ['level'], 0)
         xp_percent = self._safe_get(data, ['xpPercent'], 0)
         wars = self._safe_get(data, ['wars'], 0)
-        territories = len(self._safe_get(data, ['territories'], []))
+        territories = self._safe_get(data, ['territories'], 0)
         
         season_ranks = self._safe_get(data, ['seasonRanks'], {})
         latest_season = str(max([int(k) for k in season_ranks.keys()])) if season_ranks else "N/A"
