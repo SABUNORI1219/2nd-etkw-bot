@@ -196,20 +196,31 @@ class MapRenderer:
             right = min(self.map_img.width, x_max_orig + padding)
             bottom = min(self.map_img.height, y_max_orig + padding)
 
-            # Pillowの要求通り、(左 < 右) かつ (上 < 下) を保証する
-            if left >= right or top >= bottom:
-                logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。")
-                return None
+            image_to_send = None
 
-            box = (left, top, right, bottom)
-            # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-            
-            logger.info(f"--- [MapRenderer] 元の地図を、座標 {box} で切り出します。")
-            cropped_image = self.map_img.crop(box)
+            # 計算後の切り抜き範囲が有効かチェック
+            if left < right and top < bottom:
+                logger.info(f"--- [MapRenderer] 座標 { (left, top, right, bottom) } で地図を切り出します。")
+                image_to_send = self.map_img.crop((left, top, right, bottom))
+            else:
+                # 無効な場合は、全体地図に目印を描画する
+                logger.warning(f"--- [MapRenderer] '{territory}'の切り抜き範囲が無効なため、全体マップに目印を描画します。")
+                map_copy = self.map_img.copy()
+                draw = ImageDraw.Draw(map_copy)
+                
+                # テリトリーの中心に赤い円を描画
+                center_x = (x_min_orig + x_max_orig) / 2
+                center_y = (y_min_orig + y_max_orig) / 2
+                radius = 30
+                draw.ellipse(
+                    (center_x - radius, center_y - radius, center_x + radius, center_y + radius),
+                    outline="red", width=5
+                )
+                image_to_send = map_copy
             
             # 画像をバイトデータに変換
             map_bytes = BytesIO()
-            cropped_image.save(map_bytes, format='PNG')
+            image_to_send.save(map_bytes, format='PNG')
             map_bytes.seek(0)
             logger.info(f"--- [MapRenderer] ✅ 画像生成成功。")
             
