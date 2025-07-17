@@ -66,12 +66,13 @@ class MapRenderer:
                     px2_orig, py2_orig = self._coord_to_pixel(x2, z2)
                     spx2, spy2 = px2_orig * self.scale_factor, py2_orig * self.scale_factor
                     
-                    if box:
-                        px1_orig, px2_orig = spx1 - box[:2][0], spx2 - box[:2][0]
-                        py1_orig, py2_orig = spy1 - box[:2][1], spy2 - box[:2][1]
-                        draw.line([(px1_orig, py1_orig), (px2_orig, py2_orig)], fill=(10, 10, 10, 128), width=1)
-                    else:
-                        draw.line([(spx1, spy1), (spx2, spy2)], fill=(10, 10, 10, 128), width=1)
+                    final_px1, final_py1 = spx1 - offset_x, spy1 - offset_y
+                    final_px2, final_py2 = spx2 - offset_x, spy2 - offset_y
+                    
+                    if (final_px1 > 0 or final_px2 > 0) and (final_py1 > 0 or final_py2 > 0) and \
+                       (final_px1 < base_image.width or final_px2 < base_image.width) and \
+                       (final_py1 < base_image.height or final_py2 < base_image.height):
+                        draw.line([(final_px1, final_py1), (final_px2, final_py2)], fill=(10, 10, 10, 128), width=2)
             except KeyError:
                 continue
         
@@ -90,11 +91,8 @@ class MapRenderer:
             spx1, spy1 = px1_orig * self.scale_factor, py1_orig * self.scale_factor
             spx2, spy2 = px2_orig * self.scale_factor, py2_orig * self.scale_factor
 
-            if box:
-                px1_orig, px2_orig = spx1 - box[:2][0], spx2 - box[:2][0]
-                py1_orig, py2_orig = spy1 - box[:2][1], spy2 - box[:2][1]
-            else:
-                px1_orig, py1_orig, px2_orig, py2_orig = spx1, spy1, spx2, spy2
+            final_px1, final_py1 = spx1 - offset_x, spy1 - offset_y
+            final_px2, final_py2 = spx2 - offset_x, spy2 - offset_y
             
             x_min, x_max = sorted([final_px1, final_px2])
             y_min, y_max = sorted([final_py1, final_py2])
@@ -119,21 +117,24 @@ class MapRenderer:
             if guild:
                 all_x, all_y = [], []
                 target_territories = [v for v in territory_data.values() if v.get('guild',{}).get('prefix','').upper() == guild.upper()]
-                if not target_territories: return None, None
-                    
-                for territory_data in target_territories:
-                    loc = territory_data.get("location", {})
-                    px1, py1 = self._coord_to_pixel(*loc.get("start", [0,0]))
-                    px2, py2 = self._coord_to_pixel(*loc.get("end", [0,0]))
-                    all_x.extend([px1 * self.scale_factor, px2 * self.scale_factor])
-                    all_y.extend([py1 * self.scale_factor, py2 * self.scale_factor])
+                if not target_territories:
+                    pass
+                else:   
+                    for territory_data in target_territories:
+                        loc = territory_data.get("location", {})
+                        px1, py1 = self._coord_to_pixel(*loc.get("start", [0,0]))
+                        px2, py2 = self._coord_to_pixel(*loc.get("end", [0,0]))
+                        all_x.extend([px1 * self.scale_factor, px2 * self.scale_factor])
+                        all_y.extend([py1 * self.scale_factor, py2 * self.scale_factor])
 
-                padding = 30
-                box = (max(0, min(all_x) - padding), max(0, min(all_y) - padding),
+                    padding = 30
+                    box = (max(0, min(all_x) - padding), max(0, min(all_y) - padding),
                        min(self.resized_map.width, max(all_x) + padding), min(self.resized_map.height, max(all_y) + padding))
-                if box[0] < box[2] and box[1] < box[3]:
-                    map_to_process = self.resized_map.crop(box)
-                    crop_box = box
+                    if box[0] < box[2] and box[1] < box[3]:
+                        map_to_process = self.resized_map.crop(box)
+                        crop_box = box
+                    else:
+                        crop_box = None
 
             # --- 最終出力 ---
             final_map = self._draw_overlays(map_to_process, territory_data, guild_color_map, self.scale_factor, crop_box)
