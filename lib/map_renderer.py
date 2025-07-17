@@ -70,8 +70,8 @@ class MapRenderer:
                     final_px2, final_py2 = spx2 - offset_x, spy2 - offset_y
                     
                     if (final_px1 > 0 or final_px2 > 0) and (final_py1 > 0 or final_py2 > 0) and \
-                       (final_px1 < map_to_process.width or final_px2 < map_to_process.width) and \
-                       (final_py1 < map_to_process.height or final_py2 < map_to_process.height):
+                       (final_px1 < map_to_draw_on.width or final_px2 < map_to_draw_on.width) and \
+                       (final_py1 < map_to_draw_on.height or final_py2 < map_to_draw_on.height):
                         draw.line([(final_px1, final_py1), (final_px2, final_py2)], fill=(10, 10, 10, 128), width=2)
             except KeyError:
                 continue
@@ -97,7 +97,7 @@ class MapRenderer:
             x_min, x_max = sorted([final_px1, final_px2])
             y_min, y_max = sorted([final_py1, final_py2])
 
-            if x_max > 0 and y_max > 0 and x_min < map_to_process.width and y_min < map_to_process.height:
+            if x_max > 0 and y_max > 0 and x_min < map_to_draw_on.width and y_min < map_to_draw_on.height:
                 prefix = info["guild"]["prefix"]
                 color_hex = guild_color_map.get(prefix, "#FFFFFF")
                 color_rgb = self._hex_to_rgb(color_hex)
@@ -106,7 +106,7 @@ class MapRenderer:
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
                 draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="white")
                 
-        return Image.alpha_composite(map_to_process, overlay)
+        return Image.alpha_composite(map_to_draw_on, overlay)
 
     def create_territory_map(self, territory_data: dict, guild: str, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
         if not territory_data: return None, None
