@@ -177,8 +177,8 @@ class MapRenderer:
         logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
         try:
             terri_data = self.local_territories.get(territory)
-            if not terri_data or 'location' not in terri_data:
-                logger.error(f"'{territory}'にlocationデータがありません。")
+            if not terri_data or 'Location' not in terri_data:
+                logger.error(f"'{territory}'にLocationデータがありません。")
                 return None
             
             loc = terri_data.get("location", {})
