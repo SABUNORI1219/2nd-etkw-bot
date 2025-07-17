@@ -171,3 +171,31 @@ class MapRenderer:
         except Exception as e:
             logger.error(f"マップ生成中にエラー: {e}", exc_info=True)
             return None, None
+
+    def create_single_territory_image(self, territory_name: str) -> BytesIO | None:
+        """指定された単一のテリトリー画像を切り出して返す"""
+        try:
+            terri_data = self.local_territories.get(territory_name)
+            if not terri_data or 'location' not in terri_data:
+                return None
+            
+            loc = terri_data.get("location", {})
+            px1, py1 = self._coord_to_pixel(*loc.get("start", [0,0]))
+            px2, py2 = self._coord_to_pixel(*loc.get("end", [0,0]))
+            
+            # テリトリーを囲むように、少し余白(padding)を持たせて切り抜く
+            padding = 50 
+            box = (min(px1, px2) - padding, min(py1, py2) - padding,
+                   max(px1, px2) + padding, max(py1, py2) + padding)
+            
+            cropped_image = self.map_img.crop(box)
+            
+            # 画像をバイトデータに変換
+            map_bytes = BytesIO()
+            cropped_image.save(map_bytes, format='PNG')
+            map_bytes.seek(0)
+            
+            return map_bytes
+        except Exception as e:
+            logger.error(f"単一テリトリー画像の生成中にエラー: {e}")
+            return None
