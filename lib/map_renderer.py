@@ -131,13 +131,13 @@ class MapRenderer:
                     box = (max(0, min(all_x) - padding), max(0, min(all_y) - padding),
                        min(self.resized_map.width, max(all_x) + padding), min(self.resized_map.height, max(all_y) + padding))
                     if box[0] < box[2] and box[1] < box[3]:
-                        map_to_process = self.resized_map.crop(box)
+                        map_to_draw_on = self.resized_map.crop(box)
                         crop_box = box
                     else:
                         crop_box = None
 
             # --- 最終出力 ---
-            final_map = self._draw_overlays(map_to_process, territory_data, guild_color_map, self.scale_factor, crop_box)
+            final_map = self._draw_overlays(map_to_draw_on, territory_data, guild_color_map, self.scale_factor, crop_box)
             map_bytes = BytesIO()
             final_map.save(map_bytes, format='PNG')
             map_bytes.seek(0)
