@@ -111,7 +111,7 @@ class MapRenderer:
         return Image.alpha_composite(map_to_draw_on, overlay)
 
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
-        if not territoriy_data: return None, None
+        if not territory_data: return None, None
         try:
             map_to_draw_on = self.resized_map
             crop_box = None
