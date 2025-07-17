@@ -132,7 +132,7 @@ class MapRenderer:
                     map_to_draw_on = map_to_draw_on.crop(box)
 
             # --- 最終出力 ---
-            final_map = self._draw_overlays(map_to_process, territory_data, guild_color_map, scale_factor, crop_box)
+            final_map = self._draw_overlays(map_to_draw_on, territory_data, guild_color_map, scale_factor, crop_box)
             map_bytes = BytesIO()
             final_map.save(map_bytes, format='PNG')
             map_bytes.seek(0)
