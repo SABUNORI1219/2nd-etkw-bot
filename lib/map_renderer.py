@@ -184,6 +184,9 @@ class MapRenderer:
             loc = terri_data.get("location", {})
             px1, py1 = self._coord_to_pixel(*loc.get("start", [0,0]))
             px2, py2 = self._coord_to_pixel(*loc.get("end", [0,0]))
+
+            x_min, x_max = min(px1, px2), max(px1, px2)
+            y_min, y_max = min(py1, py2), max(py1, py2)
             
             # テリトリーを囲むように、少し余白(padding)を持たせて切り抜く
             padding = 50 
