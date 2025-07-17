@@ -110,15 +110,15 @@ class MapRenderer:
                 
         return Image.alpha_composite(map_to_draw_on, overlay)
 
-    def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
+    def create_territory_map(self, territory_data: dict, guild: str, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
         if not territory_data: return None, None
         try:
             map_to_draw_on = self.resized_map
             crop_box = None
 
-            if territories_to_render:
+            if guild:
                 all_x, all_y = [], []
-                target_territories = [v for v in territory_data.values() if v.get('guild',{}).get('prefix','').upper() == territories_to_render.upper()]
+                target_territories = [v for v in territory_data.values() if v.get('guild',{}).get('prefix','').upper() == guild.upper()]
                 if not target_territories: return None, None
                     
                 for territory_data in target_territories:
