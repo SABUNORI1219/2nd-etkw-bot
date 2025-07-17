@@ -63,7 +63,16 @@ class Territory(commands.GroupCog, name="territory"):
         days = duration.days
         hours, remainder = divmod(duration.seconds, 3600)
         minutes, _ = divmod(remainder, 60)
-        held_for = f"{days} days {hours} hours {minutes} mins"
+
+        held_for_parts = []
+        if days > 0:
+            held_for_parts.append(f"{days} days")
+        if hours > 0:
+            held_for_parts.append(f"{hours} hours")
+        if minutes > 0:
+            held_for_parts.append(f"{minutes} mins")
+        
+        held_for = " ".join(held_for_parts) if held_for_parts else "Just now"
 
         # --- 生産情報を整形 ---
         production_data = static_data.get('resources', {})
