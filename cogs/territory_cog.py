@@ -195,7 +195,7 @@ class Territory(commands.GroupCog, name="territory"):
         production_text_list = []
         for res_name, amount in production_data.items():
             if amount > 0: # 生産量が0より大きいものだけを追加
-                emoji = RESOURCE_EMOJIS.get(res_name, '❓')
+                emoji = RESOURCE_EMOJIS.get(res_name.upper(), '❓')
                 production_text_list.append(f"{emoji} {res_name.capitalize()} `+{amount}/h`")
         
         production_text = "\n".join(production_text_list) if production_text_list else "なし"
