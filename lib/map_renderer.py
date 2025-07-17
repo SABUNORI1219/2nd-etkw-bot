@@ -64,7 +64,7 @@ class MapRenderer:
                     x2 = (dest_data["Location"]["start"][0] + dest_data["Location"]["end"][0]) // 2
                     z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
                     px2_orig, py2_orig = self._coord_to_pixel(x2, z2)
-                    spx2, spy2 = int(px2_orig * self.scale_factor), int(py2_orig * self.scale_factor)
+                    spx2, spy2 = px2_orig * self.scale_factor, py2_orig * self.scale_factor
                     
                     if box:
                         px1_orig, px2_orig = spx1 - box[:2][0], spx2 - box[:2][0]
