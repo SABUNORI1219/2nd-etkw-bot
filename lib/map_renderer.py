@@ -79,7 +79,12 @@ class MapRenderer:
                 continue
         
         # --- テリトリーの描画 ---
-        scaled_font = ImageFont.truetype(FONT_PATH, max(12, int(self.font_large.size * self.scale_factor)))
+        scaled_font_size = max(12, int(self.font.size * self.scale_factor))
+            try:
+                scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
+            except IOError:
+                scaled_font = ImageFont.load_default()
+                
         for info in territory_data.values():
             if 'location' not in info or 'guild' not in info: continue
             px1_orig, py1_orig = self._coord_to_pixel(*info["location"]["start"])
