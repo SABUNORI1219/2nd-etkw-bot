@@ -81,9 +81,15 @@ class Territory(commands.GroupCog, name="territory"):
         for res_name, amount in production_data.items():
             if int(amount) > 0: # amountが0より大きいものだけを追加
                 emoji = RESOURCE_EMOJIS.get(res_name.upper(), '❓')
-                production_text_list.append(f"{emoji} {res_name.capitalize()} `+{amount}/h`")
+                
+                # 表示用の名前を作成する際に、末尾の's'を削除
+                display_res_name = res_name.capitalize()
+                if display_res_name.endswith('s'):
+                    display_res_name = display_res_name[:-1]
+                    
+                production_text_list.append(f"{emoji} {display_res_name} `+{amount}/h`")
         
-        production_text = "\n".join(production_text_list) if production_text_list else "なし"
+        production_text = "\n".join(production_text_list) if production_text_list else "None"
         
         # --- 接続数を計算 ---
         conns_count = len(static_data.get('Trading Routes', []))
