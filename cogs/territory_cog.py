@@ -185,16 +185,20 @@ class Territory(commands.GroupCog, name="territory"):
         # 所有期間を計算
         acquired_dt = datetime.fromisoformat(live_data['acquired'].replace("Z", "+00:00"))
         duration = datetime.now(timezone.utc) - acquired_dt
-        days, remainder = divmod(duration.total_seconds(), 86400)
-        hours, _ = divmod(remainder, 3600)
-        held_for = f"{int(days)}日と{int(hours)}時間"
+        days = duration.days
+        hours, remainder = divmod(duration.seconds, 3600)
+        minutes, _ = divmod(remainder, 60)
+        held_for = f"{days} days {hours} hours {minutes} mins"
 
         # 生産情報を整形
         production_data = static_data.get('resources', {})
-        production_text = "\n".join(
-            f"{RESOURCE_EMOJIS.get(res_name, '❓')} {res_name.capitalize()} `+{amount}/h`"
-            for res_name, amount in production_data.items()
-        ) or "なし"
+        production_text_list = []
+        for res_name, amount in production_data.items():
+            if amount > 0: # 生産量が0より大きいものだけを追加
+                emoji = RESOURCE_EMOJIS.get(res_name, '❓')
+                production_text_list.append(f"{emoji} {res_name.capitalize()} `+{amount}/h`")
+        
+        production_text = "\n".join(production_text_list) if production_text_list else "なし"
         
         # 接続数を計算
         conns_count = len(static_data.get('Trading Routes', []))
@@ -209,7 +213,7 @@ class Territory(commands.GroupCog, name="territory"):
         embed.add_field(name="Guild", value=f"[{guild_prefix}] {guild_name}", inline=False)
         embed.add_field(name="Have Held for", value=held_for, inline=False)
         embed.add_field(name="Production", value=production_text, inline=False)
-        embed.add_field(name="Original Conns", value=f"{conns_count}Conns", inline=False)
+        embed.add_field(name="Original Conns", value=f"{conns_count} Conns", inline=False)
         embed.set_footer(text="Territory Status | Minister Chikuwa")
 
         # --- ステップ3: 画像の生成と送信 ---
