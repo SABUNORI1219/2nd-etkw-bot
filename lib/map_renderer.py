@@ -201,7 +201,7 @@ class MapRenderer:
 
             # 計算後の切り抜き範囲が有効かチェック
             if not (box[0] < box[2] and box[1] < box[3]):
-                logger.error(f"'{territory_name}'の計算後の切り抜き範囲が無効です。Box: {box}")
+                logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。Box: {box}")
                 return None
 
             logger.info(f"--- [MapRenderer] 元の地図を、座標 {box} で切り出します。")
