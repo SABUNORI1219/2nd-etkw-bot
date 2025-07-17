@@ -176,7 +176,7 @@ class MapRenderer:
         """指定された単一のテリトリー画像を切り出して返す"""
         logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
         try:
-            terri_data = self.local_territories.get(territory_name)
+            terri_data = self.local_territories.get(territory)
             if not terri_data or 'location' not in terri_data:
                 logger.error(f"'{territory}'にlocationデータがありません。")
                 return None
