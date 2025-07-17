@@ -174,7 +174,7 @@ class MapRenderer:
 
     def create_single_territory_image(self, territory: str) -> BytesIO | None:
         """指定された単一のテリトリー画像を切り出して返す"""
-        logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory_name}")
+        logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
         try:
             terri_data = self.local_territories.get(territory)
             if not terri_data:
