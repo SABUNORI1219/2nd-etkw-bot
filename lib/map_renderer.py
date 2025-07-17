@@ -51,30 +51,27 @@ class MapRenderer:
         offset_x, offset_y = (crop_box[0], crop_box[1]) if crop_box else (0, 0)
 
         # --- コネクション線の描画 ---
-        for data in self.local_territories.values():
+        for name, data in self.local_territories.values():
             if "Trading Routes" not in data or "Location" not in data: continue
             try:
                 x1 = (data["Location"]["start"][0] + data["Location"]["end"][0]) // 2
                 z1 = (data["Location"]["start"][1] + data["Location"]["end"][1]) // 2
                 px1_orig, py1_orig = self._coord_to_pixel(x1, z1)
-                for dest_name in data["Trading Routes"]:
-                    dest_data = self.local_territories.get(dest_name)
+                spx1, spy1 = px1_orig * self.scale_factor, py1_orig * self.scale_factor
+                for destination_name in data["Trading Routes"]:
+                    dest_data = self.local_territories.get(destination_name)
                     if not dest_data or "Location" not in dest_data: continue
                     x2 = (dest_data["Location"]["start"][0] + dest_data["Location"]["end"][0]) // 2
                     z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
                     px2_orig, py2_orig = self._coord_to_pixel(x2, z2)
-                    
-                    spx1, spy1 = int(px1_orig * self.scale_factor), int(py1_orig * self.scale_factor)
                     spx2, spy2 = int(px2_orig * self.scale_factor), int(py2_orig * self.scale_factor)
                     
-                    final_px1, final_py1 = spx1 - offset_x, spy1 - offset_y
-                    final_px2, final_py2 = spx2 - offset_x, spy2 - offset_y
-                    
-                    # 線が描画範囲内にあるか簡易チェック
-                    if (final_px1 > 0 or final_px2 > 0) and (final_py1 > 0 or final_py2 > 0) and \
-                       (final_px1 < map_to_draw_on.width or final_px2 < map_to_draw_on.width) and \
-                       (final_py1 < map_to_draw_on.height or final_py2 < map_to_draw_on.height):
-                        draw.line([(final_px1, final_py1), (final_px2, final_py2)], fill=(10, 10, 10, 128), width=1)
+                    if box:
+                        px1_orig, px2_orig = spx1 - box[:2][0], spx2 - box[:2][0]
+                        py1_orig, py2_orig = spy1 - box[:2][1], spy2 - box[:2][1]
+                        draw.line([(px1_orig, py1_orig), (px2_orig, py2_orig)], fill=(10, 10, 10, 128), width=1)
+                    else:
+                        draw.line([(spx1, spy1), (spx2, spy2)], fill=(10, 10, 10, 128), width=1)
             except KeyError:
                 continue
         
@@ -85,24 +82,31 @@ class MapRenderer:
         except IOError:
             scaled_font = ImageFont.load_default()
                 
-        for info in territory_data.values():
+        for name, info in territory_data.values():
             if 'location' not in info or 'guild' not in info: continue
+            
             px1_orig, py1_orig = self._coord_to_pixel(*info["location"]["start"])
             px2_orig, py2_orig = self._coord_to_pixel(*info["location"]["end"])
-            spx1, spy1 = int(px1_orig * self.scale_factor), int(py1_orig * self.scale_factor)
-            spx2, spy2 = int(px2_orig * self.scale_factor), int(py2_orig * self.scale_factor)
+            spx1, spy1 = px1_orig * self.scale_factor, py1_orig * self.scale_factor
+            spx2, spy2 = px2_orig * self.scale_factor, py2_orig * self.scale_factor
+
+            if box:
+                px1_orig, px2_orig = spx1 - box[:2][0], spx2 - box[:2][0]
+                py1_orig, py2_orig = spy1 - box[:2][1], spy2 - box[:2][1]
+            else:
+                px1_orig, py1_orig, px2_orig, py2_orig = spx1, spy1, spx2, spy2
             
-            final_px1, final_py1 = spx1 - offset_x, spy1 - offset_y
-            final_px2, final_py2 = spx2 - offset_x, spy2 - offset_y
             x_min, x_max = sorted([final_px1, final_px2])
             y_min, y_max = sorted([final_py1, final_py2])
 
             if x_max > 0 and y_max > 0 and x_min < map_to_draw_on.width and y_min < map_to_draw_on.height:
                 prefix = info["guild"]["prefix"]
-                color_rgb = self._hex_to_rgb(guild_color_map.get(prefix, "#FFFFFF"))
+                color_hex = guild_color_map.get(prefix, "#FFFFFF")
+                color_rgb = self._hex_to_rgb(color_hex)
+                
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
-                draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=1, stroke_fill="black")
+                draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="white")
                 
         return Image.alpha_composite(map_to_draw_on, overlay)
 
@@ -110,7 +114,7 @@ class MapRenderer:
         if not territories_to_render: return None, None
         
         try:
-            map_to_draw_on = self.resized_map.copy()
+            map_to_draw_on = self.resized_map
             crop_box = None
             
             # --- クロップ処理 ---
