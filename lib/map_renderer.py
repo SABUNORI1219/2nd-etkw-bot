@@ -51,7 +51,7 @@ class MapRenderer:
         offset_x, offset_y = (crop_box[0], crop_box[1]) if crop_box else (0, 0)
 
         # --- コネクション線の描画 ---
-        for name, data in self.local_territories.values():
+        for data in self.local_territories.values():
             if "Trading Routes" not in data or "Location" not in data: continue
             try:
                 x1 = (data["Location"]["start"][0] + data["Location"]["end"][0]) // 2
@@ -82,7 +82,7 @@ class MapRenderer:
         except IOError:
             scaled_font = ImageFont.load_default()
                 
-        for name, info in territory_data.values():
+        for info in territory_data.values():
             if 'location' not in info or 'guild' not in info: continue
             
             px1_orig, py1_orig = self._coord_to_pixel(*info["location"]["start"])
