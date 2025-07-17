@@ -174,9 +174,14 @@ class MapRenderer:
 
     def create_single_territory_image(self, territory: str) -> BytesIO | None:
         """指定された単一のテリトリー画像を切り出して返す"""
+        logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory_name}")
         try:
             terri_data = self.local_territories.get(territory)
-            if not terri_data or 'location' not in terri_data:
+            if not terri_data:
+                logger.error(f"--- [MapRenderer] territories.json内に'{territory}'が見つかりません。")
+                return None
+            if 'location' not in terri_data:
+                logger.error(f"--- [MapRenderer] '{territory}'にlocationデータがありません。")
                 return None
             
             loc = terri_data.get("location", {})
@@ -187,13 +192,15 @@ class MapRenderer:
             padding = 50 
             box = (min(px1, px2) - padding, min(py1, py2) - padding,
                    max(px1, px2) + padding, max(py1, py2) + padding)
-            
+
+            logger.info(f"--- [MapRenderer] 元の地図を、座標 {box} で切り出します。")
             cropped_image = self.map_img.crop(box)
             
             # 画像をバイトデータに変換
             map_bytes = BytesIO()
             cropped_image.save(map_bytes, format='PNG')
             map_bytes.seek(0)
+            logger.info(f"--- [MapRenderer] ✅ 画像生成成功。")
             
             return map_bytes
         except Exception as e:
