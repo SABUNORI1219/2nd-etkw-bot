@@ -201,7 +201,7 @@ class Territory(commands.GroupCog, name="territory"):
 
         # 埋め込みを作成
         embed = discord.Embed(
-            title=f"Territory: {territory_name}",
+            title=f"Territory: {territory}",
             color=discord.Color.dark_teal()
         )
         guild_name = live_data['guild']['name']
@@ -213,10 +213,10 @@ class Territory(commands.GroupCog, name="territory"):
         embed.set_footer(text="Territory Status | Minister Chikuwa")
 
         # --- ステップ3: 画像の生成と送信 ---
-        image_bytes = self.map_renderer.create_single_territory_image(territory_name)
+        image_bytes = self.map_renderer.create_single_territory_image(territory)
         if image_bytes:
-            image_file = discord.File(fp=image_bytes, filename=f"{territory_name}.png")
-            embed.set_image(url=f"attachment://{territory_name}.png")
+            image_file = discord.File(fp=image_bytes, filename=f"{territory}.png")
+            embed.set_image(url=f"attachment://{territory}.png")
             await interaction.followup.send(embed=embed, file=image_file)
         else:
             await interaction.followup.send(embed=embed)
