@@ -174,7 +174,7 @@ class Territory(commands.GroupCog, name="territory"):
     async def status(self, interaction: discord.Interaction, territory: str):
         await interaction.response.defer()
 
-        static_data = self.local_territories.get(territory)
+        static_data = self.map_renderer.local_territories.get(territory)
 
         # --- ステップ1: データの取得 ---
         cache_key = "wynn_territory_list"
