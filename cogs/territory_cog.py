@@ -201,7 +201,7 @@ class Territory(commands.GroupCog, name="territory"):
 
         # 埋め込みを作成
         embed = discord.Embed(
-            title=f"Territory: {territory}",
+            title=f"{territory}",
             color=discord.Color.dark_teal()
         )
         guild_name = live_data['guild']['name']
