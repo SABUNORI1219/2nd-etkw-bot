@@ -45,9 +45,9 @@ class MapRenderer:
 
     def _draw_overlays(self, map_to_draw_on: Image.Image, territory_data: dict, guild_color_map: dict, scale_factor: float, crop_box: tuple | None) -> Image.Image:
         """与えられた画像の上に、コネクション線とテリトリーを描画する共通の専門家"""
-        overlay = Image.new("RGBA", base_image.size, (0,0,0,0))
+        overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
-        draw = ImageDraw.Draw(base_image)
+        draw = ImageDraw.Draw(map_to_draw_on)
         offset_x, offset_y = (crop_box[0], crop_box[1]) if crop_box else (0, 0)
 
         # --- コネクション線の描画 ---
@@ -72,8 +72,8 @@ class MapRenderer:
                     
                     # 線が描画範囲内にあるか簡易チェック
                     if (final_px1 > 0 or final_px2 > 0) and (final_py1 > 0 or final_py2 > 0) and \
-                       (final_px1 < base_image.width or final_px2 < base_image.width) and \
-                       (final_py1 < base_image.height or final_py2 < base_image.height):
+                       (final_px1 < map_to_draw_on.width or final_px2 < map_to_draw_on.width) and \
+                       (final_py1 < map_to_draw_on.height or final_py2 < map_to_draw_on.height):
                         draw.line([(final_px1, final_py1), (final_px2, final_py2)], fill=(10, 10, 10, 128), width=1)
             except KeyError:
                 continue
@@ -97,7 +97,7 @@ class MapRenderer:
             x_min, x_max = sorted([final_px1, final_px2])
             y_min, y_max = sorted([final_py1, final_py2])
 
-            if x_max > 0 and y_max > 0 and x_min < base_image.width and y_min < base_image.height:
+            if x_max > 0 and y_max > 0 and x_min < base_image.width and y_min < map_to_draw_on.height:
                 prefix = info["guild"]["prefix"]
                 color_rgb = self._hex_to_rgb(guild_color_map.get(prefix, "#FFFFFF"))
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
