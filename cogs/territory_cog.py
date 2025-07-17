@@ -42,8 +42,18 @@ class Territory(commands.GroupCog, name="territory"):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
         self.map_renderer = MapRenderer()
+        self.cache = CacheHandler()
         self.territory_guilds_cache = [] # ギルド名のリスト
         self.update_territory_cache.start() # 定期更新タスクを開始
+        logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
+
+        try:
+            with open(TERRITORIES_JSON_PATH, "r", encoding='utf-8') as f:
+                self.territory_names = list(json.load(f).keys())
+        except Exception as e:
+            self.territory_names = []
+            logger.error(f"territories.jsonの読み込みに失敗: {e}")
+
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
     def cog_unload(self):
