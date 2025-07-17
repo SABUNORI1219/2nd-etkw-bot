@@ -178,7 +178,7 @@ class MapRenderer:
         try:
             terri_data = self.local_territories.get(territory_name)
             if not terri_data or 'location' not in terri_data:
-                logger.error(f"'{territory_name}'にlocationデータがありません。")
+                logger.error(f"'{territory}'にlocationデータがありません。")
                 return None
             
             loc = terri_data.get("location", {})
