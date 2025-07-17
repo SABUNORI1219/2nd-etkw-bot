@@ -33,6 +33,15 @@ class GuildCog(commands.Cog):
         """オンラインプレイヤーのリストからASCIIテーブルと人数を生成する"""
         online_players = []
 
+        rank_to_stars_map = {
+            "OWNER": "*****",
+            "CHIEF": "****",
+            "STRATEGIST": "***",
+            "CAPTAIN": "**",
+            "RECRUITER": "*",
+            "RECRUIT": ""
+        }
+
         for rank_name, rank_group in members_data.items():
             # 'total'キーは辞書ではないので、チェックしてスキップ
             if not isinstance(rank_group, dict):
@@ -41,10 +50,11 @@ class GuildCog(commands.Cog):
             # 各ランク内のプレイヤー情報をループ
             for player_name, player_data in rank_group.items():
                 if isinstance(player_data, dict) and player_data.get('online'):
+                    star_rank = rank_to_stars_map.get(rank_name.upper(), "")
                     online_players.append({
                         "name": player_name,
                         "server": player_data.get("server", "N/A"),
-                        "rank": rank_name.capitalize() # ランク名を整形して追加
+                        "rank": star_rank
                     })
         
         if not online_players:
