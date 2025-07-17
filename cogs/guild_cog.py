@@ -162,11 +162,11 @@ Online Players: {online_count}/{total_members}
 
         else:
             stale_cache = self.cache.get_cache(cache_key, ignore_freshness=True)
-                if stale_cache:
-                    logger.warning(f"--- [API] APIアクセスに失敗。ギルド'{guild}'の古いキャッシュを使用。")
-                    data_to_use = stale_cache
-                    from_cache = True
-                    is_stale = True
+            if stale_cache:
+                logger.warning(f"--- [API] APIアクセスに失敗。ギルド'{guild}'の古いキャッシュを使用。")
+                data_to_use = stale_cache
+                from_cache = True
+                is_stale = True
 
         # --- ステップ4: データが何もなければ、ここで終了 ---
         if not data_to_use:
