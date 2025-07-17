@@ -111,37 +111,32 @@ class MapRenderer:
         return Image.alpha_composite(map_to_draw_on, overlay)
 
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
-        if not territories_to_render: return None, None
-        
+        if not territoriy_data: return None, None
         try:
             map_to_draw_on = self.resized_map
             crop_box = None
-            
-            # --- クロップ処理 ---
-            all_x = []
-            all_y = []
-            is_zoomed = len(territories_to_render) < len(self.local_territories)
 
-            if is_zoomed:
-                for terri_data in territories_to_render.values():
-                    loc = terri_data.get("location", {})
-                    start_x, start_z = loc.get("start", [0,0])
-                    end_x, end_z = loc.get("end", [0,0])
-                    px1, py1 = self._coord_to_pixel(start_x, start_z)
-                    px2, py2 = self._coord_to_pixel(end_x, end_z)
+            if territories_to_render:
+                all_x, all_y = [], []
+                target_territories = [v for v in territory_data.values() if v.get('guild',{}).get('prefix','').upper() == territories_to_render.upper()]
+                if not target_territories: return None, None
+                    
+                for territory_data in target_territories:
+                    loc = territory_data.get("location", {})
+                    px1, py1 = self._coord_to_pixel(*loc.get("start", [0,0]))
+                    px2, py2 = self._coord_to_pixel(*loc.get("end", [0,0]))
                     all_x.extend([px1 * self.scale_factor, px2 * self.scale_factor])
                     all_y.extend([py1 * self.scale_factor, py2 * self.scale_factor])
-                
-                if all_x and all_y:
-                    padding = 30 # 切り取る領域の周囲の余白
-                    box = (max(0, min(all_x) - padding), 
-                           max(0, min(all_y) - padding),
-                           min(self.resized_map.width, max(all_x) + padding),
-                           min(self.resized_map.height, max(all_y) + padding))
-                    map_to_draw_on = map_to_draw_on.crop(box)
+
+                padding = 30
+                box = (max(0, min(all_x) - padding), max(0, min(all_y) - padding),
+                       min(self.resized_map.width, max(all_x) + padding), min(self.resized_map.height, max(all_y) + padding))
+                if box[0] < box[2] and box[1] < box[3]:
+                    map_to_process = self.resized_map.crop(box)
+                    crop_box = box
 
             # --- 最終出力 ---
-            final_map = self._draw_overlays(map_to_draw_on, territory_data, guild_color_map, self.scale_factor, crop_box)
+            final_map = self._draw_overlays(map_to_process, territory_data, guild_color_map, self.scale_factor, crop_box)
             map_bytes = BytesIO()
             final_map.save(map_bytes, format='PNG')
             map_bytes.seek(0)
