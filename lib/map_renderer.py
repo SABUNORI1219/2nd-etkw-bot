@@ -185,17 +185,24 @@ class MapRenderer:
             px1, py1 = self._coord_to_pixel(*loc.get("start", [0,0]))
             px2, py2 = self._coord_to_pixel(*loc.get("end", [0,0]))
 
-            x_min, x_max = min(px1, px2), max(px1, px2)
-            y_min, y_max = min(py1, py2), max(py1, py2)
+            x_min_orig, x_max_orig = min(px1, px2), max(px1, px2)
+            y_min_orig, y_max_orig = min(py1, py2), max(py1, py2)
             
-            # テリトリーを囲むように、少し余白(padding)を持たせて切り抜く
             padding = 50 
-            box = (
-                max(0, min(px1, px2) - padding), 
-                max(0, min(py1, py2) - padding),
-                min(self.map_img.width, max(px1, px2) + padding), 
-                min(self.map_img.height, max(py1, py2) + padding)
-            )
+            
+            # ▼▼▼【最終修正箇所】cropに渡す座標を、最終段階で並べ替える▼▼▼
+            left = max(0, x_min_orig - padding)
+            top = max(0, y_min_orig - padding)
+            right = min(self.map_img.width, x_max_orig + padding)
+            bottom = min(self.map_img.height, y_max_orig + padding)
+
+            # Pillowの要求通り、(左 < 右) かつ (上 < 下) を保証する
+            if left >= right or top >= bottom:
+                logger.error(f"'{territory_name}'の計算後の切り抜き範囲が無効です。")
+                return None
+
+            box = (left, top, right, bottom)
+            # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
             
             logger.info(f"--- [MapRenderer] 元の地図を、座標 {box} で切り出します。")
             cropped_image = self.map_img.crop(box)
