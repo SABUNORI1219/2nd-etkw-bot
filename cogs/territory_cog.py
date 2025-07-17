@@ -56,6 +56,40 @@ class Territory(commands.GroupCog, name="territory"):
 
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
+    def _create_status_embed(self, interaction: discord.Interaction, territory: str, live_data: dict, static_data: dict) -> discord.Embed:
+        # --- 所有期間を計算 ---
+        acquired_dt = datetime.fromisoformat(live_data['acquired'].replace("Z", "+00:00"))
+        duration = datetime.now(timezone.utc) - acquired_dt
+        days = duration.days
+        hours, remainder = divmod(duration.seconds, 3600)
+        minutes, _ = divmod(remainder, 60)
+        held_for = f"{days} days {hours} hours {minutes} mins"
+
+        # --- 生産情報を整形 ---
+        production_data = static_data.get('resources', {})
+        production_text_list = []
+        # ▼▼▼【修正点1】amountを数値に変換して比較▼▼▼
+        for res_name, amount in production_data.items():
+            if int(amount) > 0: # amountが0より大きいものだけを追加
+                emoji = RESOURCE_EMOJIS.get(res_name.upper(), '❓')
+                production_text_list.append(f"{emoji} {res_name.capitalize()} `+{amount}/h`")
+        
+        production_text = "\n".join(production_text_list) if production_text_list else "なし"
+        
+        # --- 接続数を計算 ---
+        conns_count = len(static_data.get('Trading Routes', []))
+
+        # --- 埋め込みを作成 ---
+        embed = discord.Embed(title=f"{territory}", color=discord.Color.dark_teal())
+        guild_name = live_data['guild']['name']
+        guild_prefix = live_data['guild']['prefix']
+        embed.add_field(name="Guild", value=f"[{guild_prefix}] {guild_name}", inline=False)
+        embed.add_field(name="Have Held for", value=held_for, inline=False)
+        embed.add_field(name="Production", value=production_text, inline=False)
+        embed.add_field(name="Original Conns", value=f"{conns_count} Conns", inline=False)
+        embed.set_footer(text="Territory Status | Minister Chikuwa")
+        return embed
+
     def cog_unload(self):
         self.update_territory_cache.cancel()
 
@@ -158,66 +192,8 @@ class Territory(commands.GroupCog, name="territory"):
         if not target_territory_live_data:
             await interaction.followup.send(f"テリトリー「{territory}」は現在どのギルドも所有していません。")
             return
-        
-        # --- ステップ3: Embedの作成と送信 ---
-        try:
-            static_data = self.map_renderer.local_territories.get(territory)
-        except Exception:
-            static_data = None
-        
-        cache_key = "wynn_territory_list"
-        live_data_all = self.cache.get_cache(cache_key)
-        if not live_data_all:
-            live_data_all = await self.wynn_api.get_territory_list()
-            if live_data_all:
-                self.cache.set_cache(cache_key, live_data_all)
 
-        if not static_data or not live_data_all:
-            await interaction.followup.send("テリトリー情報の取得に失敗しました。")
-            return
-            
-        live_data = live_data_all.get(territory)
-        if not live_data:
-            await interaction.followup.send(f"テリトリー「{territory_name}」は現在どのギルドも所有していません。")
-            return
-        
-        # --- ステップ4: Embedの作成 ---
-        # 所有期間を計算
-        acquired_dt = datetime.fromisoformat(live_data['acquired'].replace("Z", "+00:00"))
-        duration = datetime.now(timezone.utc) - acquired_dt
-        days = duration.days
-        hours, remainder = divmod(duration.seconds, 3600)
-        minutes, _ = divmod(remainder, 60)
-        held_for = f"{days} days {hours} hours {minutes} mins"
-
-        # --- 生産情報を整形 ---
-        production_data = static_data.get('resources', {})
-        production_text_list = []
-        # ▼▼▼【修正点1】amountを数値に変換して比較▼▼▼
-        for res_name, amount in production_data.items():
-            if int(amount) > 0: # amountが0より大きいものだけを追加
-                emoji = RESOURCE_EMOJIS.get(res_name.upper(), '❓')
-                production_text_list.append(f"{emoji} {res_name.capitalize()} `+{amount}/h`")
-        
-        production_text = "\n".join(production_text_list) if production_text_list else "なし"
-        
-        production_text = "\n".join(production_text_list) if production_text_list else "なし"
-        
-        # 接続数を計算
-        conns_count = len(static_data.get('Trading Routes', []))
-
-        # 埋め込みを作成
-        embed = discord.Embed(
-            title=f"{territory}",
-            color=discord.Color.dark_teal()
-        )
-        guild_name = live_data['guild']['name']
-        guild_prefix = live_data['guild']['prefix']
-        embed.add_field(name="Guild", value=f"[{guild_prefix}] {guild_name}", inline=False)
-        embed.add_field(name="Have Held for", value=held_for, inline=False)
-        embed.add_field(name="Production", value=production_text, inline=False)
-        embed.add_field(name="Original Conns", value=f"{conns_count} Conns", inline=False)
-        embed.set_footer(text="Territory Status | Minister Chikuwa")
+        embed = self._create_status_embed(interaction, territory, target_territory_live_data, territory_list_data)
 
         # --- ステップ3: 画像の生成と送信 ---
         image_bytes = self.map_renderer.create_single_territory_image(territory)
