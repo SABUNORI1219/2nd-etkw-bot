@@ -15,6 +15,25 @@ from config import EMBED_COLOR_BLUE, RESOURCE_EMOJIS
 
 logger = logging.getLogger(__name__)
 
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TERRITORIES_JSON_PATH = os.path.join(project_root, "assets", "map", "territories.json")
+
+async def territory_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    
+    try:
+        with open(TERRITORIES_JSON_PATH, "r", encoding='utf-8') as f:
+            territory_names = list(json.load(f).keys())
+    except Exception:
+        territory_names = []
+            
+    return [
+        app_commands.Choice(name=name, value=name)
+        for name in territory_names if current.lower() in name.lower()
+    ][:25]
+
 # allowed_installsとallowed_contextsは、Botをどこで使えるかを定義するデコレータです
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
@@ -30,7 +49,6 @@ class Territory(commands.GroupCog, name="territory"):
     def cog_unload(self):
         self.update_territory_cache.cancel()
 
-    # ▼▼▼【キャッシュを10分おきに更新するタスクを追加】▼▼▼
     @tasks.loop(minutes=10.0)
     async def update_territory_cache(self):
         logger.info("--- [TerritoryCache] テリトリー所有ギルドのキャッシュを更新します...")
@@ -43,8 +61,7 @@ class Territory(commands.GroupCog, name="territory"):
     @update_territory_cache.before_loop
     async def before_cache_update(self):
         await self.bot.wait_until_ready() # Botの準備が完了するまで待つ
-
-    # ▼▼▼【オートコンプリートは、APIではなくキャッシュを参照するように修正】▼▼▼
+        
     async def guild_autocomplete(
         self,
         interaction: discord.Interaction,
