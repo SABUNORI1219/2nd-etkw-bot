@@ -175,7 +175,7 @@ Online Players: {online_count}/{total_members}
 
         # --- ステップ5: 取得したデータで、埋め込みとバナーを生成・送信 ---
         embed = self._create_guild_embed(data_to_use, interaction, from_cache, is_stale)
-        banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner'))
+        banner_bytes = self.banner_renderer.create_banner_image(data_to_use.get('banner'))
         
         if banner_bytes:
             banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
