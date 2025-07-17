@@ -80,10 +80,10 @@ class MapRenderer:
         
         # --- テリトリーの描画 ---
         scaled_font_size = max(12, int(self.font.size * self.scale_factor))
-            try:
-                scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
-            except IOError:
-                scaled_font = ImageFont.load_default()
+        try:
+            scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
+        except IOError:
+            scaled_font = ImageFont.load_default()
                 
         for info in territory_data.values():
             if 'location' not in info or 'guild' not in info: continue
