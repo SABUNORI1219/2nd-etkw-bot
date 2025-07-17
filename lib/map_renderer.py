@@ -195,8 +195,8 @@ class MapRenderer:
             box = (
                 max(0, min(all_x) - padding), 
                 max(0, min(all_y) - padding),
-                min(self.resized_map.width, max(all_x) + padding), 
-                min(self.resized_map.height, max(all_y) + padding)
+                min(self.map_img.width, max(all_x) + padding), 
+                min(self.map_img.height, max(all_y) + padding)
             )
 
             # 計算後の切り抜き範囲が有効かチェック
@@ -205,7 +205,7 @@ class MapRenderer:
                 return None
 
             logger.info(f"--- [MapRenderer] 元の地図を、座標 {box} で切り出します。")
-            cropped_image = self.resized_map.crop(box)
+            cropped_image = self.map_img.crop(box)
             
             # 画像をバイトデータに変換
             map_bytes = BytesIO()
