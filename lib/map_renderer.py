@@ -198,7 +198,7 @@ class MapRenderer:
 
             # Pillowの要求通り、(左 < 右) かつ (上 < 下) を保証する
             if left >= right or top >= bottom:
-                logger.error(f"'{territory_name}'の計算後の切り抜き範囲が無効です。")
+                logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。")
                 return None
 
             box = (left, top, right, bottom)
