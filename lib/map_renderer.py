@@ -43,148 +43,172 @@ class MapRenderer:
         except (ValueError, IndexError):
             return (255, 255, 255)
 
-    def _draw_overlays(self, map_to_draw_on: Image.Image, territory_data: dict, guild_color_map: dict, scale_factor: float, crop_box: tuple | None) -> Image.Image:
-        """与えられた画像の上に、コネクション線とテリトリーを描画する共通の専門家"""
+    def _draw_trading_and_territories(self, draw, overlay_draw, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map):
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
         draw = ImageDraw.Draw(map_to_draw_on)
-        offset_x, offset_y = (crop_box[0], crop_box[1]) if crop_box else (0, 0)
-
-        # --- コネクション線の描画 ---
-        for data in self.local_territories.values():
-            if "Trading Routes" not in data or "Location" not in data: continue
+        
+        # 1. 全ての交易路を地図の裏側に薄く描画する
+        for name, data in self.local_territories.items():
+            if "Trading Routes" not in data or "Location" not in data:
+                continue
             try:
                 x1 = (data["Location"]["start"][0] + data["Location"]["end"][0]) // 2
                 z1 = (data["Location"]["start"][1] + data["Location"]["end"][1]) // 2
-                px1_orig, py1_orig = self._coord_to_pixel(x1, z1)
-                spx1, spy1 = px1_orig * self.scale_factor, py1_orig * self.scale_factor
+                l_px1, l_py1 = self._coord_to_pixel(x1, z1)
+                l_scaled_px1, l_scaled_py1 = l_px1 * self.scale_factor, l_py1 * self.scale_factor
                 for destination_name in data["Trading Routes"]:
                     dest_data = self.local_territories.get(destination_name)
-                    if not dest_data or "Location" not in dest_data: continue
+                    if not dest_data or "Location" not in dest_data:
+                        continue
                     x2 = (dest_data["Location"]["start"][0] + dest_data["Location"]["end"][0]) // 2
                     z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
-                    px2_orig, py2_orig = self._coord_to_pixel(x2, z2)
-                    spx2, spy2 = px2_orig * self.scale_factor, py2_orig * self.scale_factor
-                    
-                    final_px1, final_py1 = spx1 - offset_x, spy1 - offset_y
-                    final_px2, final_py2 = spx2 - offset_x, spy2 - offset_y
-                    
-                    if (final_px1 > 0 or final_px2 > 0) and (final_py1 > 0 or final_py2 > 0) and \
-                       (final_px1 < map_to_draw_on.width or final_px2 < map_to_draw_on.width) and \
-                       (final_py1 < map_to_draw_on.height or final_py2 < map_to_draw_on.height):
-                        draw.line([(final_px1, final_py1), (final_px2, final_py2)], fill=(10, 10, 10, 128), width=1)
+                    l_px2, l_py2 = self._coord_to_pixel(x2, z2)
+                    l_scaled_px2, l_scaled_py2 = l_px2 * self.scale_factor, l_py2 * self.scale_factor
+                    if is_zoomed and box:
+                        l_px1_rel, l_px2_rel = l_scaled_px1 - box[0], l_scaled_px2 - box[0]
+                        l_py1_rel, l_py2_rel = l_scaled_py1 - box[1], l_scaled_py2 - box[1]
+                        draw.line([(l_px1_rel, l_py1_rel), (l_px2_rel, l_py2_rel)], fill=(10, 10, 10, 128), width=1)
+                    else:
+                        draw.line([(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)], fill=(10, 10, 10, 128), width=1)
             except KeyError:
                 continue
-        
-        # --- テリトリーの描画 ---
+
+        # Font Scaling dayo!
         scaled_font_size = max(12, int(self.font.size * self.scale_factor))
         try:
             scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
         except IOError:
             scaled_font = ImageFont.load_default()
-                
-        for info in territory_data.items():
-            if 'location' not in info or 'guild' not in info: continue
-            
-            px1_orig, py1_orig = self._coord_to_pixel(*info["location"]["start"])
-            px2_orig, py2_orig = self._coord_to_pixel(*info["location"]["end"])
-            spx1, spy1 = px1_orig * self.scale_factor, py1_orig * self.scale_factor
-            spx2, spy2 = px2_orig * self.scale_factor, py2_orig * self.scale_factor
 
-            final_px1, final_py1 = spx1 - offset_x, spy1 - offset_y
-            final_px2, final_py2 = spx2 - offset_x, spy2 - offset_y
-            
-            x_min, x_max = sorted([final_px1, final_px2])
-            y_min, y_max = sorted([final_py1, final_py2])
-
+        # --- 2. 全てのテリトリーを描画 ---
+        for name, info in territory_data.items():
+            if 'location' not in info or 'guild' not in info:
+                continue
+            t_px1, t_py1 = self._coord_to_pixel(*info["location"]["start"])
+            t_px2, t_py2 = self._coord_to_pixel(*info["location"]["end"])
+            t_scaled_px1, t_scaled_py1 = t_px1 * self.scale_factor, t_py1 * self.scale_factor
+            t_scaled_px2, t_scaled_py2 = t_px2 * self.scale_factor, t_py2 * self.scale_factor
+            if is_zoomed and box:
+                t_px1_rel, t_px2_rel = t_scaled_px1 - box[0], t_scaled_px2 - box[0]
+                t_py1_rel, t_py2_rel = t_scaled_py1 - box[1], t_scaled_py2 - box[1]
+            else:
+                t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
+            x_min, x_max = sorted([t_px1_rel, t_px2_rel])
+            y_min, y_max = sorted([t_py1_rel, t_py2_rel])
             if x_max > 0 and y_max > 0 and x_min < map_to_draw_on.width and y_min < map_to_draw_on.height:
                 prefix = info["guild"]["prefix"]
                 color_hex = guild_color_map.get(prefix, "#FFFFFF")
                 color_rgb = self._hex_to_rgb(color_hex)
-                
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
                 draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
-                
-        return Image.alpha_composite(map_to_draw_on, overlay)
 
-    def create_territory_map(self, territory_data: dict, guild: str, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
-        if not territory_data: return None, None
-        try:
-            map_to_draw_on = self.resized_map
-            crop_box = None
+    def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
+    if not territories_to_render:
+        return None, None
 
-            if guild:
-                all_x, all_y = [], []
-                target_territories = [v for v in territory_data.values() if v.get('guild',{}).get('prefix','').upper() == guild.upper()]
-                if not target_territories:
-                    pass
-                else:   
-                    for territory_data in target_territories:
-                        loc = territory_data.get("location", {})
-                        px1, py1 = self._coord_to_pixel(*loc.get("start", [0,0]))
-                        px2, py2 = self._coord_to_pixel(*loc.get("end", [0,0]))
-                        all_x.extend([px1 * self.scale_factor, px2 * self.scale_factor])
-                        all_y.extend([py1 * self.scale_factor, py2 * self.scale_factor])
+    try:
+        # 地図のコピーと初期化
+        map_to_draw_on = self.resized_map.copy()
+        box = None
+        is_zoomed = len(territories_to_render) < len(self.local_territories)
 
-                    padding = 30
-                    box = (max(0, min(all_x) - padding), max(0, min(all_y) - padding),
-                       min(self.resized_map.width, max(all_x) + padding), min(self.resized_map.height, max(all_y) + padding))
-                    if box[0] < box[2] and box[1] < box[3]:
-                        map_to_draw_on = self.resized_map.crop(box)
-                        crop_box = box
-                    else:
-                        crop_box = None
+        # --- クロップ領域を計算 ---
+        if is_zoomed:
+            all_x, all_y = [], []
+            for terri_data in territories_to_render.values():
+                loc = terri_data.get("location", {})
+                start_x, start_z = loc.get("start", [0,0])
+                end_x, end_z = loc.get("end", [0,0])
+                px1, py1 = self._coord_to_pixel(start_x, start_z)
+                px2, py2 = self._coord_to_pixel(end_x, end_z)
+                all_x.extend([px1 * self.scale_factor, px2 * self.scale_factor])
+                all_y.extend([py1 * self.scale_factor, py2 * self.scale_factor])
 
-            # --- 最終出力 ---
-            final_map = self._draw_overlays(map_to_draw_on, territory_data, guild_color_map, self.scale_factor, crop_box)
-            map_bytes = BytesIO()
-            final_map.save(map_bytes, format='PNG')
-            map_bytes.seek(0)
+            if all_x and all_y:
+                padding = 30
+                box = (
+                    max(0, min(all_x) - padding),
+                    max(0, min(all_y) - padding),
+                    min(self.resized_map.width, max(all_x) + padding),
+                    min(self.resized_map.height, max(all_y) + padding)
+                )
+                map_to_draw_on = map_to_draw_on.crop(box)
 
-            jst_tz = timezone(timedelta(hours=9))
-            jst_now = datetime.now(jst_tz)
+        # --- 描画処理をヘルパー関数に委譲 ---
+        final_map = self._draw_trading_and_territories(
+            map_to_draw_on,
+            box,
+            is_zoomed,
+            territory_data,
+            guild_color_map
+        )
 
-            # "年/月/日 時:分:秒" の形式に変換
-            formatted_time = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-            
-            file = discord.File(map_bytes, filename="wynn_map.png")
-            embed = discord.Embed(
-                title="",
-                color=discord.Color.green()
-            )
-            embed.set_image(url="attachment://wynn_map.png")
-            embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
-            
-            return file, embed
+        # --- 最終出力 ---
+        map_bytes = BytesIO()
+        final_map.save(map_bytes, format='PNG')
+        map_bytes.seek(0)
 
-        except Exception as e:
-            logger.error(f"マップ生成中にエラー: {e}", exc_info=True)
-            return None, None
+        jst_now = datetime.now(timezone(timedelta(hours=9)))
+        formatted_time = jst_now.strftime("%Y/%m/%d %H:%M:%S")
+
+        file = discord.File(map_bytes, filename="wynn_map.png")
+        embed = discord.Embed(
+            title="",
+            color=discord.Color.green()
+        )
+        embed.set_image(url="attachment://wynn_map.png")
+        embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
+
+        return file, embed
+
+    except Exception as e:
+        logger.error(f"マップ生成中にエラー: {e}", exc_info=True)
+        return None, None
 
     def create_single_territory_image(self, territory: str) -> BytesIO | None:
         """指定された単一のテリトリー画像を切り出して返す"""
         logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
         try:
             terri_data = self.local_territories.get(territory)
-            if not terri_data or 'Location' not in terri_data: return None
+            if not terri_data or 'Location' not in terri_data:
+                logger.error(f"'{territory}'にLocationデータがありません。")
+                return None
             
-            # クロップ範囲の計算
+            all_x, all_y = [], []
+            
             loc = terri_data.get("Location", {})
             px1, py1 = self._coord_to_pixel(*loc.get("start", [0,0]))
             px2, py2 = self._coord_to_pixel(*loc.get("end", [0,0]))
-            padding = 150
-            box = (min(px1,px2)-padding, min(py1,py2)-padding, max(px1,px2)+padding, max(py1,py2)+padding)
-            if not (box[0] < box[2] and box[1] < box[3]): return None
+            all_x.extend([px1, px2])
+            all_y.extend([py1, py2])
+
+            padding = 50 
             
-            # 全体地図をクロップ
-            cropped_map = self.map_img.crop(box)
+            # boxの計算方法を、実績のある方に統一
+            box = (
+                max(0, min(all_x) - padding), 
+                max(0, min(all_y) - padding),
+                min(self.map_img.width, max(all_x) + padding), 
+                min(self.map_img.height, max(all_y) + padding)
+            )
+
+            # 計算後の切り抜き範囲が有効かチェック
+            if not (box[0] < box[2] and box[1] < box[3]):
+                logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。Box: {box}")
+                return None
+
+            logger.info(f"--- [MapRenderer] 元の地図を、座標 {box} で切り出します。")
+            cropped_image = self.map_img.crop(box)
             
-            # クロップした地図の上に、共通描画関数で領地情報を描画
-            final_map = self._draw_overlays(cropped_map, territory_data, guild_color_map, 1.0, box)
+            # 画像をバイトデータに変換
+            map_bytes = BytesIO()
+            cropped_image.save(map_bytes, format='PNG')
+            map_bytes.seek(0)
+            logger.info(f"--- [MapRenderer] ✅ 画像生成成功。")
             
-            map_bytes = BytesIO(); final_map.save(map_bytes, 'PNG'); map_bytes.seek(0)
             return map_bytes
         except Exception as e:
-            logger.error(f"単一テリトリー画像の生成中にエラー: {e}", exc_info=True)
+            logger.error(f"単一テリトリー画像の生成中にエラー: {e}")
             return None
