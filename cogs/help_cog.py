@@ -35,6 +35,7 @@ class HelpCog(commands.Cog):
         embed.add_field(
             name="🗺️ テリトリー関連",
             value="`/territory map [guild]`: テリトリーマップを生成します。",
+                  "`/territory status <territory>`: テリトリーのステータスを表示します。",
             inline=False
         )
         
