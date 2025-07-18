@@ -214,11 +214,14 @@ class Territory(commands.GroupCog, name="territory"):
             territory,
             target_territory_live_data,
             static_data,
-            guild_color_map
         )
 
         # --- ステップ3: 画像の生成と送信 ---
-        image_bytes = self.map_renderer.create_single_territory_image(territory)
+        image_bytes = self.map_renderer.create_single_territory_image(
+            territory,
+            guild_color_map,
+            
+        )
         if image_bytes:
             filename = f"{territory.replace(' ', '_')}.png"
             image_file = discord.File(fp=image_bytes, filename=filename)
