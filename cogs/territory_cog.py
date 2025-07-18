@@ -141,7 +141,6 @@ class Territory(commands.GroupCog, name="territory"):
         await interaction.response.defer()
         logger.info(f"--- [TerritoryCmd] /territory map が実行されました by {interaction.user}")
 
-        # ▼▼▼【修正点】必要なAPIデータを両方取得する▼▼▼
         # 1. テリトリー所有者リストを取得
         territory_data = await self.wynn_api.get_territory_list()
         # 2. ギルドカラーの対応表を取得
@@ -189,6 +188,7 @@ class Territory(commands.GroupCog, name="territory"):
         await interaction.response.defer()
 
         static_data = self.map_renderer.local_territories.get(territory)
+        guild_color_map = await self.wynn_api.get_guild_color_map()
 
         # --- ステップ1: データの取得 ---
         cache_key = "wynn_territory_list"
@@ -209,7 +209,13 @@ class Territory(commands.GroupCog, name="territory"):
             await interaction.followup.send(f"「{territory}」は無効なテリトリーか、現在どのギルドも所有していません。")
             return
 
-        embed = self._create_status_embed(interaction, territory, target_territory_live_data, static_data)
+        embed = self._create_status_embed(
+            interaction,
+            territory,
+            target_territory_live_data,
+            static_data,
+            guild_color_map
+        )
 
         # --- ステップ3: 画像の生成と送信 ---
         image_bytes = self.map_renderer.create_single_territory_image(territory)
