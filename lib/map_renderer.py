@@ -227,7 +227,7 @@ class MapRenderer:
                 return None
                 
             logger.info(f"--- [MapRenderer] 元の地図を、座標 {box} で切り出します。")
-            cropped_image = map_on_process.crop(box)
+            cropped_image = self.map_on_process.crop(box)
             
             # 画像をバイトデータに変換
             map_bytes = BytesIO()
