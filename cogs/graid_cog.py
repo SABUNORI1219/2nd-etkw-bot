@@ -21,6 +21,7 @@ class TrackerCog(commands.GroupCog, group_name="raidtracker", description="レ�
             f"✅ ギルドレイドの通知チャンネルを {channel.mention} に設定しました。",
             ephemeral=True
         )
+        logger.info(f"ギルドレイドの通知チャンネルが更新されました: {channel.mention}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(TrackerCog(bot))
