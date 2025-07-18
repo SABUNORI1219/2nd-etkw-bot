@@ -192,19 +192,19 @@ class Territory(commands.GroupCog, name="territory"):
 
         # --- ステップ1: データの取得 ---
         cache_key = "wynn_territory_list"
-        territory_list_data = self.cache.get_cache(cache_key)
-        if not territory_list_data:
+        territory_data = self.cache.get_cache(cache_key)
+        if not territory_data:
             logger.info("--- [API] テリトリーリストのキャッシュがないため、APIから取得します。")
-            territory_list_data = await self.wynn_api.get_territory_list()
-            if territory_list_data:
-                self.cache.set_cache(cache_key, territory_list_data)
+            territory_data = await self.wynn_api.get_territory_list()
+            if territory_data:
+                self.cache.set_cache(cache_key, territory_data)
 
-        if not territory_list_data:
+        if not territory_data:
             await interaction.followup.send("テリトリー情報の取得に失敗しました。")
             return
             
         # --- ステップ2: データの整形 ---
-        target_territory_live_data = territory_list_data.get(territory)
+        target_territory_live_data = territory_data.get(territory)
         if not target_territory_live_data:
             await interaction.followup.send(f"「{territory}」は無効なテリトリーか、現在どのギルドも所有していません。")
             return
@@ -220,8 +220,9 @@ class Territory(commands.GroupCog, name="territory"):
         image_bytes = self.map_renderer.create_single_territory_image(
             territory,
             guild_color_map,
-            
+            territory_data
         )
+        
         if image_bytes:
             filename = f"{territory.replace(' ', '_')}.png"
             image_file = discord.File(fp=image_bytes, filename=filename)
