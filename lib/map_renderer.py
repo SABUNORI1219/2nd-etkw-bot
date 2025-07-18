@@ -205,7 +205,7 @@ class MapRenderer:
             top = min(py1, py2)
             bottom = max(py1, py2)
 
-            padding = 30
+            padding = 50
 
             box = (
                 max(0, left - padding),
@@ -232,7 +232,6 @@ class MapRenderer:
             highlight_radius = max(6, min(base_radius, 25))  # 範囲を制限
 
             draw = ImageDraw.Draw(self.map_on_process)
-            highlight_radius = 12  # 円の半径
             draw.ellipse(
                 [(center_x - highlight_radius, center_y - highlight_radius),
                  (center_x + highlight_radius, center_y + highlight_radius)],
