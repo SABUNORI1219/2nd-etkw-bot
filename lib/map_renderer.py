@@ -169,7 +169,7 @@ class MapRenderer:
             logger.error(f"マップ生成中にエラー: {e}", exc_info=True)
             return None, None
 
-    def create_single_territory_image(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
+    def create_single_territory_image(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> BytesIO | None:
         """指定された単一のテリトリー画像を切り出して返す"""
         logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
         try:
@@ -178,7 +178,18 @@ class MapRenderer:
                 logger.error(f"'{territory}'にLocationデータがありません。")
                 return None
             
+            map_to_draw_on = self.resized_map.copy()
+            box = None
             all_x, all_y = [], []
+            is_zoomed = None
+
+            map_on_process = self._draw_trading_and_territories(
+                map_to_draw_on,
+                box,
+                is_zoomed,
+                territory_data,
+                guild_color_map
+            )
             
             loc = terri_data.get("Location", {})
             px1, py1 = self._coord_to_pixel(*loc.get("start", [0,0]))
@@ -192,8 +203,8 @@ class MapRenderer:
             box = (
                 max(0, min(all_x) - padding), 
                 max(0, min(all_y) - padding),
-                min(self.map_img.width, max(all_x) + padding), 
-                min(self.map_img.height, max(all_y) + padding)
+                min(self.map_on_process.width, max(all_x) + padding), 
+                min(self.map_on_process.height, max(all_y) + padding)
             )
 
             # 計算後の切り抜き範囲が有効かチェック
@@ -202,7 +213,7 @@ class MapRenderer:
                 return None
 
             logger.info(f"--- [MapRenderer] 元の地図を、座標 {box} で切り出します。")
-            cropped_image = self.map_img.crop(box)
+            cropped_image = map_on_process.crop(box)
             
             # 画像をバイトデータに変換
             map_bytes = BytesIO()
