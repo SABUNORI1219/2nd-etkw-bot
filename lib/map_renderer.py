@@ -206,6 +206,8 @@ class MapRenderer:
             top = min(py1, py2)
             bottom = max(py1, py2)
 
+            padding = 50
+
             box = (
                 max(0, left - padding),
                 max(0, top - padding),
