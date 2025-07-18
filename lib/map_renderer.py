@@ -104,6 +104,8 @@ class MapRenderer:
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
                 draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
 
+        return map_to_draw_on
+
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
         if not territories_to_render:
             return None, None
