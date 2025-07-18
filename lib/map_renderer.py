@@ -218,6 +218,19 @@ class MapRenderer:
             if not (box[0] < box[2] and box[1] < box[3]):
                 logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。Box: {box}")
                 return None
+
+            # ✨ 特別な装飾を描画（中心点を使って金色の円を描く）
+            center_x = (px1 + px2) / 2
+            center_y = (py1 + py2) / 2
+
+            draw = ImageDraw.Draw(self.map_on_process)
+            highlight_radius = 12  # 円の半径
+            draw.ellipse(
+                [(center_x - highlight_radius, center_y - highlight_radius),
+                 (center_x + highlight_radius, center_y + highlight_radius)],
+                outline="gold",
+                width=3
+            )
                 
             cropped_image = self.map_on_process.crop(box)
             
