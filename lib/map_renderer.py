@@ -169,7 +169,7 @@ class MapRenderer:
             logger.error(f"マップ生成中にエラー: {e}", exc_info=True)
             return None, None
 
-    def create_single_territory_image(self, territory: str) -> BytesIO | None:
+    def create_single_territory_image(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
         """指定された単一のテリトリー画像を切り出して返す"""
         logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
         try:
