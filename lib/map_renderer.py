@@ -209,8 +209,8 @@ class MapRenderer:
             box = (
                 max(0, left - padding),
                 max(0, top - padding),
-                min(map_on_process.width, right + padding),
-                min(map_on_process.height, bottom + padding)
+                min(self.map_on_process.width, right + padding),
+                min(self.map_on_process.height, bottom + padding)
             )
 
             # 計算後の切り抜き範囲が有効かチェック
