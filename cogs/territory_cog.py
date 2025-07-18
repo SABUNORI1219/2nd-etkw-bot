@@ -56,9 +56,9 @@ class Territory(commands.GroupCog, name="territory"):
 
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
-    def _create_status_embed(self, interaction: discord.Interaction, territory: str, live_data: dict, static_data: dict) -> discord.Embed:
+    def _create_status_embed(self, interaction: discord.Interaction, territory: str, target_territory_live_data: dict, static_data: dict) -> discord.Embed:
         # --- 所有期間を計算 ---
-        acquired_dt = datetime.fromisoformat(live_data['acquired'].replace("Z", "+00:00"))
+        acquired_dt = datetime.fromisoformat(target_territory_live_data['acquired'].replace("Z", "+00:00"))
         duration = datetime.now(timezone.utc) - acquired_dt
         days = duration.days
         hours, remainder = divmod(duration.seconds, 3600)
@@ -219,8 +219,8 @@ class Territory(commands.GroupCog, name="territory"):
         # --- ステップ3: 画像の生成と送信 ---
         image_bytes = self.map_renderer.create_single_territory_image(
             territory,
+            territory_data,
             guild_color_map,
-            territory_data
         )
         
         if image_bytes:
