@@ -29,7 +29,8 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
         current_raid_counts = {}
         history_to_add = []
         
-        all_members = [p for rank in guild_data['members'] for p in rank.values()]
+        all_members = [member for members_list in guild_data['members'].values() for member in members_list]
+        logger.info(f"[DEBUG] guild_data['members']: {guild_data['members']}")
 
         for member in all_members:
             if not isinstance(member, dict) or 'uuid' not in member: continue
