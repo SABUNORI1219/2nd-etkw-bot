@@ -54,8 +54,17 @@ class MyBot(commands.Bot):
                     logger.info(f"--- [司令塔] ✅ 受付係 '{filename}' の配属完了。")
                 except Exception as e:
                     logger.error(f"--- [司令塔] ❌ 受付係 '{filename}' の配属に失敗しました: {e}")
+
+        # tasksを読み込む
+        logger.info("--- [司令塔] -> 全ての内部処理係（tasks）を配属させます...")
+        for filename in os.listdir('./tasks'):
+            if filename.endswith('.py'):
+                try:
+                    await self.load_extension(f'tasks.{filename[:-3]}')
+                    logger.info(f"--- [司令塔] ✅ 受付係 '{filename}' の配属完了。")
+                except Exception as e:
+                    logger.error(f"--- [司令塔] ❌ 受付係 '{filename}' の配属に失敗しました: {e}")
         
-        # ▼▼▼【修正点】コマンド同期をon_readyからsetup_hookに移動▼▼▼
         try:
             logger.info("--- [司令塔] -> スラッシュコマンドをグローバルに同期します... ---")
             synced = await self.tree.sync()
