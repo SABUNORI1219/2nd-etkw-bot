@@ -198,6 +198,9 @@ class MapRenderer:
             px1, py1 = self._coord_to_pixel(*loc.get("start", [0, 0]))
             px2, py2 = self._coord_to_pixel(*loc.get("end", [0, 0]))
 
+            px1, py1 = px1 * self.scale_factor, py1 * self.scale_factor
+            px2, py2 = px2 * self.scale_factor, py2 * self.scale_factor
+
             logger.debug(f"[{territory}] Pixel coords: ({px1}, {py1}) → ({px2}, {py2})")
 
             # 必ず正しい順に整列
