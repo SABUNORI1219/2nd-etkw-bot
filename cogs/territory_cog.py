@@ -5,6 +5,7 @@ import asyncio
 import logging
 import json
 import os
+import re
 from datetime import datetime, timezone
 
 # libフォルダから専門家たちをインポート
@@ -107,6 +108,10 @@ class Territory(commands.GroupCog, name="territory"):
 
     def cog_unload(self):
         self.update_territory_cache.cancel()
+
+    def safe_filename(name: str) -> str:
+        # アルファベットと数字以外の文字をアンダースコアに置き換える
+        return re.sub(r'[^a-zA-Z0-9_-]', '_', name)
 
     @tasks.loop(minutes=10.0)
     async def update_territory_cache(self):
@@ -224,7 +229,8 @@ class Territory(commands.GroupCog, name="territory"):
         )
         
         if image_bytes:
-            filename = f"{territory.replace(' ', '_')}.png"
+            safe_name = safe_filename(territory)
+            filename = f"{safe_name}.png"
             image_file = discord.File(fp=image_bytes, filename=filename)
             embed.set_image(url=f"attachment://{filename}")
             await interaction.followup.send(embed=embed, file=image_file)
