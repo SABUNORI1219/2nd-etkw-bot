@@ -59,7 +59,7 @@ def set_setting(key: str, value: str):
         return
     try:
         with conn.cursor() as cur:
-            cur.execute(
+            cur.execute(sql, (key, value))
             CREATE TABLE IF NOT EXISTS bot_settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
