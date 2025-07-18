@@ -109,7 +109,7 @@ class Territory(commands.GroupCog, name="territory"):
     def cog_unload(self):
         self.update_territory_cache.cancel()
 
-    def safe_filename(name: str) -> str:
+    def safe_filename(self, name: str) -> str:
         # アルファベットと数字以外の文字をアンダースコアに置き換える
         return re.sub(r'[^a-zA-Z0-9_-]', '_', name)
 
@@ -229,7 +229,7 @@ class Territory(commands.GroupCog, name="territory"):
         )
         
         if image_bytes:
-            safe_name = safe_filename(territory)
+            safe_name = self.safe_filename(territory)
             filename = f"{safe_name}.png"
             image_file = discord.File(fp=image_bytes, filename=filename)
             embed.set_image(url=f"attachment://{filename}")
