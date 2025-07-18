@@ -183,7 +183,7 @@ class MapRenderer:
             all_x, all_y = [], []
             is_zoomed = None
 
-            map_on_process = self._draw_trading_and_territories(
+            self.map_on_process = self._draw_trading_and_territories(
                 map_to_draw_on,
                 box,
                 is_zoomed,
