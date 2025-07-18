@@ -104,7 +104,7 @@ class Territory(commands.GroupCog, name="territory"):
         embed.add_field(name="Original Conns", value=f"{conns_count} Conns", inline=False)
         embed.set_footer(text="Territory Status | Minister Chikuwa")
         return embed
-        
+
     def cog_unload(self):
         self.update_territory_cache.cancel()
 
@@ -136,7 +136,7 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.checks.cooldown(1, 20.0)
     @app_commands.command(name="map", description="現在のWynncraftのテリトリーマップを生成")
     @app_commands.autocomplete(guild=guild_autocomplete) # guild引数にオートコンプリートを適用
-    @app_commands.describe(guild="マップ上のギルドのPrefix(任意)")
+    @app_commands.describe(guild="Onmap Guild Prefix")
     async def map(self, interaction: discord.Interaction, guild: str = None):
         await interaction.response.defer()
         logger.info(f"--- [TerritoryCmd] /territory map が実行されました by {interaction.user}")
@@ -150,6 +150,20 @@ class Territory(commands.GroupCog, name="territory"):
         if not territory_data or not guild_color_map:
             await interaction.followup.send("テリトリーまたはギルドカラー情報の取得に失敗しました。コマンドをもう一度お試しください。")
             return
+
+        # ギルドが指定されているかによって、描画するデータを切り替える
+        if guild:
+            # 指定されたギルドのテリトリーのみをフィルタリング
+            territories_to_render = {
+                name: data for name, data in territory_data.items()
+                if data['guild']['prefix'].upper() == guild.upper()
+            }
+            if not territories_to_render:
+                await interaction.followup.send(f"ギルド「{guild}」は現在テリトリーを所有していません。")
+                return
+        else:
+            # 指定がなければ、全てのテリトリーを描画
+            territories_to_render = territory_data
             
         # 地図職人に、非同期で画像の生成を依頼
         # 必要な情報を全て渡す
@@ -158,10 +172,9 @@ class Territory(commands.GroupCog, name="territory"):
             None, 
             self.map_renderer.create_territory_map,
             territory_data,
-            guild, 
+            territories_to_render, 
             guild_color_map
         )
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
         if file and embed:
             await interaction.followup.send(file=file, embed=embed)
