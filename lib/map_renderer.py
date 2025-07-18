@@ -43,7 +43,7 @@ class MapRenderer:
         except (ValueError, IndexError):
             return (255, 255, 255)
 
-    def _draw_trading_and_territories(self, draw, overlay_draw, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map):
+    def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map):
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
         draw = ImageDraw.Draw(map_to_draw_on)
