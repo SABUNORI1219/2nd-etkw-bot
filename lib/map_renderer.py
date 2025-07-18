@@ -112,11 +112,11 @@ class MapRenderer:
             # 地図のコピーと初期化
             map_to_draw_on = self.resized_map.copy()
             box = None
+            all_x, all_y = [], []
             is_zoomed = len(territories_to_render) < len(self.local_territories)
 
             # --- クロップ領域を計算 ---
             if is_zoomed:
-                all_x, all_y = [], []
                 for terri_data in territories_to_render.values():
                     loc = terri_data.get("location", {})
                     start_x, start_z = loc.get("start", [0,0])
