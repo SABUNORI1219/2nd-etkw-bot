@@ -21,31 +21,30 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
 
     @tasks.loop(minutes=2.0)
     async def collect_raid_data_task(self):
-    logger.info(f"--- [RaidTrackerTask] {GUILD_NAME}のメンバーデータを収集中...")
-    guild_data = await self.wynn_api.get_nori_guild_data(GUILD_NAME)
-    if not guild_data or 'members' not in guild_data:
-        logger.warning("--- [RaidTrackerTask] ギルドデータの取得に失敗。")
-        return
+        logger.info(f"--- [RaidTrackerTask] {GUILD_NAME}のメンバーデータを収集中...")
+        guild_data = await self.wynn_api.get_nori_guild_data(GUILD_NAME)
+        if not guild_data or 'members' not in guild_data:
+            logger.warning("--- [RaidTrackerTask] ギルドデータの取得に失敗。")
+            return
 
-    # メンバー抽出
-    member_section = guild_data["members"]
-    all_members = []
-    for rank, players_dict in member_section.items():
-        if rank == "total":
-            continue
-        for player_name, data in players_dict.items():
-            all_members.append((player_name, data))
+        # メンバー抽出（owner, chiefなどの各階層を走査）
+        member_section = guild_data["members"]
+        all_members = []
+        for rank, players_dict in member_section.items():
+            if rank == "total":
+                continue
+        for player_name, player_info in players_dict.items():
+            all_members.append((player_name, player_info))
 
-    current_raid_counts = {}
-    history_to_add = []
+        current_raid_counts = {}
+        history_to_add = []
 
-    async with ClientSession() as session:
         for name, member in all_members:
             uuid = member.get("uuid")
             if not uuid:
                 continue
 
-            # Nori Player APIからレイドデータを取得
+            # ✅ WynncraftAPIを通してNori Player APIにアクセス
             player_data = await self.wynn_api.get_nori_player_data(name)
             if not player_data:
                 logger.warning(f"--- {name} のプレイヤーデータ取得に失敗")
@@ -64,11 +63,11 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
                         logger.info(f"--- {name} が {raid_name} をクリア ({previous_count} -> {current_count})")
                         history_to_add.append((uuid, name, raid_name, current_count, server))
 
-    if history_to_add:
-        add_raid_history(history_to_add)
+        if history_to_add:
+            add_raid_history(history_to_add)
 
-    self.previous_raid_counts = current_raid_counts
-    logger.info("--- データ収集完了")
+        self.previous_raid_counts = current_raid_counts
+        logger.info("--- データ収集完了")
 
     @collect_raid_data_task.before_loop
     async def before_task(self):
