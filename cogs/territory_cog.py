@@ -104,7 +104,7 @@ class Territory(commands.GroupCog, name="territory"):
         embed.add_field(name="Original Conns", value=f"{conns_count} Conns", inline=False)
         embed.set_footer(text="Territory Status | Minister Chikuwa")
         return embed
-
+        
     def cog_unload(self):
         self.update_territory_cache.cancel()
 
