@@ -192,19 +192,25 @@ class MapRenderer:
             )
             
             loc = terri_data.get("Location", {})
+            
             px1, py1 = self._coord_to_pixel(*loc.get("start", [0,0]))
             px2, py2 = self._coord_to_pixel(*loc.get("end", [0,0]))
-            all_x.extend([px1, px2])
-            all_y.extend([py1, py2])
+            logger.debug(f"Territory: {territory}")
+            logger.debug(f"start coord → pixel: {loc.get('start')} → ({px1}, {py1})")
+            logger.debug(f"end coord → pixel: {loc.get('end')} → ({px2}, {py2})")
 
             padding = 50 
-            
-            # boxの計算方法を、実績のある方に統一
+        
+            left = min(px1, px2)
+            right = max(px1, px2)
+            top = min(py1, py2)
+            bottom = max(py1, py2)
+
             box = (
-                max(0, min(all_x) - padding), 
-                max(0, min(all_y) - padding),
-                min(self.map_on_process.width, max(all_x) + padding), 
-                min(self.map_on_process.height, max(all_y) + padding)
+                max(0, left - padding),
+                max(0, top - padding),
+                min(map_on_process.width, right + padding),
+                min(map_on_process.height, bottom + padding)
             )
 
             # 計算後の切り抜き範囲が有効かチェック
