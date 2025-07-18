@@ -5,6 +5,7 @@ import logging
 import json
 import discord
 from datetime import datetime, timezone, timedelta
+from math import sqrt
 
 logger = logging.getLogger(__name__)
 
@@ -227,15 +228,13 @@ class MapRenderer:
             territory_width = abs(px2 - px1)
             territory_height = abs(py2 - py1)
 
-            # 幅・高さの平均値から半径を決定（最大は25、最小は6など）
-            base_radius = int((territory_width + territory_height) / 2 * 0.25)
-            highlight_radius = max(6, min(base_radius, 25))  # 範囲を制限
+            highlight_radius = int(sqrt(territory_width ** 2 + territory_height ** 2) / 2)
 
             draw = ImageDraw.Draw(self.map_on_process)
             draw.ellipse(
                 [(center_x - highlight_radius, center_y - highlight_radius),
                  (center_x + highlight_radius, center_y + highlight_radius)],
-                outline="black",
+                outline="gold",
                 width=3
             )
                 
