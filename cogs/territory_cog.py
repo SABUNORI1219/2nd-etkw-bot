@@ -96,8 +96,8 @@ class Territory(commands.GroupCog, name="territory"):
 
         # --- 埋め込みを作成 ---
         embed = discord.Embed(title=f"{territory}", color=discord.Color.dark_teal())
-        guild_name = live_data['guild']['name']
-        guild_prefix = live_data['guild']['prefix']
+        guild_name = target_territory_live_data['guild']['name']
+        guild_prefix = target_territory_live_data['guild']['prefix']
         embed.add_field(name="Guild", value=f"[{guild_prefix}] {guild_name}", inline=False)
         embed.add_field(name="Time Held for", value=f"`{held_for}`", inline=False)
         embed.add_field(name="Production", value=production_text, inline=False)
