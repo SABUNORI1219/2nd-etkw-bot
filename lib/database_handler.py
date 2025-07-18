@@ -21,47 +21,54 @@ def get_db_connection():
 def setup_database():
     """データベースとテーブルをセットアップする"""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            # 既存のテーブル (もしあれば)
-            # cursor.execute('''CREATE TABLE IF NOT EXISTS ...''')
-
-            # ▼▼▼【新しいテーブルを追加】▼▼▼
+        conn = get_db_connection()
+        if conn is None:
+            return
+        with conn.cursor() as cursor:
             cursor.execute('''
             CREATE TABLE IF NOT EXISTS player_raid_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 player_uuid TEXT NOT NULL,
                 player_name TEXT NOT NULL,
                 raid_name TEXT NOT NULL,
                 new_raid_count INTEGER NOT NULL,
                 server TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             ''')
+            conn.commit()
             logger.info("--- [DB Handler] 'player_raid_history'テーブルのセットアップが完了しました。")
     except Exception as e:
         logger.error(f"--- [DB Handler] データベースのセットアップ中にエラー: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 def add_raid_history(history_entries: list):
     """複数のレイドクリア履歴をデータベースに一括で追加する"""
     if not history_entries: return
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
+        conn = get_db_connection()
+        if conn is None:
+            return
+        with conn.cursor() as cursor:
             cursor.executemany('''
             INSERT INTO player_raid_history (player_uuid, player_name, raid_name, new_raid_count, server)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
             ''', history_entries)
             conn.commit()
             logger.info(f"--- [DB Handler] {len(history_entries)}件のレイド履歴をデータベースに追加しました。")
     except Exception as e:
         logger.error(f"--- [DB Handler] レイド履歴の追加中にエラー: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 def get_raid_counts(player_uuid: str, since_date: datetime) -> list:
     """
     指定されたプレイヤーの、指定された日付以降のレイドクリア回数を集計して返す。
     """
-    sql = "SELECT raid_type, COUNT(*) FROM clear_records WHERE player_uuid = %s AND cleared_at >= %s GROUP BY raid_type"
+    sql = "SELECT raid_name, COUNT(*) FROM player_raid_history WHERE player_uuid = %s AND timestamp >= %s GROUP BY raid_name"
     conn = get_db_connection()
     if conn is None:
         return []
