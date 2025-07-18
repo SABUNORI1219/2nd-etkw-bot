@@ -114,17 +114,17 @@ class MapRenderer:
             box = None
             is_zoomed = len(territories_to_render) < len(self.local_territories)
 
-        # --- クロップ領域を計算 ---
-        if is_zoomed:
-            all_x, all_y = [], []
-            for terri_data in territories_to_render.values():
-                loc = terri_data.get("location", {})
-                start_x, start_z = loc.get("start", [0,0])
-                end_x, end_z = loc.get("end", [0,0])
-                px1, py1 = self._coord_to_pixel(start_x, start_z)
-                px2, py2 = self._coord_to_pixel(end_x, end_z)
-                all_x.extend([px1 * self.scale_factor, px2 * self.scale_factor])
-                all_y.extend([py1 * self.scale_factor, py2 * self.scale_factor])
+            # --- クロップ領域を計算 ---
+            if is_zoomed:
+                all_x, all_y = [], []
+                for terri_data in territories_to_render.values():
+                    loc = terri_data.get("location", {})
+                    start_x, start_z = loc.get("start", [0,0])
+                    end_x, end_z = loc.get("end", [0,0])
+                    px1, py1 = self._coord_to_pixel(start_x, start_z)
+                    px2, py2 = self._coord_to_pixel(end_x, end_z)
+                    all_x.extend([px1 * self.scale_factor, px2 * self.scale_factor])
+                    all_y.extend([py1 * self.scale_factor, py2 * self.scale_factor])
 
             if all_x and all_y:
                 padding = 30
