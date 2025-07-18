@@ -223,12 +223,20 @@ class MapRenderer:
             center_x = (px1 + px2) / 2
             center_y = (py1 + py2) / 2
 
+            # 幅・高さをもとに円の半径を動的に設定
+            territory_width = abs(px2 - px1)
+            territory_height = abs(py2 - py1)
+
+            # 幅・高さの平均値から半径を決定（最大は25、最小は6など）
+            base_radius = int((territory_width + territory_height) / 2 * 0.25)
+            highlight_radius = max(6, min(base_radius, 25))  # 範囲を制限
+
             draw = ImageDraw.Draw(self.map_on_process)
             highlight_radius = 12  # 円の半径
             draw.ellipse(
                 [(center_x - highlight_radius, center_y - highlight_radius),
                  (center_x + highlight_radius, center_y + highlight_radius)],
-                outline="gold",
+                outline="black",
                 width=3
             )
                 
