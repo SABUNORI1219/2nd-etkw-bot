@@ -36,8 +36,17 @@ def setup_database():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             ''')
-            conn.commit()
             logger.info("--- [DB Handler] 'player_raid_history'テーブルのセットアップが完了しました。")
+
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bot_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            ''')
+            logger.info("--- [DB Handler] 'bot_settings'テーブルのセットアップが完了しました。")
+
+            conn.commit()
     except Exception as e:
         logger.error(f"--- [DB Handler] データベースのセットアップ中にエラー: {e}")
     finally:
