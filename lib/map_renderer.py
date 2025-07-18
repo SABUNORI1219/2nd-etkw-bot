@@ -136,36 +136,36 @@ class MapRenderer:
                 )
                 map_to_draw_on = map_to_draw_on.crop(box)
 
-        # --- 描画処理をヘルパー関数に委譲 ---
-        final_map = self._draw_trading_and_territories(
-            map_to_draw_on,
-            box,
-            is_zoomed,
-            territory_data,
-            guild_color_map
-        )
+            # --- 描画処理をヘルパー関数に委譲 ---
+            final_map = self._draw_trading_and_territories(
+                map_to_draw_on,
+                box,
+                is_zoomed,
+                territory_data,
+                guild_color_map
+            )
 
-        # --- 最終出力 ---
-        map_bytes = BytesIO()
-        final_map.save(map_bytes, format='PNG')
-        map_bytes.seek(0)
+            # --- 最終出力 ---
+            map_bytes = BytesIO()
+            final_map.save(map_bytes, format='PNG')
+            map_bytes.seek(0)
 
-        jst_now = datetime.now(timezone(timedelta(hours=9)))
-        formatted_time = jst_now.strftime("%Y/%m/%d %H:%M:%S")
+            jst_now = datetime.now(timezone(timedelta(hours=9)))
+            formatted_time = jst_now.strftime("%Y/%m/%d %H:%M:%S")
 
-        file = discord.File(map_bytes, filename="wynn_map.png")
-        embed = discord.Embed(
-            title="",
-            color=discord.Color.green()
-        )
-        embed.set_image(url="attachment://wynn_map.png")
-        embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
+            file = discord.File(map_bytes, filename="wynn_map.png")
+            embed = discord.Embed(
+                title="",
+                color=discord.Color.green()
+            )
+            embed.set_image(url="attachment://wynn_map.png")
+            embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
 
-        return file, embed
+            return file, embed
 
-    except Exception as e:
-        logger.error(f"マップ生成中にエラー: {e}", exc_info=True)
-        return None, None
+        except Exception as e:
+            logger.error(f"マップ生成中にエラー: {e}", exc_info=True)
+            return None, None
 
     def create_single_territory_image(self, territory: str) -> BytesIO | None:
         """指定された単一のテリトリー画像を切り出して返す"""
