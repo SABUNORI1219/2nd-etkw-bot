@@ -6,6 +6,7 @@ NORI_PLAYER_API_URL = "https://nori.fish/api/player/{}"
 WYNN_PLAYER_API_URL = "https://api.wynncraft.com/v3/player/{}"
 WYNN_GUILD_BY_NAME_API_URL = "https://api.wynncraft.com/v3/guild/{}"
 WYNN_GUILD_BY_PREFIX_API_URL = "https://api.wynncraft.com/v3/guild/prefix/{}"
+GUILD_NAME = "Empire of TKW"
 
 # Discord関連 (環境変数から読み込み)
 GUILD_ID_INT = int(os.getenv('GUILD_ID', 0))
