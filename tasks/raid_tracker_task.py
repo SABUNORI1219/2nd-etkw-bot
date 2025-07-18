@@ -46,11 +46,10 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
                 continue
 
             # Nori Player APIからレイドデータを取得
-            async with session.get(f"https://nori.fish/api/player/{name}") as resp:
-                if resp.status != 200:
-                    logger.warning(f"--- {name} のプレイヤーデータ取得に失敗 (status={resp.status})")
-                    continue
-                player_data = await resp.json()
+            player_data = await self.wynn_api.get_nori_player_data(name)
+            if not player_data:
+                logger.warning(f"--- {name} のプレイヤーデータ取得に失敗")
+                continue
 
             raids = player_data.get('globalData', {}).get('raids', {}).get('list', {})
             server = member.get("server")
