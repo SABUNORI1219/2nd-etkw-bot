@@ -183,9 +183,6 @@ class MapRenderer:
             all_x, all_y = [], []
             is_zoomed = None
 
-            logger.info("DEBUG: Specific territory exists:", "Nomads' Refuge" in territory_data)
-            logger.info("DEBUG: Target territory data:", territory_data.get("Nomads' Refuge"))
-
             self.map_on_process = self._draw_trading_and_territories(
                 map_to_draw_on,
                 box,
@@ -195,8 +192,6 @@ class MapRenderer:
             )
             
             loc = terri_data.get("Location", {})
-
-            logger.info(f"[{territory}] Location: {loc}")
             
             px1, py1 = self._coord_to_pixel(*loc.get("start", [0, 0]))
             px2, py2 = self._coord_to_pixel(*loc.get("end", [0, 0]))
@@ -204,15 +199,13 @@ class MapRenderer:
             px1, py1 = px1 * self.scale_factor, py1 * self.scale_factor
             px2, py2 = px2 * self.scale_factor, py2 * self.scale_factor
 
-            logger.info(f"[{territory}] Pixel coords: ({px1}, {py1}) → ({px2}, {py2})")
-
             # 必ず正しい順に整列
             left = min(px1, px2)
             right = max(px1, px2)
             top = min(py1, py2)
             bottom = max(py1, py2)
 
-            padding = 50
+            padding = 30
 
             box = (
                 max(0, left - padding),
@@ -220,9 +213,6 @@ class MapRenderer:
                 min(self.map_on_process.width, right + padding),
                 min(self.map_on_process.height, bottom + padding)
             )
-
-            # デバッグ出力をしっかり出す
-            logger.info(f"[{territory}] Crop box: {box} (W: {self.map_on_process.width}, H: {self.map_on_process.height})")
 
             # ここでチェック
             if not (box[0] < box[2] and box[1] < box[3]):
