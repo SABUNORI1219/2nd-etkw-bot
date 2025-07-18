@@ -183,6 +183,10 @@ class MapRenderer:
             all_x, all_y = [], []
             is_zoomed = None
 
+            logger.info("DEBUG: Keys in territory_data:", territory_data.keys())
+            logger.info("DEBUG: Specific territory exists:", "Nomads' Refuge" in territory_data)
+            logger.info("DEBUG: Target territory data:", territory_data.get("Nomads' Refuge"))
+
             self.map_on_process = self._draw_trading_and_territories(
                 map_to_draw_on,
                 box,
