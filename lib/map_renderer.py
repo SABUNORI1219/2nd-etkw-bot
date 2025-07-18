@@ -192,15 +192,15 @@ class MapRenderer:
             )
             
             loc = terri_data.get("Location", {})
-            
-            px1, py1 = self._coord_to_pixel(*loc.get("start", [0,0]))
-            px2, py2 = self._coord_to_pixel(*loc.get("end", [0,0]))
-            logger.debug(f"Territory: {territory}")
-            logger.debug(f"start coord → pixel: {loc.get('start')} → ({px1}, {py1})")
-            logger.debug(f"end coord → pixel: {loc.get('end')} → ({px2}, {py2})")
 
-            padding = 50 
-        
+            logger.debug(f"[{territory}] Location: {loc}")
+            
+            px1, py1 = self._coord_to_pixel(*loc.get("start", [0, 0]))
+            px2, py2 = self._coord_to_pixel(*loc.get("end", [0, 0]))
+
+            logger.debug(f"[{territory}] Pixel coords: ({px1}, {py1}) → ({px2}, {py2})")
+
+            # 必ず正しい順に整列
             left = min(px1, px2)
             right = max(px1, px2)
             top = min(py1, py2)
@@ -213,11 +213,14 @@ class MapRenderer:
                 min(self.map_on_process.height, bottom + padding)
             )
 
-            # 計算後の切り抜き範囲が有効かチェック
+            # デバッグ出力をしっかり出す
+            logger.debug(f"[{territory}] Crop box: {box} (W: {self.map_on_process.width}, H: {self.map_on_process.height})")
+
+            # ここでチェック
             if not (box[0] < box[2] and box[1] < box[3]):
                 logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。Box: {box}")
                 return None
-
+                
             logger.info(f"--- [MapRenderer] 元の地図を、座標 {box} で切り出します。")
             cropped_image = map_on_process.crop(box)
             
