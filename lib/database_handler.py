@@ -60,10 +60,6 @@ def set_setting(key: str, value: str):
     try:
         with conn.cursor() as cur:
             cur.execute(sql, (key, value))
-            CREATE TABLE IF NOT EXISTS bot_settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );
             conn.commit()
     except Exception as e:
         logger.error(f"[DB Handler] 設定の保存に失敗: {e}")
