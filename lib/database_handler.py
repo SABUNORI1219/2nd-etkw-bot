@@ -44,6 +44,28 @@ def setup_database():
         if conn:
             conn.close()
 
+def set_setting(key: str, value: str):
+    """
+    設定情報をbot_settingsテーブルに保存します（存在すれば更新）。
+    """
+    sql = """
+    INSERT INTO bot_settings (key, value)
+    VALUES (%s, %s)
+    ON CONFLICT (key) DO UPDATE
+    SET value = EXCLUDED.value
+    """
+    conn = get_db_connection()
+    if conn is None:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (key, value))
+            conn.commit()
+    except Exception as e:
+        logger.error(f"[DB Handler] 設定の保存に失敗: {e}")
+    finally:
+        conn.close()
+
 def add_raid_history(history_entries: list):
     """複数のレイドクリア履歴をデータベースに一括で追加する"""
     if not history_entries: return
