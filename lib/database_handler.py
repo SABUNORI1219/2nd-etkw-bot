@@ -1,5 +1,6 @@
 import os
 import psycopg2
+import sqlite3
 from datetime import datetime
 import logging
 
@@ -18,54 +19,43 @@ def get_db_connection():
         return None
 
 def setup_database():
-    """
-    データベースに 'clear_records' テーブルが存在しない場合に作成する。
-    """
-    logger.info("--- [DB Handler] データベースのテーブルをセットアップします...")
-    conn = get_db_connection()
-    if conn is None:
-        return
-        
+    """データベースとテーブルをセットアップする"""
     try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS clear_records (
-                    id SERIAL PRIMARY KEY,
-                    group_id VARCHAR(255) NOT NULL,
-                    user_id BIGINT NOT NULL,
-                    player_uuid VARCHAR(255) NOT NULL,
-                    raid_type VARCHAR(50) NOT NULL,
-                    cleared_at TIMESTAMP NOT NULL DEFAULT current_timestamp
-                );
-            """)
-            conn.commit()
-        logger.info("--- [DB Handler] テーブルのセットアップが完了しました。")
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            # 既存のテーブル (もしあれば)
+            # cursor.execute('''CREATE TABLE IF NOT EXISTS ...''')
+
+            # ▼▼▼【新しいテーブルを追加】▼▼▼
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS player_raid_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                player_uuid TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                raid_name TEXT NOT NULL,
+                new_raid_count INTEGER NOT NULL,
+                server TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
+            logger.info("--- [DB Handler] 'player_raid_history'テーブルのセットアップが完了しました。")
     except Exception as e:
-        logger.error(f"--- [DB Handler] テーブルセットアップ中にエラー: {e}")
-    finally:
-        if conn:
-            conn.close()
+        logger.error(f"--- [DB Handler] データベースのセットアップ中にエラー: {e}")
 
-def add_raid_records(records: list):
-    """
-    複数のレイドクリア記録をデータベースに一括で保存する。
-    records: (group_id, user_id, player_uuid, raid_type, cleared_at) のタプルのリスト
-    """
-    sql = "INSERT INTO clear_records (group_id, user_id, player_uuid, raid_type, cleared_at) VALUES (%s, %s, %s, %s, %s)"
-    conn = get_db_connection()
-    if conn is None:
-        return
-
+def add_raid_history(history_entries: list):
+    """複数のレイドクリア履歴をデータベースに一括で追加する"""
+    if not history_entries: return
     try:
-        with conn.cursor() as cur:
-            cur.executemany(sql, records)
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.executemany('''
+            INSERT INTO player_raid_history (player_uuid, player_name, raid_name, new_raid_count, server)
+            VALUES (?, ?, ?, ?, ?)
+            ''', history_entries)
             conn.commit()
-        logger.info(f"--- [DB Handler] {len(records)}件のレイド記録をデータベースに保存しました。")
+            logger.info(f"--- [DB Handler] {len(history_entries)}件のレイド履歴をデータベースに追加しました。")
     except Exception as e:
-        logger.error(f"--- [DB Handler] レイド記録の保存中にエラー: {e}")
-    finally:
-        if conn:
-            conn.close()
+        logger.error(f"--- [DB Handler] レイド履歴の追加中にエラー: {e}")
 
 def get_raid_counts(player_uuid: str, since_date: datetime) -> list:
     """
