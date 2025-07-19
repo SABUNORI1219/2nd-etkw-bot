@@ -90,18 +90,28 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
             party = p_info['party']
             score = p_info['score']
             raid_name = party[0][3]
-            
+            # 各メンバー: (uuid, server, name, raid_name, timestamp)
             player_names = [f"`{p[2]}`" for p in party]
+            # クリア時刻（例: 5番目がtimestampの場合。なければhistoryに追加時に入れる）
+            clear_times = [p[4] for p in party if len(p) > 4]
+            if clear_times:
+                clear_time_str = max(clear_times)  # or min(clear_times)
+                try:
+                    # ISO形式なら
+                    clear_time_str = datetime.fromisoformat(clear_time_str).strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    pass
+            else:
+                clear_time_str = "不明"
             
             embed = discord.Embed(
                 title="Guild Raid Clear",
                 color=discord.Color.blue()
             )
-            
             embed.add_field(
-            name=f"**{raid_name}** - ",
-            value=f"**Members**: {party}",
-            inline=False # このフィールドは横幅をすべて使う
+                name=f"**{raid_name}** - `{cleaar_time_str}`",
+                value=f"**Members**: {', '.join(player_names)}",
+                inline=False
             )
             
             embed.set_footer(text=f"Guild Raid Tracker | Minister Chikuwa")
