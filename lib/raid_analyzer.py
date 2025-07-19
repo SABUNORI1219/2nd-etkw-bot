@@ -11,7 +11,7 @@ SCORE_THRESHOLD = 85  # このスコア以上で通知
 TIME_WINDOW_MINUTES = 3 # この時間内でのクリアを同じパーティと見なす
 
 class RaidAnalyzer:
-    def ensure_datetime(value):
+    def ensure_datetime(self, value):
         return datetime.fromisoformat(value) if isinstance(value, str) else value
 
     def analyze_raids(self) -> list:
