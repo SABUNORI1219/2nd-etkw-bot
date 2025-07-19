@@ -8,7 +8,7 @@ from lib.database_handler import set_setting
 logger = logging.getLogger(__name__)
 
 def is_specific_user(user_id: int):
-    def predicate(interaction: app_commands.Interaction):
+    def predicate(interaction: discord.Interaction):
         if interaction.user.id != user_id:
             raise app_commands.CheckFailure(f"このコマンドは <@{user_id}> のみが使用できます！")
         return True
