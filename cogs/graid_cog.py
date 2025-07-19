@@ -19,14 +19,6 @@ class TrackerCog(commands.GroupCog, group_name="graid", description="ギルド�
         self.bot = bot
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
-    async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.CheckFailure):
-            # カスタムメッセージを表示
-            await interaction.response.send_message(str(error), ephemeral=True)
-        else:
-            # その他のエラー
-            await interaction.response.send_message("不明なエラーが発生しました。", ephemeral=True)
-
     @app_commands.command(name="channel", description="ギルドレイドの通知を送信するチャンネルを設定")
     @app_commands.describe(channel="通知を送信するチャンネル")
     @is_specific_user(1062535250099589120)
