@@ -20,16 +20,19 @@ class RaidHistoryView(discord.ui.View):
         super().__init__(timeout=180.0) # 3分でボタンを無効化
         self.current_page = initial_page
         self.total_pages = total_pages
+        self.since_date = since_date
         self.update_buttons()
 
     def create_embed(self) -> discord.Embed:
         """現在のページに基づいてEmbedを作成する"""
-        history, self.total_pages = get_raid_history_page(page=self.current_page)
+        history, self.total_pages = get_raid_history_page(page=self.current_page, since_date=self.since_date)
         
         if not history:
             return discord.Embed(description=f"{self.current_page}ページ目には記録がありません。", color=discord.Color.greyple())
 
         embed = discord.Embed(title="Guild Raid Clear History", color=discord.Color.blue())
+        if self.since_date:
+            embed.title += f" (since {self.since_date.strftime('%Y-%m-%d')})"
         
         desc_lines = []
         for raid_name, timestamp, players in history:
@@ -77,18 +80,29 @@ class TrackerCog(commands.GroupCog, group_name="graid", description="ギルド�
         logger.info(f"ギルドレイドの通知チャンネルが更新されました: {channel.mention}")
 
     @app_commands.command(name="list", description="記録されたギルドレイドのクリア履歴を表示")
+    @app_commands.describe(since="日付 (YYYY-MM-DD形式) で絞り込み")
     @is_specific_user(1062535250099589120)
-    async def list(self, interaction: discord.Interaction):
+    async def list(self, interaction: discord.Interaction, since: str = None):
         await interaction.response.defer(ephemeral=True)
         
-        history, total_pages = get_raid_history_page(page=1)
-
-        if not history:
-            await interaction.followup.send("まだレイドのクリア記録がありません。")
+        since_date = None
+        if since:
+            try:
+                since_date = datetime.strptime(since, "%Y-%m-%d")
+            except ValueError:
+                await interaction.followup.send("日付の形式が正しくありません。`YYYY-MM-DD`形式で入力してください。")
+                return
+        
+        # フィルターを考慮して総ページ数を取得
+        _, total_pages = get_raid_history_page(page=1, since_date=since_date)
+        if total_pages == 0:
+            message = "まだレイドのクリア記録がありません。"
+            if since_date:
+                message = f"{since_date.strftime('%Y-%m-%d')}以降のクリア記録はありません。"
+            await interaction.followup.send(message)
             return
 
-        # 常に1ページ目からViewを開始
-        view = RaidHistoryView(initial_page=1, total_pages=total_pages)
+        view = RaidHistoryView(initial_page=1, total_pages=total_pages, since_date=since_date)
         embed = view.create_embed()
         
         await interaction.followup.send(embed=embed, view=view)
