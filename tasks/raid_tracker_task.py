@@ -36,6 +36,7 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
             if rank_name == "total":
                 continue
             for name, info in rank_dict.items():
+                logger.info(f"[DEBUG] メンバー抽出: {name}, info: {info)")
                 all_names.append((name, info))
 
         current_raid_counts = {}
