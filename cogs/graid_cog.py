@@ -36,8 +36,7 @@ class RaidHistoryView(discord.ui.View):
         
         desc_lines = []
         for raid_name, timestamp, players in history:
-            dt_object = datetime.fromisoformat(timestamp)
-            formatted_ts = dt_object.strftime("%Y/%m/%d %H:%M")
+            formatted_ts = timestamp.strftime("%Y/%m/%d %H:%M") if hasattr(timestamp, "strftime") else str(timestamp)
             desc_lines.append(f"**{raid_name}** - `{formatted_ts}`\n> **Members:** {players}\n")
         
         embed.description = "\n".join(desc_lines)
