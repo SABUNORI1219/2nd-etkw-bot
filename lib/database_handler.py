@@ -201,9 +201,8 @@ def get_raid_history_page(page: int = 1, per_page: int = 10, since_date: datetim
         data_sql += " WHERE timestamp >= %s"
         params.append(since_date)
 
-    data_sql += " GROUP BY raid_name, timestamp"
-    data_sql += " ORDER BY timestamp DESC LIMIT %s OFFSET %s"
-    params.extend([per_page, offset])
+    count_sql = "SELECT COUNT(*) FROM (SELECT 1 " + base_sql + " GROUP BY raid_name, timestamp HAVING COUNT(player_uuid) = 4) AS subquery"
+    data_sql = "SELECT raid_name, timestamp, STRING_AGG(player_name, ', ') " + base_sql + " GROUP BY raid_name, timestamp HAVING COUNT(player_uuid) = 4 ORDER BY timestamp DESC LIMIT %s OFFSET %s"
 
     try:
         with conn.cursor() as cur:
