@@ -3,7 +3,8 @@ from discord.ext import commands, tasks
 import logging
 
 from lib.wynncraft_api import WynncraftAPI
-from lib.database_handler import add_raid_history
+from lib.database_handler import add_raid_history, get_setting
+from lib.raid_analyzer import RaidAnalyzer
 from config import GUILD_NAME # 追跡対象のギルド名
 from aiohttp import ClientSession
 
@@ -13,6 +14,7 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
+        self.analyzer = RaidAnalyzer()
         self.previous_raid_counts = {} # 前回のレイド数を記憶
         self.collect_raid_data_task.start()
 
@@ -68,6 +70,36 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
 
         self.previous_raid_counts = current_raid_counts
         logger.info("--- データ収集完了")
+        
+        # --- 2. 分析 ---
+        logger.info("--- [RaidTrackerTask] レイドパーティの分析を開始します...")
+        parties = self.analyzer.analyze_raids()
+        if not parties:
+            logger.info("--- [RaidTrackerTask] 通知対象のパーティは見つかりませんでした。"); return
+
+        # --- 3. 通知 ---
+        channel_id_str = get_setting("raid_notification_channel")
+        if not channel_id_str:
+            logger.warning("--- [RaidTrackerTask] 通知チャンネルが設定されていません。"); return
+        
+        channel = self.bot.get_channel(int(channel_id_str))
+        if not channel:
+            logger.error(f"--- [RaidTrackerTask] ID {channel_id_str} のチャンネルが見つかりません。"); return
+
+        for p_info in parties:
+            party = p_info['party']
+            score = p_info['score']
+            raid_name = party[0][3]
+            
+            player_names = [f"`{p[2]}`" for p in party]
+            
+            embed = discord.Embed(
+                title=f"🎉 Guild Raid Clear: {raid_name}",
+                description="**パーティメンバー:**\n- " + "\n- ".join(player_names),
+                color=discord.Color.gold()
+            )
+            embed.set_footer(text=f"信頼スコア: {score}")
+            await channel.send(embed=embed)
 
     @collect_raid_data_task.before_loop
     async def before_task(self):
