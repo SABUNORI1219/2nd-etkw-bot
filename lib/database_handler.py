@@ -176,3 +176,43 @@ def mark_raid_history_as_processed(ids: list):
         logger.error(f"--- [DB Handler] レイド履歴の更新中にエラー: {e}")
     finally:
         if conn: conn.close()
+
+def get_raid_history_page(page: int = 1, per_page: int = 10) -> tuple[list, int]:
+    """
+    player_raid_historyテーブルから、ページ指定で履歴を取得する。
+    戻り値は (履歴のリスト, 総ページ数)。
+    """
+    offset = (page - 1) * per_page
+    conn = get_db_connection()
+    if conn is None:
+        return [], 0
+
+    results = []
+    total_count = 0
+    try:
+        with conn.cursor() as cur:
+            # まず、総件数を取得
+            cur.execute("SELECT COUNT(DISTINCT timestamp) FROM player_raid_history")
+            count_result = cur.fetchone()
+            if count_result:
+                total_count = count_result[0]
+
+            # 1ページ分のデータを取得 (タイムスタンプでグループ化し、最新のものから)
+            sql = """
+            SELECT raid_name, timestamp, STRING_AGG(player_name, ', ')
+            FROM player_raid_history
+            GROUP BY raid_name, timestamp
+            ORDER BY timestamp DESC
+            LIMIT %s OFFSET %s
+            """
+            cur.execute(sql, (per_page, offset))
+            results = cur.fetchall()
+            
+    except Exception as e:
+        logger.error(f"[DB Handler] レイド履歴のページ取得に失敗: {e}")
+    finally:
+        if conn:
+            conn.close()
+    
+    total_pages = (total_count + per_page - 1) // per_page
+    return results, total_pages
