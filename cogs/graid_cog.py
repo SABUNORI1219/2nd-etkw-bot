@@ -8,14 +8,24 @@ from lib.database_handler import set_setting
 logger = logging.getLogger(__name__)
 
 def is_specific_user(user_id: int):
-    def predicate(interaction: discord.Interaction):
-        return interaction.user.id == user_id
+    def predicate(interaction: app_commands.Interaction):
+        if interaction.user.id != user_id:
+            raise app_commands.CheckFailure(f"このコマンドは <@{user_id}> のみが使用できます！")
+        return True
     return app_commands.check(predicate)
 
 class TrackerCog(commands.GroupCog, group_name="graid", description="ギルドレイド関連"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
+
+    async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.CheckFailure):
+            # カスタムメッセージを表示
+            await interaction.response.send_message(str(error), ephemeral=True)
+        else:
+            # その他のエラー
+            await interaction.response.send_message("不明なエラーが発生しました。", ephemeral=True)
 
     @app_commands.command(name="channel", description="ギルドレイドの通知を送信するチャンネルを設定")
     @app_commands.describe(channel="通知を送信するチャンネル")
