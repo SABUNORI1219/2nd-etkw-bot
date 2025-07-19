@@ -79,7 +79,7 @@ class RaidAnalyzer:
             criteria['server_match'] = "一部のサーバー情報が欠損"
 
         # 時間差をスコアリング
-        first_time = self.ensure_datetime(party_candidate[0][5])
+        first_time = self.ensure_datetime(party[0][5])
         last_time = self.ensure_datetime(party[-1][5])
         time_diff = (last_time - first_time).total_seconds()
         if time_diff <= 60:
