@@ -10,14 +10,16 @@ logger = logging.getLogger(__name__)
 def is_specific_user(user_id: int):
     def predicate(interaction: discord.Interaction):
         if interaction.user.id != user_id:
-            raise app_commands.CheckFailure(f"このコマンドは <@{user_id}> のみが使用できます！")
+            raise app_commands.CheckFailure(f"このコマンドは現在 <@{user_id}> のみが使用できます！")
         return True
     return app_commands.check(predicate)
 
-class TrackerCog(commands.GroupCog, group_name="graid", description="ギルドレイド関連"):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
+class RaidHistoryView(discord.ui.View):
+    def __init__(self, initial_page: int, total_pages: int):
+        super().__init__(timeout=180.0) # 3分でボタンを無効化
+        self.current_page = initial_page
+        self.total_pages = total_pages
+        self.update_buttons()
 
     def create_embed(self) -> discord.Embed:
         """現在のページに基づいてEmbedを作成する"""
@@ -57,6 +59,11 @@ class TrackerCog(commands.GroupCog, group_name="graid", description="ギルド�
         self.update_buttons()
         await interaction.response.edit_message(embed=self.create_embed(), view=self)
 
+class TrackerCog(commands.GroupCog, group_name="graid", description="ギルドレイド関連"):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
+
     @app_commands.command(name="channel", description="ギルドレイドの通知を送信するチャンネルを設定")
     @app_commands.describe(channel="通知を送信するチャンネル")
     @is_specific_user(1062535250099589120)
@@ -69,6 +76,7 @@ class TrackerCog(commands.GroupCog, group_name="graid", description="ギルド�
         logger.info(f"ギルドレイドの通知チャンネルが更新されました: {channel.mention}")
 
     @app_commands.command(name="list", description="記録されたギルドレイドのクリア履歴を表示")
+    @is_specific_user(1062535250099589120)
     async def list(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
