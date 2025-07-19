@@ -72,7 +72,7 @@ class TrackerCog(commands.GroupCog, group_name="graid", description="ギルド�
     async def list(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         
-       history, total_pages = get_raid_history_page(page=1)
+        history, total_pages = get_raid_history_page(page=1)
 
         if not history:
             await interaction.followup.send("まだレイドのクリア記録がありません。")
