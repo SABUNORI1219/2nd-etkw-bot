@@ -17,22 +17,29 @@ class RaidAnalyzer:
     def analyze_raids(self) -> list:
         """未処理のレイド履歴を分析し、ギルドレイドパーティを推定する"""
         history = get_unprocessed_raid_history()
+        logger.info(f"[DEBUG] 未処理履歴取得: {len(history)}件")
         if not history:
+            logger.info("[DEBUG] 未処理履歴が空です。分析せず終了。")
             return []
 
         # レイドの種類ごとにクリア履歴をグループ分け
         raids_by_type = defaultdict(list)
         for record in history:
             raids_by_type[record[3]].append(record) # record[3]はraid_name
+        logger.info(f"[DEBUG] レイド種別ごと履歴数: {[ (raid, len(records)) for raid, records in raids_by_type.items() ]}")
 
         confident_parties = []
         processed_ids = []
 
         for raid_name, records in raids_by_type.items():
-            if len(records) < 4: continue
+            logger.info(f"[DEBUG] {raid_name} 履歴: {len(records)}件")
+            if len(records) < 4:
+                logger.info(f"[DEBUG] {raid_name}は履歴不足でスキップ")
+                continue
 
             # 時間が近いプレイヤーでパーティを組む
             possible_parties = self._find_parties(records)
+            logger.info(f"[DEBUG] {raid_name} パーティ候補数: {len(possible_parties)}")
 
             for party in possible_parties:
                 score, criteria = self._score_party(party)
