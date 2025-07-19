@@ -53,7 +53,7 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
                 continue
 
             raids = player_data.get('globalData', {}).get('raids', {}).get('list', {})
-            server = member.get("server")
+            server = player_data.get("server")
 
             current_raid_counts[uuid] = raids
 
