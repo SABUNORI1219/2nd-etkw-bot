@@ -36,7 +36,6 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
             if rank_name == "total":
                 continue
             for name, info in rank_dict.items():
-                logger.info(f"[DEBUG] メンバー抽出: {name}, info: {info}")
                 all_names.append((name, info))
 
         current_raid_counts = {}
@@ -95,11 +94,17 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
             player_names = [f"`{p[2]}`" for p in party]
             
             embed = discord.Embed(
-                title=f"🎉 Guild Raid Clear: {raid_name}",
-                description="**パーティメンバー:**\n- " + "\n- ".join(player_names),
-                color=discord.Color.gold()
+                title="Guild Raid Clear",
+                color=discord.Color.blue()
             )
-            embed.set_footer(text=f"信頼スコア: {score}")
+            
+            embed.add_field(
+            name=f"**{raid_name}** - ",
+            value=f"**Members**: {party}",
+            inline=False # このフィールドは横幅をすべて使う
+            )
+            
+            embed.set_footer(text=f"Guild Raid Tracker | Minister Chikuwa")
             await channel.send(embed=embed)
 
     @collect_raid_data_task.before_loop
