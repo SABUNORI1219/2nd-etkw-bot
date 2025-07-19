@@ -11,6 +11,9 @@ SCORE_THRESHOLD = 85  # このスコア以上で通知
 TIME_WINDOW_MINUTES = 3 # この時間内でのクリアを同じパーティと見なす
 
 class RaidAnalyzer:
+    def ensure_datetime(value):
+        return datetime.fromisoformat(value) if isinstance(value, str) else value
+
     def analyze_raids(self) -> list:
         """未処理のレイド履歴を分析し、ギルドレイドパーティを推定する"""
         history = get_unprocessed_raid_history()
@@ -54,8 +57,8 @@ class RaidAnalyzer:
         records.sort(key=lambda x: x[5]) # タイムスタンプでソート
         for i in range(len(records) - 3):
             party_candidate = records[i:i+4]
-            first_time = datetime.fromisoformat(party_candidate[0][5])
-            last_time = datetime.fromisoformat(party_candidate[-1][5])
+            first_time = ensure_datetime(party_candidate[0][5])
+            last_time = ensure_datetime(party[-1][5])
             if (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES):
                 parties.append(party_candidate)
         return parties
@@ -76,8 +79,8 @@ class RaidAnalyzer:
             criteria['server_match'] = "一部のサーバー情報が欠損"
 
         # 時間差をスコアリング
-        first_time = datetime.fromisoformat(party[0][5])
-        last_time = datetime.fromisoformat(party[-1][5])
+        first_time = ensure_datetime(party_candidate[0][5])
+        last_time = ensure_datetime(party[-1][5])
         time_diff = (last_time - first_time).total_seconds()
         if time_diff <= 60:
             score += 50; criteria['time_proximity'] = f"1分以内にクリア ({int(time_diff)}秒差)"
