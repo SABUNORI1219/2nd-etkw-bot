@@ -16,7 +16,7 @@ def is_specific_user(user_id: int):
     return app_commands.check(predicate)
 
 class RaidHistoryView(discord.ui.View):
-    def __init__(self, initial_page: int, total_pages: int):
+    def __init__(self, initial_page: int, total_pages: int, since_date: datetime | None):
         super().__init__(timeout=180.0) # 3分でボタンを無効化
         self.current_page = initial_page
         self.total_pages = total_pages
