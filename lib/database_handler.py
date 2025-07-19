@@ -138,3 +138,37 @@ def get_raid_counts(player_uuid: str, since_date: datetime) -> list:
         if conn:
             conn.close()
     return results
+
+def get_unprocessed_raid_history() -> list:
+    """まだ処理・通知されていないレイド履歴を取得する"""
+    sql = "SELECT id, player_uuid, player_name, raid_name, server, timestamp FROM player_raid_history WHERE processed = FALSE ORDER BY timestamp ASC"
+    conn = get_db_connection()
+    if conn is None: return []
+    results = []
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            results = cur.fetchall()
+    except Exception as e:
+        logger.error(f"--- [DB Handler] 未処理レイド履歴の取得中にエラー: {e}")
+    finally:
+        if conn: conn.close()
+    return results
+
+def mark_raid_history_as_processed(ids: list):
+    """指定されたIDのレイド履歴を「処理済み」としてマークする"""
+    if not ids: return
+    # executemanyで使うために、リストの各要素をタプルに変換
+    id_tuples = [(id,) for id in ids]
+    sql = "UPDATE player_raid_history SET processed = TRUE WHERE id = %s"
+    conn = get_db_connection()
+    if conn is None: return
+    try:
+        with conn.cursor() as cur:
+            cur.executemany(sql, id_tuples)
+            conn.commit()
+            logger.info(f"--- [DB Handler] {len(ids)}件のレイド履歴を処理済みにマークしました。")
+    except Exception as e:
+        logger.error(f"--- [DB Handler] レイド履歴の更新中にエラー: {e}")
+    finally:
+        if conn: conn.close()
