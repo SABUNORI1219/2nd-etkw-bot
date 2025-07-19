@@ -58,7 +58,7 @@ class RaidAnalyzer:
         for i in range(len(records) - 3):
             party_candidate = records[i:i+4]
             first_time = self.ensure_datetime(party_candidate[0][5])
-            last_time = self.ensure_datetime(party[-1][5])
+            last_time = self.ensure_datetime(party_candidate[-1][5])
             if (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES):
                 parties.append(party_candidate)
         return parties
