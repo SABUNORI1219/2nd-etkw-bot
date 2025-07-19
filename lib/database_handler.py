@@ -192,18 +192,16 @@ def get_raid_history_page(page: int = 1, per_page: int = 10, since_date: datetim
     # SQLクエリとパラメータを動的に構築
     count_sql = "SELECT COUNT(DISTINCT timestamp) FROM player_raid_history"
     data_sql = """
-        SELECT raid_name, timestamp, STRING_AGG(player_name, ', ')
-        FROM player_raid_history
-        GROUP BY raid_name, timestamp
+    SELECT raid_name, timestamp, STRING_AGG(player_name, ', ')
+    FROM player_raid_history
     """
     params = []
 
     if since_date:
-        where_clause = " WHERE timestamp >= %s"
-        count_sql += where_clause
-        data_sql += where_clause
+        data_sql += " WHERE timestamp >= %s"
         params.append(since_date)
 
+    data_sql += " GROUP BY raid_name, timestamp"
     data_sql += " ORDER BY timestamp DESC LIMIT %s OFFSET %s"
     params.extend([per_page, offset])
 
