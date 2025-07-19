@@ -36,6 +36,10 @@ def setup_database():
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             ''')
+
+            cursor.execute('''
+            ALTER TABLE player_raid_history ADD COLUMN IF NOT EXISTS processed BOOLEAN DEFAULT FALSE
+            ''')
             logger.info("--- [DB Handler] 'player_raid_history'テーブルのセットアップが完了しました。")
 
             cursor.execute('''
