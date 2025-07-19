@@ -26,6 +26,7 @@ class RaidAnalyzer:
         raids_by_type = defaultdict(list)
         for record in history:
             raids_by_type[record[3]].append(record) # record[3]はraid_name
+            logger.info(f"[DEBUG] 履歴: raid={record[3]}, ts={record[5]}, name={record[2]}")
         logger.info(f"[DEBUG] レイド種別ごと履歴数: {[ (raid, len(records)) for raid, records in raids_by_type.items() ]}")
 
         confident_parties = []
