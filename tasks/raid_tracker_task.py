@@ -32,10 +32,12 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
         # メンバー抽出（owner, chiefなどの各階層を走査）
         member_section = guild_data["members"]
         all_members = []
+        logger.info(f"[DEBUG] ギルドメンバー一覧: {list(member_section.keys())}")
         for rank, players_dict in member_section.items():
             if rank == "total":
                 continue
         for player_name, player_info in players_dict.items():
+            logger.info(f"[DEBUG] メンバー抽出: {player_name}, info: {player_info}")
             all_members.append((player_name, player_info))
 
         current_raid_counts = {}
@@ -48,6 +50,7 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
 
             # ✅ WynncraftAPIを通してNori Player APIにアクセス
             player_data = await self.wynn_api.get_nori_player_data(name)
+            logger.info(f"[DEBUG] {player_name} のAPIレスポンス: {player_data}")
             if not player_data:
                 logger.warning(f"--- {name} のプレイヤーデータ取得に失敗")
                 continue
