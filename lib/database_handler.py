@@ -189,20 +189,36 @@ def get_raid_history_page(page: int = 1, per_page: int = 10, since_date: datetim
     results = []
     total_count = 0
     
-    # SQLクエリとパラメータを動的に構築
-    count_sql = "SELECT COUNT(DISTINCT timestamp) FROM player_raid_history"
-    data_sql = """
-    SELECT raid_name, timestamp, STRING_AGG(player_name, ', ')
-    FROM player_raid_history
-    """
+    # SQL共通部分
+    where_clause = ""
     params = []
 
     if since_date:
-        data_sql += " WHERE timestamp >= %s"
+        where_clause = " WHERE timestamp >= %s"
         params.append(since_date)
 
-    count_sql = "SELECT COUNT(*) FROM (SELECT 1 " + base_sql + " GROUP BY raid_name, timestamp HAVING COUNT(player_uuid) = 4) AS subquery"
-    data_sql = "SELECT raid_name, timestamp, STRING_AGG(player_name, ', ') " + base_sql + " GROUP BY raid_name, timestamp HAVING COUNT(player_uuid) = 4 ORDER BY timestamp DESC LIMIT %s OFFSET %s"
+    # 4人組のみ抽出するためのGROUP BY + HAVING
+    data_sql = f"""
+        SELECT raid_name, timestamp, STRING_AGG(player_name, ', ')
+        FROM player_raid_history
+        {where_clause}
+        GROUP BY raid_name, timestamp
+        HAVING COUNT(player_uuid) = 4
+        ORDER BY timestamp DESC
+        LIMIT %s OFFSET %s
+    """
+    params.extend([per_page, offset])
+
+    # 総件数取得用
+    count_sql = f"""
+        SELECT COUNT(*) FROM (
+            SELECT 1
+            FROM player_raid_history
+            {where_clause}
+            GROUP BY raid_name, timestamp
+            HAVING COUNT(player_uuid) = 4
+        ) AS subquery
+    """
 
     try:
         with conn.cursor() as cur:
