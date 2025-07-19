@@ -33,21 +33,29 @@ class RaidHistoryView(discord.ui.View):
         self.update_buttons()
 
     def create_embed(self):
-        # ページデータ取得
         results, _ = get_raid_history_page(page=self.current_page, since_date=self.since_date)
-        desc_lines = []
-        total_count = 0
-        for raid_name, timestamp, players in results:
-            # フィルタ
-            if self.raid_type != "Total" and raid_name != self.raid_type:
-                continue
-            dt_object = timestamp if hasattr(timestamp, "strftime") else datetime.fromisoformat(timestamp)
-            formatted_ts = dt_object.strftime("%Y/%m/%d %H:%M")
-            desc_lines.append(f"**{raid_name}** - `{formatted_ts}`\n> **Members:** {players}\n")
-            total_count += 1
-
-        embed = discord.Embed(title="Guild Raid Clear History", description="\n".join(desc_lines) or "該当レイドの記録はありません。")
-        embed.set_footer(text=f"Page {self.current_page}/{self.total_pages} | Raid: {self.raid_type} | Total clears: {total_count}")
+        embed = discord.Embed(title="Guild Raid Clear History", color=discord.Color.blue())
+        if self.raid_type == "Total":
+            # 集計処理：全メンバーのクリア数を集計
+            from collections import Counter
+            counter = Counter()
+            for raid_name, timestamp, players in results:
+                for name in [n.strip() for n in players.split(",")]:
+                    counter[name] += 1
+            # 回数降順で並べる
+            lines = [f"{name}: {count}" for name, count in counter.most_common()]
+            embed.description = "\n".join(lines) if lines else "該当するデータはありません。"
+        else:
+            # 通常の個別表示
+            desc_lines = []
+            for raid_name, timestamp, players in results:
+                if raid_name != self.raid_type:
+                    continue
+                dt_object = timestamp if hasattr(timestamp, "strftime") else datetime.fromisoformat(timestamp)
+                formatted_ts = dt_object.strftime("%Y/%m/%d %H:%M")
+                desc_lines.append(f"**{raid_name}** - `{formatted_ts}`\n> **Members:** {players}\n")
+            embed.description = "\n".join(desc_lines) if desc_lines else "該当するデータはありません。"
+        embed.set_footer(text=f"Page {self.current_page}/{self.total_pages} | Raid: {self.raid_type}")
         return embed
 
     @discord.ui.button(label="次へ ▶️", style=discord.ButtonStyle.blurple)
