@@ -75,6 +75,29 @@ def set_setting(key: str, value: str):
     finally:
         conn.close()
 
+def get_setting(key: str) -> str | None:
+    """設定情報をbot_settingsテーブルから取得します。"""
+    sql = "SELECT value FROM bot_settings WHERE key = %s"
+    conn = get_db_connection()
+    if conn is None:
+        return None
+
+    result = None
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (key,))
+            # fetchone()は、結果がなければNone、あれば(値,)というタプルを返す
+            record = cur.fetchone()
+            if record:
+                result = record[0]
+    except Exception as e:
+        logger.error(f"[DB Handler] 設定の取得に失敗: {e}")
+    finally:
+        if conn:
+            conn.close()
+    
+    return result
+
 def add_raid_history(history_entries: list):
     """複数のレイドクリア履歴をデータベースに一括で追加する"""
     if not history_entries: return
