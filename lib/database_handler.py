@@ -33,12 +33,16 @@ def setup_database():
                 raid_name TEXT NOT NULL,
                 new_raid_count INTEGER NOT NULL,
                 server TEXT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                clear_time TIMESTAMP
             )
             ''')
 
             cursor.execute('''
             ALTER TABLE player_raid_history ADD COLUMN IF NOT EXISTS processed BOOLEAN DEFAULT FALSE
+            ''')
+            cursor.execute('''
+            ALTER TABLE player_raid_history ADD COLUMN IF NOT EXISTS clear_time TIMESTAMP
             ''')
             logger.info("--- [DB Handler] 'player_raid_history'テーブルのセットアップが完了しました。")
 
@@ -122,8 +126,10 @@ def add_raid_history(history_entries: list):
             return
         with conn.cursor() as cursor:
             cursor.executemany('''
-            INSERT INTO player_raid_history (player_uuid, player_name, raid_name, new_raid_count, server)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO player_raid_history (
+                player_uuid, player_name, raid_name, new_raid_count, server, clear_time
+            )
+            VALUES (%s, %s, %s, %s, %s, %s)
             ''', history_entries)
             conn.commit()
             logger.info(f"--- [DB Handler] {len(history_entries)}件のレイド履歴をデータベースに追加しました。")
@@ -200,7 +206,7 @@ def get_latest_server_before(player_uuid: str, before_time: datetime):
 
 def get_unprocessed_raid_history() -> list:
     """まだ処理・通知されていないレイド履歴を取得する"""
-    sql = "SELECT id, player_uuid, player_name, raid_name, server, timestamp FROM player_raid_history WHERE processed = FALSE ORDER BY timestamp ASC"
+    sql = "SELECT id, player_uuid, player_name, raid_name, server, clear_time timestamp FROM player_raid_history WHERE processed = FALSE ORDER BY timestamp ASC"
     conn = get_db_connection()
     if conn is None: return []
     results = []
