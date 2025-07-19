@@ -94,6 +94,9 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
             f"現在クールダウン中です。あと **{remaining_seconds}秒** 待ってからもう一度お試しください。",
             ephemeral=True # コマンドを実行した本人にだけ見えるメッセージ
         )
+    elif isinstance(error, app_commands.CheckFailure):
+        # CheckFailure時のカスタムメッセージ
+        await interaction.response.send_message(str(error), ephemeral=True)
     else:
         # 他のエラーはコンソールに出力（これまで通り）
         logger.error(f"--- [司令塔] 予期せぬエラーが発生: {error}", exc_info=True)
