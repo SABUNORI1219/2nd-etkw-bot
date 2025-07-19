@@ -43,6 +43,17 @@ def setup_database():
             logger.info("--- [DB Handler] 'player_raid_history'テーブルのセットアップが完了しました。")
 
             cursor.execute('''
+            CREATE TABLE IF NOT EXISTS player_server_history (
+                id SERIAL PRIMARY KEY,
+                player_uuid TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                server TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
+            logger.info("--- [DB Handler] 'player_server_history'テーブルのセットアップが完了しました。")
+            
+            cursor.execute('''
             CREATE TABLE IF NOT EXISTS bot_settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
@@ -142,6 +153,50 @@ def get_raid_counts(player_uuid: str, since_date: datetime) -> list:
         if conn:
             conn.close()
     return results
+
+def add_server_history(history_entries: list):
+    """
+    2分ごとに取得したサーバー履歴をplayer_server_historyに一括追加する
+    history_entries: [(player_uuid, player_name, server, timestamp), ...]
+    """
+    if not history_entries: return
+    conn = get_db_connection()
+    if conn is None: return
+    try:
+        with conn.cursor() as cursor:
+            cursor.executemany('''
+            INSERT INTO player_server_history (player_uuid, player_name, server, timestamp)
+            VALUES (%s, %s, %s, %s)
+            ''', history_entries)
+            conn.commit()
+            logger.info(f"--- [DB Handler] {len(history_entries)}件のサーバー履歴を追加しました。")
+    except Exception as e:
+        logger.error(f"--- [DB Handler] サーバー履歴の追加中にエラー: {e}")
+    finally:
+        if conn: conn.close()
+
+def get_latest_server_before(player_uuid: str, before_time: datetime):
+    """
+    指定したUUIDのプレイヤーについて、指定時刻より前で一番新しいサーバー履歴を返す
+    """
+    sql = '''
+        SELECT server FROM player_server_history
+        WHERE player_uuid = %s AND timestamp <= %s
+        ORDER BY timestamp DESC LIMIT 1
+    '''
+    conn = get_db_connection()
+    if conn is None: return None
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (player_uuid, before_time))
+            record = cur.fetchone()
+            if record:
+                return record[0]
+    except Exception as e:
+        logger.error(f"--- [DB Handler] サーバー履歴取得中にエラー: {e}")
+    finally:
+        if conn: conn.close()
+    return None
 
 def get_unprocessed_raid_history() -> list:
     """まだ処理・通知されていないレイド履歴を取得する"""
