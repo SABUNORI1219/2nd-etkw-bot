@@ -177,42 +177,52 @@ def mark_raid_history_as_processed(ids: list):
     finally:
         if conn: conn.close()
 
-def get_raid_history_page(page: int = 1, per_page: int = 10) -> tuple[list, int]:
+def get_raid_history_page(page: int = 1, per_page: int = 10, since_date: datetime = None) -> tuple[list, int]:
     """
     player_raid_historyテーブルから、ページ指定で履歴を取得する。
-    戻り値は (履歴のリスト, 総ページ数)。
+    since_dateが指定されていれば、その日付以降のデータに絞り込む。
     """
     offset = (page - 1) * per_page
     conn = get_db_connection()
-    if conn is None:
-        return [], 0
+    if conn is None: return [], 0
 
     results = []
     total_count = 0
+    
+    # SQLクエリとパラメータを動的に構築
+    count_sql = "SELECT COUNT(DISTINCT timestamp) FROM player_raid_history"
+    data_sql = """
+        SELECT raid_name, timestamp, STRING_AGG(player_name, ', ')
+        FROM player_raid_history
+        GROUP BY raid_name, timestamp
+    """
+    params = []
+
+    if since_date:
+        where_clause = " WHERE timestamp >= %s"
+        count_sql += where_clause
+        data_sql += where_clause
+        params.append(since_date)
+
+    data_sql += " ORDER BY timestamp DESC LIMIT %s OFFSET %s"
+    params.extend([per_page, offset])
+
     try:
         with conn.cursor() as cur:
-            # まず、総件数を取得
-            cur.execute("SELECT COUNT(DISTINCT timestamp) FROM player_raid_history")
+            # 総件数を取得
+            cur.execute(count_sql, [since_date] if since_date else [])
             count_result = cur.fetchone()
             if count_result:
                 total_count = count_result[0]
 
-            # 1ページ分のデータを取得 (タイムスタンプでグループ化し、最新のものから)
-            sql = """
-            SELECT raid_name, timestamp, STRING_AGG(player_name, ', ')
-            FROM player_raid_history
-            GROUP BY raid_name, timestamp
-            ORDER BY timestamp DESC
-            LIMIT %s OFFSET %s
-            """
-            cur.execute(sql, (per_page, offset))
+            # 1ページ分のデータを取得
+            cur.execute(data_sql, params)
             results = cur.fetchall()
             
     except Exception as e:
         logger.error(f"[DB Handler] レイド履歴のページ取得に失敗: {e}")
     finally:
-        if conn:
-            conn.close()
+        if conn: conn.close()
     
     total_pages = (total_count + per_page - 1) // per_page
     return results, total_pages
