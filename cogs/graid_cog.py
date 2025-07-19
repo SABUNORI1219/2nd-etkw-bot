@@ -7,7 +7,11 @@ from lib.database_handler import set_setting
 
 logger = logging.getLogger(__name__)
 
-@app_commands.checks.has_permissions(administrator=True) # このグループのコマンドは管理者のみ
+def is_specific_user(user_id: int):
+    def predicate(interaction: discord.Interaction):
+        return interaction.user.id == user_id
+    return app_commands.check(predicate)
+
 class TrackerCog(commands.GroupCog, group_name="graid", description="ギルドレイド関連"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -15,6 +19,7 @@ class TrackerCog(commands.GroupCog, group_name="graid", description="ギルド�
 
     @app_commands.command(name="channel", description="ギルドレイドの通知を送信するチャンネルを設定")
     @app_commands.describe(channel="通知を送信するチャンネル")
+    @is_specific_user(1062535250099589120)
     async def set_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
         set_setting("raid_notification_channel", str(channel.id))
         await interaction.response.send_message(
