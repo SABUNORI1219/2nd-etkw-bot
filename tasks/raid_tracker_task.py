@@ -40,6 +40,7 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
 
         current_raid_counts = {}
         history_to_add = []
+        server_history_to_add = []
 
         for name, member in all_names:
             uuid = member.get("uuid")
@@ -56,14 +57,21 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
             server = player_data.get("server")
 
             current_raid_counts[uuid] = raids
+            now = datetime.utcnow()
+
+            server_history_to_add.append((uuid, name, server, now))
 
             if uuid in self.previous_raid_counts:
                 previous_raids = self.previous_raid_counts[uuid]
                 for raid_name, current_count in raids.items():
                     previous_count = previous_raids.get(raid_name, 0)
                     if current_count > previous_count:
+                        clear_time = datetime.utcnow()
                         logger.info(f"--- {name} が {raid_name} をクリア ({previous_count} -> {current_count})")
-                        history_to_add.append((uuid, name, raid_name, current_count, server))
+                        server = get_latest_server_before(uuid, clear_time)
+                        history_to_add.append((uuid, name, raid_name, current_count, server, clear_time))
+
+        add_server_history(server_history_to_add)
 
         if history_to_add:
             add_raid_history(history_to_add)
