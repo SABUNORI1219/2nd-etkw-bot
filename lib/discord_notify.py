@@ -12,6 +12,7 @@ async def send_guild_raid_embed(bot, party):
     if not channel:
         logger.warning("通知チャンネルが見つかりません")
         return
+    logger.info(f"通知先チャンネルID: {NOTIFY_CHANNEL_ID}, channel={channel}")
     embed = discord.Embed(
         title="Guild Raid Clear",
         color=discord.Color.blue()
