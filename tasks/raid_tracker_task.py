@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import logging
 
 from lib.wynncraft_api import WynncraftAPI
-from lib.database_handler import add_raid_history, get_setting
+from lib.database_handler import add_raid_history, get_setting, add_server_history
 from lib.raid_analyzer import RaidAnalyzer
 from config import GUILD_NAME # 追跡対象のギルド名
 from aiohttp import ClientSession
