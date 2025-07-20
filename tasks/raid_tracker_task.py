@@ -2,7 +2,7 @@ import asyncio
 import logging
 from datetime import datetime
 from lib.wynncraft_api import WynncraftAPI
-from lib.db import insert_history, get_prev_count, set_prev_count, insert_server_log
+from lib.db import insert_history, get_prev_count, set_prev_count, insert_server_log, get_last_server_before
 from lib.party_estimator import estimate_party
 
 logger = logging.getLogger(__name__)
@@ -45,14 +45,14 @@ async def track_guild_raids():
                 if current_count > prev_count:
                     # クリア増加イベント
                     clear_time = datetime.utcnow()
-                    server = pdata.get("server")
+                    prev_server = get_last_server_before(name, clear_time)
                     clear_events.append({
                         "player": name,
                         "raid_name": raid,
                         "clear_time": clear_time,
-                        "server": server
+                        "server": prev_server
                     })
-                    logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{server}")
+                    logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{prev_server}")
                 prev_raid_counts[(name, raid)] = current_count
                 set_prev_count(name, raid, current_count)
         # パーティ推定＆保存
