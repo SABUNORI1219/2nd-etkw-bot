@@ -5,9 +5,8 @@ import os
 
 logger = logging.getLogger(__name__)
 
-NOTIFY_CHANNEL_ID = int(get_config("NOTIFY_CHANNEL_ID") or "0")
-
 async def send_guild_raid_embed(bot, party):
+    NOTIFY_CHANNEL_ID = int(get_config("NOTIFY_CHANNEL_ID") or "0")
     channel = bot.get_channel(NOTIFY_CHANNEL_ID)
     if not channel:
         logger.warning("通知チャンネルが見つかりません")
