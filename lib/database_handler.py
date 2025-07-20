@@ -206,7 +206,7 @@ def get_latest_server_before(player_uuid: str, before_time: datetime):
 
 def get_unprocessed_raid_history() -> list:
     """まだ処理・通知されていないレイド履歴を取得する"""
-    sql = "SELECT id, player_uuid, player_name, raid_name, server, clear_time timestamp FROM player_raid_history WHERE processed = FALSE ORDER BY timestamp ASC"
+    sql = "SELECT id, player_uuid, player_name, raid_name, server, clear_time FROM player_raid_history WHERE processed = FALSE ORDER BY timestamp ASC"
     conn = get_db_connection()
     if conn is None: return []
     results = []
