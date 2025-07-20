@@ -43,23 +43,31 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
         history_to_add = []
         server_history_to_add = []
 
-        for name, member in all_names:
+        # --- 並列でAPIアクセス（async gather） ---
+        async def fetch_player_data(name, member):
             uuid = member.get("uuid")
             if not uuid:
-                continue
-
-            # ✅ WynncraftAPIを通してNori Player APIにアクセス
+                return None
             player_data = await self.wynn_api.get_nori_player_data(name)
             if not player_data:
                 logger.warning(f"--- {name} のプレイヤーデータ取得に失敗")
-                continue
-
+                return None
             raids = player_data.get('globalData', {}).get('raids', {}).get('list', {})
             server = player_data.get("server")
-
-            current_raid_counts[uuid] = raids
             now = datetime.utcnow()
+            return (uuid, name, raids, server, now)
 
+        # 並列で取得
+        results = await asyncio.gather(
+            *[fetch_player_data(name, member) for name, member in all_names],
+            return_exceptions=True
+        )
+
+        for res in results:
+            if not res or isinstance(res, Exception):
+                continue
+            uuid, name, raids, server, now = res
+            current_raid_counts[uuid] = raids
             server_history_to_add.append((uuid, name, server, now))
 
             if uuid in self.previous_raid_counts:
@@ -82,11 +90,15 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
         
         # --- 2. 分析 ---
         logger.info("--- [RaidTrackerTask] レイドパーティの分析を開始します...")
-        parties = self.analyzer.analyze_raids()
+        await self._analyze_and_notify()
+
+    async def _analyze_and_notify(self):
+        loop = asyncio.get_running_loop()
+        # RaidAnalyzer.analyze_raids() は重い処理なので executorで非同期化
+        parties = await loop.run_in_executor(None, self.analyzer.analyze_raids)
         if not parties:
             logger.info("--- [RaidTrackerTask] 通知対象のパーティは見つかりませんでした。"); return
 
-        # --- 3. 通知 ---
         channel_id_str = get_setting("raid_notification_channel")
         if not channel_id_str:
             logger.warning("--- [RaidTrackerTask] 通知チャンネルが設定されていません。"); return
@@ -98,14 +110,11 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
         for p_info in parties:
             party = p_info['party']
             raid_name = party[0][3]
-            # 各メンバー: (uuid, server, name, raid_name, timestamp)
             player_names = [f"`{p[2]}`" for p in party]
-            # クリア時刻（例: 5番目がtimestampの場合。なければhistoryに追加時に入れる）
             clear_times = [p[4] for p in party if len(p) > 4]
             if clear_times:
-                clear_time_str = max(clear_times)  # or min(clear_times)
+                clear_time_str = max(clear_times)
                 try:
-                    # ISO形式なら
                     clear_time_str = datetime.fromisoformat(clear_time_str).strftime("%Y-%m-%d %H:%M:%S")
                 except Exception:
                     pass
@@ -117,14 +126,13 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
                 color=discord.Color.blue()
             )
             embed.add_field(
-                name=f"**{raid_name}** - `{cleaar_time_str}`",
+                name=f"**{raid_name}** - `{clear_time_str}`",
                 value=f"**Members**: {', '.join(player_names)}",
                 inline=False
             )
-            
             embed.set_footer(text=f"Guild Raid Tracker | Minister Chikuwa")
             await channel.send(embed=embed)
-
+    
     @collect_raid_data_task.before_loop
     async def before_task(self):
         await self.bot.wait_until_ready()
