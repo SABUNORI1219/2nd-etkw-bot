@@ -10,7 +10,7 @@ from .database_handler import get_unprocessed_raid_history, mark_raid_history_as
 # スコアリングの基準
 SCORE_THRESHOLD = 85  # このスコア以上で通知
 TIME_WINDOW_MINUTES = 3 # この時間内でのクリアを同じパーティと見なす
-SERVER_LOOKBACK_MINUTES = 2
+MAX_RECORDS_PER_RAID = 20
 
 class RaidAnalyzer:
     def ensure_datetime(self, value):
@@ -31,24 +31,40 @@ class RaidAnalyzer:
         processed_ids = []
 
         for raid_name, records in raids_by_type.items():
-            if len(records) < 4:
-                continue
+            valid_records = [r for r in records if r[5] is not None]
+            valid_records.sort(key=lambda x: x[5]) # タイムスタンプでソート
+            recent_records = valid_records[-MAX_RECORDS_PER_RAID:] if len(valid_records) > MAX_RECORDS_PER_RAID else valid_records
 
-            # 時間が近いプレイヤーでパーティを組む
-            possible_parties = self._find_parties(records)
+            # まず1人ずつ「近い人リスト」を作り、その組み合わせだけcombinations
+            parties = []
+            seen_ids = set()
+            for i, rec in enumerate(recent_records):
+                rec_time = self.ensure_datetime(rec[5])
+                # 3分以内の人リスト
+                close_group = [r for r in recent_records if abs((self.ensure_datetime(r[5]) - rec_time).total_seconds()) <= TIME_WINDOW_MINUTES * 60]
+                if len(close_group) < 4:
+                    continue
+                # 組み合わせ爆発防止: close_groupが10人以上なら上位10人だけ
+                if len(close_group) > 10:
+                    close_group = close_group[:10]
+                for party_candidate in combinations(close_group, 4):
+                    times = [self.ensure_datetime(p[5]) for p in party_candidate]
+                    if max(times) - min(times) <= timedelta(minutes=TIME_WINDOW_MINUTES):
+                        ids_tuple = tuple(sorted(p[0] for p in party_candidate))
+                        if ids_tuple not in seen_ids:
+                            seen_ids.add(ids_tuple)
+                            parties.append(list(party_candidate))
 
-            for party in possible_parties:
+            # --- スコアリング ---
+            for party in parties:
                 score, criteria = self._score_party(party)
                 logger.info(f"パーティ候補: {[p[2] for p in party]}, スコア: {score}, 詳細: {criteria}")
-                
                 if score >= SCORE_THRESHOLD:
                     confident_parties.append({'party': party, 'score': score, 'criteria': criteria})
-                
-                # 分析済みの履歴IDを記録
-                processed_ids.extend([p[0] for p in party])
-        
+                    processed_ids.update([p[0] for p in party])
+
         if processed_ids:
-            mark_raid_history_as_processed(list(set(processed_ids)))
+            mark_raid_history_as_processed(list(processed_ids))
 
         return confident_parties
 
@@ -83,7 +99,7 @@ class RaidAnalyzer:
         for p in party:
             uuid = p[1]
             clear_time = self.ensure_datetime(p[5])
-            lookback_time = clear_time - timedelta(minutes=SERVER_LOOKBACK_MINUTES)
+            lookback_time = clear_time - timedelta(minutes=2)
             server_at_lookback = get_latest_server_before(uuid, lookback_time)
             lookback_servers.append(server_at_lookback)
             lookback_info.append({'uuid': uuid, 'clear_time': clear_time, 'lookback_time': lookback_time, 'server': server_at_lookback})
