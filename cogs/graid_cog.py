@@ -104,7 +104,8 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         view = PlayerCountView(sorted_counts, page=0)
         embed = discord.Embed(title=title_text)
         for name, count in sorted_counts[:10]:
-            embed.add_field(name=name, value=f"Count: {count}", inline=False)
+            safe_name = discord.utils.escape_markdown(name)
+            embed.add_field(name=safe_name, value=f"Count: {count}", inline=False)
         embed.set_footer(text=f"Page 1/{view.max_page+1}")
 
         # 日付記述方法の説明をEmbedのdescriptionに追加
