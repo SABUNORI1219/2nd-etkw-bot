@@ -4,13 +4,14 @@ from datetime import datetime
 from lib.wynncraft_api import WynncraftAPI
 from lib.db import insert_history, get_prev_count, set_prev_count, insert_server_log, get_last_server_before
 from lib.party_estimator import estimate_party
+from lib.discord_notify import send_guild_raid_embed
 
 logger = logging.getLogger(__name__)
 
 # メモリ上に前回値を保持
 prev_raid_counts = {}
 
-async def track_guild_raids():
+async def track_guild_raids(bot=None):
     api = WynncraftAPI()
     while True:
         logger.info("ETKWメンバー情報取得開始")
@@ -65,7 +66,12 @@ async def track_guild_raids():
                 party["server"],
                 party["trust_score"]
             )
-            # 通知タスクに渡す（後述）
+            # Discord通知（パーティ推定ごとに即送信）
+            if bot is not None:
+                try:
+                    await send_guild_raid_embed(bot, party)
+                except Exception as e:
+                    logger.error(f"通知Embed送信失敗: {e}")
         await asyncio.sleep(120)
 
 async def setup(bot):
