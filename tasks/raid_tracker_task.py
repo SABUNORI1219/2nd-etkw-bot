@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from datetime import datetime
 from lib.wynncraft_api import WynncraftAPI
 from lib.db import insert_history, get_prev_count, set_prev_count, insert_server_log, get_last_server_before
@@ -22,6 +23,7 @@ async def track_guild_raids(bot=None):
     api = WynncraftAPI()
     while True:
         logger.info("ETKWメンバー情報取得開始...")
+        start_time = time.time()
         guild_data = await api.get_nori_guild_data("ETKW")
         members = []
         # 各ランクごと走査
@@ -93,7 +95,10 @@ async def track_guild_raids(bot=None):
                     await send_guild_raid_embed(bot, party)
                 except Exception as e:
                     logger.error(f"通知Embed送信失敗: {e}")
-        await asyncio.sleep(60)
+        elapsed = time.time() - start_time
+        sleep_time = max(60 - elapsed, 0)
+        logger.info(f"次回まで{sleep_time:.1f}秒待機（処理時間: {elapsed:.1f}秒）")
+        await asyncio.sleep(sleep_time)
 
 async def setup(bot):
     bot.loop.create_task(track_guild_raids(bot))
