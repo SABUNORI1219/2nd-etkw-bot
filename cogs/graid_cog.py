@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from lib.db import fetch_history
+from lib.db import fetch_history, set_config
 import os
 import logging
 
@@ -9,9 +9,6 @@ logger = logging.getLogger(__name__)
 
 AUTHORIZED_USER_IDS = [1062535250099589120]  # サンプルID
 
-# コマンド許可範囲の指定（guildsのみ）
-@app_commands.allowed_installs(guilds=True, users=False)
-@app_commands.allowed_contexts(guilds=True, dms=False, private_channels=True)
 class GuildRaidDetector(commands.GroupCog, name="graid"):
   def __init__(self, bot):
         self.bot = bot
@@ -23,7 +20,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
       if interaction.user.id not in AUTHORIZED_USER_IDS:
         await interaction.response.send_message("権限がありません。", ephemeral=True)
         return
-      os.environ["NOTIFY_CHANNEL_ID"] = str(channel.id)
+      set_config("NOTIFY_CHANNEL_ID", str(channel.id))
       await interaction.response.send_message(f"Guild Raid通知チャンネルを {channel.mention} に設定しました。", ephemeral=True)
       logger.info(f"通知チャンネル設定: {channel.id}")
 
