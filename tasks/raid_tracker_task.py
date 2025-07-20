@@ -14,7 +14,7 @@ prev_raid_counts = {}
 async def track_guild_raids(bot=None):
     api = WynncraftAPI()
     while True:
-        logger.info("ETKWメンバー情報取得開始")
+        logger.info("ETKWメンバー情報取得開始...")
         guild_data = await api.get_nori_guild_data("ETKW")
         members = []
         # 各ランクごと走査
@@ -72,6 +72,7 @@ async def track_guild_raids(bot=None):
                     await send_guild_raid_embed(bot, party)
                 except Exception as e:
                     logger.error(f"通知Embed送信失敗: {e}")
+        logger.info("ETKWメンバー情報取得完了！")
         await asyncio.sleep(120)
 
 async def setup(bot):
