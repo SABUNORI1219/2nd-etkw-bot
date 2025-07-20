@@ -83,6 +83,7 @@ async def track_guild_raids(bot=None):
                 party["trust_score"]
             )
             # Discord通知（パーティ推定ごとに即送信）
+            logger.info(f"send_guild_raid_embed呼び出し: {party}")
             if bot is not None:
                 try:
                     await send_guild_raid_embed(bot, party)
