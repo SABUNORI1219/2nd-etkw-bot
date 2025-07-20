@@ -18,8 +18,8 @@ async def send_guild_raid_embed(bot, party):
     )
     embed.add_field(
         name=f"**{party['raid_name']}** - `{party['clear_time']}`",
-        value=f"**Members**: .join(party["members"])\n"
-              f"**Server**: party["server"]",
+        value=f"**Members**: {', '.join(party['members'])}\n"
+              f"**Server**: {party['server']}",
         inline=False
     )
     await channel.send(embed=embed)
