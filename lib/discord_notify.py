@@ -12,8 +12,15 @@ async def send_guild_raid_embed(bot, party):
     if not channel:
         logger.warning("通知チャンネルが見つかりません")
         return
-    embed = discord.Embed(title=f"{party['raid_name']} - {party['clear_time']}")
-    embed.add_field(name="Members", value="\n".join(party["members"]))
-    embed.add_field(name="Server", value=party["server"])
+    embed = discord.Embed(
+        title="Guild Raid Clear",
+        color=discord.Color.blue()
+    )
+    embed.add_field(
+        name=f"**{party['raid_name']}** - `{party['clear_time']}`",
+        value=f"**Members**: .join(party["members"])\n"
+              f"**Server**: party["server"]",
+        inline=False
+    )
     await channel.send(embed=embed)
     logger.info(f"Embed通知: {party}")
