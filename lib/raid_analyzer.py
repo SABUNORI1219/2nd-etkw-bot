@@ -80,7 +80,7 @@ class RaidAnalyzer:
 
             # --- スコアリング ---
             for party in parties:
-                score, criteria = self._score_party(party)
+                score, criteria = self._score_party(party, server_cache)
                 logger.info(f"パーティ候補: {[p[2] for p in party]}, スコア: {score}, 詳細: {criteria}")
                 if score >= SCORE_THRESHOLD:
                     confident_parties.append({'party': party, 'score': score, 'criteria': criteria})
