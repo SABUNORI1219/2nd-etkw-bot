@@ -8,6 +8,16 @@ from lib.discord_notify import send_guild_raid_embed
 
 logger = logging.getLogger(__name__)
 
+# メモリ上に前回値を保持（ただしDBキャッシュ優先）
+prev_raid_counts = {}
+
+# 同時実行数10に制限
+semaphore = asyncio.Semaphore(10)
+
+async def get_player_data(api, name):
+    async with semaphore:
+        return name, await api.get_nori_player_data(name)
+
 async def track_guild_raids(bot=None):
     api = WynncraftAPI()
     while True:
@@ -19,10 +29,8 @@ async def track_guild_raids(bot=None):
             if isinstance(section, dict):
                 for name, info in section.items():
                     members.append(name)
-        # 並列で各メンバーのデータ取得
-        async def get_player_data(name):
-            return name, await api.get_nori_player_data(name)
-        player_tasks = [get_player_data(name) for name in members]
+        # 同時実行数制限付き並列で各メンバーのデータ取得
+        player_tasks = [get_player_data(api, name) for name in members]
         player_results = await asyncio.gather(*player_tasks)
         logger.info("ETKWメンバー情報取得完了！")
         # 各メンバーのレイドクリア数取得
