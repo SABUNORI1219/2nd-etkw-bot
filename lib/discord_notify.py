@@ -16,9 +16,11 @@ async def send_guild_raid_embed(bot, party):
         title="Guild Raid Clear",
         color=discord.Color.blue()
     )
+    
+    members_str = ', '.join([discord.utils.escape_markdown(m) for m in party['members']])
     embed.add_field(
         name=f"**{party['raid_name']}** - `{party['clear_time']}`",
-        value=f"**Members**: {', '.join(party['members'])}\n"
+        value=f"**Members**: {members_str}\n"
               f"**Server**: {party['server']}",
         inline=False
     )
