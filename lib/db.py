@@ -32,6 +32,14 @@ def create_table():
                 PRIMARY KEY (player_name, raid_name)
             );
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS player_server_log (
+                player_name TEXT NOT NULL,
+                timestamp TIMESTAMP NOT NULL,
+                server TEXT,
+                PRIMARY KEY (player_name, timestamp)
+            );
+        """)
         conn.commit()
     conn.close()
     logger.info("guild_raid_historyテーブルを作成/確認しました")
@@ -85,3 +93,28 @@ def fetch_history(raid_name=None, date_from=None):
         rows = cur.fetchall()
     conn.close()
     return rows
+
+def insert_server_log(player_name, timestamp, server):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO player_server_log (player_name, timestamp, server)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (player_name, timestamp)
+            DO UPDATE SET server = EXCLUDED.server
+        """, (player_name, timestamp, server))
+        conn.commit()
+    conn.close()
+
+def get_last_server_before(player_name, event_time):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT server FROM player_server_log
+            WHERE player_name = %s AND timestamp < %s
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """, (player_name, event_time))
+        row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
