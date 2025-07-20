@@ -8,9 +8,6 @@ from lib.discord_notify import send_guild_raid_embed
 
 logger = logging.getLogger(__name__)
 
-# メモリ上に前回値を保持
-prev_raid_counts = {}
-
 async def track_guild_raids(bot=None):
     api = WynncraftAPI()
     while True:
@@ -22,16 +19,26 @@ async def track_guild_raids(bot=None):
             if isinstance(section, dict):
                 for name, info in section.items():
                     members.append(name)
+        # 並列で各メンバーのデータ取得
+        async def get_player_data(name):
+            return name, await api.get_nori_player_data(name)
+        player_tasks = [get_player_data(name) for name in members]
+        player_results = await asyncio.gather(*player_tasks)
+        logger.info("ETKWメンバー情報取得完了！")
         # 各メンバーのレイドクリア数取得
         clear_events = []
-        for name in members:
-            pdata = await api.get_nori_player_data(name)
+        now = datetime.utcnow()
+        for name, pdata in player_results:
             server = pdata.get("server")
-            now = datetime.utcnow()
             insert_server_log(name, now, server)
             # 主要レイドのみ
             raids = pdata.get("globalData", {}).get("raids", {}).get("list", {})
-            raid_types = ["The Canyon Colossus", "Orphion's Nexus of Light", "The Nameless Anomaly", "Nest of the Grootslangs"]
+            raid_types = [
+                "The Canyon Colossus",
+                "Orphion's Nexus of Light",
+                "The Nameless Anomaly",
+                "Nest of the Grootslangs"
+            ]
             for raid in raid_types:
                 current_count = raids.get(raid, 0)
                 prev_count = get_prev_count(name, raid)
@@ -72,8 +79,7 @@ async def track_guild_raids(bot=None):
                     await send_guild_raid_embed(bot, party)
                 except Exception as e:
                     logger.error(f"通知Embed送信失敗: {e}")
-        logger.info("ETKWメンバー情報取得完了！")
-        await asyncio.sleep(120)
+        await asyncio.sleep(60)
 
 async def setup(bot):
     bot.loop.create_task(track_guild_raids())
