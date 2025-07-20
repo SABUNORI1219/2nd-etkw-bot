@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-AUTHORIZED_USER_IDS = [123456789012345678]  # サンプルID
+AUTHORIZED_USER_IDS = [1062535250099589120]  # サンプルID
 
 # コマンド許可範囲の指定（guildsのみ）
 @app_commands.allowed_installs(guilds=True, users=False)
