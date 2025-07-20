@@ -10,6 +10,7 @@ from .database_handler import get_unprocessed_raid_history, mark_raid_history_as
 # スコアリングの基準
 SCORE_THRESHOLD = 85  # このスコア以上で通知
 TIME_WINDOW_MINUTES = 3 # この時間内でのクリアを同じパーティと見なす
+SERVER_LOOKBACK_MINUTES = 2
 
 class RaidAnalyzer:
     def ensure_datetime(self, value):
