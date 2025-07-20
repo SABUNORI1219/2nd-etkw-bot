@@ -32,7 +32,7 @@ class RaidAnalyzer:
         # uuidごとにDBアクセスをまとめて省略化
         for uuid, times in uuid_to_records.items():
             for clear_time in times:
-                lookback_time = clear_time - timedelta(minutes=SERVER_LOOKBACK_MINUTES)
+                lookback_time = clear_time - timedelta(minutes=2)
                 server_cache[uuid][lookback_time] = get_latest_server_before(uuid, lookback_time)
         return server_cache
 
