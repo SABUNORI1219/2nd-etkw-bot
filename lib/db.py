@@ -40,6 +40,12 @@ def create_table():
                 PRIMARY KEY (player_name, timestamp)
             );
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS bot_config (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );
+        """)
         conn.commit()
     conn.close()
     logger.info("guild_raid_historyテーブルを作成/確認しました")
@@ -115,6 +121,26 @@ def get_last_server_before(player_name, event_time):
             ORDER BY timestamp DESC
             LIMIT 1
         """, (player_name, event_time))
+        row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+def set_config(key, value):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO bot_config (key, value)
+            VALUES (%s, %s)
+            ON CONFLICT (key)
+            DO UPDATE SET value = EXCLUDED.value
+        """, (key, value))
+        conn.commit()
+    conn.close()
+
+def get_config(key):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT value FROM bot_config WHERE key = %s", (key,))
         row = cur.fetchone()
     conn.close()
     return row[0] if row else None
