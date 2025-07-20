@@ -55,32 +55,32 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
   # 履歴リスト出力コマンド
   @app_commands.command(name="list", description="指定レイド・日付の履歴をリスト表示します")
-    async def guildraid_list(self, interaction: discord.Interaction, raid_name: str, date: str = None):
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await interaction.response.send_message("権限がありません。", ephemeral=True)
-            return
-        rows = fetch_history(raid_name=raid_name, date_from=date)
-        if not rows:
-            await interaction.response.send_message("履歴がありません。", ephemeral=True)
-            return
+  async def guildraid_list(self, interaction: discord.Interaction, raid_name: str, date: str = None):
+      if interaction.user.id not in AUTHORIZED_USER_IDS:
+          await interaction.response.send_message("権限がありません。", ephemeral=True)
+          return
+      rows = fetch_history(raid_name=raid_name, date_from=date)
+      if not rows:
+          await interaction.response.send_message("履歴がありません。", ephemeral=True)
+          return
 
-        # プレイヤーごとに累計カウント集計
-        player_counts = {}
-        for row in rows:
-            # row[3]がparty_members
-            for player in row[3]:
-                player_counts[player] = player_counts.get(player, 0) + 1
-        sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
+      # プレイヤーごとに累計カウント集計
+      player_counts = {}
+      for row in rows:
+          # row[3]がparty_members
+          for player in row[3]:
+              player_counts[player] = player_counts.get(player, 0) + 1
+      sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
 
-        # 最初のページを表示
-        view = PlayerCountView(sorted_counts, page=0)
-        embed = discord.Embed(title=f"Guild Raid Player Counts: {raid_name}")
-        for name, count in sorted_counts[:10]:
-            embed.add_field(name=name, value=f"Count: {count}", inline=False)
-        embed.set_footer(text=f"Page 1/{view.max_page+1}")
+      # 最初のページを表示
+      view = PlayerCountView(sorted_counts, page=0)
+      embed = discord.Embed(title=f"Guild Raid Player Counts: {raid_name}")
+      for name, count in sorted_counts[:10]:
+          embed.add_field(name=name, value=f"Count: {count}", inline=False)
+      embed.set_footer(text=f"Page 1/{view.max_page+1}")
 
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-        logger.info(f"履歴リスト出力: {raid_name} {date} (embed形式ページ付き)")
+      await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+      logger.info(f"履歴リスト出力: {raid_name} {date} (embed形式ページ付き)")
 
   # 管理者補正コマンド
   @app_commands.command(name="count", description="指定プレイヤーのレイドクリア回数を補正します")
