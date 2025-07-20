@@ -16,6 +16,13 @@ RAID_CHOICES = [
     app_commands.Choice(name="Total", value="Total"),
 ]
 
+ADDC_RAID_CHOICES = [
+    app_commands.Choice(name="Nest of the Grootslang", value="Nest of the Grootslang"),
+    app_commands.Choice(name="Orphion's Nexus of Light", value="Orphion's Nexus of Light"),
+    app_commands.Choice(name="The Canyon Colossus", value="The Canyon Colossus"),
+    app_commands.Choice(name="The Nameless Anomaly", value="The Nameless Anomaly")
+]
+
 # ページ付きEmbed用View
 class PlayerCountView(discord.ui.View):
     def __init__(self, player_counts, page=0, per_page=10, timeout=120):
@@ -30,7 +37,8 @@ class PlayerCountView(discord.ui.View):
         start = self.page * self.per_page
         end = start + self.per_page
         for name, count in self.player_counts[start:end]:
-            embed.add_field(name=name, value=f"Count: {count}", inline=False)
+            safe_name = discord.utils.escape_markdown(name)
+            embed.add_field(name=sefe_name, value=f"Count: {count}", inline=False)
         embed.set_footer(text=f"Page {self.page+1}/{self.max_page+1}")
         await interaction.response.edit_message(embed=embed, view=self)
 
@@ -64,7 +72,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     # 履歴リスト出力コマンド
     @app_commands.command(name="list", description="指定レイド・日付の履歴をリスト表示")
     @app_commands.describe(
-        raid_name="表示するレイド名を選択してください（Totalはすべてのレイド合計）",
+        raid_name="表示するレイド名（Totalはすべてのレイド合計）",
         date="履歴を表示したい日付（例: 2025-07-20、2025-07 など。未指定なら全期間）"
     )
     @app_commands.choices(raid_name=RAID_CHOICES)
@@ -122,6 +130,12 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
     # 管理者補正コマンド
     @app_commands.command(name="count", description="指定プレイヤーのレイドクリア回数を補正")
+    @app_commands.describe(
+        player="プレイヤー名",
+        raid_name="レイド名",
+        count="カウント数"
+    )
+    @app_commands.choices(raid_name=ADDC_RAID_CHOICES)
     async def guildraid_count(self, interaction: discord.Interaction, player: str, raid_name: str, count: int):
         if interaction.user.id not in AUTHORIZED_USER_IDS:
             await interaction.response.send_message("権限がありません。", ephemeral=True)
