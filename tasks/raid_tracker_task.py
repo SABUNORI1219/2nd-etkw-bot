@@ -38,7 +38,7 @@ async def track_guild_raids(bot=None):
         now = datetime.utcnow()
         for name, pdata in player_results:
             server = pdata.get("server")
-            insert_server_log(name, now, server)
+            await asyncio.to_thread(insert_server_log, name, now, server)
             # 主要レイドのみ
             raids = pdata.get("globalData", {}).get("raids", {}).get("list", {})
             raid_types = [
@@ -49,19 +49,19 @@ async def track_guild_raids(bot=None):
             ]
             for raid in raid_types:
                 current_count = raids.get(raid, 0)
-                prev_count = get_prev_count(name, raid)
+                prev_count = await asyncio.to_thread(get_prev_count, name, raid)
                 if prev_count is None:
-                    set_prev_count(name, raid, current_count)
+                    await asyncio.to_thread(set_prev_count, name, raid, current_count)
                     continue
                 # 異常な増加は無視（例：減った/0から大ジャンプ/+10以上）
                 delta = current_count - prev_count
                 if delta <= 0 or delta > 4:
-                    set_prev_count(name, raid, current_count)
+                    await asyncio.to_thread(set_prev_count, name, raid, current_count)
                     continue
                 if current_count > prev_count:
                     # クリア増加イベント
                     clear_time = datetime.utcnow()
-                    prev_server = get_last_server_before(name, clear_time)
+                    prev_server = await asyncio.to_thread(get_last_server_before, name, clear_time)
                     clear_events.append({
                         "player": name,
                         "raid_name": raid,
@@ -70,11 +70,12 @@ async def track_guild_raids(bot=None):
                     })
                     logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{prev_server}")
                 prev_raid_counts[(name, raid)] = current_count
-                set_prev_count(name, raid, current_count)
+                await asyncio.to_thread(set_prev_count, name, raid, current_count)
         # パーティ推定＆保存
         parties = estimate_party(clear_events)
         for party in parties:
-            insert_history(
+            await asyncio.to_thread(
+                insert_history,
                 party["raid_name"],
                 party["clear_time"],
                 party["members"],
@@ -87,7 +88,7 @@ async def track_guild_raids(bot=None):
                     await send_guild_raid_embed(bot, party)
                 except Exception as e:
                     logger.error(f"通知Embed送信失敗: {e}")
-        await asyncio.sleep(120)
+        await asyncio.sleep(60)
 
 async def setup(bot):
     bot.loop.create_task(track_guild_raids())
