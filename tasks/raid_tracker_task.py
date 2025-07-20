@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 # メモリ上に前回値を保持（ただしDBキャッシュ優先）
 prev_raid_counts = {}
 
-# 同時実行数10に制限
+# 同時実行数40に制限
 semaphore = asyncio.Semaphore(40)
 
 async def get_player_data(api, name):
