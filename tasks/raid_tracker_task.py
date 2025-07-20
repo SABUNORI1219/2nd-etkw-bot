@@ -96,7 +96,6 @@ class RaidTrackerTask(commands.Cog, name="RaidDataCollector"):
 
         for p_info in parties:
             party = p_info['party']
-            score = p_info['score']
             raid_name = party[0][3]
             # 各メンバー: (uuid, server, name, raid_name, timestamp)
             player_names = [f"`{p[2]}`" for p in party]
