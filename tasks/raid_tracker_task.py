@@ -79,7 +79,7 @@ async def track_guild_raids(bot=None):
                     await send_guild_raid_embed(bot, party)
                 except Exception as e:
                     logger.error(f"通知Embed送信失敗: {e}")
-        await asyncio.sleep(60)
+        await asyncio.sleep(120)
 
 async def setup(bot):
     bot.loop.create_task(track_guild_raids())
