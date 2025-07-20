@@ -2,7 +2,7 @@ import asyncio
 import logging
 from datetime import datetime
 from lib.wynncraft_api import WynncraftAPI
-from lib.db import insert_history
+from lib.db import insert_history, get_prev_count, set_prev_count
 from lib.party_estimator import estimate_party
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,15 @@ async def track_guild_raids():
             raid_types = ["The Canyon Colossus", "Orphion's Nexus of Light", "The Nameless Anomaly", "Nest of the Grootslangs"]
             for raid in raid_types:
                 current_count = raids.get(raid, 0)
-                prev_count = prev_raid_counts.get((name, raid), 0)
+                prev_count = get_prev_count(name, raid)
+                if prev_count is None:
+                    set_prev_count(name, raid, current_count)
+                    continue
+                # 異常な増加は無視（例：減った/0から大ジャンプ/+10以上）
+                delta = current_count - prev_count
+                if delta <= 0 or delta > 4:
+                    set_prev_count(name, raid, current_count)
+                    continue
                 if current_count > prev_count:
                     # クリア増加イベント
                     clear_time = datetime.utcnow()
@@ -43,6 +51,7 @@ async def track_guild_raids():
                     })
                     logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{server}")
                 prev_raid_counts[(name, raid)] = current_count
+                set_prev_count(name, raid, current_count)
         # パーティ推定＆保存
         parties = estimate_party(clear_events)
         for party in parties:
