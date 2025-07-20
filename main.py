@@ -42,7 +42,6 @@ class MyBot(commands.Bot):
         logger.info("--- [司令塔] 起動準備を開始します ---")
         
         # 同期的な準備処理を最初に実行
-        setup_database()
         keep_alive()
 
         # Cogsを読み込む
