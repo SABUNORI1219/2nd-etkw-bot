@@ -53,11 +53,13 @@ class RaidAnalyzer:
     def _find_parties(self, records: list) -> list:
         """同じレイドをクリアしたプレイヤーリストから、4人組のパーティ候補を探す"""
         parties = []
+        # タイムスタンプがNoneなレコードは除外
+        valid_records = [r for r in records if r[5] is not None]
         # この関数は、時間差やサーバー情報に基づいてプレイヤーを4人組にするロジック
         # 簡単のため、ここでは時間が近い4人を単純にグループ化する
-        records.sort(key=lambda x: x[5]) # タイムスタンプでソート
-        for i in range(len(records) - 3):
-            party_candidate = records[i:i+4]
+        valid_records.sort(key=lambda x: x[5]) # タイムスタンプでソート
+        for i in range(len(valid_records) - 3):
+            party_candidate = valid_records[i:i+4]
             first_time = self.ensure_datetime(party_candidate[0][5])
             last_time = self.ensure_datetime(party_candidate[-1][5])
             if (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES):
