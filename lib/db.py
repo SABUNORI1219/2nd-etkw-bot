@@ -24,6 +24,14 @@ def create_table():
                 trust_score INTEGER NOT NULL
             );
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS raid_clear_cache (
+                player_name TEXT NOT NULL,
+                raid_name TEXT NOT NULL,
+                clear_count INTEGER NOT NULL,
+                PRIMARY KEY (player_name, raid_name)
+            );
+        """)
         conn.commit()
     conn.close()
     logger.info("guild_raid_historyテーブルを作成/確認しました")
