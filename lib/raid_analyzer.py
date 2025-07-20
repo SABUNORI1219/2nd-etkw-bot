@@ -5,7 +5,7 @@ from itertools import combinations
 
 logger = logging.getLogger(__name__)
 # データベースから必要な関数をインポート
-from .database_handler import get_unprocessed_raid_history, mark_raid_history_as_processed
+from .database_handler import get_unprocessed_raid_history, mark_raid_history_as_processed, get_latest_server_before
 
 # スコアリングの基準
 SCORE_THRESHOLD = 85  # このスコア以上で通知
