@@ -68,16 +68,29 @@ class RaidAnalyzer:
         """パーティ候補をスコアリングする"""
         score = 0
         criteria = {}
+
+        # 2分前のサーバーデータを参照
+        lookback_servers = []
+        lookback_info = []
+        for p in party:
+            uuid = p[1]
+            clear_time = self.ensure_datetime(p[5])
+            lookback_time = clear_time - timedelta(minutes=SERVER_LOOKBACK_MINUTES)
+            server_at_lookback = get_latest_server_before(uuid, lookback_time)
+            lookback_servers.append(server_at_lookback)
+            lookback_info.append({'uuid': uuid, 'clear_time': clear_time, 'lookback_time': lookback_time, 'server': server_at_lookback})
         
-        # サーバーの一致度をスコアリング
-        servers = [p[4] for p in party if p[4] is not None]
-        if len(servers) == 4:
-            if len(set(servers)) == 1:
-                score += 50; criteria['server_match'] = f"全員が同じサーバー ({servers[0]})"
+        # サーバーの一致度をスコアリング（2分前のデータで判定）
+        valid_servers = [s for s in lookback_servers if s is not None]
+        if len(valid_servers) == 4:
+            if len(set(valid_servers)) == 1:
+                score += 50
+                criteria['server_match'] = f"全員が直前サーバー一致 ({valid_servers[0]})"
             else:
-                score += 20; criteria['server_match'] = "サーバーが一部異なる"
+                score += 20
+                criteria['server_match'] = f"直前サーバーが一部異なる: {valid_servers}"
         else:
-            criteria['server_match'] = "一部のサーバー情報が欠損"
+            criteria['server_match'] = f"一部の直前サーバー情報が欠損: {lookback_info}"
 
         # 時間差をスコアリング
         first_time = self.ensure_datetime(party[0][5])
