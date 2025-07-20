@@ -2,7 +2,7 @@ import asyncio
 import logging
 from datetime import datetime
 from lib.wynncraft_api import WynncraftAPI
-from lib.db import insert_history, get_prev_count, set_prev_count
+from lib.db import insert_history, get_prev_count, set_prev_count, insert_server_log
 from lib.party_estimator import estimate_party
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,9 @@ async def track_guild_raids():
         clear_events = []
         for name in members:
             pdata = await api.get_nori_player_data(name)
+            server = pdata.get("server")
+            now = datetime.utcnow()
+            insert_server_log(name, now, server)
             # 主要レイドのみ
             raids = pdata.get("globalData", {}).get("raids", {}).get("list", {})
             raid_types = ["The Canyon Colossus", "Orphion's Nexus of Light", "The Nameless Anomaly", "Nest of the Grootslangs"]
