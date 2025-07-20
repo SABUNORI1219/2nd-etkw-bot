@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 prev_raid_counts = {}
 
 # 同時実行数10に制限
-semaphore = asyncio.Semaphore(10)
+semaphore = asyncio.Semaphore(30)
 
 async def get_player_data(api, name):
     async with semaphore:
