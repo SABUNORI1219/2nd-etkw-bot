@@ -51,11 +51,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     await interaction.response.send_message(f"{player}の{raid_name}クリア回数を{count}だけ補正します（未実装）", ephemeral=True)
     logger.info(f"管理者補正: {player} {raid_name} {count}")
 
-# GroupCogにコマンドを登録
-GuildRaidDetector.channel = guildraid_channel
-GuildRaidDetector.list = guildraid_list
-GuildRaidDetector.count = guildraid_count
-
 # セットアップ関数
 async def setup(bot: commands.Bot):
     await bot.add_cog(GuildRaidDetector(bot))
