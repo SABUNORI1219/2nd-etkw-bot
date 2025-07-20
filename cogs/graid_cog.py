@@ -18,7 +18,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
   # 通知チャンネル設定コマンド
   @app_commands.command(name="channel", description="Guild Raid通知チャンネルを設定します")
-  async def guildraid_channel(interaction: discord.Interaction, channel: discord.TextChannel):
+  async def guildraid_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
       # 権限チェック
       if interaction.user.id not in AUTHORIZED_USER_IDS:
         await interaction.response.send_message("権限がありません。", ephemeral=True)
@@ -29,7 +29,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
 # 履歴リスト出力コマンド
   @app_commands.command(name="list", description="指定レイド・日付の履歴をリスト表示します")
-  async def guildraid_list(interaction: discord.Interaction, raid_name: str, date: str = None):
+  async def guildraid_list(self, interaction: discord.Interaction, raid_name: str, date: str = None):
     if interaction.user.id not in AUTHORIZED_USER_IDS:
         await interaction.response.send_message("権限がありません。", ephemeral=True)
         return
@@ -43,7 +43,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
   # 管理者補正コマンド
   @app_commands.command(name="count", description="指定プレイヤーのレイドクリア回数を補正します")
-  async def guildraid_count(interaction: discord.Interaction, player: str, raid_name: str, count: int):
+  async def guildraid_count(self, interaction: discord.Interaction, player: str, raid_name: str, count: int):
     if interaction.user.id not in AUTHORIZED_USER_IDS:
         await interaction.response.send_message("権限がありません。", ephemeral=True)
         return
