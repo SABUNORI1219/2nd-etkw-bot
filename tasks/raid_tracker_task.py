@@ -52,6 +52,7 @@ async def track_guild_raids(bot=None):
                 prev_count = await asyncio.to_thread(get_prev_count, name, raid)
                 if prev_count is None:
                     await asyncio.to_thread(set_prev_count, name, raid, current_count)
+                    logger.info(f"初回DB保存: {name} {raid} -> {current_count}")
                     continue
                 # 異常な増加は無視（例：減った/0から大ジャンプ/+10以上）
                 delta = current_count - prev_count
@@ -74,6 +75,9 @@ async def track_guild_raids(bot=None):
         # パーティ推定＆保存
         parties = estimate_party(clear_events)
         for party in parties:
+            if party["trust_score"] < 7:
+                logger.info(f"信頼スコア5のため履歴保存＆通知スキップ: {party}")
+                continue
             await asyncio.to_thread(
                 insert_history,
                 party["raid_name"],
