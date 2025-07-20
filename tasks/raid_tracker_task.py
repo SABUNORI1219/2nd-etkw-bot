@@ -55,3 +55,6 @@ async def track_guild_raids():
             )
             # 通知タスクに渡す（後述）
         await asyncio.sleep(120)
+
+async def setup(bot):
+    bot.loop.create_task(track_guild_raids())
