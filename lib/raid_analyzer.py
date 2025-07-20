@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 from collections import defaultdict
+from itertools import combinations
 
 logger = logging.getLogger(__name__)
 # データベースから必要な関数をインポート
@@ -54,16 +55,20 @@ class RaidAnalyzer:
         """同じレイドをクリアしたプレイヤーリストから、4人組のパーティ候補を探す"""
         parties = []
         # タイムスタンプがNoneなレコードは除外
-        valid_records = [r for r in records if r[5] is not None]
         # この関数は、時間差やサーバー情報に基づいてプレイヤーを4人組にするロジック
         # 簡単のため、ここでは時間が近い4人を単純にグループ化する
+        valid_records = [r for r in records if r[5] is not None]
         valid_records.sort(key=lambda x: x[5]) # タイムスタンプでソート
-        for i in range(len(valid_records) - 3):
-            party_candidate = valid_records[i:i+4]
-            first_time = self.ensure_datetime(party_candidate[0][5])
-            last_time = self.ensure_datetime(party_candidate[-1][5])
-            if (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES):
-                parties.append(party_candidate)
+        seen_ids = set() # 履歴IDのセットで重複排除
+        
+        for party_candidate in combinations(valid_records, 4):
+            times = [self.ensure_datetime(p[5]) for p in party_candidate]
+            if max(times) - min(times) <= timedelta(minutes=TIME_WINDOW_MINUTES):
+                # 履歴IDのタプルで重複判定（IDはp[0]）
+                ids_tuple = tuple(sorted(p[0] for p in party_candidate))
+                if ids_tuple not in seen_ids:
+                    seen_ids.add(ids_tuple)
+                    parties.append(list(party_candidate))
         return parties
 
     def _score_party(self, party: list) -> tuple[int, dict]:
