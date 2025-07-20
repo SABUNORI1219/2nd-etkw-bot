@@ -28,6 +28,29 @@ def create_table():
     conn.close()
     logger.info("guild_raid_historyテーブルを作成/確認しました")
 
+def get_prev_count(player_name, raid_name):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT clear_count FROM raid_clear_cache WHERE player_name = %s AND raid_name = %s",
+            (player_name, raid_name)
+        )
+        row = cur.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+def set_prev_count(player_name, raid_name, count):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO raid_clear_cache (player_name, raid_name, clear_count)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (player_name, raid_name)
+            DO UPDATE SET clear_count = EXCLUDED.clear_count
+        """, (player_name, raid_name, count))
+        conn.commit()
+    conn.close()
+
 def insert_history(raid_name, clear_time, party_members, server_name, trust_score):
     conn = get_conn()
     with conn.cursor() as cur:
