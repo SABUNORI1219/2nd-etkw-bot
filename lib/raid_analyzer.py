@@ -16,6 +16,26 @@ class RaidAnalyzer:
     def ensure_datetime(self, value):
         return datetime.fromisoformat(value) if isinstance(value, str) else value
 
+    def _build_server_cache(self, records):
+        """
+        キャッシュ: { (uuid, lookback_minute): server }
+        uuidごとに各クリア履歴の2分前サーバーをまとめて取得しメモリ上にキャッシュ
+        """
+        from collections import defaultdict
+        server_cache = defaultdict(dict)
+        # uuidごとに履歴をまとめる
+        uuid_to_records = defaultdict(list)
+        for rec in records:
+            uuid = rec[1]
+            clear_time = self.ensure_datetime(rec[5])
+            uuid_to_records[uuid].append(clear_time)
+        # uuidごとにDBアクセスをまとめて省略化
+        for uuid, times in uuid_to_records.items():
+            for clear_time in times:
+                lookback_time = clear_time - timedelta(minutes=SERVER_LOOKBACK_MINUTES)
+                server_cache[uuid][lookback_time] = get_latest_server_before(uuid, lookback_time)
+        return server_cache
+
     def analyze_raids(self) -> list:
         """未処理のレイド履歴を分析し、ギルドレイドパーティを推定する"""
         history = get_unprocessed_raid_history()
@@ -35,6 +55,9 @@ class RaidAnalyzer:
             valid_records.sort(key=lambda x: x[5]) # タイムスタンプでソート
             recent_records = valid_records[-MAX_RECORDS_PER_RAID:] if len(valid_records) > MAX_RECORDS_PER_RAID else valid_records
 
+            # --- ここでサーバーキャッシュを構築 ---
+            server_cache = self._build_server_cache(recent_records)
+            
             # まず1人ずつ「近い人リスト」を作り、その組み合わせだけcombinations
             parties = []
             seen_ids = set()
@@ -100,7 +123,12 @@ class RaidAnalyzer:
             uuid = p[1]
             clear_time = self.ensure_datetime(p[5])
             lookback_time = clear_time - timedelta(minutes=2)
-            server_at_lookback = get_latest_server_before(uuid, lookback_time)
+            # キャッシュ利用
+            server_at_lookback = None
+            if server_cache and uuid in server_cache and lookback_time in server_cache[uuid]:
+                server_at_lookback = server_cache[uuid][lookback_time]
+            else:
+                server_at_lookback = get_latest_server_before(uuid, lookback_time)
             lookback_servers.append(server_at_lookback)
             lookback_info.append({'uuid': uuid, 'clear_time': clear_time, 'lookback_time': lookback_time, 'server': server_at_lookback})
         
