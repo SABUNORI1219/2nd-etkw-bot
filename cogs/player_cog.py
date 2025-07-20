@@ -7,7 +7,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 from lib.wynncraft_api import WynncraftAPI
-from lib.database_handler import get_raid_counts
 from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN
 from lib.cache_handler import CacheHandler
 
