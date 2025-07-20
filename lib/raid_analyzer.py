@@ -111,7 +111,7 @@ class RaidAnalyzer:
                     parties.append(list(party_candidate))
         return parties
 
-    def _score_party(self, party: list) -> tuple[int, dict]:
+    def _score_party(self, party: list, server_cache=None) -> tuple[int, dict]:
         """パーティ候補をスコアリングする"""
         score = 0
         criteria = {}
