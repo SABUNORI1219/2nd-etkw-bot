@@ -23,9 +23,9 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
       if interaction.user.id not in AUTHORIZED_USER_IDS:
         await interaction.response.send_message("権限がありません。", ephemeral=True)
         return
-    os.environ["NOTIFY_CHANNEL_ID"] = str(channel.id)
-    await interaction.response.send_message(f"Guild Raid通知チャンネルを {channel.mention} に設定しました。", ephemeral=True)
-    logger.info(f"通知チャンネル設定: {channel.id}")
+      os.environ["NOTIFY_CHANNEL_ID"] = str(channel.id)
+      await interaction.response.send_message(f"Guild Raid通知チャンネルを {channel.mention} に設定しました。", ephemeral=True)
+      logger.info(f"通知チャンネル設定: {channel.id}")
 
 # 履歴リスト出力コマンド
   @app_commands.command(name="list", description="指定レイド・日付の履歴をリスト表示します")
