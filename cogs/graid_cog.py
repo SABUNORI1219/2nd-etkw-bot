@@ -49,15 +49,15 @@ class RaidHistoryView(discord.ui.View):
         embed.set_footer(text=f"Page {self.current_page}/{self.total_pages} | Raid: {self.raid_type}")
         return embed
 
-    @discord.ui.button(label="次へ ▶️", style=discord.ButtonStyle.blurple)
-    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.current_page += 1
-        self.update_buttons()
-        await interaction.response.edit_message(embed=self.create_embed(), view=self)
-
     @discord.ui.button(label="◀️ 前へ", style=discord.ButtonStyle.blurple)
     async def prev_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page -= 1
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.create_embed(), view=self)
+
+    @discord.ui.button(label="次へ ▶️", style=discord.ButtonStyle.blurple)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current_page += 1
         self.update_buttons()
         await interaction.response.edit_message(embed=self.create_embed(), view=self)
 
