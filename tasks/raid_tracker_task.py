@@ -9,9 +9,6 @@ from lib.discord_notify import send_guild_raid_embed
 
 logger = logging.getLogger(__name__)
 
-# メモリ上に前回値を保持（ただしDBキャッシュ優先）
-prev_raid_counts = {}
-
 # 同時実行数40に制限
 semaphore = asyncio.Semaphore(40)
 
@@ -26,7 +23,6 @@ async def track_guild_raids(bot=None):
         start_time = time.time()
         guild_data = await api.get_nori_guild_data("ETKW")
         members = []
-        # 各ランクごと走査
         for section in guild_data["members"].values():
             if isinstance(section, dict):
                 for name, info in section.items():
@@ -34,50 +30,61 @@ async def track_guild_raids(bot=None):
         # 同時実行数制限付き並列で各メンバーのデータ取得
         player_tasks = [get_player_data(api, name) for name in members]
         player_results = await asyncio.gather(*player_tasks)
-        logger.info("ETKWメンバー情報取得完了！")
         # 各メンバーのレイドクリア数取得
         clear_events = []
         now = datetime.utcnow()
-        for name, pdata in player_results:
-            server = pdata.get("server")
-            await asyncio.to_thread(insert_server_log, name, now, server)
-            # 主要レイドのみ
-            raids = pdata.get("globalData", {}).get("raids", {}).get("list", {})
-            raid_types = [
+        # 事前に全員分DBから前回クリア数をまとめて取得
+        prev_counts = {}  # {(name, raid): prev_count}
+        for name in members:
+            # レイドごとに
+            for raid in [
                 "The Canyon Colossus",
                 "Orphion's Nexus of Light",
                 "The Nameless Anomaly",
                 "Nest of the Grootslangs"
-            ]
-            for raid in raid_types:
+            ]:
+                prev_counts[(name, raid)] = await asyncio.to_thread(get_prev_count, name, raid)
+        # クリアイベント判定・DBバルク書き込みリスト
+        set_prev_count_calls = []
+        for name, pdata in player_results:
+            server = pdata.get("server")
+            await asyncio.to_thread(insert_server_log, name, now, server)
+            raids = pdata.get("globalData", {}).get("raids", {}).get("list", {})
+            for raid in [
+                "The Canyon Colossus",
+                "Orphion's Nexus of Light",
+                "The Nameless Anomaly",
+                "Nest of the Grootslangs"
+            ]:
                 current_count = raids.get(raid, 0)
-                prev_count = await asyncio.to_thread(get_prev_count, name, raid)
-                if prev_count is None or prev_count == 0:
-                    # APIに項目がなければ（未挑戦）は保存しない
-                    if raid not in raids:
-                        logger.info(f"{name}は{raid}未挑戦のためDB保存スキップ")
+                prev_count = prev_counts[(name, raid)]
+                # 未挑戦または0クリアはスキップ
+                if prev_count is None:
+                    if raid not in raids or current_count == 0:
                         continue
-                    await asyncio.to_thread(set_prev_count, name, raid, current_count)
+                    set_prev_count_calls.append((name, raid, current_count))
                     logger.info(f"初回DB保存: {name} {raid} -> {current_count}")
                     continue
-                # 異常な増加は無視（例：減った/0から大ジャンプ/+10以上）
+                # 異常な増加は無視
                 delta = current_count - prev_count
                 if delta <= 0 or delta > 4:
-                    await asyncio.to_thread(set_prev_count, name, raid, current_count)
+                    set_prev_count_calls.append((name, raid, current_count))
                     continue
                 if current_count > prev_count:
-                    # クリア増加イベント
-                    clear_time = datetime.utcnow()
-                    prev_server = await asyncio.to_thread(get_last_server_before, name, clear_time)
+                    # クリア増加イベント（全員now基準で統一）
+                    prev_server = await asyncio.to_thread(get_last_server_before, name, now)
                     clear_events.append({
                         "player": name,
                         "raid_name": raid,
-                        "clear_time": clear_time,
+                        "clear_time": now,
                         "server": prev_server
                     })
                     logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{prev_server}")
-                prev_raid_counts[(name, raid)] = current_count
-                await asyncio.to_thread(set_prev_count, name, raid, current_count)
+                set_prev_count_calls.append((name, raid, current_count))
+        # 増加分のみまとめてDB保存
+        for name, raid, count in set_prev_count_calls:
+            await asyncio.to_thread(set_prev_count, name, raid, count)
+        logger.info("ETKWメンバー情報取得完了！")
         # パーティ推定＆保存
         parties = estimate_and_save_parties(clear_events)
         for party in parties:
