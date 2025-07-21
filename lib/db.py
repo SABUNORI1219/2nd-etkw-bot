@@ -100,23 +100,6 @@ def fetch_history(raid_name=None, date_from=None):
     conn.close()
     return rows
 
-def fetch_individual_raid_history():
-    """
-    直近X分の個人レイドクリア履歴を取得
-    Returns: List of (player_name, raid_name, clear_time[datetime])
-    """
-    conn = get_conn()
-    with conn.cursor() as cur:
-        since = datetime.utcnow() - timedelta(minutes=10)
-        cur.execute(
-            "SELECT player_name, raid_name, clear_time FROM raid_clear_cache WHERE clear_time >= %s ORDER BY clear_time ASC",
-            (since,)
-        )
-        rows = cur.fetchall()
-    conn.close()
-    # clear_timeをdatetime型に変換
-    return [(r[0], r[1], r[2] if isinstance(r[2], datetime) else datetime.strptime(r[2], "%Y-%m-%d %H:%M:%S")) for r in rows]
-
 def insert_server_log(player_name, timestamp, server):
     conn = get_conn()
     with conn.cursor() as cur:
