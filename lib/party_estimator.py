@@ -48,5 +48,6 @@ def estimate_party(clear_events):
                 "server": a["server"],
                 "trust_score": min(scores)  # 最低スコア
             })
-            logger.info(f"【パーティ推定/4人】raid={a['raid_name']} server={a['server']} time={a['clear_time']} members={[x['player'] for x in party]}")
+            criteria = f"raid_match={TRUST_SCORE_CONFIG['raid_match']}, server_match={TRUST_SCORE_CONFIG['server_match']}, time_window={TRUST_SCORE_CONFIG['time_window']}, threshold={TRUST_SCORE_CONFIG['threshold']}"
+            logger.info(f"パーティ候補: レイド名: {a['raid_name']} / メンバー: {[x['player'] for x in party]}, スコア: {min(scores)}, 詳細: {criteria}")
     return parties
