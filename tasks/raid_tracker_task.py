@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 from lib.wynncraft_api import WynncraftAPI
 from lib.db import insert_history, get_prev_count, set_prev_count, insert_server_log, get_last_server_before, cleanup_old_server_logs
-from lib.party_estimator import estimate_party
+from lib.party_estimator import estimate_and_save_parties
 from lib.discord_notify import send_guild_raid_embed
 
 logger = logging.getLogger(__name__)
