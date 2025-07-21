@@ -10,7 +10,7 @@ from lib.discord_notify import send_guild_raid_embed
 logger = logging.getLogger(__name__)
 
 # 同時実行数40に制限
-semaphore = asyncio.Semaphore(40)
+semaphore = asyncio.Semaphore(120)
 
 async def get_player_data(api, name):
     async with semaphore:
