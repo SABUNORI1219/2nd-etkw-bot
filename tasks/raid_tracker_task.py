@@ -52,7 +52,7 @@ async def track_guild_raids(bot=None):
             for raid in raid_types:
                 current_count = raids.get(raid, 0)
                 prev_count = await asyncio.to_thread(get_prev_count, name, raid)
-                if prev_count is None:
+                if prev_count is None or prev_count == 0:
                     # APIに項目がなければ（未挑戦）は保存しない
                     if raid not in raids:
                         logger.info(f"{name}は{raid}未挑戦のためDB保存スキップ")
