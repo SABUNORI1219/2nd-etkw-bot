@@ -2,7 +2,7 @@ import os
 import logging
 import psycopg2
 from psycopg2.extras import execute_values
-from datetime import datetime
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -144,3 +144,13 @@ def get_config(key):
         row = cur.fetchone()
     conn.close()
     return row[0] if row else None
+
+def cleanup_old_server_logs(minutes=10):
+    """player_server_logのminutes分より前のデータを削除"""
+    conn = get_conn()
+    with conn.cursor() as cur:
+        threshold = datetime.utcnow() - timedelta(minutes=minutes)
+        cur.execute("DELETE FROM player_server_log WHERE timestamp < %s", (threshold,))
+        conn.commit()
+    conn.close()
+    logger.info(f"{minutes}分より前のplayer_server_logを削除しました")
