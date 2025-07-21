@@ -79,7 +79,7 @@ async def track_guild_raids(bot=None):
                 prev_raid_counts[(name, raid)] = current_count
                 await asyncio.to_thread(set_prev_count, name, raid, current_count)
         # パーティ推定＆保存
-        parties = estimate_party(clear_events)
+        parties = estimate_and_save_parties(clear_events)
         for party in parties:
             if party["trust_score"] < 7:
                 logger.info(f"信頼スコア5のため履歴保存＆通知スキップ: {party}")
