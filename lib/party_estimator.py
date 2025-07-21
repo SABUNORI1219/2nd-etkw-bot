@@ -1,7 +1,6 @@
 import logging
-from datetime import datetime, timedelta
-from collections import defaultdict, deque
-from .db import fetch_individual_raid_history, get_last_server_before, insert_history
+from datetime import timedelta
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -13,63 +12,58 @@ TIME_SCORE_60 = 50
 TIME_SCORE_120 = 30
 TIME_SCORE_OTHER = 10
 
-def estimate_and_save_parties():
+def estimate_and_save_parties(clear_events):
     """
-    個人クリア履歴からパーティ推定し、認定できるものをguild_raid_historyに保存する
+    個人クリアイベントリストからパーティ推定
+    clear_events: [
+        {
+            "player": str,
+            "raid_name": str,
+            "clear_time": datetime,
+            "server": Optional[str]
+        }, ...
+    ]
+    Returns: List of party dicts
     """
-    # 個人クリア履歴を時系列で取得
-    # fetch_individual_raid_history()の返り値: List of (player_name, raid_name, clear_time[datetime])
-    clears = fetch_individual_raid_history()
-    if not clears:
-        logger.info("クリア履歴がありません")
-        return []
+    # レイドごとで分割
+    events_by_raid = defaultdict(list)
+    for event in clear_events:
+        events_by_raid[event["raid_name"]].append(event)
 
-    # レイドごとに分割
-    clears_by_raid = defaultdict(list)
-    for rec in clears:
-        clears_by_raid[rec[1]].append(rec)
-    
     saved_parties = []
-    for raid, records in clears_by_raid.items():
+    for raid, events in events_by_raid.items():
         # 時刻順にソート
-        records.sort(key=lambda x: x[2])  # x[2]: clear_time
+        events.sort(key=lambda x: x["clear_time"])
         # スライディングウィンドウで4人組を抽出
-        for i in range(len(records) - 3):
-            party_candidate = records[i:i+4]
-            first_time = party_candidate[0][2]
-            last_time = party_candidate[-1][2]
+        for i in range(len(events) - 3):
+            party_candidate = events[i:i+4]
+            first_time = party_candidate[0]["clear_time"]
+            last_time = party_candidate[-1]["clear_time"]
+            # クリア時刻が近い4人
             if (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES):
                 score, criteria, server = _score_party(party_candidate)
-                logger.info(f"パーティ候補: レイド名: {raid} / メンバー: {[p[0] for p in party_candidate]}, スコア: {score}, 詳細: {criteria}")
+                logger.info(
+                    f"パーティ候補: レイド名: {raid} / メンバー: {[p['player'] for p in party_candidate]}, スコア: {score}, 詳細: {criteria}"
+                )
                 if score >= SCORE_THRESHOLD:
-                    members = [p[0] for p in party_candidate]
-                    insert_history(
-                        raid_name=raid,
-                        clear_time=first_time,
-                        party_members=members,
-                        server_name=server,
-                        trust_score=score
-                    )
-                    saved_parties.append({
+                    members = [p["player"] for p in party_candidate]
+                    party = {
                         "raid_name": raid,
                         "clear_time": first_time,
                         "members": members,
                         "server": server,
                         "trust_score": score,
                         "criteria": criteria
-                    })
+                    }
+                    saved_parties.append(party)
     return saved_parties
 
 def _score_party(party):
     """
-    party: [(player_name, raid_name, clear_time), ...] の4人組
+    party: [{player, raid_name, clear_time, server}, ...]の4人dictリスト
     サーバー一致度・時間差でスコアリング
     """
-    # サーバーログから直前サーバーを取得
-    servers = []
-    for p in party:
-        server = get_last_server_before(p[0], p[2])
-        servers.append(server)
+    servers = [p["server"] for p in party]
     criteria = {}
     score = 0
     if len(servers) == 4:
@@ -81,8 +75,8 @@ def _score_party(party):
             score += SERVER_PARTIAL_SCORE
             criteria['server_match'] = f"サーバーが一部異なる: {servers}"
     # 時間差スコア
-    first_time = party[0][2]
-    last_time = party[-1][2]
+    first_time = party[0]["clear_time"]
+    last_time = party[-1]["clear_time"]
     time_diff = (last_time - first_time).total_seconds()
     if time_diff <= 60:
         score += TIME_SCORE_60
