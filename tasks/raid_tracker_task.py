@@ -22,20 +22,26 @@ async def track_guild_raids(bot=None):
         logger.info("ETKWメンバー情報取得開始...")
         start_time = time.time()
         guild_data = await api.get_nori_guild_data("ETKW")
-        members = []
-        for section in guild_data["members"].values():
-            if isinstance(section, dict):
-                for name, info in section.items():
-                    members.append(name)
+
+        # online_playersだけ処理する
+        online_members = []
+        for player in guild_data.get("online_players", []):
+            online_members.append(player["name"])
+        
+        if not online_members:
+            logger.info("オンラインメンバーがいません。")
+            await asyncio.sleep(60)
+            continue
+        
         # 同時実行数制限付き並列で各メンバーのデータ取得
-        player_tasks = [get_player_data(api, name) for name in members]
+        player_tasks = [get_player_data(api, name) for name in online_members]
         player_results = await asyncio.gather(*player_tasks)
         # 各メンバーのレイドクリア数取得
         clear_events = []
         now = datetime.utcnow()
         # 事前に全員分DBから前回クリア数をまとめて取得
         prev_counts = {}  # {(name, raid): prev_count}
-        for name in members:
+        for name in online_members:
             # レイドごとに
             for raid in [
                 "The Canyon Colossus",
