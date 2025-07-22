@@ -11,7 +11,6 @@ import logging
 # 作成したモジュールから必要な関数やクラスをインポート
 from keep_alive import keep_alive
 from logger_setup import setup_logger
-from lib.db import create_table
 
 # ロガーを最初にセットアップ
 setup_logger()
@@ -40,11 +39,6 @@ class MyBot(commands.Bot):
     async def setup_hook(self):
         """Botの非同期セットアップを管理する"""
         logger.info("--- [司令塔] 起動準備を開始します ---")
-        try:
-            create_table()
-            logger.info("DBテーブルセットアップ正常終了")
-        except Exception as e:
-            logger.error(f"DBセットアップ失敗: {e}")
         
         # 同期的な準備処理を最初に実行
         keep_alive()
