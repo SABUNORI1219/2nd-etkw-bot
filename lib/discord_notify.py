@@ -1,6 +1,6 @@
 import discord
 import logging
-from lib.json_store import get_config
+from lib.db import get_config
 import os
 from datetime import timezone, timedelta
 
