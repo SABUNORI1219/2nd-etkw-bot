@@ -64,8 +64,13 @@ async def track_guild_raids(bot=None):
             if party["trust_score"] < 85:
                 logger.info(f"信頼スコア85未満のため通知スキップ: {party}")
                 continue
-            # ギルドレイドカウント反映
-            add_guild_raid_clear(party["members"], party["raid_name"])
+            # ギルドレイド認定前
+            if len(set(party['members'])) == 4:
+                # 4人全員異なる場合のみギルドレイド成立
+                add_guild_raid_clear(party['members'], party['raid_name'])
+            else:
+                # 同一名が含まれている場合はスキップ（無視）
+                continue
             logger.info(f"send_guild_raid_embed呼び出し: {party}")
             if bot is not None:
                 try:
