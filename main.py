@@ -11,6 +11,7 @@ import logging
 # 作成したモジュールから必要な関数やクラスをインポート
 from keep_alive import keep_alive
 from logger_setup import setup_logger
+from lib import create_table
 
 # ロガーを最初にセットアップ
 setup_logger()
@@ -41,6 +42,7 @@ class MyBot(commands.Bot):
         logger.info("--- [司令塔] 起動準備を開始します ---")
         
         # 同期的な準備処理を最初に実行
+        create_table()
         keep_alive()
 
         # Cogsを読み込む
