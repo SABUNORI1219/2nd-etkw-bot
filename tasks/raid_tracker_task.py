@@ -68,10 +68,10 @@ async def track_guild_raids(bot=None):
             if len(set(party['members'])) == 4:
                 # 4人全員異なる場合のみギルドレイド成立
                 add_guild_raid_clear(party['members'], party['raid_name'])
+                logger.info(f"send_guild_raid_embed呼び出し: {party}")
             else:
                 # 同一名が含まれている場合はスキップ（無視）
                 continue
-            logger.info(f"send_guild_raid_embed呼び出し: {party}")
             if bot is not None:
                 try:
                     await send_guild_raid_embed(bot, party)
