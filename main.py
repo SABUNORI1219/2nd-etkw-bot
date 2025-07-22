@@ -11,7 +11,7 @@ import logging
 # 作成したモジュールから必要な関数やクラスをインポート
 from keep_alive import keep_alive
 from logger_setup import setup_logger
-from lib import create_table
+from lib.db import create_table
 
 # ロガーを最初にセットアップ
 setup_logger()
