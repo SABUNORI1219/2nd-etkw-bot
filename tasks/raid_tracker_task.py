@@ -13,11 +13,8 @@ from lib.discord_notify import send_guild_raid_embed
 
 logger = logging.getLogger(__name__)
 
-semaphore = asyncio.Semaphore(60)
-
 async def get_player_data(api, name):
-    async with semaphore:
-        return name, await api.get_nori_player_data(name)
+    return name, await api.get_nori_player_data(name)
 
 async def track_guild_raids(bot=None):
     api = WynncraftAPI()
@@ -79,7 +76,7 @@ async def track_guild_raids(bot=None):
                     logger.error(f"通知Embed送信失敗: {e}")
 
         elapsed = time.time() - start_time
-        sleep_time = max(60 - elapsed, 0)
+        sleep_time = max(20 - elapsed, 0)
         logger.info(f"次回まで{sleep_time:.1f}秒待機（処理時間: {elapsed:.1f}秒）")
         await asyncio.sleep(sleep_time)
 
