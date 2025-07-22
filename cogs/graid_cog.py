@@ -40,6 +40,8 @@ class PlayerCountView(discord.ui.View):
             safe_name = discord.utils.escape_markdown(name)
             embed.add_field(name=sefe_name, value=f"Count: {count}", inline=False)
         embed.set_footer(text=f"Page {self.page+1}/{self.max_page+1}")
+        self.previous.disabled = self.page == 0
+        self.next.disabled = self.page == self.max_page
         await interaction.response.edit_message(embed=embed, view=self)
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary)
