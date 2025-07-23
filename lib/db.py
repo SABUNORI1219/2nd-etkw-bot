@@ -72,14 +72,17 @@ def set_prev_count(player_name, raid_name, count):
     conn.close()
 
 def insert_history(raid_name, clear_time, member):
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("""
-            INSERT INTO guild_raid_history (raid_name, clear_time, member)
-            VALUES (%s, %s, %s)
-        """, (raid_name, clear_time, member))
-        conn.commit()
-    conn.close()
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO guild_raid_history (raid_name, clear_time, member)
+                VALUES (%s, %s, %s)
+            """, (raid_name, clear_time, member))
+            conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"insert_history failed: {raid_name}, {clear_time}, {member}, error={e}")
     
 def reset_player_raid_count(player, raid_name, count):
     conn = get_conn()
