@@ -218,8 +218,18 @@ Total Level: {total_level:,}
             self.cache.set_cache(cache_key, api_data)
             await interaction.followup.send(embed=embed)
         elif isinstance(api_data, dict):
-            view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self)
-            await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
+            # UUIDキー1件だけなら単一扱い
+            if (
+                all(len(k) == 36 for k in api_data.keys()) and  # UUIDキーのみ
+                len(api_data) == 1 and
+                all(isinstance(v, dict) for v in api_data.values())
+            ):
+                player_data = list(api_data.values())[0]
+                embed = self._create_player_embed(player_data)
+                await interaction.followup.send(embed=embed)
+            else:
+                view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self)
+                await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
         else:
             # ここは通常通らないはずだが、念のため
             await interaction.followup.send(f"プレイヤー「{player}」の情報を正しく取得できませんでした。")
