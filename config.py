@@ -1,4 +1,5 @@
 import os
+import discord
 
 # Wynncraft API関連
 NORI_GUILD_API_URL = "https://nori.fish/api/guild/{}"
@@ -9,8 +10,10 @@ WYNN_GUILD_BY_PREFIX_API_URL = "https://api.wynncraft.com/v3/guild/prefix/{}"
 GUILD_NAME = "Empire of TKW"
 
 # Discord関連 (環境変数から読み込み)
-GUILD_ID_INT = int(os.getenv('GUILD_ID', 0))
 TRACKING_CHANNEL_ID = int(os.getenv('NOTIFICATION_CHANNEL_ID', 0))
+
+# コマンドの許可ユーザーリスト（IDで管理）
+AUTHORIZED_USER_IDS = [1062535250099589120]  # 必要ならここに追加
 
 # Embed用の色設定
 EMBED_COLOR_GOLD = 0xFFD700
@@ -25,3 +28,17 @@ RESOURCE_EMOJIS = {
     "FISH": "<:wynn_fish:1395325644899881011>",
     "CROPS": "<:wynn_crop:1395325604806656032>"
 }
+
+async def send_authorized_only_message(interaction: discord.Interaction, user_ids=None):
+    """
+    指定ユーザー以外がコマンド実行時に警告メッセージを返す共通関数。
+    user_ids: 許可ユーザーIDリスト（Noneの場合はAUTHORIZED_USER_IDS）
+    """
+    if user_ids is None:
+        user_ids = AUTHORIZED_USER_IDS
+    # mention形式のユーザー名リストを作る
+    mentions = ", ".join([f"<@{uid}>" for uid in user_ids])
+    await interaction.response.send_message(
+        f"このコマンドは {mentions} のみ使用できます！",
+        ephemeral=True
+    )
