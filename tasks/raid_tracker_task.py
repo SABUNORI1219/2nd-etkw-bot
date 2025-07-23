@@ -87,7 +87,6 @@ async def track_guild_raids(bot=None):
         for name, raid, count in set_prev_count_calls:
             await asyncio.to_thread(set_prev_count, name, raid, count)
         logger.info("ETKWメンバー情報取得完了！")
-        logger.info(f"clear_events: {clear_events}")
         # パーティ推定＆保存
         parties = estimate_and_save_parties(clear_events)
         for party in parties:
