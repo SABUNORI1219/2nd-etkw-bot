@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 RAID_CHOICES = [
-    app_commands.Choice(name="Nest of the Grootslangs", value="Nest of the Grootslang"),
+    app_commands.Choice(name="Nest of the Grootslangs", value="Nest of the Grootslangs"),
     app_commands.Choice(name="Orphion's Nexus of Light", value="Orphion's Nexus of Light"),
     app_commands.Choice(name="The Canyon Colossus", value="The Canyon Colossus"),
     app_commands.Choice(name="The Nameless Anomaly", value="The Nameless Anomaly"),
@@ -17,7 +17,7 @@ RAID_CHOICES = [
 ]
 
 ADDC_RAID_CHOICES = [
-    app_commands.Choice(name="Nest of the Grootslang", value="Nest of the Grootslang"),
+    app_commands.Choice(name="Nest of the Grootslangs", value="Nest of the Grootslangs"),
     app_commands.Choice(name="Orphion's Nexus of Light", value="Orphion's Nexus of Light"),
     app_commands.Choice(name="The Canyon Colossus", value="The Canyon Colossus"),
     app_commands.Choice(name="The Nameless Anomaly", value="The Nameless Anomaly")
