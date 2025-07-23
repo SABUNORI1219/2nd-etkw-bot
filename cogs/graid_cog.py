@@ -2,11 +2,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from lib.db import fetch_history, set_config
+from config import AUTHORIZED_USER_IDS, send_authorized_only_message
 import os
 import logging
 
 logger = logging.getLogger(__name__)
-AUTHORIZED_USER_IDS = [1062535250099589120]  # サンプルID
 
 RAID_CHOICES = [
     app_commands.Choice(name="Nest of the Grootslang", value="Nest of the Grootslang"),
@@ -65,7 +65,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     async def guildraid_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
         # 権限チェック
         if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await interaction.response.send_message("権限がありません。", ephemeral=True)
+            await send_authorized_only_message(interaction)
             return
         set_config("NOTIFY_CHANNEL_ID", str(channel.id))
         await interaction.response.send_message(f"Guild Raid通知チャンネルを {channel.mention} に設定しました。", ephemeral=True)
@@ -84,7 +84,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         date: "2025-07-20"（日単位）, "2025-07"（月単位）, "2025"（年単位）など
         """
         if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await interaction.response.send_message("権限がありません。", ephemeral=True)
+            await send_authorized_only_message(interaction)
             return
         
         # 合計集計
@@ -131,7 +131,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     @app_commands.choices(raid_name=ADDC_RAID_CHOICES)
     async def guildraid_count(self, interaction: discord.Interaction, player: str, raid_name: str, count: int):
         if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await interaction.response.send_message("権限がありません。", ephemeral=True)
+            await send_authorized_only_message(interaction)
             return
         # 指定プレイヤー・レイドの既存履歴削除 & 新しい回数分insert
         from lib.db import reset_player_raid_count
