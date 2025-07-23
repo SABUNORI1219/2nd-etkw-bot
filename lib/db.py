@@ -99,21 +99,53 @@ def reset_player_raid_count(player, raid_name, count):
         conn.commit()
 
 def fetch_history(raid_name=None, date_from=None):
+    """
+    ギルドレイド履歴を取得する。
+    - raid_name: レイド名で絞り込み（Noneなら全件）
+    - date_from: 指定日時以降で絞り込み（Noneなら全期間）。
+      'YYYY-MM-DD', 'YYYY-MM', 'YYYY' の文字列も対応。
+    戻り値: (id, raid_name, clear_time, member(str)) のリスト
+    """
     conn = get_conn()
     with conn.cursor() as cur:
-        sql = "SELECT * FROM guild_raid_history WHERE 1=1"
+        sql = "SELECT id, raid_name, clear_time, member FROM guild_raid_history WHERE 1=1"
         params = []
         if raid_name:
             sql += " AND raid_name = %s"
             params.append(raid_name)
         if date_from:
-            sql += " AND clear_time >= %s"
-            params.append(date_from)
+            # 年・月単位など柔軟に対応
+            if isinstance(date_from, str):
+                # YYYY-MM-DD
+                if len(date_from) == 10:
+                    sql += " AND to_char(clear_time, 'YYYY-MM-DD') = %s"
+                    params.append(date_from)
+                # YYYY-MM
+                elif len(date_from) == 7:
+                    sql += " AND to_char(clear_time, 'YYYY-MM') = %s"
+                    params.append(date_from)
+                # YYYY
+                elif len(date_from) == 4:
+                    sql += " AND to_char(clear_time, 'YYYY') = %s"
+                    params.append(date_from)
+                else:
+                    # 形式不明→何もしない
+                    pass
+            else:
+                # datetime型もしくはそれ以外（>=検索）
+                sql += " AND clear_time >= %s"
+                params.append(date_from)
+        sql += " ORDER BY clear_time DESC"
         cur.execute(sql, params)
         rows = cur.fetchall()
     conn.close()
-    return rows
-
+    # memberはstr型で返す
+    result = []
+    for row in rows:
+        member = row[3]
+        result.append((row[0], row[1], row[2], str(member)))
+    return result
+    
 def insert_server_log(player_name, timestamp, server):
     conn = get_conn()
     with conn.cursor() as cur:
