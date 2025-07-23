@@ -14,6 +14,7 @@ class PlayerSelectView(discord.ui.View):
     def __init__(self, player_collision_dict: dict, cog_instance):
         super().__init__(timeout=60.0)
         self.cog_instance = cog_instance
+        self.owner_id = owner_id
 
         options = []
         for uuid, player_info in player_collision_dict.items():
@@ -40,6 +41,11 @@ class PlayerSelectView(discord.ui.View):
             self.add_item(self.select_menu)
             
     async def select_callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "この操作はコマンドを実行したユーザーのみ有効です。", ephemeral=True
+            )
+            return
         selected_uuid = self.select_menu.values[0]
         
         self.select_menu.disabled = True
@@ -228,7 +234,7 @@ Total Level: {total_level:,}
                 embed = self._create_player_embed(player_data)
                 await interaction.followup.send(embed=embed)
             else:
-                view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self)
+                view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self, owner_id=interaction.user.id)
                 await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
         else:
             # ここは通常通らないはずだが、念のため
