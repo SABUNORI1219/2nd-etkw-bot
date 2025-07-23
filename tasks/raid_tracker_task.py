@@ -91,16 +91,16 @@ async def track_guild_raids(bot=None):
         parties = estimate_and_save_parties(clear_events)
         for party in parties:
             if party["trust_score"] < 85:
-                logger.info(f"信頼スコア85の未満のため履歴保存＆通知スキップ: {party}")
+                logger.info(f"信頼スコア85未満のため履歴保存＆通知スキップ: {party}")
                 continue
-            await asyncio.to_thread(
-                insert_history,
-                party["raid_name"],
-                party["clear_time"],
-                party["members"],
-                party["server"],
-                party["trust_score"]
-            )
+            # party["members"]はlist型なので、DB保存時は1人ずつinsert
+            for member in party["members"]:
+                await asyncio.to_thread(
+                    insert_history,
+                    party["raid_name"],
+                    party["clear_time"],
+                    member
+                )
             # Discord通知（パーティ推定ごとに即送信）
             logger.info(f"send_guild_raid_embed呼び出し: {party}")
             if bot is not None:
