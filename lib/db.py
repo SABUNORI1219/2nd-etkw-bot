@@ -72,31 +72,33 @@ def set_prev_count(player_name, raid_name, count):
     conn.close()
 
 def insert_history(raid_name, clear_time, member):
-    sql = """
-    INSERT INTO guild_raid_history 
-    (raid_name, clear_time, member)
-    VALUES (?, ?, ?)
-    """
-    params = (raid_name, clear_time, member)
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(sql, params)
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO guild_raid_history (raid_name, clear_time, member)
+            VALUES (%s, %s, %s)
+        """, (raid_name, clear_time, member))
         conn.commit()
     conn.close()
-
+    
 def reset_player_raid_count(player, raid_name, count):
-    with sqlite3.connect(DB_PATH) as conn:
+    conn = get_conn()
+    with conn.cursor() as cur:
         # まず、該当player/raid_nameの履歴を削除
-        conn.execute(
-            "DELETE FROM guild_raid_history WHERE member=? AND raid_name=?",
+        cur.execute(
+            "DELETE FROM guild_raid_history WHERE member=%s AND raid_name=%s",
             (player, raid_name)
         )
+        now = datetime.utcnow()
         # 指定回数だけinsert
-        for _ in range(count):
-            conn.execute(
-                "INSERT INTO guild_raid_history (raid_name, clear_time, member) VALUES (?, datetime('now'), ?)",
-                (raid_name, player)
+        if count > 0:
+            execute_values(
+                cur,
+                "INSERT INTO guild_raid_history (raid_name, clear_time, member) VALUES %s",
+                [(raid_name, now, player)] * count
             )
         conn.commit()
+    conn.close()
 
 def fetch_history(raid_name=None, date_from=None):
     """
