@@ -16,9 +16,9 @@ def create_table():
     with conn.cursor() as cur:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS guild_raid_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 raid_name TEXT,
-                clear_time TEXT,
+                clear_time TIMESTAMP,
                 member TEXT
             );
         """)
