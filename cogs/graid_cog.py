@@ -38,7 +38,7 @@ class PlayerCountView(discord.ui.View):
         end = start + self.per_page
         for name, count in self.player_counts[start:end]:
             safe_name = discord.utils.escape_markdown(name)
-            embed.add_field(name=sefe_name, value=f"Count: {count}", inline=False)
+            embed.add_field(name=safe_name, value=f"Count: {count}", inline=False)
         embed.set_footer(text=f"Page {self.page+1}/{self.max_page+1}")
         self.previous.disabled = self.page == 0
         self.next.disabled = self.page == self.max_page
@@ -102,12 +102,12 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             await interaction.response.send_message("履歴がありません。", ephemeral=True)
             return
 
-        # プレイヤーごとに累計カウント集計
+        # guild_raid_historyは1人1行で保存なので、playerカウント集計
         player_counts = {}
         for row in rows:
-            # row[3]がparty_members
-            for player in row[3]:
-                player_counts[player] = player_counts.get(player, 0) + 1
+            # rowの構造: (id, raid_name, clear_time, member)
+            member = row[3]
+            player_counts[member] = player_counts.get(member, 0) + 1
         sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
 
         # 最初のページを表示
@@ -117,15 +117,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             safe_name = discord.utils.escape_markdown(name)
             embed.add_field(name=safe_name, value=f"Count: {count}", inline=False)
         embed.set_footer(text=f"Page 1/{view.max_page+1}")
-
-        # 日付記述方法の説明をEmbedのdescriptionに追加
-        embed.description = (
-            "【日付指定の記述方法例】\n"
-            "・2025-07-20：2025年7月20日のみ\n"
-            "・2025-07：2025年7月全体\n"
-            "・2025：2025年全体\n"
-            "（未指定なら全期間表示）"
-        )
 
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         logger.info(f"履歴リスト出力: {raid_name} {date} (embed形式ページ付き)")
@@ -142,8 +133,10 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         if interaction.user.id not in AUTHORIZED_USER_IDS:
             await interaction.response.send_message("権限がありません。", ephemeral=True)
             return
-        # 補正ロジックは未実装
-        await interaction.response.send_message(f"{player}の{raid_name}クリア回数を{count}だけ補正します（未実装）", ephemeral=True)
+        # 指定プレイヤー・レイドの既存履歴削除 & 新しい回数分insert
+        from lib.db import reset_player_raid_count
+        reset_player_raid_count(player, raid_name, count)
+        await interaction.response.send_message(f"{player}の{raid_name}クリア回数を{count}に補正しました", ephemeral=True)
         logger.info(f"管理者補正: {player} {raid_name} {count}")
 
 # セットアップ関数
