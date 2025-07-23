@@ -99,6 +99,7 @@ async def track_guild_raids(bot=None):
                 continue
             # party["members"]はlist型なので、DB保存時は1人ずつinsert
             for member in party["members"]:
+                logger.info(f"insert_history呼び出し: {party['raid_name']} {party['clear_time']} {member}")
                 await asyncio.to_thread(
                     insert_history,
                     party["raid_name"],
