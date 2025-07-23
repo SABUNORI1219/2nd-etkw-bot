@@ -83,6 +83,21 @@ def insert_history(raid_name, clear_time, member):
         conn.commit()
     conn.close()
 
+def reset_player_raid_count(player, raid_name, count):
+    with sqlite3.connect(DB_PATH) as conn:
+        # まず、該当player/raid_nameの履歴を削除
+        conn.execute(
+            "DELETE FROM guild_raid_history WHERE member=? AND raid_name=?",
+            (player, raid_name)
+        )
+        # 指定回数だけinsert
+        for _ in range(count):
+            conn.execute(
+                "INSERT INTO guild_raid_history (raid_name, clear_time, member) VALUES (?, datetime('now'), ?)",
+                (raid_name, player)
+            )
+        conn.commit()
+
 def fetch_history(raid_name=None, date_from=None):
     conn = get_conn()
     with conn.cursor() as cur:
