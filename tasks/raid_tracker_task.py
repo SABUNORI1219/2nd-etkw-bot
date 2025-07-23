@@ -18,6 +18,10 @@ async def track_guild_raids(bot=None):
         logger.info("ETKWメンバー情報取得開始...")
         start_time = time.time()
         guild_data = await api.get_nori_guild_data("ETKW")
+        if guild_data is None:
+            logger.warning("guild_data取得失敗。10秒後に再試行します。")
+            await asyncio.sleep(10)
+            continue
 
         # online_playersだけ処理する
         online_members = []
