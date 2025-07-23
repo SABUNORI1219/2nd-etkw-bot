@@ -32,6 +32,10 @@ class PlayerCountView(discord.ui.View):
         self.per_page = per_page
         self.max_page = (len(player_counts) - 1) // per_page
 
+        # 最初のボタン状態をページ数に応じて設定
+        self.previous.disabled = self.page == 0
+        self.next.disabled = self.page == self.max_page
+
     async def update_message(self, interaction):
         embed = discord.Embed(title="Guild Raid Player Counts")
         start = self.page * self.per_page
