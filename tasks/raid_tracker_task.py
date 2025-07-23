@@ -113,7 +113,7 @@ async def track_guild_raids(bot=None):
         await asyncio.to_thread(cleanup_old_server_logs, 5)
         
         elapsed = time.time() - start_time
-        sleep_time = max(60 - elapsed, 0)
+        sleep_time = max(140 - elapsed, 0)
         logger.info(f"次回まで{sleep_time:.1f}秒待機（処理時間: {elapsed:.1f}秒）")
         await asyncio.sleep(sleep_time)
 
