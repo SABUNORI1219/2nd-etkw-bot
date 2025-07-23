@@ -16,12 +16,10 @@ def create_table():
     with conn.cursor() as cur:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS guild_raid_history (
-                id SERIAL PRIMARY KEY,
-                raid_name TEXT NOT NULL,
-                clear_time TIMESTAMP NOT NULL,
-                party_members TEXT[] NOT NULL,
-                server_name TEXT NOT NULL,
-                trust_score INTEGER NOT NULL
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                raid_name TEXT,
+                clear_time TEXT,
+                member TEXT
             );
         """)
         cur.execute("""
@@ -73,16 +71,17 @@ def set_prev_count(player_name, raid_name, count):
         conn.commit()
     conn.close()
 
-def insert_history(raid_name, clear_time, party_members, server_name, trust_score):
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("""
-            INSERT INTO guild_raid_history (raid_name, clear_time, party_members, server_name, trust_score)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (raid_name, clear_time, party_members, server_name, trust_score))
+def insert_history(raid_name, clear_time, member):
+    sql = """
+    INSERT INTO guild_raid_history 
+    (raid_name, clear_time, member)
+    VALUES (?, ?, ?)
+    """
+    params = (raid_name, clear_time, member)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(sql, params)
         conn.commit()
     conn.close()
-    logger.info(f"履歴保存: {raid_name} {clear_time} Party: {party_members}")
 
 def fetch_history(raid_name=None, date_from=None):
     conn = get_conn()
