@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from lib.db import fetch_history, set_config
+from lib.db import fetch_history, set_config, reset_player_raid_count
 from config import AUTHORIZED_USER_IDS, send_authorized_only_message
 import os
 import logging
@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 RAID_CHOICES = [
-    app_commands.Choice(name="Nest of the Grootslang", value="Nest of the Grootslang"),
+    app_commands.Choice(name="Nest of the Grootslangs", value="Nest of the Grootslang"),
     app_commands.Choice(name="Orphion's Nexus of Light", value="Orphion's Nexus of Light"),
     app_commands.Choice(name="The Canyon Colossus", value="The Canyon Colossus"),
     app_commands.Choice(name="The Nameless Anomaly", value="The Nameless Anomaly"),
@@ -74,8 +74,8 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     # 履歴リスト出力コマンド
     @app_commands.command(name="list", description="指定レイド・日付の履歴をリスト表示")
     @app_commands.describe(
-        raid_name="表示するレイド名（Totalはすべてのレイド合計）",
-        date="履歴を表示したい日付（例: 2025-07-20、2025-07 など。未指定なら全期間）"
+        raid_name="表示するレイド名(Totalはすべてのレイド合計)",
+        date="履歴を表示したい日付(YYYY-MM-DD表記)"
     )
     @app_commands.choices(raid_name=RAID_CHOICES)
     async def guildraid_list(self, interaction: discord.Interaction, raid_name: str, date: str = None):
@@ -107,7 +107,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         for row in rows:
             # rowの構造: (id, raid_name, clear_time, member)
             member = row[3]
-            player_counts[member] = player_counts.get(member, 0) + 1
+            player_counts[str(member)] = player_counts.get(str(member), 0) + 1
         sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
 
         # 最初のページを表示
@@ -133,8 +133,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         if interaction.user.id not in AUTHORIZED_USER_IDS:
             await send_authorized_only_message(interaction)
             return
-        # 指定プレイヤー・レイドの既存履歴削除 & 新しい回数分insert
-        from lib.db import reset_player_raid_count
         reset_player_raid_count(player, raid_name, count)
         await interaction.response.send_message(f"{player}の{raid_name}クリア回数を{count}に補正しました", ephemeral=True)
         logger.info(f"管理者補正: {player} {raid_name} {count}")
