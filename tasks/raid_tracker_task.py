@@ -45,7 +45,7 @@ async def track_guild_raids(bot=None):
         
         if not online_members:
             logger.info("オンラインメンバーがいません。")
-            await asyncio.sleep(60)
+            await asyncio.sleep(100)
             continue
         
         # uuidベースでAPI取得
@@ -110,7 +110,7 @@ async def track_guild_raids(bot=None):
 
         await asyncio.to_thread(cleanup_old_server_logs, 5)        
         elapsed = time.time() - start_time
-        sleep_time = max(60 - elapsed, 0)
+        sleep_time = max(100 - elapsed, 0)
         logger.info(f"次回まで{sleep_time:.1f}秒待機（処理時間: {elapsed:.1f}秒）")
         await asyncio.sleep(sleep_time)
 
