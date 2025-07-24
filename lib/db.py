@@ -23,14 +23,6 @@ def create_table():
             );
         """)
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS raid_clear_cache (
-                player_name TEXT NOT NULL,
-                raid_name TEXT NOT NULL,
-                clear_count INTEGER NOT NULL,
-                PRIMARY KEY (player_name, raid_name)
-            );
-        """)
-        cur.execute("""
             CREATE TABLE IF NOT EXISTS player_server_log (
                 player_name TEXT NOT NULL,
                 timestamp TIMESTAMP NOT NULL,
@@ -47,29 +39,6 @@ def create_table():
         conn.commit()
     conn.close()
     logger.info("guild_raid_historyテーブルを作成/確認しました")
-
-def get_prev_count(player_name, raid_name):
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT clear_count FROM raid_clear_cache WHERE player_name = %s AND raid_name = %s",
-            (player_name, raid_name)
-        )
-        row = cur.fetchone()
-    conn.close()
-    return row[0] if row else None
-
-def set_prev_count(player_name, raid_name, count):
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("""
-            INSERT INTO raid_clear_cache (player_name, raid_name, clear_count)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (player_name, raid_name)
-            DO UPDATE SET clear_count = EXCLUDED.clear_count
-        """, (player_name, raid_name, count))
-        conn.commit()
-    conn.close()
 
 def insert_history(raid_name, clear_time, member):
     try:
