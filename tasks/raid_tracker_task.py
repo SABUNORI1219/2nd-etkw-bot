@@ -55,16 +55,13 @@ async def track_guild_raids(bot=None):
         clear_events = []
         now = datetime.utcnow()
         
-        # クリア判定（uuidベースで比較、appendはnameベース）
         for member, pdata in zip(online_members, player_results):
             uuid = member["uuid"]
             name = member["name"]
             server = pdata.get("server") or member.get("server")
             raids = pdata.get("globalData", {}).get("raids", {}).get("list", {})
             previous = previous_player_data.get(uuid)
-            # サーバーログ保存（DB）
             await asyncio.to_thread(insert_server_log, name, now, server)
-            # 比較して個人クリアイベントを抽出
             for raid in [
                 "The Canyon Colossus",
                 "Orphion's Nexus of Light",
@@ -76,20 +73,19 @@ async def track_guild_raids(bot=None):
                 delta = current_count - prev_count
                 if previous and delta > 0 and delta <= 4:
                     clear_events.append({
-                        "player": name,  # ←従来通りname
+                        "player": name,
                         "raid_name": raid,
                         "clear_time": now,
                         "server": previous.get("server", server)
                     })
                     logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{previous.get('server', server)}")
-            # 更新（前回値保持）※nameも記録しておく
             previous_player_data[uuid] = {
                 "raids": dict(raids),
                 "server": server,
                 "timestamp": now,
                 "name": name
             }
-
+        
         logger.info("ETKWメンバー情報取得完了！")
         # パーティ推定＆DB保存・通知
         parties = estimate_and_save_parties(clear_events)
