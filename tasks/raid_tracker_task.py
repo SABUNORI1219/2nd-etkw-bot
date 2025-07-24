@@ -27,7 +27,7 @@ def extract_online_members(guild_data):
 
 async def get_player_data(api, uuid):
     # uuidでAPI取得、nameは後で紐づけ
-    return await api.get_nori_player_data_by_uuid(uuid)  # 実装によっては引数調整
+    return await api.get_nori_player_data(uuid)  # 実装によっては引数調整
 
 async def track_guild_raids(bot=None):
     api = WynncraftAPI()
