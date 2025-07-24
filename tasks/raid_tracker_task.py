@@ -9,11 +9,25 @@ from lib.discord_notify import send_guild_raid_embed
 
 logger = logging.getLogger(__name__)
 
-# メモリ型で前回分を保持
-previous_player_data = dict()  # {name: {"raids": {...}, "server": ..., "timestamp": ...}}
+# メモリ型で前回分を保持（uuidベース）
+previous_player_data = dict()  # {uuid: {"raids": {...}, "server": ..., "timestamp": ..., "name": ...}}
 
-async def get_player_data(api, name):
-    return name, await api.get_nori_player_data(name)
+def extract_online_members(guild_data):
+    ranks = ["owner", "chief", "strategist", "captain", "recruiter", "recruit"]
+    online_members = []
+    for rank in ranks:
+        for name, member_info in guild_data["members"].get(rank, {}).items():
+            if member_info.get("online"):
+                online_members.append({
+                    "uuid": member_info["uuid"],
+                    "name": name,
+                    "server": member_info.get("server")
+                })
+    return online_members
+
+async def get_player_data(api, uuid):
+    # uuidでAPI取得、nameは後で紐づけ
+    return await api.get_nori_player_data_by_uuid(uuid)  # 実装によっては引数調整
 
 async def track_guild_raids(bot=None):
     api = WynncraftAPI()
@@ -26,26 +40,29 @@ async def track_guild_raids(bot=None):
             await asyncio.sleep(10)
             continue
 
-        # online_playersだけ処理する
-        online_members = [player["name"] for player in guild_data.get("online_players", [])]
+        # online_members抽出（uuid・name・serverセット）
+        online_members = extract_online_members(guild_data)
         
         if not online_members:
             logger.info("オンラインメンバーがいません。")
             await asyncio.sleep(60)
             continue
         
-        player_tasks = [get_player_data(api, name) for name in online_members]
+        # uuidベースでAPI取得
+        player_tasks = [get_player_data(api, member["uuid"]) for member in online_members]
         player_results = await asyncio.gather(*player_tasks)
         
         clear_events = []
         now = datetime.utcnow()
         
-        # クリア判定（メモリ型比較）
-        for name, pdata in player_results:
+        # クリア判定（uuidベースで比較、appendはnameベース）
+        for member, pdata in zip(online_members, player_results):
+            uuid = member["uuid"]
+            name = member["name"]
+            server = pdata.get("server") or member.get("server")
             raids = pdata.get("globalData", {}).get("raids", {}).get("list", {})
-            server = pdata.get("server")
-            previous = previous_player_data.get(name)
-            # 初回はDBにもサーバーログ保存
+            previous = previous_player_data.get(uuid)
+            # サーバーログ保存（DB）
             await asyncio.to_thread(insert_server_log, name, now, server)
             # 比較して個人クリアイベントを抽出
             for raid in [
@@ -56,21 +73,21 @@ async def track_guild_raids(bot=None):
             ]:
                 current_count = raids.get(raid, 0)
                 prev_count = previous["raids"].get(raid, 0) if previous else 0
-                # 異常な増加は無視
                 delta = current_count - prev_count
                 if previous and delta > 0 and delta <= 4:
                     clear_events.append({
-                        "player": name,
+                        "player": name,  # ←従来通りname
                         "raid_name": raid,
                         "clear_time": now,
                         "server": previous.get("server", server)
                     })
                     logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{previous.get('server', server)}")
-            # 更新（前回値保持）
-            previous_player_data[name] = {
+            # 更新（前回値保持）※nameも記録しておく
+            previous_player_data[uuid] = {
                 "raids": dict(raids),
                 "server": server,
-                "timestamp": now
+                "timestamp": now,
+                "name": name
             }
 
         logger.info("ETKWメンバー情報取得完了！")
