@@ -2,6 +2,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime
+from collections import deque
 from lib.wynncraft_api import WynncraftAPI
 from lib.db import insert_history, insert_server_log, cleanup_old_server_logs
 from lib.party_estimator import estimate_and_save_parties
@@ -11,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 # メモリ型で前回分を保持（uuidベース）
 previous_player_data = dict()  # {uuid: {"raids": {...}, "server": ..., "timestamp": ..., "name": ...}}
+
+# 直近3ループ分のクリアイベントを保持（30人×3ループ＝90件程度。最大200件に余裕を持たせる）
+clear_events_window = deque(maxlen=200)
 
 def extract_online_members(guild_data):
     ranks = ["owner", "chief", "strategist", "captain", "recruiter", "recruit"]
@@ -27,9 +31,20 @@ def extract_online_members(guild_data):
 
 async def get_player_data(api, uuid):
     # uuidでAPI取得、nameは後で紐づけ
-    return await api.get_nori_player_data(uuid)  # 実装によっては引数調整
+    return await api.get_nori_player_data(uuid)
 
-async def track_guild_raids(bot=None):
+def is_duplicate_event(event, window, threshold_sec=2):
+    """window内にほぼ同時刻・同じplayer・同じraidのイベントがあるか判定"""
+    for e in window:
+        if (
+            e["player"] == event["player"] and
+            e["raid_name"] == event["raid_name"] and
+            abs((e["clear_time"] - event["clear_time"]).total_seconds()) < threshold_sec
+        ):
+            return True
+    return False
+
+async def track_guild_raids(bot=None, loop_interval=30):
     api = WynncraftAPI()
     while True:
         logger.info("ETKWメンバー情報取得開始...")
@@ -45,7 +60,7 @@ async def track_guild_raids(bot=None):
         
         if not online_members:
             logger.info("オンラインメンバーがいません。")
-            await asyncio.sleep(100)
+            await asyncio.sleep(loop_interval)
             continue
         
         # uuidベースでAPI取得
@@ -54,7 +69,8 @@ async def track_guild_raids(bot=None):
         
         clear_events = []
         now = datetime.utcnow()
-        
+
+        # クリアイベント抽出
         for member, pdata in zip(online_members, player_results):
             uuid = member["uuid"]
             name = member["name"]
@@ -72,13 +88,16 @@ async def track_guild_raids(bot=None):
                 prev_count = previous["raids"].get(raid, 0) if previous else 0
                 delta = current_count - prev_count
                 if previous and delta > 0 and delta <= 4:
-                    clear_events.append({
+                    event = {
                         "player": name,
                         "raid_name": raid,
                         "clear_time": now,
                         "server": previous.get("server", server)
-                    })
-                    logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{previous.get('server', server)}")
+                    }
+                    # 重複排除
+                    if not is_duplicate_event(event, clear_events_window):
+                        clear_events.append(event)
+                        logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{previous.get('server', server)}")
             previous_player_data[uuid] = {
                 "raids": dict(raids),
                 "server": server,
@@ -87,8 +106,14 @@ async def track_guild_raids(bot=None):
             }
         
         logger.info("ETKWメンバー情報取得完了！")
-        # パーティ推定＆DB保存・通知
-        parties = estimate_and_save_parties(clear_events)
+
+        # windowに今回のイベントを追加（重複排除）
+        for event in clear_events:
+            if not is_duplicate_event(event, clear_events_window):
+                clear_events_window.append(event)
+
+        # パーティ推定＆DB保存・通知（window全体を渡す）
+        parties = estimate_and_save_parties(list(clear_events_window))
         for party in parties:
             if party["trust_score"] < 85:
                 logger.info(f"信頼スコア85未満のため履歴保存＆通知スキップ: {party}")
@@ -108,11 +133,12 @@ async def track_guild_raids(bot=None):
                 except Exception as e:
                     logger.error(f"通知Embed送信失敗: {e}")
 
-        await asyncio.to_thread(cleanup_old_server_logs, 5)        
+        # サーバーログのクリーンアップ（4分保持）
+        await asyncio.to_thread(cleanup_old_server_logs, 4)
         elapsed = time.time() - start_time
-        sleep_time = max(100 - elapsed, 0)
+        sleep_time = max(loop_interval - elapsed, 0)
         logger.info(f"次回まで{sleep_time:.1f}秒待機（処理時間: {elapsed:.1f}秒）")
         await asyncio.sleep(sleep_time)
 
 async def setup(bot):
-    bot.loop.create_task(track_guild_raids(bot))
+    bot.loop.create_task(track_guild_raids(bot, loop_interval=30))
