@@ -174,4 +174,4 @@ async def track_guild_raids(bot=None, loop_interval=100):
         await asyncio.sleep(sleep_time)
 
 async def setup(bot):
-    bot.loop.create_task(track_guild_raids(bot, loop_interval=30))
+    bot.loop.create_task(track_guild_raids(bot, loop_interval=100))
