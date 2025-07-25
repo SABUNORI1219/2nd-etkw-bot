@@ -23,6 +23,18 @@ ADDC_RAID_CHOICES = [
     app_commands.Choice(name="The Nameless Anomaly", value="The Nameless Anomaly")
 ]
 
+def normalize_date(date_str):
+    parts = date_str.split('-')
+    if len(parts) == 3:
+        year, month, day = parts
+        return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+    elif len(parts) == 2:
+        year, month = parts
+        return f"{year}-{month.zfill(2)}"
+    elif len(parts) == 1:
+        return parts[0]
+    return date_str
+
 # ページ付きEmbed用View
 class PlayerCountView(discord.ui.View):
     def __init__(self, player_counts, page=0, per_page=10, timeout=120):
@@ -90,16 +102,29 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         if interaction.user.id not in AUTHORIZED_USER_IDS:
             await send_authorized_only_message(interaction)
             return
+
+        date_from = None
+        if date:
+            normalized_date = normalize_date(date)
+            try:
+                if len(normalized_date) == 10:
+                    date_from = datetime.strptime(normalized_date, "%Y-%m-%d")
+                elif len(normalized_date) == 7:
+                    date_from = datetime.strptime(normalized_date, "%Y-%m")
+                elif len(normalized_date) == 4:
+                    date_from = datetime.strptime(normalized_date, "%Y")
+            except Exception:
+                date_from = None
         
         # 合計集計
         if raid_name == "Total":
             rows = []
             for raid_choice in RAID_CHOICES[:-1]:
-                raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date)
+                raid_rows = fetch_history(raid_name=raid_choice.value, date_from)
                 rows.extend(raid_rows)
             title_text = "Guild Raid Player Counts: 合計"
         else:
-            rows = fetch_history(raid_name=raid_name, date_from=date)
+            rows = fetch_history(raid_name=raid_name, date_from)
             title_text = f"Guild Raid Player Counts: {raid_name}"
 
         if not rows:
