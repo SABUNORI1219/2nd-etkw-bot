@@ -36,8 +36,10 @@ class SpamDetectorCog(commands.Cog):
         mention_pattern = r"<@!?(\d+)>"
         all_mentions = re.findall(mention_pattern, message.content)
 
+        all_mentions_int = [int(user_id) for user_id in all_mentions]
+
         # 各ユーザーIDのメンション回数をカウント
-        other_mentions = [user_id for user_id in all_mentions if int(user_id) != message.author.id]
+        other_mentions = [user_id for user_id in all_mentions_int if int(user_id) != message.author.id]
         mention_counts = Counter(other_mentions)
 
         # 2回以上メンションされたユーザーを抽出
