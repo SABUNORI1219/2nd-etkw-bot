@@ -72,6 +72,8 @@ def reset_player_raid_count(player, raid_name, count):
         conn.commit()
     conn.close()
 
+from datetime import datetime
+
 def fetch_history(raid_name=None, date_from=None):
     """
     ギルドレイド履歴を取得する。
@@ -89,27 +91,30 @@ def fetch_history(raid_name=None, date_from=None):
             params.append(raid_name)
         if date_from:
             # 年・月単位など柔軟に対応
+            dt = None
             if isinstance(date_from, str):
-                # YYYY-MM-DD
-                if len(date_from) == 10:
-                    sql += " AND clear_time >= %s"
-                    params.append(date_from)
-                # YYYY-MM
-                elif len(date_from) == 7:
-                    month_start = f"{date_from}-01"
-                    sql += " AND clear_time >= %s"
-                    params.append(month_start)
-                # YYYY
-                elif len(date_from) == 4:
-                    year_start = f"{date_from}-01-01"
-                    sql += " AND clear_time >= %s"
-                    params.append(year_start)
-                else:
-                    # 形式不明→何もしない
-                    pass
-            else:
+                if len(date_from) == 10:  # YYYY-MM-DD
+                    try:
+                        dt = datetime.strptime(date_from, "%Y-%m-%d")
+                    except Exception:
+                        pass
+                elif len(date_from) == 7:  # YYYY-MM
+                    try:
+                        dt = datetime.strptime(date_from, "%Y-%m")
+                    except Exception:
+                        pass
+                elif len(date_from) == 4:  # YYYY
+                    try:
+                        dt = datetime.strptime(date_from, "%Y")
+                    except Exception:
+                        pass
+                # 不正な形式は無視
+            elif isinstance(date_from, datetime):
+                dt = date_from
+            # datetime型に変換できた場合だけフィルタ
+            if dt is not None:
                 sql += " AND clear_time >= %s"
-                params.append(date_from)
+                params.append(dt)
         sql += " ORDER BY clear_time DESC"
         cur.execute(sql, params)
         rows = cur.fetchall()
