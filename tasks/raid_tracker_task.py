@@ -29,6 +29,26 @@ def extract_online_members(guild_data):
                 })
     return online_members
 
+def remove_party_events_from_window(window, party, time_threshold=2):
+    """
+    windowからpartyに該当するクリアイベントを除去
+    - party: {"raid_name", "clear_time", "members"}
+    - time_threshold: clear_time一致判定の許容秒数
+    """
+    to_remove = []
+    for e in window:
+        if (
+            e["raid_name"] == party["raid_name"] and
+            e["player"] in party["members"] and
+            abs((e["clear_time"] - party["clear_time"]).total_seconds()) < time_threshold
+        ):
+            to_remove.append(e)
+    for e in to_remove:
+        try:
+            window.remove(e)
+        except ValueError:
+            pass  # 既に消えてた場合
+
 async def get_player_data(api, uuid):
     # uuidでAPI取得、nameは後で紐づけ
     return await api.get_nori_player_data(uuid)
@@ -142,6 +162,9 @@ async def track_guild_raids(bot=None, loop_interval=30):
                     await send_guild_raid_embed(bot, party)
                 except Exception as e:
                     logger.error(f"通知Embed送信失敗: {e}")
+
+            # --- party通知後にwindowから該当イベント除去 ---
+            remove_party_events_from_window(clear_events_window, party, time_threshold=2)
 
         # サーバーログのクリーンアップ（4分保持）
         await asyncio.to_thread(cleanup_old_server_logs, 4)
