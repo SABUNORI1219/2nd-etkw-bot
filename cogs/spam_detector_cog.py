@@ -1,4 +1,5 @@
 import discord
+import re
 from discord.ext import commands
 import logging
 from collections import defaultdict
