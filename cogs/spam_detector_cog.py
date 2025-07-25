@@ -30,6 +30,15 @@ class SpamDetectorCog(commands.Cog):
         if message.author.id not in SPAM_TARGET_USER_IDS:
             return
 
+        # 1. メッセージ内のメンション数を数える
+        total_mentions = len(message.mentions) + len(message.role_mentions)
+
+        # 2. メンション数が2以上であれば、スパムと判断して応答
+        if total_mentions >= 2:
+            logger.info(f"--- [SpamDetector] ユーザー'{message.author.name}'によるメンションスパムを検知しました。")
+            await message.reply("tkbad!")
+            return # メンションスパムの場合は、ここで処理を終了
+
         user_id = message.author.id
         current_time = datetime.utcnow()
 
