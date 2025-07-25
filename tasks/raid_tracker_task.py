@@ -44,6 +44,13 @@ def is_duplicate_event(event, window, threshold_sec=2):
             return True
     return False
 
+def cleanup_old_events(window, max_age_sec=100):
+    """windowからmax_age_secより前のイベントを除去"""
+    now = datetime.utcnow()
+    # dequeの先頭から古いイベントを削除
+    while window and (now - window[0]["clear_time"]).total_seconds() > max_age_sec:
+        window.popleft()
+
 async def track_guild_raids(bot=None, loop_interval=30):
     api = WynncraftAPI()
     while True:
@@ -111,6 +118,9 @@ async def track_guild_raids(bot=None, loop_interval=30):
         for event in clear_events:
             if not is_duplicate_event(event, clear_events_window):
                 clear_events_window.append(event)
+
+        # 100秒より前のイベントをwindowから除去
+        cleanup_old_events(clear_events_window, max_age_sec=100)
 
         # パーティ推定＆DB保存・通知（window全体を渡す）
         parties = estimate_and_save_parties(list(clear_events_window))
