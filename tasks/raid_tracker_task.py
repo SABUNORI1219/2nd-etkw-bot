@@ -146,7 +146,7 @@ async def track_guild_raids(bot=None, loop_interval=120):
         cleanup_old_events(clear_events_window, max_age_sec=500)
 
         # パーティ推定＆DB保存・通知（window全体を渡す）
-        parties = estimate_and_save_parties(list(clear_events_window))
+        parties = estimate_and_save_parties(list(clear_events_window), window=clear_events_window))
         for party in parties:
             for member in party["members"]:
                 logger.info(f"insert_history呼び出し: {party['raid_name']} {party['clear_time']} {member}")
