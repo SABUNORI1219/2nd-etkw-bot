@@ -103,6 +103,9 @@ async def track_guild_raids(bot=None, loop_interval=120):
             name = member["name"]
             server = pdata.get("server") or member.get("server")
             raids = pdata.get("globalData", {}).get("raids", {}).get("list", {})
+            if not raids or len(raids) == 0:
+                logger.warning(f"APIが空データ: {name} {uuid} サーバー:{server}。previous_player_dataは更新せずスキップ")
+                continue  # このループはスキップ
             previous = previous_player_data.get(uuid)
             logger.info(f"API raids for {name}: {raids}")
             await asyncio.to_thread(insert_server_log, name, now, server)
@@ -132,8 +135,6 @@ async def track_guild_raids(bot=None, loop_interval=120):
                 "timestamp": now,
                 "name": name
             }
-        logger.info(f"previous_player_data[{uuid}]: {previous_player_data.get(uuid)}")
-        
         logger.info("ETKWメンバー情報取得完了！")
 
         # windowに今回のイベントを追加（重複排除）
