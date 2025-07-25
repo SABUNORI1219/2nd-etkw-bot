@@ -1,6 +1,7 @@
 import discord
 import re
 from discord.ext import commands
+from collections import Counter
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -36,15 +37,14 @@ class SpamDetectorCog(commands.Cog):
         all_mentions = re.findall(mention_pattern, message.content)
 
         # 各ユーザーIDのメンション回数をカウント
-        from collections import Counter
+        other_mentions = [user_id for user_id in all_mentions if int(user_id) != message.author.id]
         mention_counts = Counter(all_mentions)
 
         # 2回以上メンションされたユーザーを抽出
         multi_mentioned_users = [user_id for user_id, count in mention_counts.items() if count >= 2]
-
         if multi_mentioned_users:
             logger.info(f"--- [SpamDetector] ユーザー'{message.author.name}'が同一ユーザーを複数回メンションしました: {multi_mentioned_users}")
-            await message.reply("tkbad! (同じユーザー複数回メンション検知)")
+            await message.reply("tkbad!")
             return
 
         user_id = message.author.id
