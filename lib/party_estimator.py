@@ -39,18 +39,20 @@ def estimate_and_save_parties(clear_events):
             party_candidate = events[i:i+4]
             first_time = party_candidate[0]["clear_time"]
             last_time = party_candidate[-1]["clear_time"]
-            # クリア時刻が近い4人
+            # 追加: 同じplayerが複数名いる候補は除外
+            member_names = [p["player"] for p in party_candidate]
+            if len(set(member_names)) < 4:
+                continue
             if (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES):
                 score, criteria, server = _score_party(party_candidate)
                 logger.info(
-                    f"パーティ候補: レイド名: {raid} / メンバー: {[p['player'] for p in party_candidate]}, スコア: {score}, 詳細: {criteria}"
+                    f"パーティ候補: レイド名: {raid} / メンバー: {member_names}, スコア: {score}, 詳細: {criteria}"
                 )
                 if score >= SCORE_THRESHOLD:
-                    members = [p["player"] for p in party_candidate]
                     party = {
                         "raid_name": raid,
                         "clear_time": first_time,
-                        "members": members,
+                        "members": member_names,
                         "server": server,
                         "trust_score": score,
                         "criteria": criteria
