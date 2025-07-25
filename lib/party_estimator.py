@@ -6,11 +6,19 @@ logger = logging.getLogger(__name__)
 
 SCORE_THRESHOLD = 80
 TIME_WINDOW_MINUTES = 3
-SERVER_MATCH_SCORE = 50
-SERVER_PARTIAL_SCORE = 20
-TIME_SCORE_60 = 50
-TIME_SCORE_120 = 30
-TIME_SCORE_OTHER = 10
+
+# サーバー一致度を細かく
+SERVER_ALL_MATCH_SCORE = 50
+SERVER_THREE_MATCH_SCORE = 35
+SERVER_TWO_MATCH_SCORE = 20
+SERVER_PARTIAL_SCORE = 10
+
+# 時間差スコア
+TIME_ALL_MATCH_SCORE = 50
+TIME_30_SEC_SCORE = 40
+TIME_60_SEC_SCORE = 30
+TIME_120_SEC_SCORE = 10
+TIME_OTHER_SCORE = 0
 
 def _round_time(dt):
     # 秒単位で丸める
@@ -61,23 +69,42 @@ def _score_party(party):
     servers = [p["server"] for p in party]
     criteria = {}
     score = 0
-    if len(servers) == 4:
-        unique_servers = set(servers)
-        if len(unique_servers) == 1 and None not in unique_servers:
-            score += SERVER_MATCH_SCORE
-            criteria['server_match'] = f"全員同じサーバー({servers[0]})"
-        else:
-            score += SERVER_PARTIAL_SCORE
-            criteria['server_match'] = f"サーバーが一部異なる: {servers}"
-    first_time = min([p["clear_time"] for p in party])
-    last_time = max([p["clear_time"] for p in party])
-    time_diff = (last_time - first_time).total_seconds()
-    if time_diff <= 60:
-        score += TIME_SCORE_60
-    elif time_diff <= 120:
-        score += TIME_SCORE_120
+    # サーバー一致度
+    unique_servers = set(servers)
+    same_server_count = max([servers.count(s) for s in unique_servers]) if servers else 0
+    if len(unique_servers) == 1 and None not in unique_servers:
+        score += SERVER_ALL_MATCH_SCORE
+        criteria['server_match'] = f"全員同じサーバー({servers[0]})"
+    elif same_server_count == 3:
+        score += SERVER_THREE_MATCH_SCORE
+        criteria['server_match'] = f"3人同じサーバー({servers})"
+    elif same_server_count == 2:
+        score += SERVER_TWO_MATCH_SCORE
+        criteria['server_match'] = f"2人同じサーバー({servers})"
     else:
-        score += TIME_SCORE_OTHER
-    criteria['time_proximity'] = f"{int(time_diff)}秒差"
+        score += SERVER_PARTIAL_SCORE
+        criteria['server_match'] = f"サーバーがバラバラ: {servers}"
+
+    # クリア時間の近さ
+    times = [p["clear_time"] for p in party]
+    min_time = min(times)
+    max_time = max(times)
+    time_diff = (max_time - min_time).total_seconds()
+    if time_diff == 0:
+        score += TIME_ALL_MATCH_SCORE
+        criteria['time_proximity'] = "全員同時"
+    elif time_diff <= 30:
+        score += TIME_30_SEC_SCORE
+        criteria['time_proximity'] = f"{int(time_diff)}秒差（30秒以内）"
+    elif time_diff <= 60:
+        score += TIME_60_SEC_SCORE
+        criteria['time_proximity'] = f"{int(time_diff)}秒差（60秒以内）"
+    elif time_diff <= 120:
+        score += TIME_120_SEC_SCORE
+        criteria['time_proximity'] = f"{int(time_diff)}秒差（120秒以内）"
+    else:
+        score += TIME_OTHER_SCORE
+        criteria['time_proximity'] = f"{int(time_diff)}秒差（遠い）"
+
     server = servers[0] if servers and servers[0] is not None else None
     return score, criteria, server
