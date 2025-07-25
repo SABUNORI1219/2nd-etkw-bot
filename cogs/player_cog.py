@@ -194,51 +194,57 @@ Total Level: {total_level:,}
         await interaction.response.defer()
 
         cache_key = f"player_{player.lower()}"
-        
-        # 1. まずキャッシュ担当者に新鮮なデータを問い合わせる
         cached_data = self.cache.get_cache(cache_key)
         if cached_data:
             logger.info(f"--- [Cache] プレイヤー'{player}'のキャッシュを使用しました。")
-            # キャッシュから埋め込みを作成
             embed = self._create_player_embed(cached_data)
             await interaction.followup.send(embed=embed)
             return
 
-        # 2. キャッシュがない場合のみ、API担当者に問い合わせる
         logger.info(f"--- [API] プレイヤー'{player}'のデータをAPIから取得します。")
         api_data = await self.wynn_api.get_nori_player_data(player)
 
-        # 3. APIからの応答を処理
-        
-        # 3-1. プレイヤーが見つからない、または明確なエラーの場合
+        # 1. エラー返却なら即「見つかりませんでした」
         if not api_data or (isinstance(api_data, dict) and "Error" in api_data):
-            # この場合、キャッシュは更新せず、エラーメッセージを返す
             await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
             return
-        
-        # 3-2. データ取得に成功した場合（単一または衝突）
-        
+
+        # 2. 単一プレイヤーデータ（usernameキーあり）ならembed
         if isinstance(api_data, dict) and 'username' in api_data:
             embed = self._create_player_embed(api_data)
-            # 取得した新しいデータをキャッシュに保存する-複数プレイヤーはキャッシュ化しない(バグる)
             self.cache.set_cache(cache_key, api_data)
             await interaction.followup.send(embed=embed)
-        elif isinstance(api_data, dict):
-            # UUIDキー1件だけなら単一扱い
-            if (
-                all(len(k) == 36 for k in api_data.keys()) and  # UUIDキーのみ
-                len(api_data) == 1 and
-                all(isinstance(v, dict) for v in api_data.values())
-            ):
-                player_data = list(api_data.values())[0]
-                embed = self._create_player_embed(player_data)
-                await interaction.followup.send(embed=embed)
-            else:
-                view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self, owner_id=interaction.user.id)
+            return
+
+        # 3. UUIDキーのみ1件ならembed
+        if (
+            isinstance(api_data, dict) and
+            all(len(k) == 36 for k in api_data.keys()) and
+            len(api_data) == 1 and
+            all(isinstance(v, dict) for v in api_data.values())
+        ):
+            player_data = list(api_data.values())[0]
+            embed = self._create_player_embed(player_data)
+            await interaction.followup.send(embed=embed)
+            return
+
+        # 4. UUIDキーのみ2件以上・値が全部dictならView。空ならエラー
+        if (
+            isinstance(api_data, dict) and
+            all(len(k) == 36 for k in api_data.keys()) and
+            len(api_data) >= 2 and
+            all(isinstance(v, dict) for v in api_data.values())
+        ):
+            view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self, owner_id=interaction.user.id)
+            # optionsが実際にあるかチェック
+            if hasattr(view, "select_menu") and view.select_menu.options:
                 await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
-        else:
-            # ここは通常通らないはずだが、念のため
-            await interaction.followup.send(f"プレイヤー「{player}」の情報を正しく取得できませんでした。")
+            else:
+                await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
+            return
+
+        # 5. それ以外は全部「見つかりませんでした」
+        await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
 
 # BotにCogを登録するためのセットアップ関数
 async def setup(bot: commands.Bot):
