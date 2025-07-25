@@ -104,6 +104,7 @@ async def track_guild_raids(bot=None, loop_interval=120):
             server = pdata.get("server") or member.get("server")
             raids = pdata.get("globalData", {}).get("raids", {}).get("list", {})
             previous = previous_player_data.get(uuid)
+            logger.info(f"API raids for {name}: {raids}")
             await asyncio.to_thread(insert_server_log, name, now, server)
             for raid in [
                 "The Canyon Colossus",
@@ -131,6 +132,7 @@ async def track_guild_raids(bot=None, loop_interval=120):
                 "timestamp": now,
                 "name": name
             }
+        logger.info(f"previous_player_data[{uuid}]: {previous_player_data.get(uuid)}")
         
         logger.info("ETKWメンバー情報取得完了！")
 
