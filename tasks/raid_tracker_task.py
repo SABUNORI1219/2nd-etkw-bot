@@ -71,7 +71,7 @@ def cleanup_old_events(window, max_age_sec=100):
     while window and (now - window[0]["clear_time"]).total_seconds() > max_age_sec:
         window.popleft()
 
-async def track_guild_raids(bot=None, loop_interval=30):
+async def track_guild_raids(bot=None, loop_interval=100):
     api = WynncraftAPI()
     while True:
         logger.info("ETKWメンバー情報取得開始...")
