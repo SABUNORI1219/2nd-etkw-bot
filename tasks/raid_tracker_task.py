@@ -101,8 +101,8 @@ async def track_guild_raids(bot=None, loop_interval=30):
                         "clear_time": now,
                         "server": previous.get("server", server)
                     }
-                    # 重複排除
-                    if not is_duplicate_event(event, clear_events_window):
+                    # 重複排除（window＋同ループ内）
+                    if not is_duplicate_event(event, clear_events_window) and not is_duplicate_event(event, clear_events):
                         clear_events.append(event)
                         logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{previous.get('server', server)}")
             previous_player_data[uuid] = {
