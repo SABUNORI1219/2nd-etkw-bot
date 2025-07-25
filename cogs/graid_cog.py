@@ -120,11 +120,11 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         if raid_name == "Total":
             rows = []
             for raid_choice in RAID_CHOICES[:-1]:
-                raid_rows = fetch_history(raid_name=raid_choice.value, date_from)
+                raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from)
                 rows.extend(raid_rows)
             title_text = "Guild Raid Player Counts: 合計"
         else:
-            rows = fetch_history(raid_name=raid_name, date_from)
+            rows = fetch_history(raid_name=raid_name, date_from=date_from)
             title_text = f"Guild Raid Player Counts: {raid_name}"
 
         if not rows:
