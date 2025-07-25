@@ -30,13 +30,21 @@ class SpamDetectorCog(commands.Cog):
         if message.author.id not in SPAM_TARGET_USER_IDS:
             return
 
-        other_user_mentions = [user for user in message.mentions if user.id != message.author.id]
-        total_mentions = len(message.mentions) + len(message.role_mentions)
+        # 全てのユーザーメンションをcontentから抽出
+        mention_pattern = r"<@!?(\d+)>"
+        all_mentions = re.findall(mention_pattern, message.content)
 
-        if total_mentions >= 2:
-            logger.info(f"--- [SpamDetector] ユーザー'{message.author.name}'によるメンションスパムを検知しました。")
-            await message.reply("tkbad!")
-            return # メンションスパムの場合は、ここで処理を終了
+        # 各ユーザーIDのメンション回数をカウント
+        from collections import Counter
+        mention_counts = Counter(all_mentions)
+
+        # 2回以上メンションされたユーザーを抽出
+        multi_mentioned_users = [user_id for user_id, count in mention_counts.items() if count >= 2]
+
+        if multi_mentioned_users:
+            logger.info(f"--- [SpamDetector] ユーザー'{message.author.name}'が同一ユーザーを複数回メンションしました: {multi_mentioned_users}")
+            await message.reply("tkbad! (同じユーザー複数回メンション検知)")
+            return
 
         user_id = message.author.id
         current_time = datetime.utcnow()
