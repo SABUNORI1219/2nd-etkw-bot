@@ -119,6 +119,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                     logger.info(f"{date_from}, len4 pattern ")
             except Exception:
                 date_from = None
+                logger.info(f"{date_from}, bagutterun unko")
         
         # 合計集計
         if raid_name == "Total":
