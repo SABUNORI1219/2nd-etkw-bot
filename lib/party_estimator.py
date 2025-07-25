@@ -20,7 +20,7 @@ TIME_OTHER_SCORE = 0
 def _round_time(dt):
     return dt.replace(microsecond=0)
 
-def remove_events_from_window(window, party_candidate, time_threshold=300):
+def remove_events_from_window(window, party_candidate, time_threshold=500):
     # party_candidateに含まれるイベントをwindowから除去（5分＝300秒以内）
     to_remove = []
     candidate_names = set(p["player"] for p in party_candidate)
@@ -103,7 +103,7 @@ def estimate_and_save_parties(clear_events, window=None):
     # 認定できなかったパーティ候補のイベントをwindowから除去
     if window is not None:
         for raid, party_candidate, first_time, last_time in to_exclude_events:
-            remove_events_from_window(window, party_candidate, time_threshold=300)
+            remove_events_from_window(window, party_candidate, time_threshold=500)
 
     return saved_parties
 
