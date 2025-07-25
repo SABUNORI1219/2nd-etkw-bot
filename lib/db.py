@@ -92,21 +92,22 @@ def fetch_history(raid_name=None, date_from=None):
             if isinstance(date_from, str):
                 # YYYY-MM-DD
                 if len(date_from) == 10:
-                    sql += " AND to_char(clear_time, 'YYYY-MM-DD') = %s"
+                    sql += " AND clear_time >= %s"
                     params.append(date_from)
                 # YYYY-MM
                 elif len(date_from) == 7:
-                    sql += " AND to_char(clear_time, 'YYYY-MM') = %s"
-                    params.append(date_from)
+                    month_start = f"{date_from}-01"
+                    sql += " AND clear_time >= %s"
+                    params.append(month_start)
                 # YYYY
                 elif len(date_from) == 4:
-                    sql += " AND to_char(clear_time, 'YYYY') = %s"
-                    params.append(date_from)
+                    year_start = f"{date_from}-01-01"
+                    sql += " AND clear_time >= %s"
+                    params.append(year_start)
                 else:
                     # 形式不明→何もしない
                     pass
             else:
-                # datetime型もしくはそれ以外（>=検索）
                 sql += " AND clear_time >= %s"
                 params.append(date_from)
         sql += " ORDER BY clear_time DESC"
