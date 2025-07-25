@@ -4,7 +4,7 @@ from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
-SCORE_THRESHOLD = 85
+SCORE_THRESHOLD = 80
 TIME_WINDOW_MINUTES = 3
 SERVER_MATCH_SCORE = 50
 SERVER_PARTIAL_SCORE = 20
