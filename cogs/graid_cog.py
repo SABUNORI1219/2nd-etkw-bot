@@ -106,13 +106,17 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         date_from = None
         if date:
             normalized_date = normalize_date(date)
+            logger.info(f"{normalized_date}")
             try:
                 if len(normalized_date) == 10:
                     date_from = datetime.strptime(normalized_date, "%Y-%m-%d")
+                    logger.info(f"{date_from}, len10 poattern")
                 elif len(normalized_date) == 7:
                     date_from = datetime.strptime(normalized_date, "%Y-%m")
+                    logger.info(f"{date_from}, len7 pattern")
                 elif len(normalized_date) == 4:
                     date_from = datetime.strptime(normalized_date, "%Y")
+                    logger.info(f"{date_from}, len4 pattern ")
             except Exception:
                 date_from = None
         
