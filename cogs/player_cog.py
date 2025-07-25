@@ -11,7 +11,7 @@ from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN
 from lib.cache_handler import CacheHandler
 
 class PlayerSelectView(discord.ui.View):
-    def __init__(self, player_collision_dict: dict, cog_instance):
+    def __init__(self, player_collision_dict: dict, cog_instance, owner_id):
         super().__init__(timeout=60.0)
         self.cog_instance = cog_instance
         self.owner_id = owner_id
