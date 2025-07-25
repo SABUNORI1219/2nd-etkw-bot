@@ -64,14 +64,14 @@ def is_duplicate_event(event, window, threshold_sec=2):
             return True
     return False
 
-def cleanup_old_events(window, max_age_sec=100):
+def cleanup_old_events(window, max_age_sec=360):
     """windowからmax_age_secより前のイベントを除去"""
     now = datetime.utcnow()
     # dequeの先頭から古いイベントを削除
     while window and (now - window[0]["clear_time"]).total_seconds() > max_age_sec:
         window.popleft()
 
-async def track_guild_raids(bot=None, loop_interval=100):
+async def track_guild_raids(bot=None, loop_interval=120):
     api = WynncraftAPI()
     while True:
         logger.info("ETKWメンバー情報取得開始...")
@@ -140,7 +140,7 @@ async def track_guild_raids(bot=None, loop_interval=100):
                 clear_events_window.append(event)
 
         # 100秒より前のイベントをwindowから除去
-        cleanup_old_events(clear_events_window, max_age_sec=300)
+        cleanup_old_events(clear_events_window, max_age_sec=360)
 
         # パーティ推定＆DB保存・通知（window全体を渡す）
         parties = estimate_and_save_parties(list(clear_events_window))
@@ -167,11 +167,11 @@ async def track_guild_raids(bot=None, loop_interval=100):
             remove_party_events_from_window(clear_events_window, party, time_threshold=2)
 
         # サーバーログのクリーンアップ（4分保持）
-        await asyncio.to_thread(cleanup_old_server_logs, 4)
+        await asyncio.to_thread(cleanup_old_server_logs, 5)
         elapsed = time.time() - start_time
         sleep_time = max(loop_interval - elapsed, 0)
         logger.info(f"次回まで{sleep_time:.1f}秒待機（処理時間: {elapsed:.1f}秒）")
         await asyncio.sleep(sleep_time)
 
 async def setup(bot):
-    bot.loop.create_task(track_guild_raids(bot, loop_interval=100))
+    bot.loop.create_task(track_guild_raids(bot, loop_interval=120))
