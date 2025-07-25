@@ -10,8 +10,8 @@ from config import SPAM_TARGET_USER_IDS
 logger = logging.getLogger(__name__)
 
 # スパムと判断する基準
-SPAM_MESSAGE_COUNT = 5  # この回数以上投稿したら
-SPAM_TIME_WINDOW = timedelta(seconds=5) # この秒数以内に
+SPAM_MESSAGE_COUNT = 3  # この回数以上投稿したら
+SPAM_TIME_WINDOW = timedelta(seconds=3) # この秒数以内に
 
 class SpamDetectorCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -44,7 +44,7 @@ class SpamDetectorCog(commands.Cog):
 
         # タイムウィンドウ内のメッセージ数が閾値を超えたかチェック
         if len(self.user_message_timestamps[user_id]) >= SPAM_MESSAGE_COUNT:
-            logger.info(f"--- [SpamDetector] ユーザー'{message.author.name}'によるスパムを検知しました。")
+            logger.info(f"--- [SpamDetector] ユーザー'{message.author.name}'によるスパムを検知！")
             
             # 応答メッセージを送信
             await message.reply("tkbad!")
