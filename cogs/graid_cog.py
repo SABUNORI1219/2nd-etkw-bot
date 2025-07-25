@@ -108,15 +108,12 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             normalized_date = normalize_date(date)
             logger.info(f"{normalized_date}")
             try:
-                if len(normalized_date) == 10:
+                if normalized_date.count('-') == 2:  # YYYY-MM-DD
                     date_from = datetime.strptime(normalized_date, "%Y-%m-%d")
-                    logger.info(f"{date_from}, len10 poattern")
-                elif len(normalized_date) == 7:
+                elif normalized_date.count('-') == 1:  # YYYY-MM
                     date_from = datetime.strptime(normalized_date, "%Y-%m")
-                    logger.info(f"{date_from}, len7 pattern")
-                elif len(normalized_date) == 4:
+                elif normalized_date.count('-') == 0:  # YYYY
                     date_from = datetime.strptime(normalized_date, "%Y")
-                    logger.info(f"{date_from}, len4 pattern ")
             except Exception:
                 date_from = None
                 logger.info(f"{date_from}, bagutterun unko")
