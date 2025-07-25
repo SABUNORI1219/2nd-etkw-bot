@@ -12,56 +12,44 @@ TIME_SCORE_60 = 50
 TIME_SCORE_120 = 30
 TIME_SCORE_OTHER = 10
 
+def _round_time(dt):
+    # 秒単位で丸める
+    return dt.replace(microsecond=0)
+
 def estimate_and_save_parties(clear_events):
-    """
-    個人クリアイベントリストからパーティ推定
-    clear_events: [
-        {
-            "player": str,
-            "raid_name": str,
-            "clear_time": datetime,
-            "server": Optional[str]
-        }, ...
-    ]
-    Returns: List of party dicts
-    """
-    # レイドごとで分割
     events_by_raid = defaultdict(list)
     for event in clear_events:
         events_by_raid[event["raid_name"]].append(event)
 
     saved_parties = []
-    party_keys = set()  # 重複排除用セット
+    party_keys = set()
 
     for raid, events in events_by_raid.items():
-        # 時刻順にソート
         events.sort(key=lambda x: x["clear_time"])
-        # スライディングウィンドウで4人組を抽出
         for i in range(len(events) - 3):
             party_candidate = events[i:i+4]
-            first_time = party_candidate[0]["clear_time"]
-            last_time = party_candidate[-1]["clear_time"]
             member_names = [p["player"] for p in party_candidate]
-            # 追加: 同じplayerが複数名いる候補は除外
-            if len(set(member_names)) < 4:
+            # パーティ重複防止：順序無視でメンバーセット化
+            member_set = frozenset(member_names)
+            # 時間差判定
+            first_time = min([p["clear_time"] for p in party_candidate])
+            last_time = max([p["clear_time"] for p in party_candidate])
+            if len(member_set) < 4:
                 continue
             if (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES):
                 score, criteria, server = _score_party(party_candidate)
                 logger.info(
                     f"パーティ候補: レイド名: {raid} / メンバー: {member_names}, スコア: {score}, 詳細: {criteria}"
                 )
-                # --- 重複排除 ---
-                key = (
-                    raid,
-                    first_time,
-                    tuple(sorted(member_names))
-                )
+                # --- 強化重複排除 ---
+                rounded_time = _round_time(first_time)
+                key = (raid, rounded_time, member_set)
                 if score >= SCORE_THRESHOLD and key not in party_keys:
                     party_keys.add(key)
                     party = {
                         "raid_name": raid,
                         "clear_time": first_time,
-                        "members": member_names,
+                        "members": sorted(member_set),  # 順序安定化
                         "server": server,
                         "trust_score": score,
                         "criteria": criteria
@@ -70,10 +58,6 @@ def estimate_and_save_parties(clear_events):
     return saved_parties
 
 def _score_party(party):
-    """
-    party: [{player, raid_name, clear_time, server}, ...]の4人dictリスト
-    サーバー一致度・時間差でスコアリング
-    """
     servers = [p["server"] for p in party]
     criteria = {}
     score = 0
@@ -85,9 +69,8 @@ def _score_party(party):
         else:
             score += SERVER_PARTIAL_SCORE
             criteria['server_match'] = f"サーバーが一部異なる: {servers}"
-    # 時間差スコア
-    first_time = party[0]["clear_time"]
-    last_time = party[-1]["clear_time"]
+    first_time = min([p["clear_time"] for p in party])
+    last_time = max([p["clear_time"] for p in party])
     time_diff = (last_time - first_time).total_seconds()
     if time_diff <= 60:
         score += TIME_SCORE_60
@@ -96,6 +79,5 @@ def _score_party(party):
     else:
         score += TIME_SCORE_OTHER
     criteria['time_proximity'] = f"{int(time_diff)}秒差"
-    # サーバー名代表値
     server = servers[0] if servers and servers[0] is not None else None
     return score, criteria, server
