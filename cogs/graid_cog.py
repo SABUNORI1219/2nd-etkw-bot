@@ -105,18 +105,19 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
         date_from = None
         if date:
-            normalized_date = normalize_date(date)
-            logger.info(f"{normalized_date}")
+            normalized_date = normalize_date(date).strip()
+            logger.info(f"normalized_date: '{normalized_date}'")
             try:
-                if normalized_date.count('-') == 2:  # YYYY-MM-DD
+                dash_count = normalized_date.count('-')
+                if dash_count == 2:
                     date_from = datetime.strptime(normalized_date, "%Y-%m-%d")
-                elif normalized_date.count('-') == 1:  # YYYY-MM
+                elif dash_count == 1:
                     date_from = datetime.strptime(normalized_date, "%Y-%m")
-                elif normalized_date.count('-') == 0:  # YYYY
+                elif dash_count == 0:
                     date_from = datetime.strptime(normalized_date, "%Y")
-            except Exception:
+            except Exception as e:
                 date_from = None
-                logger.info(f"{date_from}, bagutterun unko")
+                logger.info(f"日付パース失敗: '{normalized_date}', error: {e}")
         
         # 合計集計
         if raid_name == "Total":
