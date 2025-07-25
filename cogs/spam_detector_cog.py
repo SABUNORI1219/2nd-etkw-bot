@@ -38,7 +38,7 @@ class SpamDetectorCog(commands.Cog):
 
         # 各ユーザーIDのメンション回数をカウント
         other_mentions = [user_id for user_id in all_mentions if int(user_id) != message.author.id]
-        mention_counts = Counter(all_mentions)
+        mention_counts = Counter(other_mentions)
 
         # 2回以上メンションされたユーザーを抽出
         multi_mentioned_users = [user_id for user_id, count in mention_counts.items() if count >= 2]
