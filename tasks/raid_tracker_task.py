@@ -94,7 +94,7 @@ async def track_guild_raids(bot=None, loop_interval=30):
                 current_count = raids.get(raid, 0)
                 prev_count = previous["raids"].get(raid, 0) if previous else 0
                 delta = current_count - prev_count
-                if previous and delta > 0 and delta <= 4:
+                if previous and delta == 1:
                     event = {
                         "player": name,
                         "raid_name": raid,
