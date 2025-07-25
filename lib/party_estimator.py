@@ -5,19 +5,19 @@ from collections import defaultdict
 logger = logging.getLogger(__name__)
 
 SCORE_THRESHOLD = 80
-TIME_WINDOW_MINUTES = 3
+# 時間差許容を広げる（例：最大5分まで）
+TIME_WINDOW_MINUTES = 5
 
-# サーバー一致度を細かく
+# サーバー一致度スコア（完全一致のみ許容）
 SERVER_ALL_MATCH_SCORE = 50
-SERVER_THREE_MATCH_SCORE = 35
-SERVER_TWO_MATCH_SCORE = 20
-SERVER_PARTIAL_SCORE = 10
+SERVER_PARTIAL_SCORE = 0  # 部分一致は不許可
 
 # 時間差スコア
 TIME_ALL_MATCH_SCORE = 50
 TIME_30_SEC_SCORE = 40
 TIME_60_SEC_SCORE = 30
-TIME_120_SEC_SCORE = 10
+TIME_120_SEC_SCORE = 20
+TIME_300_SEC_SCORE = 10  # 5分以内
 TIME_OTHER_SCORE = 0
 
 def _round_time(dt):
@@ -37,19 +37,17 @@ def estimate_and_save_parties(clear_events):
         for i in range(len(events) - 3):
             party_candidate = events[i:i+4]
             member_names = [p["player"] for p in party_candidate]
-            # パーティ重複防止：順序無視でメンバーセット化
             member_set = frozenset(member_names)
-            # 時間差判定
             first_time = min([p["clear_time"] for p in party_candidate])
             last_time = max([p["clear_time"] for p in party_candidate])
             if len(member_set) < 4:
                 continue
+            # 時間差判定（5分まで許容）
             if (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES):
                 score, criteria, server = _score_party(party_candidate)
                 logger.info(
                     f"パーティ候補: レイド名: {raid} / メンバー: {member_names}, スコア: {score}, 詳細: {criteria}"
                 )
-                # --- 強化重複排除 ---
                 rounded_time = _round_time(first_time)
                 key = (raid, rounded_time, member_set)
                 if score >= SCORE_THRESHOLD and key not in party_keys:
@@ -57,7 +55,7 @@ def estimate_and_save_parties(clear_events):
                     party = {
                         "raid_name": raid,
                         "clear_time": first_time,
-                        "members": sorted(member_set),  # 順序安定化
+                        "members": sorted(member_set),
                         "server": server,
                         "trust_score": score,
                         "criteria": criteria
@@ -69,21 +67,14 @@ def _score_party(party):
     servers = [p["server"] for p in party]
     criteria = {}
     score = 0
-    # サーバー一致度
     unique_servers = set(servers)
-    same_server_count = max([servers.count(s) for s in unique_servers]) if servers else 0
+    # サーバー完全一致のみ許容
     if len(unique_servers) == 1 and None not in unique_servers:
         score += SERVER_ALL_MATCH_SCORE
         criteria['server_match'] = f"全員同じサーバー({servers[0]})"
-    elif same_server_count == 3:
-        score += SERVER_THREE_MATCH_SCORE
-        criteria['server_match'] = f"3人同じサーバー({servers})"
-    elif same_server_count == 2:
-        score += SERVER_TWO_MATCH_SCORE
-        criteria['server_match'] = f"2人同じサーバー({servers})"
     else:
         score += SERVER_PARTIAL_SCORE
-        criteria['server_match'] = f"サーバーがバラバラ: {servers}"
+        criteria['server_match'] = f"サーバーが一致しない: {servers}"
 
     # クリア時間の近さ
     times = [p["clear_time"] for p in party]
@@ -102,6 +93,9 @@ def _score_party(party):
     elif time_diff <= 120:
         score += TIME_120_SEC_SCORE
         criteria['time_proximity'] = f"{int(time_diff)}秒差（120秒以内）"
+    elif time_diff <= 300:
+        score += TIME_300_SEC_SCORE
+        criteria['time_proximity'] = f"{int(time_diff)}秒差（5分以内）"
     else:
         score += TIME_OTHER_SCORE
         criteria['time_proximity'] = f"{int(time_diff)}秒差（遠い）"
