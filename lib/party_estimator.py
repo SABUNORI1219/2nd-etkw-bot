@@ -31,6 +31,8 @@ def estimate_and_save_parties(clear_events):
         events_by_raid[event["raid_name"]].append(event)
 
     saved_parties = []
+    party_keys = set()  # 重複排除用セット
+
     for raid, events in events_by_raid.items():
         # 時刻順にソート
         events.sort(key=lambda x: x["clear_time"])
@@ -39,8 +41,8 @@ def estimate_and_save_parties(clear_events):
             party_candidate = events[i:i+4]
             first_time = party_candidate[0]["clear_time"]
             last_time = party_candidate[-1]["clear_time"]
-            # 追加: 同じplayerが複数名いる候補は除外
             member_names = [p["player"] for p in party_candidate]
+            # 追加: 同じplayerが複数名いる候補は除外
             if len(set(member_names)) < 4:
                 continue
             if (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES):
@@ -48,7 +50,14 @@ def estimate_and_save_parties(clear_events):
                 logger.info(
                     f"パーティ候補: レイド名: {raid} / メンバー: {member_names}, スコア: {score}, 詳細: {criteria}"
                 )
-                if score >= SCORE_THRESHOLD:
+                # --- 重複排除 ---
+                key = (
+                    raid,
+                    first_time,
+                    tuple(sorted(member_names))
+                )
+                if score >= SCORE_THRESHOLD and key not in party_keys:
+                    party_keys.add(key)
                     party = {
                         "raid_name": raid,
                         "clear_time": first_time,
