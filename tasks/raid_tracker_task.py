@@ -148,9 +148,6 @@ async def track_guild_raids(bot=None, loop_interval=120):
         # パーティ推定＆DB保存・通知（window全体を渡す）
         parties = estimate_and_save_parties(list(clear_events_window))
         for party in parties:
-            if party["trust_score"] < 70:
-                logger.info(f"信頼スコア70未満のため履歴保存＆通知スキップ: {party}")
-                continue
             for member in party["members"]:
                 logger.info(f"insert_history呼び出し: {party['raid_name']} {party['clear_time']} {member}")
                 await asyncio.to_thread(
