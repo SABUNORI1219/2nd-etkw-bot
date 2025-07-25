@@ -140,7 +140,7 @@ async def track_guild_raids(bot=None, loop_interval=100):
                 clear_events_window.append(event)
 
         # 100秒より前のイベントをwindowから除去
-        cleanup_old_events(clear_events_window, max_age_sec=100)
+        cleanup_old_events(clear_events_window, max_age_sec=300)
 
         # パーティ推定＆DB保存・通知（window全体を渡す）
         parties = estimate_and_save_parties(list(clear_events_window))
