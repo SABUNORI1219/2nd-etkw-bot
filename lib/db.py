@@ -171,7 +171,7 @@ def get_config(key):
     conn.close()
     return row[0] if row else None
 
-def cleanup_old_server_logs(minutes=4):
+def cleanup_old_server_logs(minutes=5):
     """player_server_logのminutes分より前のデータを削除"""
     conn = get_conn()
     with conn.cursor() as cur:
