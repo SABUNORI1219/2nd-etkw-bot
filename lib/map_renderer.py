@@ -27,7 +27,7 @@ class MapRenderer:
             scale_factor = TARGET_WIDTH / original_w
             new_h = int(original_h * scale_factor)
             self.resized_map = self.map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
-            self.scale_factor = scale_factor # 初期リサイズ時のスケールファクターを保存
+            self.scale_factor = scale_factor
             logger.info(f"--- [MapRenderer] ベースマップを初期リサイズしました: {TARGET_WIDTH}x{new_h}")
         
         except FileNotFoundError as e:
@@ -45,16 +45,10 @@ class MapRenderer:
             return (255, 255, 255)
 
     def _is_city_territory(self, territory_data):
-        """街領地か判定: Emeralds=18000を生産する領地"""
         emeralds = int(territory_data.get("resources", {}).get("emeralds", "0"))
         return emeralds == 18000
 
     def _calc_conn_ext_hqbuff(self, owned_territories, territory_name):
-        """
-        Conn, Ext, HQ Buff計算。BFSで3階層まで探索。
-        owned_territories: ギルドが所有する領地名(set)
-        territory_name: HQ候補名
-        """
         connections = set()
         externals = set()
         visited = set()
@@ -76,7 +70,6 @@ class MapRenderer:
         return len(connections), len(externals), hq_buff
 
     def _sum_resources(self, owned_territories):
-        """ギルドが所有する領地全体の資源合計（デフォ値）"""
         total = {"emeralds": 0, "ore": 0, "crops": 0, "fish": 0, "wood": 0}
         for t in owned_territories:
             res = self.local_territories.get(t, {}).get("resources", {})
@@ -85,17 +78,10 @@ class MapRenderer:
         return total
 
     def _pick_hq_candidate(self, owned_territories, territory_api_data):
-        """
-        HQ推定ロジックの主処理。各条件を段階的に判定。
-        owned_territories: set of territory names
-        territory_api_data: APIで取得した最新データ(dict, name→詳細)
-        """
         hq_stats = []
         for t in owned_territories:
             conn, ext, hq_buff = self._calc_conn_ext_hqbuff(owned_territories, t)
-            # Time Held（APIのacquired。古いほどHQ候補）
             acquired = territory_api_data.get(t, {}).get("acquired", "")
-            # acquiredが空なら今時刻を入れて「一番新しい」とする
             if not acquired:
                 acquired = "9999-12-31T23:59:59.999999Z"
             hq_stats.append({
@@ -104,23 +90,19 @@ class MapRenderer:
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
             })
-        # top5 Ext順
         hq_stats.sort(key=lambda x: (-x["ext"], -x["conn"], -x["hq_buff"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
 
-        # a. Conn最多が2以上差で存在→それをHQ
         max_conn = max(hq_stats, key=lambda x: x["conn"])
         conn_tops = [x for x in hq_stats if x["conn"] == max_conn["conn"]]
         if max_conn["conn"] >= 2 and len(conn_tops) == 1:
             return max_conn["name"], hq_stats, top5, total_res
 
-        # b. 領地6個以下かつConn3以上なし→取得時最古
         if len(owned_territories) <= 6 and all(x["conn"] < 3 for x in hq_stats):
             oldest = min(hq_stats, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
 
-        # c. Ext最多(Else)→複数ならConn多い方
         ext_top = max(hq_stats, key=lambda x: x["ext"])
         ext_tops = [x for x in hq_stats if x["ext"] == ext_top["ext"]]
         if len(ext_tops) == 1:
@@ -130,7 +112,6 @@ class MapRenderer:
         if len(conn_maxs) == 1:
             return conn_maxs[0]["name"], hq_stats, top5, total_res
 
-        # d. HQBuff差100%未満 & Conn/Ext条件でcity優先 or HQBuff高
         diff = abs(conn_maxs[0]["hq_buff"] - conn_maxs[-1]["hq_buff"])
         if diff < 100 and conn_maxs[0]["conn"] == conn_maxs[-1]["conn"]:
             if conn_maxs[0]["ext"] < 20:
@@ -138,12 +119,9 @@ class MapRenderer:
                 if city:
                     return city["name"], hq_stats, top5, total_res
             else:
-                # ext>=20ならHQBuff高い方
                 hq_max = max(conn_maxs, key=lambda x: x["hq_buff"])
                 return hq_max["name"], hq_stats, top5, total_res
 
-        # e. Ext, Conn, HQBuff全同数→生産量少ない資源を生産する領地
-        # 0を無視しつつCrop→Ore→Wood→Fish優先
         res_priority = ["crops", "ore", "wood", "fish"]
         min_val = float("inf")
         min_type = None
@@ -152,54 +130,16 @@ class MapRenderer:
             if val > 0 and val < min_val:
                 min_val = val
                 min_type = rtype
-        # 該当する資源を生産する領地
         cand = next(
             (x for x in conn_maxs if int(x["resources"].get(min_type, "0")) > 0),
             conn_maxs[0]
         )
         return cand["name"], hq_stats, top5, total_res
 
-    def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data):
-        """
-        各ギルドのHQ候補を推定し、王冠アイコンを描画したマップ画像を作成
-        territory_data: name→詳細(dict, 描画対象の領地)
-        guild_color_map: prefix→色
-        territory_api_data: 最新apiデータ(name→acquired等)
-        """
-        map_img = self.resized_map.copy()
-        draw = ImageDraw.Draw(map_img)
-        crown_font = ImageFont.truetype(FONT_PATH, int(60 * self.scale_factor))
-        # ギルドごとにHQ推定
-        prefix_to_territories = {}
-        for name, info in territory_data.items():
-            prefix = info.get("guild", {}).get("prefix", "")
-            if not prefix:
-                continue
-            prefix_to_territories.setdefault(prefix, set()).add(name)
-        hq_marks = []
-        for prefix, owned in prefix_to_territories.items():
-            hq_name, _, _, _ = self._pick_hq_candidate(owned, territory_api_data)
-            # HQ領地の中心座標
-            loc = self.local_territories[hq_name].get("Location")
-            if not loc:
-                continue
-            x = (loc["start"][0] + loc["end"][0]) // 2
-            z = (loc["start"][1] + loc["end"][1]) // 2
-            px, py = self._coord_to_pixel(x, z)
-            px, py = px * self.scale_factor, py * self.scale_factor
-            hq_marks.append((px, py, prefix, hq_name))
-            # 王冠マーク描画（絵文字でもOK）
-            draw.text((px, py), "👑", font=crown_font, fill="gold", anchor="mm", stroke_width=2, stroke_fill="black")
-        # 既存領地描画
-        self._draw_trading_and_territories(map_img, None, False, territory_data, guild_color_map)
-        return map_img, hq_marks
-
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map):
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
         draw = ImageDraw.Draw(map_to_draw_on)
-        
-        # 1. 全ての交易路を地図の裏側に薄く描画する
         for name, data in self.local_territories.items():
             if "Trading Routes" not in data or "Location" not in data:
                 continue
@@ -225,14 +165,12 @@ class MapRenderer:
             except KeyError:
                 continue
 
-        # Font Scaling dayo!
         scaled_font_size = max(12, int(self.font.size * self.scale_factor))
         try:
             scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
         except IOError:
             scaled_font = ImageFont.load_default()
 
-        # --- 2. 全てのテリトリーを描画 ---
         for name, info in territory_data.items():
             if 'location' not in info or 'guild' not in info:
                 continue
@@ -254,21 +192,44 @@ class MapRenderer:
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
                 draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
-
         return map_to_draw_on
+
+    def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False):
+        map_img = self.resized_map.copy()
+        self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map)
+        draw = ImageDraw.Draw(map_img)
+        crown_font = ImageFont.truetype(FONT_PATH, int(60 * self.scale_factor))
+        prefix_to_territories = {}
+        for name, info in territory_data.items():
+            prefix = info.get("guild", {}).get("prefix", "")
+            if not prefix:
+                continue
+            prefix_to_territories.setdefault(prefix, set()).add(name)
+        hq_marks = []
+        for prefix, owned in prefix_to_territories.items():
+            hq_name, _, _, _ = self._pick_hq_candidate(owned, territory_api_data)
+            loc = self.local_territories.get(hq_name, {}).get("Location")
+            if not loc:
+                continue
+            x = (loc["start"][0] + loc["end"][0]) // 2
+            z = (loc["start"][1] + loc["end"][1]) // 2
+            px, py = self._coord_to_pixel(x, z)
+            px, py = px * self.scale_factor, py * self.scale_factor
+            if is_zoomed and box:
+                px -= box[0]
+                py -= box[1]
+            hq_marks.append((px, py, prefix, hq_name))
+            draw.text((px, py), "👑", font=crown_font, fill="gold", anchor="mm", stroke_width=2, stroke_fill="black")
+        return map_img, hq_marks
 
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
         if not territories_to_render:
             return None, None
-
         try:
-            # 地図のコピーと初期化
             map_to_draw_on = self.resized_map.copy()
             box = None
             all_x, all_y = [], []
             is_zoomed = len(territories_to_render) < len(self.local_territories)
-
-            # --- クロップ領域を計算 ---
             if is_zoomed:
                 for terri_data in territories_to_render.values():
                     loc = terri_data.get("location", {})
@@ -289,13 +250,13 @@ class MapRenderer:
                 )
                 map_to_draw_on = map_to_draw_on.crop(box)
 
-            # --- 描画処理をヘルパー関数に委譲 ---
-            final_map = self._draw_trading_and_territories(
-                map_to_draw_on,
-                box,
-                is_zoomed,
-                territory_data,
-                guild_color_map
+            # HQマークを含むマップを生成
+            final_map, _ = self.draw_guild_hq_on_map(
+                territory_data=territory_data,
+                guild_color_map=guild_color_map,
+                territory_api_data=territory_data,
+                box=box,
+                is_zoomed=is_zoomed,
             )
 
             # --- 最終出力 ---
@@ -321,7 +282,6 @@ class MapRenderer:
             return None, None
 
     def create_single_territory_image(self, territory: str, territory_data: dict, guild_color_map: dict) -> BytesIO | None:
-        """指定された単一のテリトリー画像を切り出して返す"""
         logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
         try:
             terri_data = self.local_territories.get(territory)
@@ -350,7 +310,6 @@ class MapRenderer:
             px1, py1 = px1 * self.scale_factor, py1 * self.scale_factor
             px2, py2 = px2 * self.scale_factor, py2 * self.scale_factor
 
-            # 必ず正しい順に整列
             left = min(px1, px2)
             right = max(px1, px2)
             top = min(py1, py2)
@@ -365,19 +324,14 @@ class MapRenderer:
                 min(self.map_on_process.height, bottom + padding)
             )
 
-            # ここでチェック
             if not (box[0] < box[2] and box[1] < box[3]):
                 logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。Box: {box}")
                 return None
 
-            # ✨ 特別な装飾を描画（中心点を使って金色の円を描く）
             center_x = (px1 + px2) / 2
             center_y = (py1 + py2) / 2
-
-            # 幅・高さをもとに円の半径を動的に設定
             territory_width = abs(px2 - px1)
             territory_height = abs(py2 - py1)
-
             highlight_radius = int(sqrt(territory_width ** 2 + territory_height ** 2) / 2)
 
             draw = ImageDraw.Draw(self.map_on_process)
@@ -389,8 +343,6 @@ class MapRenderer:
             )
                 
             cropped_image = self.map_on_process.crop(box)
-            
-            # 画像をバイトデータに変換
             map_bytes = BytesIO()
             cropped_image.save(map_bytes, format='PNG')
             map_bytes.seek(0)
