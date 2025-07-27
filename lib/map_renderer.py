@@ -223,8 +223,6 @@ class MapRenderer:
             crown_size = int(64 * self.scale_factor)
             crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
             # 略称テキストの下に王冠を描画
-            # まず略称テキストの位置を再計算
-            # 既定ロジック通り、矩形中心
             info = territory_data.get(hq_name)
             if not info or 'location' not in info:
                 continue
@@ -242,13 +240,20 @@ class MapRenderer:
             text_cx = (x_min + x_max) / 2
             text_cy = (y_min + y_max) / 2
 
-            # テキストサイズ取得
+            # フォントサイズ取得
             scaled_font_size = max(12, int(self.font.size * self.scale_factor))
             try:
                 scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
             except IOError:
                 scaled_font = ImageFont.load_default()
-            prefix_width, prefix_height = draw.textsize(prefix, font=scaled_font)
+            # Pillow 8.0以上ではgetbboxが使える
+            # prefixの描画領域サイズを取得
+            if hasattr(scaled_font, "getbbox"):
+                bbox = scaled_font.getbbox(prefix)
+                prefix_width = bbox[2] - bbox[0]
+                prefix_height = bbox[3] - bbox[1]
+            else:
+                prefix_width, prefix_height = scaled_font.getsize(prefix)
 
             # 王冠アイコンの貼付座標（テキスト下中央にオフセットして描画）
             crown_x = text_cx - crown_size/2
