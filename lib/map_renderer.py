@@ -223,20 +223,15 @@ class MapRenderer:
             color_hex = guild_color_map.get(prefix, "#FFFFFF")
             color_rgb = self._hex_to_rgb(color_hex)
             # フォントサイズ取得
-            scaled_font_size = max(12, int(self.font.size * self.scale_factor * 1.0))
+            scaled_font_size = max(12, int(self.font.size * self.scale_factor))
             try:
                 scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
             except IOError:
                 scaled_font = ImageFont.load_default()
-            # テキストサイズ取得
-            if hasattr(scaled_font, "getbbox"):
-                bbox = scaled_font.getbbox(prefix)
-                prefix_width = bbox[2] - bbox[0]
-                prefix_height = bbox[3] - bbox[1]
-            else:
-                prefix_width, prefix_height = scaled_font.getsize(prefix)
-            # 王冠はテキストより大きめ（1.3倍）
-            crown_size = int(max(prefix_width, prefix_height) * 1.1)
+            # 王冠は"略称フォントサイズ"の約1.8倍（調整可）
+            crown_size = int(scaled_font_size * 1.8)
+            # 必要ならサイズの最大・最小をclamp
+            crown_size = max(28, min(crown_size, 120))
             crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
             crown_x = int(px - crown_size/2)
             crown_y = int(py - crown_size/2)
