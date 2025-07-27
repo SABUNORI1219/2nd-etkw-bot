@@ -191,12 +191,15 @@ class MapRenderer:
                 color_rgb = self._hex_to_rgb(color_hex)
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
-                # テキスト描画（常に略称を描く）
                 draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
         return map_to_draw_on
 
     def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False, map_to_draw_on=None):
-        map_img = self.resized_map.copy()
+        # 修正: 必ずmap_to_draw_onを使う。Noneなら全体コピー
+        if map_to_draw_on is None:
+            map_img = self.resized_map.copy()
+        else:
+            map_img = map_to_draw_on
         self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map)
         draw = ImageDraw.Draw(map_img)
         prefix_to_territories = {}
@@ -219,24 +222,19 @@ class MapRenderer:
                 px -= box[0]
                 py -= box[1]
             hq_marks.append((px, py, prefix, hq_name))
-            # ギルドカラー取得
             color_hex = guild_color_map.get(prefix, "#FFFFFF")
             color_rgb = self._hex_to_rgb(color_hex)
-            # フォントサイズ取得
             scaled_font_size = max(12, int(self.font.size * self.scale_factor))
             try:
                 scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
             except IOError:
                 scaled_font = ImageFont.load_default()
-            # 王冠は"略称フォントサイズ"の約1.8倍（調整可）
             crown_size = int(scaled_font_size * 1.8)
-            # 必要ならサイズの最大・最小をclamp
             crown_size = max(28, min(crown_size, 120))
             crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
             crown_x = int(px - crown_size/2)
             crown_y = int(py - crown_size/2)
             map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
-            # テキスト描画（中央揃え、ギルドカラー＋ストローク）
             draw.text((px, py), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
         return map_img, hq_marks
 
@@ -268,7 +266,6 @@ class MapRenderer:
                 )
                 map_to_draw_on = map_to_draw_on.crop(box)
 
-            # HQマークを含むマップを生成
             final_map, _ = self.draw_guild_hq_on_map(
                 territory_data=territory_data,
                 guild_color_map=guild_color_map,
@@ -278,7 +275,6 @@ class MapRenderer:
                 map_to_draw_on=map_to_draw_on
             )
 
-            # --- 最終出力 ---
             map_bytes = BytesIO()
             final_map.save(map_bytes, format='PNG')
             map_bytes.seek(0)
@@ -313,12 +309,13 @@ class MapRenderer:
             all_x, all_y = [], []
             is_zoomed = None
 
-            self.map_on_process = self._draw_trading_and_territories(
-                map_to_draw_on,
-                box,
-                is_zoomed,
-                territory_data,
-                guild_color_map
+            self.map_on_process = self.draw_guild_hq_on_map(
+                territory_data=territory_data,
+                guild_color_map=guild_color_map,
+                territory_api_data=territory_data,
+                box=box,
+                is_zoomed=is_zoomed,
+                map_to_draw_on=map_to_draw_on
             )
             
             loc = terri_data.get("Location", {})
