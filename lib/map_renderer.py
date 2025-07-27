@@ -6,6 +6,7 @@ import json
 import discord
 from datetime import datetime, timezone, timedelta
 from math import sqrt
+import collections
 
 logger = logging.getLogger(__name__)
 
@@ -155,11 +156,42 @@ class MapRenderer:
             if val > 0 and val < min_val:
                 min_val = val
                 min_type = rtype
-        cand = next(
-            (x for x in conn_maxs if int(x["resources"].get(min_type, "0")) > 0),
-            conn_maxs[0]
-        )
-        return cand["name"], hq_stats, top5, total_res
+
+        # ギルド内でその資源を生産するterritoryリスト
+        res_territories = [x for x in hq_stats if int(x["resources"].get(min_type, "0")) > 0]
+        if res_territories and conn_maxs:
+            def trading_route_distance(start, goals, allow_owned_only=True):
+                # BFSでstartからgoalsまでの最短距離
+                queue = collections.deque()
+                visited = set()
+                queue.append((start, 0))
+                while queue:
+                    current, dist = queue.popleft()
+                    if current in visited:
+                        continue
+                    visited.add(current)
+                    if current in goals:
+                        return dist
+                    neighbors = self.local_territories.get(current, {}).get("Trading Routes", [])
+                    # 領地所有権チェック（ギルド所有だけ通れる場合に限定）
+                    if allow_owned_only:
+                        neighbors = [n for n in neighbors if n in owned_territories]
+                    queue.extend((n, dist+1) for n in neighbors)
+                return float("inf")  # 到達不能
+
+            # res_territoriesのnameリスト
+            res_territory_names = [x["name"] for x in res_territories]
+            min_dist = float("inf")
+            best_cand = conn_maxs[0]
+            for cand in conn_maxs:
+                d = trading_route_distance(cand["name"], set(res_territory_names))
+                if d < min_dist:
+                    min_dist = d
+                    best_cand = cand
+            return best_cand["name"], hq_stats, top5, total_res
+        else:
+            # どの候補も該当資源を生産していない場合は現状通り
+            return conn_maxs[0]["name"], hq_stats, top5, total_res
     
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None):
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
