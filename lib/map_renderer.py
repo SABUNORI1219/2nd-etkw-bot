@@ -236,7 +236,7 @@ class MapRenderer:
             else:
                 prefix_width, prefix_height = scaled_font.getsize(prefix)
             # 王冠はテキストより大きめ（1.3倍）
-            crown_size = int(max(prefix_width, prefix_height) * 1.3)
+            crown_size = int(max(prefix_width, prefix_height) * 1.1)
             crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
             crown_x = int(px - crown_size/2)
             crown_y = int(py - crown_size/2)
