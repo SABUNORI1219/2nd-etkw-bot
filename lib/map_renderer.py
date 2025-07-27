@@ -95,7 +95,14 @@ class MapRenderer:
         total_res = self._sum_resources(owned_territories)
 
         max_conn = max(hq_stats, key=lambda x: x["conn"])
+        max_ext = max(hq_stats, key=lambda x: x["ext"])
         conn_tops = [x for x in hq_stats if x["conn"] == max_conn["conn"]]
+        ext_tops = [x for x in hq_stats if x["ext"] == max_ext["ext"]]
+
+        # --- ★ 追加: ConnとExtの差が2以上ならConn最大を優先 ---
+        if (max_conn["conn"] - max_ext["conn"] >= 2) and len(conn_tops) == 1:
+            return max_conn["name"], hq_stats, top5, total_res
+
         if max_conn["conn"] >= 2 and len(conn_tops) == 1:
             return max_conn["name"], hq_stats, top5, total_res
 
@@ -103,8 +110,6 @@ class MapRenderer:
             oldest = min(hq_stats, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
 
-        ext_top = max(hq_stats, key=lambda x: x["ext"])
-        ext_tops = [x for x in hq_stats if x["ext"] == ext_top["ext"]]
         if len(ext_tops) == 1:
             return ext_tops[0]["name"], hq_stats, top5, total_res
         conn_max = max(ext_tops, key=lambda x: x["conn"])
@@ -309,7 +314,7 @@ class MapRenderer:
             all_x, all_y = [], []
             is_zoomed = None
 
-            self.map_on_process = self.draw_guild_hq_on_map(
+            self.map_on_process, _ = self.draw_guild_hq_on_map(
                 territory_data=territory_data,
                 guild_color_map=guild_color_map,
                 territory_api_data=territory_data,
