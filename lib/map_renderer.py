@@ -222,43 +222,21 @@ class MapRenderer:
             # サイズ調整
             crown_size = int(64 * self.scale_factor)
             crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
-            # 略称テキストの下に王冠を描画
-            info = territory_data.get(hq_name)
-            if not info or 'location' not in info:
-                continue
-            t_px1, t_py1 = self._coord_to_pixel(*info["location"]["start"])
-            t_px2, t_py2 = self._coord_to_pixel(*info["location"]["end"])
-            t_scaled_px1, t_scaled_py1 = t_px1 * self.scale_factor, t_py1 * self.scale_factor
-            t_scaled_px2, t_scaled_py2 = t_px2 * self.scale_factor, t_py2 * self.scale_factor
-            if is_zoomed and box:
-                t_px1_rel, t_px2_rel = t_scaled_px1 - box[0], t_scaled_px2 - box[0]
-                t_py1_rel, t_py2_rel = t_scaled_py1 - box[1], t_scaled_py2 - box[1]
-            else:
-                t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
-            x_min, x_max = sorted([t_px1_rel, t_px2_rel])
-            y_min, y_max = sorted([t_py1_rel, t_py2_rel])
-            text_cx = (x_min + x_max) / 2
-            text_cy = (y_min + y_max) / 2
+            # 王冠画像の左上座標
+            crown_x = int(px - crown_size/2)
+            crown_y = int(py - crown_size/2)
+            map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
 
-            # フォントサイズ取得
+            # テキスト（略称）を王冠の中央に重ねて描画
             scaled_font_size = max(12, int(self.font.size * self.scale_factor))
             try:
                 scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
             except IOError:
                 scaled_font = ImageFont.load_default()
-            # Pillow 8.0以上ではgetbboxが使える
-            # prefixの描画領域サイズを取得
-            if hasattr(scaled_font, "getbbox"):
-                bbox = scaled_font.getbbox(prefix)
-                prefix_width = bbox[2] - bbox[0]
-                prefix_height = bbox[3] - bbox[1]
-            else:
-                prefix_width, prefix_height = scaled_font.getsize(prefix)
-
-            # 王冠アイコンの貼付座標（テキスト下中央にオフセットして描画）
-            crown_x = text_cx - crown_size/2
-            crown_y = text_cy + prefix_height/2  # テキストの下端に合わせる
-            map_img.alpha_composite(crown_img_resized, dest=(int(crown_x), int(crown_y)))
+            text_cx = px
+            text_cy = py
+            # テキスト描画（中央揃え、視認性向上のためストローク付）
+            draw.text((text_cx, text_cy), prefix, font=scaled_font, fill="white", anchor="mm", stroke_width=2, stroke_fill="black")
         return map_img, hq_marks
 
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
