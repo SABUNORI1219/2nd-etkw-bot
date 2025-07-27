@@ -48,12 +48,54 @@ def estimate_and_save_parties(clear_events, window=None):
 
     saved_parties = []
     party_keys = set()
-    to_exclude_events = []
+    window_set = set(id(e) for e in window) if window is not None else set()  # eventのidで管理
 
+    # 追加: サーバーごと・時間ごとのグループ化を優先
     for raid, events in events_by_raid.items():
         events.sort(key=lambda x: x["clear_time"])
-        for i in range(len(events) - 3):
-            party_candidate = events[i:i+4]
+
+        # --- 1. サーバー単位でグループ化してパーティ認定を優先 ---
+        server_events = defaultdict(list)
+        for e in events:
+            server_events[e["server"]].append(e)
+        for server, s_events in server_events.items():
+            if server is None:
+                continue
+            s_events.sort(key=lambda x: x["clear_time"])
+            for i in range(len(s_events) - 3):
+                party_candidate = s_events[i:i+4]
+                member_names = [p["player"] for p in party_candidate]
+                member_set = frozenset(member_names)
+                first_time = min([p["clear_time"] for p in party_candidate])
+                last_time = max([p["clear_time"] for p in party_candidate])
+                if len(member_set) < 4:
+                    continue
+                score, criteria, _ = _score_party(party_candidate)
+                rounded_time = _round_time(first_time)
+                key = (raid, rounded_time, member_set)
+                if (
+                    (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES)
+                    and key not in party_keys
+                ):
+                    # サーバー一致グループは強制的に認定
+                    party_keys.add(key)
+                    party = {
+                        "raid_name": raid,
+                        "clear_time": first_time,
+                        "members": sorted(member_set),
+                        "server": server,
+                        "trust_score": score,
+                        "criteria": criteria
+                    }
+                    saved_parties.append(party)
+                    # 認定イベントのみwindowから除去
+                    if window is not None:
+                        remove_events_from_window(window, party_candidate, time_threshold=500)
+        # --- 2. サーバー混在グループは、残りイベントで通常スコア判定 ---
+        # windowから既に除去されたイベントは対象外
+        remaining_events = [e for e in events if window is None or id(e) in window_set]
+        for i in range(len(remaining_events) - 3):
+            party_candidate = remaining_events[i:i+4]
             member_names = [p["player"] for p in party_candidate]
             member_set = frozenset(member_names)
             first_time = min([p["clear_time"] for p in party_candidate])
@@ -66,25 +108,6 @@ def estimate_and_save_parties(clear_events, window=None):
             )
             rounded_time = _round_time(first_time)
             key = (raid, rounded_time, member_set)
-            # --- 条件1: 5分以内＆全員同じサーバーは必ず認定 ---
-            if (
-                (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES)
-                and len(set([p["server"] for p in party_candidate])) == 1
-                and None not in set([p["server"] for p in party_candidate])
-            ):
-                if key not in party_keys:
-                    party_keys.add(key)
-                    party = {
-                        "raid_name": raid,
-                        "clear_time": first_time,
-                        "members": sorted(member_set),
-                        "server": server,
-                        "trust_score": score,
-                        "criteria": criteria
-                    }
-                    saved_parties.append(party)
-                    continue  # 認定したら次へ
-            # --- 条件2: 通常スコア判定 ---
             if (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES) and score >= SCORE_THRESHOLD and key not in party_keys:
                 party_keys.add(key)
                 party = {
@@ -96,14 +119,9 @@ def estimate_and_save_parties(clear_events, window=None):
                     "criteria": criteria
                 }
                 saved_parties.append(party)
-            else:
-                # スコア不足で認定できなかった場合はwindow除去対象に
-                to_exclude_events.append((raid, party_candidate, first_time, last_time))
-
-    # 認定できなかったパーティ候補のイベントをwindowから除去
-    if window is not None:
-        for raid, party_candidate, first_time, last_time in to_exclude_events:
-            remove_events_from_window(window, party_candidate, time_threshold=500)
+                if window is not None:
+                    remove_events_from_window(window, party_candidate, time_threshold=500)
+            # 認定されなかった場合もwindowから除外しない（イベントを残す）
 
     return saved_parties
 
