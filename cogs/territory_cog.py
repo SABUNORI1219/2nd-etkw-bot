@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from lib.wynncraft_api import WynncraftAPI
 from lib.map_renderer import MapRenderer
 from lib.cache_handler import CacheHandler
-from config import EMBED_COLOR_BLUE, RESOURCE_EMOJIS
+from config import EMBED_COLOR_BLUE, RESOURCE_EMOJIS, AUTHORIZED_USER_IDS, send_authorized_only_message
 
 logger = logging.getLogger(__name__)
 
@@ -141,10 +141,14 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.checks.cooldown(1, 20.0)
     @app_commands.command(name="map", description="現在のWynncraftのテリトリーマップを生成")
     @app_commands.autocomplete(guild=guild_autocomplete) # guild引数にオートコンプリートを適用
-    @app_commands.describe(guild="Onmap Guild Prefix")
+    @app_commands.describe(guild="On-map Guild Prefix")
     async def map(self, interaction: discord.Interaction, guild: str = None):
         await interaction.response.defer()
         logger.info(f"--- [TerritoryCmd] /territory map が実行されました by {interaction.user}")
+
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
+            return
 
         # 1. テリトリー所有者リストを取得
         territory_data = await self.wynn_api.get_territory_list()
@@ -191,6 +195,10 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.describe(territory="Territory Name")
     async def status(self, interaction: discord.Interaction, territory: str):
         await interaction.response.defer()
+
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
+            return
 
         static_data = self.map_renderer.local_territories.get(territory)
         guild_color_map = await self.wynn_api.get_guild_color_map()
