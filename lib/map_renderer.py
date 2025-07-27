@@ -44,6 +44,156 @@ class MapRenderer:
         except (ValueError, IndexError):
             return (255, 255, 255)
 
+    def _is_city_territory(self, territory_data):
+        """街領地か判定: Emeralds=18000を生産する領地"""
+        emeralds = int(territory_data.get("resources", {}).get("emeralds", "0"))
+        return emeralds == 18000
+
+    def _calc_conn_ext_hqbuff(self, owned_territories, territory_name):
+        """
+        Conn, Ext, HQ Buff計算。BFSで3階層まで探索。
+        owned_territories: ギルドが所有する領地名(set)
+        territory_name: HQ候補名
+        """
+        connections = set()
+        externals = set()
+        visited = set()
+        queue = [(territory_name, 0)]
+        while queue:
+            current, dist = queue.pop(0)
+            if current in visited or dist > 3:
+                continue
+            visited.add(current)
+            if dist == 1 and current in owned_territories:
+                connections.add(current)
+            if dist > 0 and current in owned_territories and current != territory_name:
+                externals.add(current)
+            for conn in self.local_territories.get(current, {}).get("Trading Routes", []):
+                if conn not in visited:
+                    queue.append((conn, dist + 1))
+        multiplier = (1.5 + (len(externals) * 0.25)) * (1.0 + (len(connections) * 0.30))
+        hq_buff = int(multiplier * 100)
+        return len(connections), len(externals), hq_buff
+
+    def _sum_resources(self, owned_territories):
+        """ギルドが所有する領地全体の資源合計（デフォ値）"""
+        total = {"emeralds": 0, "ore": 0, "crops": 0, "fish": 0, "wood": 0}
+        for t in owned_territories:
+            res = self.local_territories.get(t, {}).get("resources", {})
+            for k in total:
+                total[k] += int(res.get(k, "0"))
+        return total
+
+    def _pick_hq_candidate(self, owned_territories, territory_api_data):
+        """
+        HQ推定ロジックの主処理。各条件を段階的に判定。
+        owned_territories: set of territory names
+        territory_api_data: APIで取得した最新データ(dict, name→詳細)
+        """
+        hq_stats = []
+        for t in owned_territories:
+            conn, ext, hq_buff = self._calc_conn_ext_hqbuff(owned_territories, t)
+            # Time Held（APIのacquired。古いほどHQ候補）
+            acquired = territory_api_data.get(t, {}).get("acquired", "")
+            # acquiredが空なら今時刻を入れて「一番新しい」とする
+            if not acquired:
+                acquired = "9999-12-31T23:59:59.999999Z"
+            hq_stats.append({
+                "name": t, "conn": conn, "ext": ext, "hq_buff": hq_buff,
+                "is_city": self._is_city_territory(self.local_territories[t]),
+                "acquired": acquired,
+                "resources": self.local_territories[t].get("resources", {})
+            })
+        # top5 Ext順
+        hq_stats.sort(key=lambda x: (-x["ext"], -x["conn"], -x["hq_buff"]))
+        top5 = hq_stats[:5]
+        total_res = self._sum_resources(owned_territories)
+
+        # a. Conn最多が2以上差で存在→それをHQ
+        max_conn = max(hq_stats, key=lambda x: x["conn"])
+        conn_tops = [x for x in hq_stats if x["conn"] == max_conn["conn"]]
+        if max_conn["conn"] >= 2 and len(conn_tops) == 1:
+            return max_conn["name"], hq_stats, top5, total_res
+
+        # b. 領地6個以下かつConn3以上なし→取得時最古
+        if len(owned_territories) <= 6 and all(x["conn"] < 3 for x in hq_stats):
+            oldest = min(hq_stats, key=lambda x: x["acquired"] or "9999")
+            return oldest["name"], hq_stats, top5, total_res
+
+        # c. Ext最多(Else)→複数ならConn多い方
+        ext_top = max(hq_stats, key=lambda x: x["ext"])
+        ext_tops = [x for x in hq_stats if x["ext"] == ext_top["ext"]]
+        if len(ext_tops) == 1:
+            return ext_tops[0]["name"], hq_stats, top5, total_res
+        conn_max = max(ext_tops, key=lambda x: x["conn"])
+        conn_maxs = [x for x in ext_tops if x["conn"] == conn_max["conn"]]
+        if len(conn_maxs) == 1:
+            return conn_maxs[0]["name"], hq_stats, top5, total_res
+
+        # d. HQBuff差100%未満 & Conn/Ext条件でcity優先 or HQBuff高
+        diff = abs(conn_maxs[0]["hq_buff"] - conn_maxs[-1]["hq_buff"])
+        if diff < 100 and conn_maxs[0]["conn"] == conn_maxs[-1]["conn"]:
+            if conn_maxs[0]["ext"] < 20:
+                city = next((x for x in conn_maxs if x["is_city"]), None)
+                if city:
+                    return city["name"], hq_stats, top5, total_res
+            else:
+                # ext>=20ならHQBuff高い方
+                hq_max = max(conn_maxs, key=lambda x: x["hq_buff"])
+                return hq_max["name"], hq_stats, top5, total_res
+
+        # e. Ext, Conn, HQBuff全同数→生産量少ない資源を生産する領地
+        # 0を無視しつつCrop→Ore→Wood→Fish優先
+        res_priority = ["crops", "ore", "wood", "fish"]
+        min_val = float("inf")
+        min_type = None
+        for rtype in res_priority:
+            val = total_res.get(rtype, 0)
+            if val > 0 and val < min_val:
+                min_val = val
+                min_type = rtype
+        # 該当する資源を生産する領地
+        cand = next(
+            (x for x in conn_maxs if int(x["resources"].get(min_type, "0")) > 0),
+            conn_maxs[0]
+        )
+        return cand["name"], hq_stats, top5, total_res
+
+    def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data):
+        """
+        各ギルドのHQ候補を推定し、王冠アイコンを描画したマップ画像を作成
+        territory_data: name→詳細(dict, 描画対象の領地)
+        guild_color_map: prefix→色
+        territory_api_data: 最新apiデータ(name→acquired等)
+        """
+        map_img = self.resized_map.copy()
+        draw = ImageDraw.Draw(map_img)
+        crown_font = ImageFont.truetype(FONT_PATH, int(60 * self.scale_factor))
+        # ギルドごとにHQ推定
+        prefix_to_territories = {}
+        for name, info in territory_data.items():
+            prefix = info.get("guild", {}).get("prefix", "")
+            if not prefix:
+                continue
+            prefix_to_territories.setdefault(prefix, set()).add(name)
+        hq_marks = []
+        for prefix, owned in prefix_to_territories.items():
+            hq_name, _, _, _ = self._pick_hq_candidate(owned, territory_api_data)
+            # HQ領地の中心座標
+            loc = self.local_territories[hq_name].get("Location")
+            if not loc:
+                continue
+            x = (loc["start"][0] + loc["end"][0]) // 2
+            z = (loc["start"][1] + loc["end"][1]) // 2
+            px, py = self._coord_to_pixel(x, z)
+            px, py = px * self.scale_factor, py * self.scale_factor
+            hq_marks.append((px, py, prefix, hq_name))
+            # 王冠マーク描画（絵文字でもOK）
+            draw.text((px, py), "👑", font=crown_font, fill="gold", anchor="mm", stroke_width=2, stroke_fill="black")
+        # 既存領地描画
+        self._draw_trading_and_territories(map_img, None, False, territory_data, guild_color_map)
+        return map_img, hq_marks
+
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map):
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
