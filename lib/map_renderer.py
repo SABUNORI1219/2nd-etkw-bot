@@ -195,7 +195,7 @@ class MapRenderer:
                 draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
         return map_to_draw_on
 
-    def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False):
+    def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False, map_to_draw_on=None):
         map_img = self.resized_map.copy()
         self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map)
         draw = ImageDraw.Draw(map_img)
@@ -275,6 +275,7 @@ class MapRenderer:
                 territory_api_data=territory_data,
                 box=box,
                 is_zoomed=is_zoomed,
+                map_to_draw_on=map_to_draw_on
             )
 
             # --- 最終出力 ---
