@@ -90,38 +90,34 @@ class MapRenderer:
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
             })
+        # Ext多い順、Conn多い順、バフ多い順でソート
         hq_stats.sort(key=lambda x: (-x["ext"], -x["conn"], -x["hq_buff"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
-
-        max_conn = max(hq_stats, key=lambda x: x["conn"])
-        max_ext = max(hq_stats, key=lambda x: x["ext"])
-        conn_tops = [x for x in hq_stats if x["conn"] == max_conn["conn"]]
-        ext_tops = [x for x in hq_stats if x["ext"] == max_ext["ext"]]
-
-        # ConnがExtトップより2個以上多ければConn最大を優先（Ext最大唯一より前に判定）
-        if any((x["conn"] - max_ext["conn"] >= 2) for x in hq_stats if x["conn"] == max_conn["conn"] and x["name"] != max_ext["name"]):
-            return max_conn["name"], hq_stats, top5, total_res
-
-        # Conn最大が唯一かつ2以上ならそれ
-        if max_conn["conn"] >= 2 and len(conn_tops) == 1:
-            return max_conn["name"], hq_stats, top5, total_res
-
-        # 所持領地が6個以下かつConnが3つ以上のものがない場合、最古
-        if len(owned_territories) <= 6 and all(x["conn"] < 3 for x in hq_stats):
-            oldest = min(hq_stats, key=lambda x: x["acquired"] or "9999")
+    
+        # Ext Top5内でExt最大を基準にConnが2個以上多いものがあればそちらをHQに
+        ext_top = top5[0]
+        for t in top5[1:]:
+            if t["conn"] - ext_top["conn"] >= 2:
+                return t["name"], hq_stats, top5, total_res
+    
+        # 小規模条件
+        if len(owned_territories) <= 6 and all(x["conn"] < 3 for x in top5):
+            oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
-
-        # Ext最大グループが1つならそれ（基本規定）
+    
+        # Ext最大グループ（通常規定）判定
+        ext_max_val = ext_top["ext"]
+        ext_tops = [x for x in top5 if x["ext"] == ext_max_val]
         if len(ext_tops) == 1:
             return ext_tops[0]["name"], hq_stats, top5, total_res
-
+    
         # Ext最大グループ内でConn最大が唯一ならそれ
-        conn_max = max(ext_tops, key=lambda x: x["conn"])
-        conn_maxs = [x for x in ext_tops if x["conn"] == conn_max["conn"]]
+        conn_max_val = max([x["conn"] for x in ext_tops])
+        conn_maxs = [x for x in ext_tops if x["conn"] == conn_max_val]
         if len(conn_maxs) == 1:
             return conn_maxs[0]["name"], hq_stats, top5, total_res
-
+    
         # HQバフが100%未満の差でConn/Extが同じなら街優先、Extが20以上ならHQバフ最大
         diff = abs(conn_maxs[0]["hq_buff"] - conn_maxs[-1]["hq_buff"])
         if diff < 100 and conn_maxs[0]["conn"] == conn_maxs[-1]["conn"]:
@@ -132,7 +128,7 @@ class MapRenderer:
             else:
                 hq_max = max(conn_maxs, key=lambda x: x["hq_buff"])
                 return hq_max["name"], hq_stats, top5, total_res
-
+    
         # 資源優先
         res_priority = ["crops", "ore", "wood", "fish"]
         min_val = float("inf")
@@ -146,7 +142,7 @@ class MapRenderer:
             (x for x in conn_maxs if int(x["resources"].get(min_type, "0")) > 0),
             conn_maxs[0]
         )
-        return cand["name"], hq_stats, top5, total_res   
+        return cand["name"], hq_stats, top5, total_res
 
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None):
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
