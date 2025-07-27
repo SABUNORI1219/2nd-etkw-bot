@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from lib.wynncraft_api import WynncraftAPI
 from lib.map_renderer import MapRenderer
 from lib.cache_handler import CacheHandler
-from config import EMBED_COLOR_BLUE, RESOURCE_EMOJIS, AUTHORIZED_USER_IDS, send_authorized_only_message
+from config import EMBED_COLOR_BLUE, RESOURCE_EMOJIS
 
 logger = logging.getLogger(__name__)
 
@@ -151,10 +151,6 @@ class Territory(commands.GroupCog, name="territory"):
         await interaction.response.defer()
         logger.info(f"--- [TerritoryCmd] /territory map が実行されました by {interaction.user}")
 
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
-            return
-
         # 1. テリトリー所有者リストを取得
         territory_data = await self.wynn_api.get_territory_list()
         # 2. ギルドカラーの対応表を取得
@@ -200,10 +196,6 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.describe(territory="Territory Name")
     async def status(self, interaction: discord.Interaction, territory: str):
         await interaction.response.defer()
-
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
-            return
 
         static_data = self.map_renderer.local_territories.get(territory)
         guild_color_map = await self.wynn_api.get_guild_color_map()
