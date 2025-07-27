@@ -18,6 +18,7 @@ class MapRenderer:
     def __init__(self):
         try:
             self.map_img = Image.open(os.path.join(ASSETS_PATH, "main-map.png")).convert("RGBA")
+            self.crown_img = Image.open(os.path.join(ASSETS_PATH, "crown.png")).convert("RGBA")
             with open(os.path.join(ASSETS_PATH, "territories.json"), "r", encoding='utf-8') as f:
                 self.local_territories = json.load(f)
             self.font = ImageFont.truetype(FONT_PATH, 40)
@@ -198,7 +199,6 @@ class MapRenderer:
         map_img = self.resized_map.copy()
         self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map)
         draw = ImageDraw.Draw(map_img)
-        crown_font = ImageFont.truetype(FONT_PATH, int(60 * self.scale_factor))
         prefix_to_territories = {}
         for name, info in territory_data.items():
             prefix = info.get("guild", {}).get("prefix", "")
@@ -219,7 +219,12 @@ class MapRenderer:
                 px -= box[0]
                 py -= box[1]
             hq_marks.append((px, py, prefix, hq_name))
-            draw.text((px, py), "👑", font=crown_font, fill="gold", anchor="mm", stroke_width=2, stroke_fill="black")
+            # サイズ調整
+            crown_size = int(64 * self.scale_factor)
+            crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
+            # 中央揃え
+            pos = (int(px - crown_size/2), int(py - crown_size/2))
+            map_img.alpha_composite(crown_img_resized, dest=pos)
         return map_img, hq_marks
 
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
