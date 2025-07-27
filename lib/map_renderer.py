@@ -219,24 +219,30 @@ class MapRenderer:
                 px -= box[0]
                 py -= box[1]
             hq_marks.append((px, py, prefix, hq_name))
-            # サイズ調整
-            crown_size = int(64 * self.scale_factor)
-            crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
-            # 王冠画像の左上座標
-            crown_x = int(px - crown_size/2)
-            crown_y = int(py - crown_size/2)
-            map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
-
-            # テキスト（略称）を王冠の中央に重ねて描画
-            scaled_font_size = max(12, int(self.font.size * self.scale_factor))
+            # ギルドカラー取得
+            color_hex = guild_color_map.get(prefix, "#FFFFFF")
+            color_rgb = self._hex_to_rgb(color_hex)
+            # フォントサイズ取得
+            scaled_font_size = max(12, int(self.font.size * self.scale_factor * 1.0))
             try:
                 scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
             except IOError:
                 scaled_font = ImageFont.load_default()
-            text_cx = px
-            text_cy = py
-            # テキスト描画（中央揃え、視認性向上のためストローク付）
-            draw.text((text_cx, text_cy), prefix, font=scaled_font, fill="white", anchor="mm", stroke_width=2, stroke_fill="black")
+            # テキストサイズ取得
+            if hasattr(scaled_font, "getbbox"):
+                bbox = scaled_font.getbbox(prefix)
+                prefix_width = bbox[2] - bbox[0]
+                prefix_height = bbox[3] - bbox[1]
+            else:
+                prefix_width, prefix_height = scaled_font.getsize(prefix)
+            # 王冠はテキストより大きめ（1.3倍）
+            crown_size = int(max(prefix_width, prefix_height) * 1.3)
+            crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
+            crown_x = int(px - crown_size/2)
+            crown_y = int(py - crown_size/2)
+            map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
+            # テキスト描画（中央揃え、ギルドカラー＋ストローク）
+            draw.text((px, py), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
         return map_img, hq_marks
 
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
