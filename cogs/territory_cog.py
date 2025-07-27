@@ -113,12 +113,17 @@ class Territory(commands.GroupCog, name="territory"):
         # アルファベットと数字以外の文字をアンダースコアに置き換える
         return re.sub(r'[^a-zA-Z0-9_-]', '_', name)
 
-    @tasks.loop(minutes=10.0)
+    @tasks.loop(minutes=1.0)
     async def update_territory_cache(self):
         logger.info("--- [TerritoryCache] テリトリー所有ギルドのキャッシュを更新します...")
         territory_data = await self.wynn_api.get_territory_list()
         if territory_data:
-            guild_names = set(data['guild']['prefix'] for data in territory_data.values())
+            guild_names = set(
+                data['guild']['prefix']
+                for data in territory_data.values()
+                if data['guild']['prefix']  # Noneや空文字を除外
+            )
+            self.territory_guilds_cache = sorted(list(guild_names))
             self.territory_guilds_cache = sorted(list(guild_names))
             logger.info(f"--- [TerritoryCache] ✅ {len(self.territory_guilds_cache)}個のギルドをキャッシュしました。")
 
