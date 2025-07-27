@@ -99,8 +99,8 @@ class MapRenderer:
         conn_tops = [x for x in hq_stats if x["conn"] == max_conn["conn"]]
         ext_tops = [x for x in hq_stats if x["ext"] == max_ext["ext"]]
 
-        # --- ★ 追加: ConnとExtの差が2以上ならConn最大を優先 ---
-        if (max_conn["conn"] - max_ext["conn"] >= 2) and len(conn_tops) == 1:
+        # --- ConnがExtトップより2個以上多ければConn最大を優先（Ext最大唯一より前に判定） ---
+        if any((x["conn"] - max_ext["conn"] >= 2) for x in hq_stats if x["conn"] == max_conn["conn"] and x["name"] != max_ext["name"]):
             return max_conn["name"], hq_stats, top5, total_res
 
         if max_conn["conn"] >= 2 and len(conn_tops) == 1:
