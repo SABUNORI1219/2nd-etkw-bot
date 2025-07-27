@@ -9,7 +9,6 @@ from math import sqrt
 
 logger = logging.getLogger(__name__)
 
-# アセットとフォントのパスを定義
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_PATH = os.path.join(project_root, "assets", "map")
 FONT_PATH = os.path.join(project_root, "assets", "fonts", "NotoSansJP-Bold.ttf")
@@ -137,7 +136,7 @@ class MapRenderer:
         )
         return cand["name"], hq_stats, top5, total_res
 
-    def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map):
+    def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None):
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
         draw = ImageDraw.Draw(map_to_draw_on)
@@ -192,6 +191,7 @@ class MapRenderer:
                 color_rgb = self._hex_to_rgb(color_hex)
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
+                # テキスト描画（常に略称を描く）
                 draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
         return map_to_draw_on
 
@@ -222,9 +222,38 @@ class MapRenderer:
             # サイズ調整
             crown_size = int(64 * self.scale_factor)
             crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
-            # 中央揃え
-            pos = (int(px - crown_size/2), int(py - crown_size/2))
-            map_img.alpha_composite(crown_img_resized, dest=pos)
+            # 略称テキストの下に王冠を描画
+            # まず略称テキストの位置を再計算
+            # 既定ロジック通り、矩形中心
+            info = territory_data.get(hq_name)
+            if not info or 'location' not in info:
+                continue
+            t_px1, t_py1 = self._coord_to_pixel(*info["location"]["start"])
+            t_px2, t_py2 = self._coord_to_pixel(*info["location"]["end"])
+            t_scaled_px1, t_scaled_py1 = t_px1 * self.scale_factor, t_py1 * self.scale_factor
+            t_scaled_px2, t_scaled_py2 = t_px2 * self.scale_factor, t_py2 * self.scale_factor
+            if is_zoomed and box:
+                t_px1_rel, t_px2_rel = t_scaled_px1 - box[0], t_scaled_px2 - box[0]
+                t_py1_rel, t_py2_rel = t_scaled_py1 - box[1], t_scaled_py2 - box[1]
+            else:
+                t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
+            x_min, x_max = sorted([t_px1_rel, t_px2_rel])
+            y_min, y_max = sorted([t_py1_rel, t_py2_rel])
+            text_cx = (x_min + x_max) / 2
+            text_cy = (y_min + y_max) / 2
+
+            # テキストサイズ取得
+            scaled_font_size = max(12, int(self.font.size * self.scale_factor))
+            try:
+                scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
+            except IOError:
+                scaled_font = ImageFont.load_default()
+            prefix_width, prefix_height = draw.textsize(prefix, font=scaled_font)
+
+            # 王冠アイコンの貼付座標（テキスト下中央にオフセットして描画）
+            crown_x = text_cx - crown_size/2
+            crown_y = text_cy + prefix_height/2  # テキストの下端に合わせる
+            map_img.alpha_composite(crown_img_resized, dest=(int(crown_x), int(crown_y)))
         return map_img, hq_marks
 
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
