@@ -60,6 +60,8 @@ async def send_guild_raid_embed(bot, party):
               f"> **Server**: {party['server']}",
         inline=False
     )
+
+    embed.set_footer(text="Guild Raid Tracker | Minister Chikuwa")
     
     await channel.send(embed=embed)
     logger.info(f"Embed通知: {party}")
