@@ -41,7 +41,7 @@ class HelpCog(commands.Cog):
             name="👹 Guild Raid関連",
             value="`/graid channel <channel>`: Guild Raidをトラックするチャンネルを設定します。（制作者のみ指定可能）\n"
                   "`/graid list <raid_name> [date]`: Guild Raidのクリア履歴を表示します。日付ソートはYYYY-MM-DD形式で入力してください。\n"
-                  "`/graid count <player> <raid_name> <count>`: プレイヤーのGuild Raidのクリア回数を補正します。",
+                  "`/graid count <player> <raid_name> <count>`: プレイヤーのGuild Raidのクリア回数を補正します。（Mythic Chikuwa以上のみ使用可能）",
             inline=False
         )
         
