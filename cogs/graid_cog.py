@@ -86,10 +86,11 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         data = await self.api.get_guild_by_prefix(PREFIX)
         members = set()
         if data and "members" in data:
-            for rank_obj in data["members"].values():
-                # rank_obj: {"MCID": {...}, ...}
-                for mcid in rank_obj.keys():
-                    members.add(mcid)
+            for rank_key, rank_obj in data["members"].items():
+                # rank_obj: {"MCID": {...}, ...} のdictであることが多いが、もしintなどなら無視
+                if isinstance(rank_obj, dict):
+                    for mcid in rank_obj.keys():
+                        members.add(mcid)
         self.etkw_member_cache = members
         return members
 
@@ -177,7 +178,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         for name, count in sorted_counts[:10]:
             safe_name = discord.utils.escape_markdown(name)
             embed.add_field(name=safe_name, value=f"Count: {count}", inline=False)
-        embed.set_footer(text=f"Page 1/{view.max_page+1}")
+        embed.set_footer(text=f"Page 1/{view.max_page+1} | Minister Chikuwa")
 
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         logger.info(f"履歴リスト出力: {raid_name} {date} (embed形式ページ付き)")
