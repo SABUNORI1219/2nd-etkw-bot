@@ -3,7 +3,8 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
 from lib.db import fetch_history, set_config, reset_player_raid_count
-from config import AUTHORIZED_USER_IDS, send_authorized_only_message
+from lib.wynncraft_api import WynncraftAPI
+from config import AUTHORIZED_USER_IDS, send_authorized_only_message, RESTRICTION
 import os
 import logging
 
@@ -40,6 +41,9 @@ def normalize_date(date_str):
 class PlayerCountView(discord.ui.View):
     def __init__(self, player_counts, page=0, per_page=10, timeout=120):
         super().__init__(timeout=timeout)
+        self.bot = bot
+        self.api = WynncraftAPI()
+        self.etkw_member_cache = None
         self.player_counts = player_counts
         self.page = page
         self.per_page = per_page
@@ -48,6 +52,23 @@ class PlayerCountView(discord.ui.View):
         # 最初のボタン状態をページ数に応じて設定
         self.previous.disabled = self.page == 0
         self.next.disabled = self.page == self.max_page
+
+    async def _get_etkw_members(self):
+        members = await self.api.get_etkw_member_names()
+        self.etkw_member_cache = set(members)
+        return self.etkw_member_cache
+
+    def _has_required_role(self, member: discord.Member) -> bool:
+        required_role = member.guild.get_role(GRAID_COUNT_ROLE_ID)
+        if not required_role:
+            return False
+        return any(role >= required_role for role in member.roles)
+
+    async def etkw_member_autocomplete(self, interaction: discord.Interaction, current: str):
+        members = await self._get_etkw_members()
+        # currentの部分一致（大文字小文字無視、最大25件）
+        results = [name for name in members if current in name]
+        return [app_commands.Choice(name=name, value=name) for name in sorted(results)[:25]]
 
     async def update_message(self, interaction):
         embed = discord.Embed(title="Guild Raid Player Counts")
@@ -163,9 +184,18 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     )
     @app_commands.choices(raid_name=ADDC_RAID_CHOICES)
     async def guildraid_count(self, interaction: discord.Interaction, player: str, raid_name: str, count: int):
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
+        if not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message("このコマンドはサーバー内でのみ利用可能です。", ephemeral=True)
             return
+        if not self._has_required_role(interaction.user):
+            await interaction.response.send_message("このコマンドを使用する権限がありません。", ephemeral=True)
+            return
+
+        etkw_members = await self._get_etkw_members()
+        if player not in etkw_members:
+            await interaction.response.send_message(f"指定プレイヤー「{player}」はETKWギルドメンバーではありません。", ephemeral=True)
+            return
+        
         reset_player_raid_count(player, raid_name, count)
         await interaction.response.send_message(f"{player}の{raid_name}クリア回数を{count}に補正しました", ephemeral=True)
         logger.info(f"管理者補正: {player} {raid_name} {count}")
