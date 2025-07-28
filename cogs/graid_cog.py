@@ -57,7 +57,7 @@ class PlayerCountView(discord.ui.View):
         for name, count in self.player_counts[start:end]:
             safe_name = discord.utils.escape_markdown(name)
             embed.add_field(name=safe_name, value=f"Count: {count}", inline=False)
-        embed.set_footer(text=f"Page {self.page+1}/{self.max_page+1}")
+        embed.set_footer(text=f"Page {self.page+1}/{self.max_page+1} | Minister Chikuwa")
         self.previous.disabled = self.page == 0
         self.next.disabled = self.page == self.max_page
         await interaction.response.edit_message(embed=embed, view=self)
