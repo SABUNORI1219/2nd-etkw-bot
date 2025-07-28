@@ -23,7 +23,6 @@ class HelpCog(commands.Cog):
             color=discord.Color.blurple() # Discordのブランドカラー
         )
 
-        # カテゴリー1: プレイヤー・ギルド情報
         embed.add_field(
             name="👤 プレイヤー・ギルド情報",
             value="`/player <name>`: プレイヤーの詳細情報を表示します。\n"
@@ -31,19 +30,25 @@ class HelpCog(commands.Cog):
             inline=False # このフィールドは横幅をすべて使う
         )
 
-        # カテゴリー2: テリトリー関連
         embed.add_field(
             name="🗺️ テリトリー関連",
-            value="`/territory map [guild]`: テリトリーマップを生成します。\n"
+            value="`/territory map [guild]`: テリトリーマップを生成します。HQの位置はあくまで推定です。\n"
                   "`/territory status <territory>`: テリトリーのステータスを表示します。",
             inline=False
         )
+
+        embed.add_field(
+            name="👹 Guild Raid関連",
+            value="`/graid channel <channel>`: Guild Raidをトラックするチャンネルを設定します。（制作者のみ指定可能）\n"
+                  "`/graid list <raid_name> [date]`: Guild Raidのクリア履歴を表示します。日付ソートはYYYY-MM-DD形式で入力してください。\n"
+                  "`/graid count <player> <raid_name> <count>`: プレイヤーのGuild Raidのクリア回数を補正します。",
+            inline=False
+        )
         
-        # カテゴリー3: その他
         embed.add_field(
             name="🎲 その他",
             value="`/roulette <title> <options>`: ルーレットを回します。\n"
-                  "`各候補は10文字以内で入力、候補数は6つまでです。`",
+                  "各候補は10文字以内で入力、候補数は6つまでです。",
             inline=False
         )
 
