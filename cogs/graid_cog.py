@@ -190,6 +190,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         count="カウント数"
     )
     @app_commands.choices(raid_name=ADDC_RAID_CHOICES)
+    @app_commands.autocomplete(player=etkw_member_autocomplete)
     async def guildraid_count(self, interaction: discord.Interaction, player: str, raid_name: str, count: int):
         if not isinstance(interaction.user, discord.Member):
             await interaction.response.send_message("このコマンドはサーバー内でのみ利用可能です。", ephemeral=True)
