@@ -33,6 +33,8 @@ RESOURCE_EMOJIS = {
     "CROPS": "<:wynn_crop:1395325604806656032>"
 }
 
+RESTRICTION = 1132652296635961385
+
 async def send_authorized_only_message(interaction: discord.Interaction, user_ids=None):
     """
     指定ユーザー以外がコマンド実行時に警告メッセージを返す共通関数。
