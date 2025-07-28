@@ -86,7 +86,12 @@ class MapRenderer:
             if not acquired:
                 acquired = "9999-12-31T23:59:59.999999Z"
             hq_stats.append({
-                "name": t, "conn": conn, "ext": ext, "hq_buff": hq_buff,
+                "name": t,
+                "conn": conn,
+                "ext": ext,
+                # 新フィールド: Connを除いたExt
+                "ext_without_conn": ext - conn if ext >= conn else 0,
+                "hq_buff": hq_buff,
                 "is_city": self._is_city_territory(self.local_territories[t]),
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
@@ -96,8 +101,8 @@ class MapRenderer:
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
 
-        # Ext Top5内でExt最大を基準にConnが2個以上多いものがあればそちらをHQに
-        ext_top = top5[0]
+        # --- ここだけ「Connを含まないExt」で最大を判定 ---
+        ext_top = max(top5, key=lambda x: x["ext_without_conn"])
         for t in top5[1:]:
             if t["conn"] - ext_top["conn"] >= 2:
                 return t["name"], hq_stats, top5, total_res
@@ -113,8 +118,6 @@ class MapRenderer:
         conn_max_val = max([x["conn"] for x in ext_tops])
         conn_maxs = [x for x in ext_tops if x["conn"] == conn_max_val]
 
-        # --- 修正版ここから ---
-        # Conn最大グループと「HQバフ差が100%未満・Conn同値・Extが20未満」のもの全てを候補に含める
         hq_buff_max = max([x["hq_buff"] for x in top5])
         candidate_group = [
             x for x in top5
@@ -126,17 +129,13 @@ class MapRenderer:
             city = next((x for x in candidate_group if x["is_city"]), None)
             if city:
                 return city["name"], hq_stats, top5, total_res
-            # Extが20以上の場合はHQバフ最大
             if candidate_group[0]["ext"] >= 20:
                 hq_max = max(candidate_group, key=lambda x: x["hq_buff"])
                 return hq_max["name"], hq_stats, top5, total_res
-        # --- 修正版ここまで ---
 
-        # Ext最大グループ内でConn最大が唯一ならそれ
         if len(conn_maxs) == 1:
             return conn_maxs[0]["name"], hq_stats, top5, total_res
 
-        # HQバフが100%未満の差でConn/Extが同じなら街優先、Extが20以上ならHQバフ最大
         diff = abs(conn_maxs[0]["hq_buff"] - conn_maxs[-1]["hq_buff"])
         if diff < 100 and conn_maxs[0]["conn"] == conn_maxs[-1]["conn"]:
             if conn_maxs[0]["ext"] < 20:
@@ -147,7 +146,6 @@ class MapRenderer:
                 hq_max = max(conn_maxs, key=lambda x: x["hq_buff"])
                 return hq_max["name"], hq_stats, top5, total_res
 
-        # 資源優先
         res_priority = ["crops", "ore", "wood", "fish"]
         min_val = float("inf")
         min_type = None
@@ -157,11 +155,9 @@ class MapRenderer:
                 min_val = val
                 min_type = rtype
 
-        # ギルド内でその資源を生産するterritoryリスト
         res_territories = [x for x in hq_stats if int(x["resources"].get(min_type, "0")) > 0]
         if res_territories and conn_maxs:
             def trading_route_distance(start, goals, allow_owned_only=True):
-                # BFSでstartからgoalsまでの最短距離
                 queue = collections.deque()
                 visited = set()
                 queue.append((start, 0))
@@ -173,13 +169,11 @@ class MapRenderer:
                     if current in goals:
                         return dist
                     neighbors = self.local_territories.get(current, {}).get("Trading Routes", [])
-                    # 領地所有権チェック（ギルド所有だけ通れる場合に限定）
                     if allow_owned_only:
                         neighbors = [n for n in neighbors if n in owned_territories]
                     queue.extend((n, dist+1) for n in neighbors)
-                return float("inf")  # 到達不能
+                return float("inf")
 
-            # res_territoriesのnameリスト
             res_territory_names = [x["name"] for x in res_territories]
             min_dist = float("inf")
             best_cand = conn_maxs[0]
@@ -190,7 +184,6 @@ class MapRenderer:
                     best_cand = cand
             return best_cand["name"], hq_stats, top5, total_res
         else:
-            # どの候補も該当資源を生産していない場合は現状通り
             return conn_maxs[0]["name"], hq_stats, top5, total_res
     
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None):
