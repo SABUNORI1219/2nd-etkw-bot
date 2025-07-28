@@ -41,9 +41,6 @@ def normalize_date(date_str):
 class PlayerCountView(discord.ui.View):
     def __init__(self, player_counts, page=0, per_page=10, timeout=120):
         super().__init__(timeout=timeout)
-        self.bot = bot
-        self.api = WynncraftAPI()
-        self.etkw_member_cache = None
         self.player_counts = player_counts
         self.page = page
         self.per_page = per_page
@@ -52,23 +49,6 @@ class PlayerCountView(discord.ui.View):
         # 最初のボタン状態をページ数に応じて設定
         self.previous.disabled = self.page == 0
         self.next.disabled = self.page == self.max_page
-
-    async def _get_etkw_members(self):
-        members = await self.api.get_etkw_member_names()
-        self.etkw_member_cache = set(members)
-        return self.etkw_member_cache
-
-    def _has_required_role(self, member: discord.Member) -> bool:
-        required_role = member.guild.get_role(GRAID_COUNT_ROLE_ID)
-        if not required_role:
-            return False
-        return any(role >= required_role for role in member.roles)
-
-    async def etkw_member_autocomplete(self, interaction: discord.Interaction, current: str):
-        members = await self._get_etkw_members()
-        # currentの部分一致（大文字小文字無視、最大25件）
-        results = [name for name in members if current in name]
-        return [app_commands.Choice(name=name, value=name) for name in sorted(results)[:25]]
 
     async def update_message(self, interaction):
         embed = discord.Embed(title="Guild Raid Player Counts")
@@ -97,6 +77,33 @@ class PlayerCountView(discord.ui.View):
 class GuildRaidDetector(commands.GroupCog, name="graid"):
     def __init__(self, bot):
         self.bot = bot
+        self.api = WynncraftAPI()
+        self.etkw_member_cache = None
+
+    async def _get_etkw_members(self):
+        # Empire of TKWのメンバーを、get_guild_by_prefixで全ランクから収集
+        PREFIX = "ETKW"  # ETKWギルドのprefix（必要に応じてconfig参照にしてもOK）
+        data = await self.api.get_guild_by_prefix(PREFIX)
+        members = set()
+        if data and "members" in data:
+            for rank_obj in data["members"].values():
+                # rank_obj: {"MCID": {...}, ...}
+                for mcid in rank_obj.keys():
+                    members.add(mcid)
+        self.etkw_member_cache = members
+        return members
+
+    def _has_required_role(self, member: discord.Member) -> bool:
+        required_role = member.guild.get_role(GRAID_COUNT_ROLE_ID)
+        if not required_role:
+            return False
+        return any(role >= required_role for role in member.roles)
+
+    async def etkw_member_autocomplete(self, interaction: discord.Interaction, current: str):
+        members = await self._get_etkw_members()
+        # currentの部分一致（大文字小文字区別・最大25件）
+        results = [name for name in members if current in name]
+        return [app_commands.Choice(name=name, value=name) for name in sorted(results)[:25]]
 
     # 通知チャンネル設定コマンド
     @app_commands.command(name="channel", description="Guild Raid通知チャンネルを設定")
