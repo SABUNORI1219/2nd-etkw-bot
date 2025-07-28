@@ -95,7 +95,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         return members
 
     def _has_required_role(self, member: discord.Member) -> bool:
-        required_role = member.guild.get_role(GRAID_COUNT_ROLE_ID)
+        required_role = member.guild.get_role(RESTRICTION)
         if not required_role:
             return False
         return any(role >= required_role for role in member.roles)
