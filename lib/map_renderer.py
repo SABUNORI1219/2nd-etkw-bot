@@ -89,57 +89,63 @@ class MapRenderer:
                 "name": t,
                 "conn": conn,
                 "ext": ext,
-                "ext_without_conn": max(0, ext - conn),
+                # 新フィールド: Connを除いたExt
+                "ext_without_conn": ext - conn if ext >= conn else 0,
                 "hq_buff": hq_buff,
                 "is_city": self._is_city_territory(self.local_territories[t]),
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
             })
-        # top5: Ext（Conn含む）多い順, Conn多い順, Buff多い順
+        # Ext多い順、Conn多い順、バフ多い順でソート
         hq_stats.sort(key=lambda x: (-x["ext"], -x["conn"], -x["hq_buff"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
 
-        # 1. Connが2個以上多いものがあればそれを絶対優先
-        ext_wo_conn_max = max(x["ext_without_conn"] for x in top5)
-        ext_wo_conn_tops = [x for x in top5 if x["ext_without_conn"] == ext_wo_conn_max]
-        ext_top = ext_wo_conn_tops[0]
-        for t in top5:
+        # --- ここだけ「Connを含まないExt」で最大を判定 ---
+        ext_top = max(top5, key=lambda x: x["ext_without_conn"])
+        for t in top5[1:]:
             if t["conn"] - ext_top["conn"] >= 2:
                 return t["name"], hq_stats, top5, total_res
 
-        # 2. 小規模条件
+        # 小規模条件
         if len(owned_territories) <= 6 and all(x["conn"] < 3 for x in top5):
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
 
-        # 3. Connを含まないExt最大グループ
-        #    その中にcityがあればcityを優先（Extが20未満のみ）
-        ext_wo_conn_tops = [x for x in top5 if x["ext_without_conn"] == ext_wo_conn_max]
-        city = None
-        if ext_wo_conn_tops and ext_wo_conn_tops[0]["ext"] < 20:
-            city = next((x for x in ext_wo_conn_tops if x["is_city"]), None)
-        if city:
-            return city["name"], hq_stats, top5, total_res
+        # Ext最大グループ（通常規定）判定
+        ext_max_val = ext_top["ext"]
+        ext_tops = [x for x in top5 if x["ext"] == ext_max_val]
+        conn_max_val = max([x["conn"] for x in ext_tops])
+        conn_maxs = [x for x in ext_tops if x["conn"] == conn_max_val]
 
-        # 4. Conn最大
-        conn_max_val = max(x["conn"] for x in ext_wo_conn_tops)
-        conn_maxs = [x for x in ext_wo_conn_tops if x["conn"] == conn_max_val]
+        hq_buff_max = max([x["hq_buff"] for x in top5])
+        candidate_group = [
+            x for x in top5
+            if x["conn"] == conn_max_val
+                and x["ext"] < 20
+                and abs(x["hq_buff"] - hq_buff_max) < 100
+        ]
+        if candidate_group:
+            city = next((x for x in candidate_group if x["is_city"]), None)
+            if city:
+                return city["name"], hq_stats, top5, total_res
+            if candidate_group[0]["ext"] >= 20:
+                hq_max = max(candidate_group, key=lambda x: x["hq_buff"])
+                return hq_max["name"], hq_stats, top5, total_res
+
         if len(conn_maxs) == 1:
             return conn_maxs[0]["name"], hq_stats, top5, total_res
 
-        # 5. HQバフ最大（Ext>=20ならcity優先は飛ばす）
-        hq_buff_max = max(x["hq_buff"] for x in conn_maxs)
-        hq_buff_maxs = [x for x in conn_maxs if x["hq_buff"] == hq_buff_max]
-        if len(hq_buff_maxs) == 1:
-            return hq_buff_maxs[0]["name"], hq_stats, top5, total_res
+        diff = abs(conn_maxs[0]["hq_buff"] - conn_maxs[-1]["hq_buff"])
+        if diff < 100 and conn_maxs[0]["conn"] == conn_maxs[-1]["conn"]:
+            if conn_maxs[0]["ext"] < 20:
+                city = next((x for x in conn_maxs if x["is_city"]), None)
+                if city:
+                    return city["name"], hq_stats, top5, total_res
+            else:
+                hq_max = max(conn_maxs, key=lambda x: x["hq_buff"])
+                return hq_max["name"], hq_stats, top5, total_res
 
-        # 6. HQバフが同じならacquired（日付が古い＝小さい）を優先
-        oldest = min(hq_buff_maxs, key=lambda x: x["acquired"] or "9999")
-        if oldest:
-            return oldest["name"], hq_stats, top5, total_res
-
-        # 7. 資源優先（全資源で一番少ないもの、同数ならCrop→Ore→Wood→Fishの順、その資源を生産する拠点に近いHQ候補を選ぶ）
         res_priority = ["crops", "ore", "wood", "fish"]
         min_val = float("inf")
         min_type = None
@@ -148,6 +154,7 @@ class MapRenderer:
             if val > 0 and val < min_val:
                 min_val = val
                 min_type = rtype
+
         res_territories = [x for x in hq_stats if int(x["resources"].get(min_type, "0")) > 0]
         if res_territories and conn_maxs:
             def trading_route_distance(start, goals, allow_owned_only=True):
@@ -166,6 +173,7 @@ class MapRenderer:
                         neighbors = [n for n in neighbors if n in owned_territories]
                     queue.extend((n, dist+1) for n in neighbors)
                 return float("inf")
+
             res_territory_names = [x["name"] for x in res_territories]
             min_dist = float("inf")
             best_cand = conn_maxs[0]
@@ -175,9 +183,8 @@ class MapRenderer:
                     min_dist = d
                     best_cand = cand
             return best_cand["name"], hq_stats, top5, total_res
-
-        # 8. それでも決まらなければconn_maxs[0]
-        return conn_maxs[0]["name"], hq_stats, top5, total_res
+        else:
+            return conn_maxs[0]["name"], hq_stats, top5, total_res
     
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None):
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
