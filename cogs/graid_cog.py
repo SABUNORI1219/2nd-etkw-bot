@@ -129,9 +129,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         raid_name: 上記RAID_CHOICESから選択
         date: "2025-07-20"（日単位）, "2025-07"（月単位）, "2025"（年単位）など
         """
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
-            return
 
         date_from = None
         if date:
