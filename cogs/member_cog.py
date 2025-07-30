@@ -96,7 +96,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             logger.info(f"--- [MemberSync] {member.display_name} がサーバーから退出したため、連携を解除しました。")
             # ここに、特定のチャンネルに通知を送る処理を追加可能
 
-     @app_commands.command(name="add", description="メンバーを登録します。")
+    @app_commands.command(name="add", description="メンバーを登録")
     @app_commands.checks.has_permissions(administrator=True)
     async def add(self, interaction: discord.Interaction, mcid: str, discord_user: discord.User):
         await interaction.response.defer(ephemeral=True)
@@ -124,7 +124,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         else:
             await interaction.followup.send("❌ メンバーの登録に失敗しました。")
 
-    @app_commands.command(name="remove", description="メンバーの登録を解除します。")
+    @app_commands.command(name="remove", description="メンバーの登録を解除")
     @app_commands.checks.has_permissions(administrator=True)
     async def remove(self, interaction: discord.Interaction, mcid: str = None, discord_user: discord.User = None):
         await interaction.response.defer(ephemeral=True)
@@ -144,7 +144,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         else:
             await interaction.followup.send("❌ 登録解除に失敗したか、対象のメンバーが見つかりませんでした。")
     
-    @app_commands.command(name="search", description="登録メンバーを検索します。")
+    @app_commands.command(name="search", description="登録メンバーを検索")
     async def search(self, interaction: discord.Interaction, mcid: str = None, discord_user: discord.User = None):
         await interaction.response.defer(ephemeral=True)
 
@@ -173,8 +173,8 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         
         await interaction.followup.send(embed=embed)
 
-    @app_commands.command(name="list", description="登録メンバーの一覧を表示します。")
-    @app_commands.describe(rank="ランクで絞り込み（任意）", sort="並び順（任意）")
+    @app_commands.command(name="list", description="登録メンバーの一覧を表示")
+    @app_commands.describe(rank="ランクで絞り込み", sort="その他の絞り込み")
     @app_commands.choices(rank=RANK_CHOICES, sort=SORT_CHOICES)
     async def list(self, interaction: discord.Interaction, rank: str = None, sort: str = None):
         await interaction.response.defer(ephemeral=True)
