@@ -98,7 +98,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             # Discord退出通知
             await notify_member_left_discord(self.bot, linked_member)
 
-    @app_commands.command(name="set_member_notify_channel", description="メンバー通知用のチャンネルを設定")
+    @app_commands.command(name="channel", description="メンバー通知用のチャンネルを設定")
     async def set_member_notify_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
         # 権限チェック
         if interaction.user.id not in AUTHORIZED_USER_IDS:
