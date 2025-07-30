@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from lib.wynncraft_api import WynncraftAPI
 from lib.db import add_member, remove_member, get_member, get_linked_members_page
-from config import GUILD_NAME, EMBED_COLOR_BLUE
+from config import GUILD_NAME, EMBED_COLOR_BLUE, AUTHORIZED_USER_IDS, send_authorized_only_message
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +100,11 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
     @app_commands.checks.has_permissions(administrator=True)
     async def add(self, interaction: discord.Interaction, mcid: str, discord_user: discord.User):
         await interaction.response.defer(ephemeral=True)
+
+        # 権限チェック
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
+            return
         
         # まず公式APIから最新のランク情報を取得
         guild_data = await self.wynn_api.get_guild_by_prefix(GUILD_NAME.split()[-1]) # ETKW
@@ -123,6 +128,12 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
     @app_commands.checks.has_permissions(administrator=True)
     async def remove(self, interaction: discord.Interaction, mcid: str = None, discord_user: discord.User = None):
         await interaction.response.defer(ephemeral=True)
+
+        # 権限チェック
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
+            return
+            
         if not mcid and not discord_user:
             await interaction.followup.send("MCIDまたはDiscordユーザーのどちらかを指定してください。"); return
         
@@ -136,6 +147,12 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
     @app_commands.command(name="search", description="登録メンバーを検索します。")
     async def search(self, interaction: discord.Interaction, mcid: str = None, discord_user: discord.User = None):
         await interaction.response.defer(ephemeral=True)
+
+        # 権限チェック
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
+            return
+        
         if not mcid and not discord_user:
             await interaction.followup.send("MCIDまたはDiscordユーザーのどちらかを指定してください。"); return
             
@@ -162,8 +179,18 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
     async def list(self, interaction: discord.Interaction, rank: str = None, sort: str = None):
         await interaction.response.defer(ephemeral=True)
 
-        # (このコマンドの中身は、次のステップで実装します)
-        await interaction.followup.send("`/member list`は現在開発中です。")
+        # 権限チェック
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
+            return
+
+        _, total_pages = get_linked_members_page(page=1, rank_filter=rank)
+        if total_pages == 0:
+            await interaction.followup.send("表示対象のメンバーが登録されていません。"); return
+
+        view = MemberListView(self, 1, total_pages, rank, sort)
+        embed = await view.create_embed()
+        await interaction.followup.send(embed=embed, view=view)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(MemberCog(bot))
