@@ -82,5 +82,7 @@ async def member_remove_sync_task(bot):
         await asyncio.sleep(120)
 
 async def setup(bot):
-    bot.loop.create_task(member_rank_sync_task())
-    bot.loop.create_task(member_remove_sync_task(bot))
+    api = WynncraftAPI()
+    bot.loop.create_task(member_rank_sync_task(api))
+    bot.loop.create_task(member_remove_sync_task(bot, api))
+
