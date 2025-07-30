@@ -191,7 +191,7 @@ def cleanup_old_server_logs(minutes=5):
 def add_member(mcid: str, discord_id: int, rank: str) -> bool:
     """新しいメンバーを登録する"""
     sql = "INSERT INTO linked_members (mcid, discord_id, ingame_rank) VALUES (%s, %s, %s) ON CONFLICT(mcid) DO UPDATE SET discord_id = EXCLUDED.discord_id, ingame_rank = EXCLUDED.ingame_rank"
-    conn = get_db_connection()
+    conn = get_conn()
     if conn is None: return False
     try:
         with conn.cursor() as cur:
@@ -217,7 +217,7 @@ def remove_member(mcid: str = None, discord_id: int = None) -> bool:
         sql += "discord_id = %s"
         params.append(discord_id)
         
-    conn = get_db_connection()
+    conn = get_conn()
     if conn is None: return False
     try:
         with conn.cursor() as cur:
@@ -242,7 +242,7 @@ def get_member(mcid: str = None, discord_id: int = None) -> dict | None:
         sql += "discord_id = %s"
         params.append(discord_id)
         
-    conn = get_db_connection()
+    conn = get_conn()
     if conn is None: return None
     try:
         with conn.cursor() as cur:
@@ -260,7 +260,7 @@ def get_member(mcid: str = None, discord_id: int = None) -> dict | None:
 def get_linked_members_page(page: int = 1, per_page: int = 10, rank_filter: str = None) -> tuple[list, int]:
     """登録済みメンバーのリストをページ指定で取得する"""
     offset = (page - 1) * per_page
-    conn = get_db_connection()
+    conn = get_conn()
     if conn is None: return [], 0
 
     base_sql = "FROM linked_members"
