@@ -36,7 +36,7 @@ def create_table():
                 value TEXT
             );
         """)
-        cursor.execute('''
+        cur.execute('''
             CREATE TABLE IF NOT EXISTS linked_members (
                 mcid TEXT PRIMARY KEY,
                 discord_id BIGINT NOT NULL,
