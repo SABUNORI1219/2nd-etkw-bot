@@ -5,7 +5,8 @@ import logging
 from datetime import datetime, timezone
 
 from lib.wynncraft_api import WynncraftAPI
-from lib.db import add_member, remove_member, get_member, get_linked_members_page
+from lib.db import add_member, remove_member, get_member, get_linked_members_page, set_config
+from lib.discord_notify import notify_member_left_discord
 from config import GUILD_NAME, EMBED_COLOR_BLUE, AUTHORIZED_USER_IDS, send_authorized_only_message
 
 logger = logging.getLogger(__name__)
@@ -94,7 +95,17 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         if linked_member:
             remove_member(discord_id=member.id)
             logger.info(f"--- [MemberSync] {member.display_name} がサーバーから退出したため、連携を解除しました。")
-            # ここに、特定のチャンネルに通知を送る処理を追加可能
+            # Discord退出通知
+            await notify_member_left_discord(self.bot, linked_member)
+
+    @app_commands.command(name="set_member_notify_channel", description="メンバー通知用のチャンネルを設定")
+    async def set_member_notify_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        # 権限チェック
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
+            return
+        set_config("MEMBER_NOTIFY_CHANNEL_ID", str(channel.id))
+        await interaction.response.send_message(f"✅ メンバー通知チャンネルを {channel.mention} に設定しました。", ephemeral=True)
 
     @app_commands.command(name="add", description="メンバーを登録")
     @app_commands.checks.has_permissions(administrator=True)
