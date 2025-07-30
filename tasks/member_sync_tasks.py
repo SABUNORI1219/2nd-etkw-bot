@@ -81,8 +81,6 @@ async def member_remove_sync_task(bot):
             logger.error(f"[MemberSync] ギルド脱退検知で例外: {e}", exc_info=True)
         await asyncio.sleep(120)
 
-# 起動時に呼び出す関数例
-def start_member_sync_tasks(bot):
-    loop = asyncio.get_event_loop()
-    loop.create_task(member_rank_sync_task())
-    loop.create_task(member_remove_sync_task(bot))
+async def setup(bot):
+    bot.loop.create_task(member_rank_sync_task())
+    bot.loop.create_task(member_remove_sync_task(bot, loop_interval=120))
