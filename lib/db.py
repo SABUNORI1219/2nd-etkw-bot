@@ -36,6 +36,13 @@ def create_table():
                 value TEXT
             );
         """)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS linked_members (
+                mcid TEXT PRIMARY KEY,
+                discord_id BIGINT NOT NULL,
+                ingame_rank TEXT NOT NULL
+            );
+        ''')
         conn.commit()
     conn.close()
     logger.info("guild_raid_historyテーブルを作成/確認しました")
@@ -180,3 +187,104 @@ def cleanup_old_server_logs(minutes=5):
         conn.commit()
     conn.close()
     logger.info(f"{minutes}分より前のplayer_server_logを削除しました")
+
+def add_member(mcid: str, discord_id: int, rank: str) -> bool:
+    """新しいメンバーを登録する"""
+    sql = "INSERT INTO linked_members (mcid, discord_id, ingame_rank) VALUES (%s, %s, %s) ON CONFLICT(mcid) DO UPDATE SET discord_id = EXCLUDED.discord_id, ingame_rank = EXCLUDED.ingame_rank"
+    conn = get_db_connection()
+    if conn is None: return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, (mcid, discord_id, rank))
+            conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"[DB Handler] メンバーの追加/更新に失敗: {e}")
+        return False
+    finally:
+        if conn: conn.close()
+
+def remove_member(mcid: str = None, discord_id: int = None) -> bool:
+    """メンバーを登録解除する"""
+    if not mcid and not discord_id: return False
+    
+    sql = "DELETE FROM linked_members WHERE "
+    params = []
+    if mcid:
+        sql += "mcid = %s"
+        params.append(mcid)
+    else:
+        sql += "discord_id = %s"
+        params.append(discord_id)
+        
+    conn = get_db_connection()
+    if conn is None: return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, tuple(params))
+            conn.commit()
+        return cur.rowcount > 0 # 1行以上削除されたらTrue
+    except Exception as e:
+        logger.error(f"[DB Handler] メンバーの削除に失敗: {e}")
+        return False
+    finally:
+        if conn: conn.close()
+
+def get_member(mcid: str = None, discord_id: int = None) -> dict | None:
+    """単一のメンバー情報を取得する"""
+    if not mcid and not discord_id: return None
+    sql = "SELECT mcid, discord_id, ingame_rank FROM linked_members WHERE "
+    params = []
+    if mcid:
+        sql += "mcid = %s"
+        params.append(mcid)
+    else:
+        sql += "discord_id = %s"
+        params.append(discord_id)
+        
+    conn = get_db_connection()
+    if conn is None: return None
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, tuple(params))
+            record = cur.fetchone()
+            if record:
+                return {"mcid": record[0], "discord_id": record[1], "rank": record[2]}
+            return None
+    except Exception as e:
+        logger.error(f"[DB Handler] メンバーの取得に失敗: {e}")
+        return None
+    finally:
+        if conn: conn.close()
+
+def get_linked_members_page(page: int = 1, per_page: int = 10, rank_filter: str = None) -> tuple[list, int]:
+    """登録済みメンバーのリストをページ指定で取得する"""
+    offset = (page - 1) * per_page
+    conn = get_db_connection()
+    if conn is None: return [], 0
+
+    base_sql = "FROM linked_members"
+    params = []
+    if rank_filter:
+        base_sql += " WHERE ingame_rank = %s"
+        params.append(rank_filter)
+
+    count_sql = "SELECT COUNT(*) " + base_sql
+    data_sql = "SELECT mcid, discord_id, ingame_rank " + base_sql + " ORDER BY ingame_rank, mcid LIMIT %s OFFSET %s"
+    params.extend([per_page, offset])
+    
+    results, total_count = [], 0
+    try:
+        with conn.cursor() as cur:
+            cur.execute(count_sql, [rank_filter] if rank_filter else [])
+            total_count = cur.fetchone()[0]
+            
+            cur.execute(data_sql, params)
+            results = [{"mcid": r[0], "discord_id": r[1], "rank": r[2]} for r in cur.fetchall()]
+    except Exception as e:
+        logger.error(f"[DB Handler] メンバーリストの取得に失敗: {e}")
+    finally:
+        if conn: conn.close()
+        
+    total_pages = (total_count + per_page - 1) // per_page
+    return results, total_pages
