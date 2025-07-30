@@ -6,7 +6,7 @@ from lib.wynncraft_api import WynncraftAPI
 from lib.db import get_linked_members_page, get_member, add_member, remove_member
 from lib.discord_notify import notify_member_removed  # 実装予定: ギルド脱退時の通知用
 
-from config import GUILD_NAME, SYNC_INTERVAL_SECONDS
+from config import GUILD_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ async def member_rank_sync_task():
                 page += 1
         except Exception as e:
             logger.error(f"[MemberSync] ランク同期で例外: {e}", exc_info=True)
-        await asyncio.sleep(SYNC_INTERVAL_SECONDS)
+        await asyncio.sleep(120)
 
 async def member_remove_sync_task(bot):
     """ギルドAPIのメンバーリストでDBから消すべき人を検知し、通知＆DB削除"""
@@ -79,11 +79,10 @@ async def member_remove_sync_task(bot):
                 page += 1
         except Exception as e:
             logger.error(f"[MemberSync] ギルド脱退検知で例外: {e}", exc_info=True)
-        await asyncio.sleep(SYNC_INTERVAL_SECONDS)
+        await asyncio.sleep(120)
 
 # 起動時に呼び出す関数例
 def start_member_sync_tasks(bot):
-    # SYNC_INTERVAL_SECONDS は config.py等で定義（例: 900=15分）
     loop = asyncio.get_event_loop()
     loop.create_task(member_rank_sync_task())
     loop.create_task(member_remove_sync_task(bot))
