@@ -8,10 +8,10 @@ logger = logging.getLogger(__name__)
 
 # レイド名ごとに対応する絵文字を登録
 RAID_EMOJIS = {
-    "The Nameless Anomaly": "<:anomaly:1272959194626134148>",
-    "The Canyon Colossus": "<:canyon:1272959833011785838>",
-    "Orphion's Nexus of Light": "<:orphion:1272959789043023893>",
-    "Nest of the Grootslangs": "<:grootslang:1272959874455572604>"
+    "The Nameless Anomaly": "<:wynn_tna:1400385557795835958>",
+    "The Canyon Colossus": "<:wynn_tcc:1400385514460155914>",
+    "Orphion's Nexus of Light": "<:wynn_nol:1400385439508074618>",
+    "Nest of the Grootslangs": "<:wynn_notg:1400385362299195424>"
 }
 DEFAULT_EMOJI = "🎲"  # 未登録レイド用
 
