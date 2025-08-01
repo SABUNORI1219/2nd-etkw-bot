@@ -23,6 +23,27 @@ SORT_CHOICES = [
     app_commands.Choice(name="Last Seen (最終ログインが古い順)", value="last_seen")
 ]
 
+def humanize_timedelta(dt: datetime) -> str:
+    now = datetime.now(timezone.utc)
+    delta = now - dt
+    seconds = int(delta.total_seconds())
+    if seconds < 60:
+        return f"{seconds} seconds ago"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes} minutes ago"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours} hours ago"
+    days = hours // 24
+    if days < 7:
+        return f"{days} days ago"
+    weeks = days // 7
+    if weeks < 52:
+        return f"{weeks} weeks ago"
+    years = days // 365
+    return f"{years} years ago"
+
 # /member list のためのページ送りView
 class MemberListView(discord.ui.View):
     def __init__(self, cog_instance, initial_page: int, total_pages: int, rank_filter: str, sort_by: str):
@@ -36,46 +57,43 @@ class MemberListView(discord.ui.View):
         self.update_buttons()
 
     async def create_embed(self) -> discord.Embed:
-        """現在のページに基づいてEmbedを作成する（新ビジュアル仕様・ランク順制御）"""
-        members_on_page, self.total_pages = get_linked_members_page(page=self.current_page, rank_filter=self.rank_filter)
+        members_on_page, self.total_pages = get_linked_members_page(
+            page=self.current_page, rank_filter=self.rank_filter
+        )
         
         embed = discord.Embed(title="メンバーリスト", color=EMBED_COLOR_BLUE)
-
+        
         if not members_on_page:
             embed.description = "表示するメンバーがいません。"
             return embed
 
-        # "Last Seen"ソートの場合、このページのメンバーのAPIデータを取得
-        if self.sort_by == "last_seen":
-            member_details = []
-            for member in members_on_page:
-                player_data = await self.cog.api.get_nori_player_data(member['username'])
-                last_join = player_data.get('lastJoin', "1970-01-01T00:00:00.000Z") if player_data else "1970-01-01T00:00:00.000Z"
-                member_details.append({**member, 'last_seen': datetime.fromisoformat(last_join.replace("Z", "+00:00"))})
-            # 最終ログイン日時でソート (古い順)
-            members_on_page = sorted(member_details, key=lambda x: x['last_seen'])
-
-        # ランクごとにまとめる
         rank_to_members = {}
         for member in members_on_page:
             rank = member['rank']
             if rank not in rank_to_members:
                 rank_to_members[rank] = []
-            last_seen_str = member['lastJoin'].strftime('%Y-%m-%d') if 'last_seen' in member else "N/A"
-            # 2行表示
-            member_str = f"`Account`: {member['mcid']} (<@{member['discord_id']}>)\n`Last Seen`: {last_seen_str}"
+            # ここで mcidをAPIのusernameとして問い合わせる
+            player_data = await self.cog.api.get_nori_player_data(member['mcid'])
+            if player_data and 'lastJoin' in player_data:
+                try:
+                    last_seen_dt = datetime.fromisoformat(player_data['lastJoin'].replace("Z", "+00:00"))
+                    last_seen_str = humanize_timedelta(last_seen_dt)
+                except Exception:
+                    last_seen_str = "N/A"
+            else:
+                last_seen_str = "N/A"
+            member_str = (
+                f"`Account`: {member['mcid']} (<@{member['discord_id']}>)\n"
+                f"`Last Seen`: {last_seen_str}"
+            )
             rank_to_members[rank].append(member_str)
 
-        # 指定した順でフィールドを追加
         for rank in RANK_ORDER:
             if rank in rank_to_members:
                 embed.add_field(name=rank, value="\n\n".join(rank_to_members[rank]), inline=False)
-
-        # RANK_ORDERにないランクがDBに入ってた場合も出す
         for rank in rank_to_members:
             if rank not in RANK_ORDER:
                 embed.add_field(name=rank, value="\n\n".join(rank_to_members[rank]), inline=False)
-
         embed.set_footer(text=f"Page {self.current_page}/{self.total_pages} | Minister Chikuwa")
         return embed
 
