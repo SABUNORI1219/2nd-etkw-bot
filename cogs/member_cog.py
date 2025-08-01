@@ -86,7 +86,7 @@ class MemberListView(discord.ui.View):
 class MemberCog(commands.GroupCog, group_name="member", description="ギルドメンバーとDiscordアカウントの連携を管理します。"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.wynn_api = WynncraftAPI()
+        self.api = WynncraftAPI()
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
     @commands.Cog.listener()
@@ -118,7 +118,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             return
         
         # まず公式APIから最新のランク情報を取得
-        guild_data = await api.get_guild_by_prefix("ETKW")
+        guild_data = await self.api.get_guild_by_prefix("ETKW")
         if not guild_data:
             await interaction.followup.send("ギルドデータの取得に失敗しました。"); return
         
