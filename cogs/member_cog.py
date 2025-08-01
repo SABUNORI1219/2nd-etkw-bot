@@ -130,6 +130,12 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             if mcid in rank_members:
                 ingame_rank = rank.capitalize()
                 break
+
+        logger.info(f"MEMBERS_DICT: {members_dict}")
+        logger.info(f"RANK_MEMBERS: {rank_members}")
+        logger.info(f"RANK: {rank}")
+        logger.info(f"MCID: {mcid}")
+        logger.info{f"INGAME_RANK: {ingame_rank}"}
         
         success = add_member(mcid, discord_user.id, ingame_rank)
         if success:
