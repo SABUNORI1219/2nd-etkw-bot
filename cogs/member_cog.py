@@ -121,7 +121,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         guild_data = await self.wynn_api.get_guild_by_prefix(GUILD_NAME.split()[-1]) # ETKW
         if not guild_data:
             await interaction.followup.send("ギルドデータの取得に失敗しました。"); return
-
+        
         ingame_rank = "Unknown"
         members_dict = guild_data.get('members', {})
         for rank, rank_members in members_dict.items():
@@ -130,11 +130,6 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             if mcid in rank_members:
                 ingame_rank = rank.capitalize()
                 break
-            # UUID比較もする場合
-            for name, info in rank_members.items():
-                if info.get("uuid") == mcid:
-                    ingame_rank = rank.capitalize()
-                    break
         
         success = add_member(mcid, discord_user.id, ingame_rank)
         if success:
