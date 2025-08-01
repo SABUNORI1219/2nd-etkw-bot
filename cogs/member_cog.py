@@ -118,7 +118,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             return
         
         # まず公式APIから最新のランク情報を取得
-        guild_data = await self.wynn_api.get_guild_by_prefix(GUILD_NAME.split()[-1]) # ETKW
+        guild_data = await self.wynn_api.get_guild_by_name(GUILD_NAME.split()[-1]) # ETKW
         if not guild_data:
             await interaction.followup.send("ギルドデータの取得に失敗しました。"); return
         
