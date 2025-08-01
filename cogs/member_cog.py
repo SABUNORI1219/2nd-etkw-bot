@@ -135,7 +135,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         logger.info(f"RANK_MEMBERS: {rank_members}")
         logger.info(f"RANK: {rank}")
         logger.info(f"MCID: {mcid}")
-        logger.info{f"INGAME_RANK: {ingame_rank}"}
+        logger.info(f"INGAME_RANK: {ingame_rank}")
         
         success = add_member(mcid, discord_user.id, ingame_rank)
         if success:
