@@ -49,7 +49,7 @@ class MemberListView(discord.ui.View):
         if self.sort_by == "last_seen":
             member_details = []
             for member in members_on_page:
-                player_data = await self.cog.api.get_nori_player_data(member['mcid'])
+                player_data = await self.cog.api.get_nori_player_data(member['username'])
                 last_join = player_data.get('lastJoin', "1970-01-01T00:00:00.000Z") if player_data else "1970-01-01T00:00:00.000Z"
                 member_details.append({**member, 'last_seen': datetime.fromisoformat(last_join.replace("Z", "+00:00"))})
             # 最終ログイン日時でソート (古い順)
