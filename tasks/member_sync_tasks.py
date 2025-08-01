@@ -12,7 +12,7 @@ async def fetch_guild_members(api: WynncraftAPI) -> dict:
     """
     Wynncraft Guild APIから全メンバーを「MCID→Rank」のdictで返す
     """
-    guild_data = await api.get_guild_by_name(GUILD_NAME.split()[-1])
+    guild_data = await api.get_guild_by_prefix("ETKW")
     if not guild_data or 'members' not in guild_data:
         logger.warning("[MemberSync] ギルドAPI取得失敗")
         return {}
