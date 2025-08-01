@@ -62,13 +62,13 @@ class PlayerCountView(discord.ui.View):
         self.next.disabled = self.page == self.max_page
         await interaction.response.edit_message(embed=embed, view=self)
 
-    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="⏪️", style=discord.ButtonStyle.secondary)
     async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.page > 0:
             self.page -= 1
             await self.update_message(interaction)
 
-    @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="⏩️", style=discord.ButtonStyle.secondary)
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.page < self.max_page:
             self.page += 1
