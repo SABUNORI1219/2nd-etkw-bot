@@ -1,30 +1,33 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
 
 from lib.wynncraft_api import WynncraftAPI
-from lib.db import get_linked_members_page, get_member, add_member, remove_member
+from lib.db import get_linked_members_page, add_member, remove_member
 from lib.discord_notify import notify_member_removed
-
 from config import GUILD_NAME
 
 logger = logging.getLogger(__name__)
 
-# ギルドAPIから全メンバー情報を取得
-async def fetch_guild_members(api):
+async def fetch_guild_members(api: WynncraftAPI) -> dict:
+    """
+    Wynncraft Guild APIから全メンバーを「MCID→Rank」のdictで返す
+    """
     guild_data = await api.get_guild_by_prefix(GUILD_NAME.split()[-1])
     if not guild_data or 'members' not in guild_data:
         logger.warning("[MemberSync] ギルドAPI取得失敗")
         return {}
     members = {}
-    for rank, mcids in guild_data['members'].items():
-        if rank == "total": continue
-        for mcid in mcids:
+    for rank, rank_members in guild_data['members'].items():
+        if rank == "total":
+            continue
+        for mcid in rank_members.keys():  # ←ここを修正
             members[mcid] = rank.capitalize()
     return members
 
-async def member_rank_sync_task(api):
-    """ギルドAPIのランク情報でDBのメンバーランクを自動同期（通知不要）"""
+async def member_rank_sync_task(api: WynncraftAPI):
+    """
+    APIのランク情報でDBのメンバーランクを自動同期（通知不要）
+    """
     while True:
         try:
             logger.info("[MemberSync] ランク同期タスク開始")
@@ -48,8 +51,10 @@ async def member_rank_sync_task(api):
             logger.error(f"[MemberSync] ランク同期で例外: {e}", exc_info=True)
         await asyncio.sleep(120)
 
-async def member_remove_sync_task(bot, api):
-    """ギルドAPIのメンバーリストでDBから消すべき人を検知し、通知＆DB削除"""
+async def member_remove_sync_task(bot, api: WynncraftAPI):
+    """
+    APIのメンバーリストでDBから消すべき人を検知し、通知＆DB削除
+    """
     while True:
         try:
             logger.info("[MemberSync] ギルド脱退検知タスク開始")
