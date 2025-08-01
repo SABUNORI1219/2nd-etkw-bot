@@ -123,11 +123,18 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             await interaction.followup.send("ギルドデータの取得に失敗しました。"); return
 
         ingame_rank = "Unknown"
-        for rank, members in guild_data.get('members', {}).items():
-            if rank == "total": continue
-            if mcid in members:
+        members_dict = guild_data.get('members', {})
+        for rank, rank_members in members_dict.items():
+            if rank == "total":
+                continue
+            if mcid in rank_members:
                 ingame_rank = rank.capitalize()
                 break
+            # UUID比較もする場合
+            for name, info in rank_members.items():
+                if info.get("uuid") == mcid:
+                    ingame_rank = rank.capitalize()
+                    break
         
         success = add_member(mcid, discord_user.id, ingame_rank)
         if success:
