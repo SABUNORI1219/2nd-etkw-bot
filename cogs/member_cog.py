@@ -27,6 +27,7 @@ class MemberListView(discord.ui.View):
     def __init__(self, cog_instance, initial_page: int, total_pages: int, rank_filter: str, sort_by: str):
         super().__init__(timeout=180.0)
         self.cog = cog_instance
+        self.api = WynncraftAPI()
         self.current_page = initial_page
         self.total_pages = total_pages
         self.rank_filter = rank_filter
@@ -34,12 +35,11 @@ class MemberListView(discord.ui.View):
         self.update_buttons()
 
     async def create_embed(self) -> discord.Embed:
-        """現在のページに基づいてEmbedを作成する"""
+        """現在のページに基づいてEmbedを作成する（新ビジュアル仕様）"""
         members_on_page, self.total_pages = get_linked_members_page(page=self.current_page, rank_filter=self.rank_filter)
         
-        embed = discord.Embed(title="Linked Member List", color=EMBED_COLOR_BLUE)
-        if self.rank_filter: embed.title += f" (Rank: {self.rank_filter})"
-        
+        embed = discord.Embed(title="メンバーリスト", color=EMBED_COLOR_BLUE)
+
         if not members_on_page:
             embed.description = "表示するメンバーがいません。"
             return embed
@@ -48,20 +48,27 @@ class MemberListView(discord.ui.View):
         if self.sort_by == "last_seen":
             member_details = []
             for member in members_on_page:
-                player_data = await self.cog.wynn_api.get_nori_player_data(member['mcid'])
+                player_data = await self.cog.api.get_nori_player_data(member['mcid'])
                 last_join = player_data.get('lastJoin', "1970-01-01T00:00:00.000Z") if player_data else "1970-01-01T00:00:00.000Z"
                 member_details.append({**member, 'last_seen': datetime.fromisoformat(last_join.replace("Z", "+00:00"))})
             # 最終ログイン日時でソート (古い順)
             members_on_page = sorted(member_details, key=lambda x: x['last_seen'])
 
-        # Embedのフィールドを作成
-        field_value = ""
+        # ランクごとにまとめる
+        rank_to_members = {}
         for member in members_on_page:
+            rank = member['rank']
+            if rank not in rank_to_members:
+                rank_to_members[rank] = []
             last_seen_str = member['last_seen'].strftime('%Y-%m-%d') if 'last_seen' in member else "N/A"
-            field_value += f"**{member['mcid']}** (<@{member['discord_id']}>)\n"
-            field_value += f"> **Rank:** `{member['rank']}` | **Last Seen:** `{last_seen_str}`\n"
-        
-        embed.add_field(name=f"Page {self.current_page}/{self.total_pages}", value=field_value)
+            # 2行表示
+            member_str = f"> {member['mcid']} (<@{member['discord_id']}>)\nLast seen: {last_seen_str}"
+            rank_to_members[rank].append(member_str)
+
+        for rank, members in rank_to_members.items():
+            embed.add_field(name=rank, value="\n\n".join(members), inline=False)
+
+        embed.set_footer(text=f"Page {self.current_page}/{self.total_pages} | Minister Chikuwa")
         return embed
 
     def update_buttons(self):
@@ -130,12 +137,6 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             if mcid in rank_members:
                 ingame_rank = rank.capitalize()
                 break
-
-        logger.info(f"MEMBERS_DICT: {members_dict}")
-        logger.info(f"RANK_MEMBERS: {rank_members}")
-        logger.info(f"RANK: {rank}")
-        logger.info(f"MCID: {mcid}")
-        logger.info(f"INGAME_RANK: {ingame_rank}")
         
         success = add_member(mcid, discord_user.id, ingame_rank)
         if success:
@@ -180,7 +181,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             await interaction.followup.send("指定されたメンバーは登録されていません。"); return
             
         # Nori APIから最新のLast Seenを取得
-        player_data = await self.wynn_api.get_nori_player_data(db_data['mcid'])
+        player_data = await self.api.get_nori_player_data(db_data['mcid'])
         last_seen = "N/A"
         if player_data and 'lastJoin' in player_data:
             last_seen = player_data['lastJoin'].split('T')[0]
