@@ -61,9 +61,9 @@ class MemberListView(discord.ui.View):
             rank = member['rank']
             if rank not in rank_to_members:
                 rank_to_members[rank] = []
-            last_seen_str = member['last_seen'].strftime('%Y-%m-%d') if 'last_seen' in member else "N/A"
+            last_seen_str = member['lastJoin'].strftime('%Y-%m-%d') if 'last_seen' in member else "N/A"
             # 2行表示
-            member_str = f"**Account**: {member['mcid']} (<@{member['discord_id']}>)\n**Last Seen**: {last_seen_str}"
+            member_str = f"`Account`: {member['mcid']} (<@{member['discord_id']}>)\n`Last Seen`: {last_seen_str}"
             rank_to_members[rank].append(member_str)
 
         # 指定した順でフィールドを追加
