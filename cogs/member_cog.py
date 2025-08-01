@@ -12,9 +12,10 @@ from config import GUILD_NAME, EMBED_COLOR_BLUE, AUTHORIZED_USER_IDS, send_autho
 logger = logging.getLogger(__name__)
 
 # ランクの選択肢 (オートコンプリート用)
+RANK_ORDER = ["Owner", "Chief", "Strategist", "Captain", "Recruiter", "Recruit"]
 RANK_CHOICES = [
     app_commands.Choice(name=rank, value=rank)
-    for rank in ["Owner", "Chief", "Strategist", "Captain", "Recruiter", "Recruit"]
+    for rank in RANK_ORDER
 ]
 
 # ソート順の選択肢
@@ -35,7 +36,7 @@ class MemberListView(discord.ui.View):
         self.update_buttons()
 
     async def create_embed(self) -> discord.Embed:
-        """現在のページに基づいてEmbedを作成する（新ビジュアル仕様）"""
+        """現在のページに基づいてEmbedを作成する（新ビジュアル仕様・ランク順制御）"""
         members_on_page, self.total_pages = get_linked_members_page(page=self.current_page, rank_filter=self.rank_filter)
         
         embed = discord.Embed(title="メンバーリスト", color=EMBED_COLOR_BLUE)
@@ -65,8 +66,15 @@ class MemberListView(discord.ui.View):
             member_str = f"> {member['mcid']} (<@{member['discord_id']}>)\nLast seen: {last_seen_str}"
             rank_to_members[rank].append(member_str)
 
-        for rank, members in rank_to_members.items():
-            embed.add_field(name=rank, value="\n\n".join(members), inline=False)
+        # 指定した順でフィールドを追加
+        for rank in RANK_ORDER:
+            if rank in rank_to_members:
+                embed.add_field(name=rank, value="\n\n".join(rank_to_members[rank]), inline=False)
+
+        # RANK_ORDERにないランクがDBに入ってた場合も出す
+        for rank in rank_to_members:
+            if rank not in RANK_ORDER:
+                embed.add_field(name=rank, value="\n\n".join(rank_to_members[rank]), inline=False)
 
         embed.set_footer(text=f"Page {self.current_page}/{self.total_pages} | Minister Chikuwa")
         return embed
@@ -75,14 +83,14 @@ class MemberListView(discord.ui.View):
         self.children[0].disabled = self.current_page <= 1
         self.children[1].disabled = self.current_page >= self.total_pages
 
-    @discord.ui.button(label="◀️ 前へ", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="⏪️", style=discord.ButtonStyle.blurple)
     async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page -= 1
         embed = await self.create_embed()
         self.update_buttons()
         await interaction.response.edit_message(embed=embed, view=self)
 
-    @discord.ui.button(label="次へ ▶️", style=discord.ButtonStyle.blurple)
+    @discord.ui.button(label="⏩️", style=discord.ButtonStyle.blurple)
     async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page += 1
         embed = await self.create_embed()
