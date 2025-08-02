@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone
 
 from lib.wynncraft_api import WynncraftAPI
-from lib.db import add_member, remove_member, get_member, get_linked_members_page, set_config
+from lib.db import add_member, remove_member, get_member, get_linked_members_page, set_config, get_all_linked_members
 from lib.discord_notify import notify_member_left_discord
 from config import GUILD_NAME, EMBED_COLOR_BLUE, AUTHORIZED_USER_IDS, send_authorized_only_message
 
@@ -49,13 +49,12 @@ def sort_members_rank_order(members):
     return sorted(members, key=lambda m: (rank_index.get(m["rank"], 999), m["mcid"].lower()))
 
 def get_linked_members_page_ranked(page=1, rank_filter=None, per_page=10):
-    all_members = get_linked_members_page(page=1, rank_filter=rank_filter)[0]
+    all_members = get_all_linked_members(rank_filter=rank_filter)
     members_sorted = []
     for rank in RANK_ORDER:
         members_sorted.extend(
             [m for m in all_members if m["rank"] and m["rank"].strip().lower() == rank.lower()]
         )
-    # rank_orderに含まれないランクも一応追加
     members_sorted.extend(
         [m for m in all_members if not m["rank"] or m["rank"].strip().lower() not in [r.lower() for r in RANK_ORDER]]
     )
