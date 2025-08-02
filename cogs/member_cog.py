@@ -87,9 +87,11 @@ class MemberListView(discord.ui.View):
     async def create_embed(self) -> discord.Embed:
         if self.rank_filter in RANK_ORDER:
             members_on_page, self.total_pages = get_linked_members_page_by_rank(self.rank_filter, page=self.current_page)
+            embed_title = f"メンバーリスト: {self.rank_filter}"
         else:
             members_on_page, self.total_pages = get_linked_members_page_ranked(page=self.current_page)
-        embed = discord.Embed(title="メンバーリスト", color=EMBED_COLOR_BLUE)
+            embed_title = "メンバーリスト"
+        embed = discord.Embed(title=embed_title, color=EMBED_COLOR_BLUE)
         if not members_on_page:
             embed.description = "表示するメンバーがいません。"
             return embed
