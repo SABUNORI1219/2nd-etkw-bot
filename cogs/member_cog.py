@@ -49,13 +49,16 @@ def sort_members_rank_order(members):
     return sorted(members, key=lambda m: (rank_index.get(m["rank"], 999), m["mcid"].lower()))
 
 def get_linked_members_page_ranked(page=1, rank_filter=None, per_page=10):
-    # すべてのメンバーを取得し、ランク順に並べてからページ分割
     all_members = get_linked_members_page(page=1, rank_filter=rank_filter)[0]
     members_sorted = []
     for rank in RANK_ORDER:
-        members_sorted.extend([m for m in all_members if m["rank"] == rank])
+        members_sorted.extend(
+            [m for m in all_members if m["rank"] and m["rank"].strip().lower() == rank.lower()]
+        )
     # rank_orderに含まれないランクも一応追加
-    members_sorted.extend([m for m in all_members if m["rank"] not in RANK_ORDER])
+    members_sorted.extend(
+        [m for m in all_members if not m["rank"] or m["rank"].strip().lower() not in [r.lower() for r in RANK_ORDER]]
+    )
     total_pages = (len(members_sorted) + per_page - 1) // per_page
     start = (page - 1) * per_page
     end = start + per_page
@@ -83,21 +86,17 @@ class MemberListView(discord.ui.View):
         self.update_buttons()
 
     async def create_embed(self) -> discord.Embed:
-        # Rankでフィルタ指定
         if self.rank_filter in RANK_ORDER:
             members_on_page, self.total_pages = get_linked_members_page_by_rank(self.rank_filter, page=self.current_page)
         else:
             members_on_page, self.total_pages = get_linked_members_page_ranked(page=self.current_page)
-
         embed = discord.Embed(title="メンバーリスト", color=EMBED_COLOR_BLUE)
         if not members_on_page:
             embed.description = "表示するメンバーがいません。"
             return embed
-
-        # MCIDとDiscordアカウントだけ羅列（改行区切り）
-        lines = [f"{member['mcid']} （<@{member['discord_id']}>）" for member in members_on_page]
+        # escape_markdownを利用
+        lines = [f"{discord.utils.escape_markdown(member['mcid'])} （<@{member['discord_id']}>）" for member in members_on_page]
         embed.description = "\n".join(lines)
-
         embed.set_footer(text=f"Page {self.current_page}/{self.total_pages} | Minister Chikuwa")
         return embed
     
