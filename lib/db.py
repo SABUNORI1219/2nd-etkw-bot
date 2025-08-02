@@ -288,3 +288,23 @@ def get_linked_members_page(page: int = 1, per_page: int = 10, rank_filter: str 
         
     total_pages = (total_count + per_page - 1) // per_page
     return results, total_pages
+
+def get_all_linked_members(rank_filter: str = None) -> list:
+    conn = get_conn()
+    if conn is None: return []
+    base_sql = "FROM linked_members"
+    params = []
+    if rank_filter:
+        base_sql += " WHERE ingame_rank = %s"
+        params.append(rank_filter)
+    data_sql = "SELECT mcid, discord_id, ingame_rank " + base_sql + " ORDER BY ingame_rank, mcid"
+    try:
+        with conn.cursor() as cur:
+            cur.execute(data_sql, params)
+            results = [{"mcid": r[0], "discord_id": r[1], "rank": r[2]} for r in cur.fetchall()]
+    except Exception as e:
+        logger.error(f"[DB Handler] 全件メンバーリスト取得に失敗: {e}")
+        return []
+    finally:
+        if conn: conn.close()
+    return results
