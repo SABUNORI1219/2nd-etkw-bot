@@ -20,6 +20,7 @@ RANK_CHOICES = [
 
 # ソート順の選択肢
 SORT_CHOICES = [
+    app_commands.Choice(name="Rankで絞る", value="rank"),
     app_commands.Choice(name="Last Seen (最終ログインが古い順)", value="last_seen")
 ]
 
@@ -56,6 +57,15 @@ def get_linked_members_page_ranked(page=1, rank_filter=None, per_page=10):
     end = start + per_page
     return members_sorted[start:end], total_pages
 
+def get_linked_members_page_by_rank(rank, page=1, per_page=10):
+    all_members = get_linked_members_page(page=1, rank_filter=rank)[0]
+    # rank_filterで既に絞っているはずだが念のため
+    members = [m for m in all_members if m["rank"] == rank]
+    total_pages = (len(members) + per_page - 1) // per_page
+    start = (page - 1) * per_page
+    end = start + per_page
+    return members[start:end], total_pages
+
 # /member list のためのページ送りView
 class MemberListView(discord.ui.View):
     def __init__(self, cog_instance, initial_page: int, total_pages: int, rank_filter: str, sort_by: str):
@@ -68,44 +78,51 @@ class MemberListView(discord.ui.View):
         self.sort_by = sort_by
         self.update_buttons()
 
-    async def create_embed(self) -> discord.Embed:
-        get_page_func = get_linked_members_page_ranked if self.sort_by != "last_seen" else get_linked_members_page
-        members_on_page, self.total_pages = get_page_func(page=self.current_page, rank_filter=self.rank_filter)
+    if self.sort_by == "rank" and self.rank_filter in RANK_ORDER:
+            members_on_page, self.total_pages = get_linked_members_page_by_rank(self.rank_filter, page=self.current_page)
+        elif self.sort_by == "last_seen":
+            members_on_page, self.total_pages = get_linked_members_page(page=self.current_page, rank_filter=self.rank_filter)
+        else:
+            members_on_page, self.total_pages = get_linked_members_page_ranked(page=self.current_page, rank_filter=self.rank_filter)
+
         embed = discord.Embed(title="メンバーリスト", color=EMBED_COLOR_BLUE)
         if not members_on_page:
             embed.description = "表示するメンバーがいません。"
             return embed
 
-        # ページ内メンバーをランクごとにグループ化
-        rank_to_members = {rank: [] for rank in RANK_ORDER}
-        others = []
-        for member in members_on_page:
-            rank = member['rank']
-            # sort=="last_seen"だけLast Seen表示
-            last_seen_str = ""
-            if self.sort_by == "last_seen":
-                player_data = await self.cog.api.get_nori_player_data(member['mcid'])
-                if player_data and 'lastJoin' in player_data:
-                    try:
-                        last_seen_dt = datetime.fromisoformat(player_data['lastJoin'].replace("Z", "+00:00"))
-                        last_seen_str = f"\n_Last Seen: `{humanize_timedelta(last_seen_dt)}`_"
-                    except Exception:
-                        last_seen_str = ""
-            # Discord名は@付き、もしくは<@id>（お好みで）
-            # ここでは<@{member['discord_id']}>を使います
-            member_str = f"**{member['mcid']}** （<@{member['discord_id']}>){last_seen_str}"
-            if rank in rank_to_members:
-                rank_to_members[rank].append(member_str)
-            else:
-                others.append(member_str)
+        # sortによって書式を分岐
+        if self.sort_by == "rank" and self.rank_filter in RANK_ORDER:
+            # 指定したランクのメンバーのみ
+            lines = []
+            for member in members_on_page:
+                lines.append(f"**{member['mcid']}** （<@{member['discord_id']}>）")
+            embed.add_field(name=self.rank_filter, value="\n".join(lines), inline=False)
+        else:
+            # 通常（ランクごとにまとめて表示、sort=last_seen時はLast Seenも表示）
+            rank_to_members = {rank: [] for rank in RANK_ORDER}
+            others = []
+            for member in members_on_page:
+                rank = member['rank']
+                last_seen_str = ""
+                if self.sort_by == "last_seen":
+                    player_data = await self.cog.api.get_nori_player_data(member['mcid'])
+                    if player_data and 'lastJoin' in player_data:
+                        try:
+                            last_seen_dt = datetime.fromisoformat(player_data['lastJoin'].replace("Z", "+00:00"))
+                            last_seen_str = f"\n_Last Seen: `{humanize_timedelta(last_seen_dt)}`_"
+                        except Exception:
+                            last_seen_str = ""
+                member_str = f"**{member['mcid']}** （<@{member['discord_id']}>){last_seen_str}"
+                if rank in rank_to_members:
+                    rank_to_members[rank].append(member_str)
+                else:
+                    others.append(member_str)
 
-        # ランク順でフィールド追加
-        for rank in RANK_ORDER:
-            if rank_to_members[rank]:
-                embed.add_field(name=rank, value="\n\n".join(rank_to_members[rank]), inline=False)
-        # RANK_ORDER以外も出す
-        if others:
-            embed.add_field(name="その他", value="\n\n".join(others), inline=False)
+            for rank in RANK_ORDER:
+                if rank_to_members[rank]:
+                    embed.add_field(name=rank, value="\n\n".join(rank_to_members[rank]), inline=False)
+            if others:
+                embed.add_field(name="その他", value="\n\n".join(others), inline=False)
 
         embed.set_footer(text=f"Page {self.current_page}/{self.total_pages} | Minister Chikuwa")
         return embed
@@ -243,7 +260,16 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             await send_authorized_only_message(interaction)
             return
 
-        _, total_pages = get_linked_members_page(page=1, rank_filter=rank)
+        if sort == "rank" and (not rank or rank not in RANK_ORDER):
+            await interaction.followup.send("ランク指定が必要です。"); return
+
+        if sort == "rank":
+            # 指定ランクのみ表示
+            _, total_pages = get_linked_members_page_by_rank(rank, page=1)
+        elif sort == "last_seen":
+            _, total_pages = get_linked_members_page(page=1, rank_filter=rank)
+        else:
+            _, total_pages = get_linked_members_page_ranked(page=1, rank_filter=rank)
         if total_pages == 0:
             await interaction.followup.send("表示対象のメンバーが登録されていません。"); return
 
