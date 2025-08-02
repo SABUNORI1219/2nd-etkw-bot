@@ -96,7 +96,7 @@ class MemberListView(discord.ui.View):
             embed.description = "表示するメンバーがいません。"
             return embed
         # escape_markdownを利用
-        lines = [f"- {discord.utils.escape_markdown(member['mcid'])} （<@{member['discord_id']}>）" for member in members_on_page]
+        lines = [f"- **{discord.utils.escape_markdown(member['mcid'])}** （<@{member['discord_id']}>）" for member in members_on_page]
         embed.description = "\n".join(lines)
         embed.set_footer(text=f"Page {self.current_page}/{self.total_pages} | Minister Chikuwa")
         return embed
