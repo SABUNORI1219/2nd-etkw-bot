@@ -44,6 +44,18 @@ def humanize_timedelta(dt: datetime) -> str:
     years = days // 365
     return f"{years} years ago"
 
+def sort_members_rank_order(members):
+    rank_index = {rank: i for i, rank in enumerate(RANK_ORDER)}
+    return sorted(members, key=lambda m: (rank_index.get(m["rank"], 999), m["mcid"].lower()))
+
+def get_linked_members_page_ranked(page=1, rank_filter=None, per_page=10):
+    all_members = get_linked_members_page(page=1, rank_filter=rank_filter)[0]
+    members_sorted = sort_members_rank_order(all_members)
+    total_pages = (len(members_sorted) + per_page - 1) // per_page
+    start = (page - 1) * per_page
+    end = start + per_page
+    return members_sorted[start:end], total_pages
+
 # /member list のためのページ送りView
 class MemberListView(discord.ui.View):
     def __init__(self, cog_instance, initial_page: int, total_pages: int, rank_filter: str, sort_by: str):
@@ -57,46 +69,47 @@ class MemberListView(discord.ui.View):
         self.update_buttons()
 
     async def create_embed(self) -> discord.Embed:
-        members_on_page, self.total_pages = get_linked_members_page(
-            page=self.current_page, rank_filter=self.rank_filter
-        )
-        
+        get_page_func = get_linked_members_page_ranked if self.sort_by != "last_seen" else get_linked_members_page
+        members_on_page, self.total_pages = get_page_func(page=self.current_page, rank_filter=self.rank_filter)
         embed = discord.Embed(title="メンバーリスト", color=EMBED_COLOR_BLUE)
-        
         if not members_on_page:
             embed.description = "表示するメンバーがいません。"
             return embed
 
-        rank_to_members = {}
+        # ページ内メンバーをランクごとにグループ化
+        rank_to_members = {rank: [] for rank in RANK_ORDER}
+        others = []
         for member in members_on_page:
             rank = member['rank']
-            if rank not in rank_to_members:
-                rank_to_members[rank] = []
-            # ここで mcidをAPIのusernameとして問い合わせる
-            player_data = await self.cog.api.get_nori_player_data(member['mcid'])
-            if player_data and 'lastJoin' in player_data:
-                try:
-                    last_seen_dt = datetime.fromisoformat(player_data['lastJoin'].replace("Z", "+00:00"))
-                    last_seen_str = humanize_timedelta(last_seen_dt)
-                except Exception:
-                    last_seen_str = "N/A"
-            else:
-                last_seen_str = "N/A"
-            member_str = (
-                f"`Account`: {member['mcid']} (<@{member['discord_id']}>)\n"
-                f"`Last Seen`: {last_seen_str}"
-            )
-            rank_to_members[rank].append(member_str)
-
-        for rank in RANK_ORDER:
+            # sort=="last_seen"だけLast Seen表示
+            last_seen_str = ""
+            if self.sort_by == "last_seen":
+                player_data = await self.cog.api.get_nori_player_data(member['mcid'])
+                if player_data and 'lastJoin' in player_data:
+                    try:
+                        last_seen_dt = datetime.fromisoformat(player_data['lastJoin'].replace("Z", "+00:00"))
+                        last_seen_str = f"\n_Last Seen: `{humanize_timedelta(last_seen_dt)}`_"
+                    except Exception:
+                        last_seen_str = ""
+            # Discord名は@付き、もしくは<@id>（お好みで）
+            # ここでは<@{member['discord_id']}>を使います
+            member_str = f"**{member['mcid']}** （<@{member['discord_id']}>){last_seen_str}"
             if rank in rank_to_members:
+                rank_to_members[rank].append(member_str)
+            else:
+                others.append(member_str)
+
+        # ランク順でフィールド追加
+        for rank in RANK_ORDER:
+            if rank_to_members[rank]:
                 embed.add_field(name=rank, value="\n\n".join(rank_to_members[rank]), inline=False)
-        for rank in rank_to_members:
-            if rank not in RANK_ORDER:
-                embed.add_field(name=rank, value="\n\n".join(rank_to_members[rank]), inline=False)
+        # RANK_ORDER以外も出す
+        if others:
+            embed.add_field(name="その他", value="\n\n".join(others), inline=False)
+
         embed.set_footer(text=f"Page {self.current_page}/{self.total_pages} | Minister Chikuwa")
         return embed
-
+    
     def update_buttons(self):
         self.children[0].disabled = self.current_page <= 1
         self.children[1].disabled = self.current_page >= self.total_pages
