@@ -63,15 +63,6 @@ def get_linked_members_page_ranked(page=1, rank_filter=None, per_page=10):
     end = start + per_page
     return members_sorted[start:end], total_pages
 
-def get_linked_members_page_by_rank(rank, page=1, per_page=10):
-    all_members = get_linked_members_page(page=1, rank_filter=rank)[0]
-    # rank_filterで既に絞っているはずだが念のため
-    members = [m for m in all_members if m["rank"] == rank]
-    total_pages = (len(members) + per_page - 1) // per_page
-    start = (page - 1) * per_page
-    end = start + per_page
-    return members[start:end], total_pages
-
 # /member list のためのページ送りView
 class MemberListView(discord.ui.View):
     def __init__(self, cog_instance, initial_page: int, total_pages: int, rank_filter: str, sort_by: str):
