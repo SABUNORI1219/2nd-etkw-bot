@@ -78,7 +78,9 @@ class MemberListView(discord.ui.View):
         self.sort_by = sort_by
         self.update_buttons()
 
-    if self.sort_by == "rank" and self.rank_filter in RANK_ORDER:
+    async def create_embed(self) -> discord.Embed:
+        # sort="rank"時はrank_filter必須
+        if self.sort_by == "rank" and self.rank_filter in RANK_ORDER:
             members_on_page, self.total_pages = get_linked_members_page_by_rank(self.rank_filter, page=self.current_page)
         elif self.sort_by == "last_seen":
             members_on_page, self.total_pages = get_linked_members_page(page=self.current_page, rank_filter=self.rank_filter)
