@@ -83,51 +83,20 @@ class MemberListView(discord.ui.View):
         self.update_buttons()
 
     async def create_embed(self) -> discord.Embed:
-        # rank引数が指定されているならそのランクのみ
+        # Rankでフィルタ指定
         if self.rank_filter in RANK_ORDER:
             members_on_page, self.total_pages = get_linked_members_page_by_rank(self.rank_filter, page=self.current_page)
-        elif self.sort_by == "last_seen":
-            members_on_page, self.total_pages = get_linked_members_page(page=self.current_page, rank_filter=None)
         else:
-            members_on_page, self.total_pages = get_linked_members_page_ranked(page=self.current_page, rank_filter=None)
+            members_on_page, self.total_pages = get_linked_members_page_ranked(page=self.current_page)
 
         embed = discord.Embed(title="メンバーリスト", color=EMBED_COLOR_BLUE)
         if not members_on_page:
             embed.description = "表示するメンバーがいません。"
             return embed
 
-        # rank指定あり: そのランクのメンバーのみ
-        if self.rank_filter in RANK_ORDER:
-            lines = []
-            for member in members_on_page:
-                lines.append(f"**{member['mcid']}** （<@{member['discord_id']}>）")
-            embed.add_field(name=self.rank_filter, value="\n".join(lines), inline=False)
-        else:
-            # 通常: ランクごとにまとめて表示
-            rank_to_members = {rank: [] for rank in RANK_ORDER}
-            others = []
-            for member in members_on_page:
-                rank = member['rank']
-                last_seen_str = ""
-                if self.sort_by == "last_seen":
-                    player_data = await self.cog.api.get_nori_player_data(member['mcid'])
-                    if player_data and 'lastJoin' in player_data:
-                        try:
-                            last_seen_dt = datetime.fromisoformat(player_data['lastJoin'].replace("Z", "+00:00"))
-                            last_seen_str = f"\n_Last Seen: `{humanize_timedelta(last_seen_dt)}`_"
-                        except Exception:
-                            last_seen_str = ""
-                member_str = f"**{member['mcid']}** （<@{member['discord_id']}>){last_seen_str}"
-                if rank in rank_to_members:
-                    rank_to_members[rank].append(member_str)
-                else:
-                    others.append(member_str)
-
-            for rank in RANK_ORDER:
-                if rank_to_members[rank]:
-                    embed.add_field(name=rank, value="\n\n".join(rank_to_members[rank]), inline=False)
-            if others:
-                embed.add_field(name="その他", value="\n\n".join(others), inline=False)
+        # MCIDとDiscordアカウントだけ羅列（改行区切り）
+        lines = [f"{member['mcid']} （<@{member['discord_id']}>）" for member in members_on_page]
+        embed.description = "\n".join(lines)
 
         embed.set_footer(text=f"Page {self.current_page}/{self.total_pages} | Minister Chikuwa")
         return embed
