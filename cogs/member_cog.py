@@ -18,9 +18,8 @@ RANK_CHOICES = [
     for rank in RANK_ORDER
 ]
 
-# ソート順の選択肢
+# ソート順の選択肢（rankは除外）
 SORT_CHOICES = [
-    app_commands.Choice(name="Rankで絞る", value="rank"),
     app_commands.Choice(name="Last Seen (最終ログインが古い順)", value="last_seen")
 ]
 
@@ -50,8 +49,13 @@ def sort_members_rank_order(members):
     return sorted(members, key=lambda m: (rank_index.get(m["rank"], 999), m["mcid"].lower()))
 
 def get_linked_members_page_ranked(page=1, rank_filter=None, per_page=10):
+    # すべてのメンバーを取得し、ランク順に並べてからページ分割
     all_members = get_linked_members_page(page=1, rank_filter=rank_filter)[0]
-    members_sorted = sort_members_rank_order(all_members)
+    members_sorted = []
+    for rank in RANK_ORDER:
+        members_sorted.extend([m for m in all_members if m["rank"] == rank])
+    # rank_orderに含まれないランクも一応追加
+    members_sorted.extend([m for m in all_members if m["rank"] not in RANK_ORDER])
     total_pages = (len(members_sorted) + per_page - 1) // per_page
     start = (page - 1) * per_page
     end = start + per_page
@@ -79,28 +83,27 @@ class MemberListView(discord.ui.View):
         self.update_buttons()
 
     async def create_embed(self) -> discord.Embed:
-        # sort="rank"時はrank_filter必須
-        if self.sort_by == "rank" and self.rank_filter in RANK_ORDER:
+        # rank引数が指定されているならそのランクのみ
+        if self.rank_filter in RANK_ORDER:
             members_on_page, self.total_pages = get_linked_members_page_by_rank(self.rank_filter, page=self.current_page)
         elif self.sort_by == "last_seen":
-            members_on_page, self.total_pages = get_linked_members_page(page=self.current_page, rank_filter=self.rank_filter)
+            members_on_page, self.total_pages = get_linked_members_page(page=self.current_page, rank_filter=None)
         else:
-            members_on_page, self.total_pages = get_linked_members_page_ranked(page=self.current_page, rank_filter=self.rank_filter)
+            members_on_page, self.total_pages = get_linked_members_page_ranked(page=self.current_page, rank_filter=None)
 
         embed = discord.Embed(title="メンバーリスト", color=EMBED_COLOR_BLUE)
         if not members_on_page:
             embed.description = "表示するメンバーがいません。"
             return embed
 
-        # sortによって書式を分岐
-        if self.sort_by == "rank" and self.rank_filter in RANK_ORDER:
-            # 指定したランクのメンバーのみ
+        # rank指定あり: そのランクのメンバーのみ
+        if self.rank_filter in RANK_ORDER:
             lines = []
             for member in members_on_page:
                 lines.append(f"**{member['mcid']}** （<@{member['discord_id']}>）")
             embed.add_field(name=self.rank_filter, value="\n".join(lines), inline=False)
         else:
-            # 通常（ランクごとにまとめて表示、sort=last_seen時はLast Seenも表示）
+            # 通常: ランクごとにまとめて表示
             rank_to_members = {rank: [] for rank in RANK_ORDER}
             others = []
             for member in members_on_page:
@@ -262,16 +265,13 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             await send_authorized_only_message(interaction)
             return
 
-        if sort == "rank" and (not rank or rank not in RANK_ORDER):
-            await interaction.followup.send("ランク指定が必要です。"); return
-
-        if sort == "rank":
-            # 指定ランクのみ表示
+        # rankでの絞り込みはrank引数でのみ
+        if rank in RANK_ORDER:
             _, total_pages = get_linked_members_page_by_rank(rank, page=1)
         elif sort == "last_seen":
-            _, total_pages = get_linked_members_page(page=1, rank_filter=rank)
+            _, total_pages = get_linked_members_page(page=1, rank_filter=None)
         else:
-            _, total_pages = get_linked_members_page_ranked(page=1, rank_filter=rank)
+            _, total_pages = get_linked_members_page_ranked(page=1, rank_filter=None)
         if total_pages == 0:
             await interaction.followup.send("表示対象のメンバーが登録されていません。"); return
 
