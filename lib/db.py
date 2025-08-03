@@ -43,6 +43,12 @@ def create_table():
                 ingame_rank TEXT NOT NULL
             );
         ''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS last_join_cache (
+                mcid TEXT PRIMARY KEY,
+                last_join TEXT  -- ISO8601文字列, 取得できない場合はNULL
+            );
+        ''')
         conn.commit()
     conn.close()
     logger.info("guild_raid_historyテーブルを作成/確認しました")
@@ -308,3 +314,51 @@ def get_all_linked_members(rank_filter: str = None) -> list:
     finally:
         if conn: conn.close()
     return results
+
+def upsert_last_join_cache(last_join_list):
+    """
+    last_join_list: [(mcid, last_join_str or None), ...]
+    登録済みならUPDATE、なければINSERT
+    """
+    if not last_join_list:
+        return
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            execute_values(
+                cur,
+                """
+                INSERT INTO last_join_cache (mcid, last_join)
+                VALUES %s
+                ON CONFLICT (mcid) DO UPDATE SET last_join = EXCLUDED.last_join
+                """,
+                last_join_list
+            )
+            conn.commit()
+    except Exception as e:
+        logger.error(f"[DB Handler] upsert_last_join_cache failed: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+def get_last_join_cache(top_n=10):
+    """
+    last_join_cacheからlast_joinが古い順で上位N件を返す
+    戻り値: [(mcid, last_join_str or None)]
+    """
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT mcid, last_join FROM last_join_cache
+                WHERE last_join IS NOT NULL
+                ORDER BY last_join ASC
+                LIMIT %s
+            """, (top_n,))
+            return cur.fetchall()
+    except Exception as e:
+        logger.error(f"[DB Handler] get_last_join_cache failed: {e}")
+        return []
+    finally:
+        if conn:
+            conn.close()
