@@ -228,7 +228,10 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         embed = discord.Embed(title=db_data['mcid'], color=EMBED_COLOR_BLUE)
         embed.add_field(name="Rank", value=f"`{db_data['rank']}`", inline=False)
         embed.add_field(name="Last Seen", value=f"`{last_seen}`", inline=False)
-        embed.add_field(name="Discord", value=f"<@{db_data['discord_id']}>", inline=False)
+        if db_data['discord_id']:
+            embed.add_field(name="Discord", value=f"<@{db_data['discord_id']}>", inline=False)
+        else:
+            embed.add_field(name="Discord", value="Discordなし", inline=False)
         
         await interaction.followup.send(embed=embed)
 
