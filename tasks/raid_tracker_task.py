@@ -85,6 +85,8 @@ async def track_guild_raids(bot=None, loop_interval=120):
         # --- ここで全メンバーlastJoinキャッシュDBへ ---
         db_last_join_cache = []
         for rank, members in guild_data["members"].items():
+            if not isinstance(members, dict):
+                continue
             for mcid, info in members.items():
                 lj = info.get("lastJoin") or info.get("last_seen")
                 # lastJoin: 取得できなければNone
