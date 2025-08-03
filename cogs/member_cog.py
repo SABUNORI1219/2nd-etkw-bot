@@ -33,6 +33,9 @@ SORT_CHOICES = [
 
 def humanize_timedelta(dt: datetime) -> str:
     now = datetime.now(timezone.utc)
+    # dtがnaiveならUTC付与
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
     delta = now - dt
     seconds = int(delta.total_seconds())
     if seconds < 60:
