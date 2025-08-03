@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 from collections import deque
 from lib.wynncraft_api import WynncraftAPI
-from lib.db import insert_history, insert_server_log, cleanup_old_server_logs
+from lib.db import insert_history, insert_server_log, cleanup_old_server_logs, upsert_last_join_cache
 from lib.party_estimator import estimate_and_save_parties
 from lib.discord_notify import send_guild_raid_embed
 
@@ -81,6 +81,17 @@ async def track_guild_raids(bot=None, loop_interval=120):
             logger.warning("guild_data取得失敗。10秒後に再試行します。")
             await asyncio.sleep(10)
             continue
+
+        # --- ここで全メンバーlastJoinキャッシュDBへ ---
+        db_last_join_cache = []
+        for rank, members in guild_data["members"].items():
+            for mcid, info in members.items():
+                lj = info.get("lastJoin") or info.get("last_seen")
+                # lastJoin: 取得できなければNone
+                db_last_join_cache.append((mcid, lj))
+        # DBにバルクアップサート
+        await asyncio.to_thread(upsert_last_join_cache, db_last_join_cache)
+        # --- ここまで ---
 
         # online_members抽出（uuid・name・serverセット）
         online_members = extract_online_members(guild_data)
