@@ -115,7 +115,6 @@ class MemberListView(discord.ui.View):
 
     async def create_embed(self) -> discord.Embed:
         if self.sort_by == "last_seen":
-            # last_seen_membersはすでに最終ログインが古い順
             embed_title = "メンバーリスト: 最終ログイン順(上位10名)"
             lines = []
             for member, last_seen_dt in self.last_seen_members:
@@ -124,14 +123,18 @@ class MemberListView(discord.ui.View):
                     discord_str = f"<@{member['discord_id']}>"
                 else:
                     discord_str = "Discordなし"
-                last_seen_str = last_seen_dt.strftime("%Y-%m-%d %H:%M") if last_seen_dt else "N/A"
+                # ↓ここを修正
+                if last_seen_dt:
+                    last_seen_str = humanize_timedelta(last_seen_dt)
+                else:
+                    last_seen_str = "N/A"
                 lines.append(f"- **{mcid}** （{discord_str}） - Last Seen: {last_seen_str}")
             embed = discord.Embed(title=embed_title, color=EMBED_COLOR_BLUE)
             if not lines:
                 embed.description = "表示するメンバーがいません。"
             else:
                 embed.description = "\n".join(lines)
-            embed.set_footer(text=f"Minister Chikuwa")
+            embed.set_footer(text=f"最終ログイン | Minister Chikuwa")
             return embed
 
         if self.rank_filter in RANK_ORDER:
