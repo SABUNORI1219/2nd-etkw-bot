@@ -77,7 +77,8 @@ class MemberListView(discord.ui.View):
 
     async def create_embed(self) -> discord.Embed:
         if self.rank_filter in RANK_ORDER:
-            members_on_page, self.total_pages = get_linked_members_page_by_rank(self.rank_filter, page=self.current_page)
+            # get_linked_members_page_by_rankは不要になった前提
+            members_on_page, self.total_pages = get_linked_members_page_ranked(page=self.current_page, rank_filter=self.rank_filter)
             embed_title = f"メンバーリスト: {self.rank_filter}"
         else:
             members_on_page, self.total_pages = get_linked_members_page_ranked(page=self.current_page)
@@ -144,21 +145,29 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         if interaction.user.id not in AUTHORIZED_USER_IDS:
             await send_authorized_only_message(interaction)
             return
-        
-        # まず公式APIから最新のランク情報を取得
+
+        # WynncraftAPIからギルドデータを取得して、その中にMCIDがいるか調べる
         guild_data = await self.api.get_guild_by_prefix("ETKW")
         if not guild_data:
-            await interaction.followup.send("ギルドデータの取得に失敗しました。"); return
-        
-        ingame_rank = "Unknown"
+            await interaction.followup.send("ギルドデータの取得に失敗しました。")
+            return
+
+        ingame_rank = None
         members_dict = guild_data.get('members', {})
+        found = False
         for rank, rank_members in members_dict.items():
             if rank == "total":
                 continue
             if mcid in rank_members:
                 ingame_rank = rank.capitalize()
+                found = True
                 break
-        
+
+        if not found:
+            await interaction.followup.send("❌ そのプレイヤーはギルドに所属していません。綴りを再確認してください。")
+            return
+
+        # 登録
         success = add_member(mcid, discord_user.id, ingame_rank)
         if success:
             await interaction.followup.send(f"✅ メンバー `{mcid}` を `{discord_user.display_name}` としてランク `{ingame_rank}` で登録しました。")
@@ -227,7 +236,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
 
         # rankでの絞り込みはrank引数でのみ
         if rank in RANK_ORDER:
-            _, total_pages = get_linked_members_page_by_rank(rank, page=1)
+            _, total_pages = get_linked_members_page_ranked(page=1, rank_filter=rank)
         elif sort == "last_seen":
             _, total_pages = get_linked_members_page(page=1, rank_filter=None)
         else:
