@@ -5,7 +5,15 @@ import logging
 from datetime import datetime, timezone
 
 from lib.wynncraft_api import WynncraftAPI
-from lib.db import add_member, remove_member, get_member, get_linked_members_page, set_config, get_all_linked_members
+from lib.db import (
+    add_member,
+    remove_member,
+    get_member,
+    get_linked_members_page,
+    set_config,
+    get_all_linked_members,
+    get_last_join_cache
+)
 from lib.discord_notify import notify_member_left_discord
 from config import GUILD_NAME, EMBED_COLOR_BLUE, AUTHORIZED_USER_IDS, send_authorized_only_message
 
@@ -63,29 +71,34 @@ def get_linked_members_page_ranked(page=1, rank_filter=None, per_page=10):
     end = start + per_page
     return members_sorted[start:end], total_pages
 
-async def get_last_seen_dict(api, members, limit=10):
+async def get_last_seen_dict_db(limit=10):
     """
-    全メンバーのlastJoinをAPIから取得し、古い順に上位limit件を返す
+    last_join_cacheテーブルから古い順で上位limit件を取得しlinked_members情報と紐付けて返す
     戻り値: [(member_dict, last_seen_datetime), ...]
     """
-    last_seen_list = []
-    for member in members:
-        player_data = await api.get_nori_player_data(member['mcid'])
-        if player_data and 'lastJoin' in player_data:
+    # 1. last_join_cacheから上位N件
+    last_join_rows = get_last_join_cache(top_n=limit)
+    # 2. MCID→linked_members情報取得
+    mcids = [row[0] for row in last_join_rows]
+    all_members = get_all_linked_members()
+    member_dict = {m['mcid']: m for m in all_members}
+    results = []
+    for mcid, last_join in last_join_rows:
+        m = member_dict.get(mcid)
+        if not m:
+            continue
+        if last_join:
             try:
-                last_join_dt = datetime.strptime(player_data['lastJoin'], "%Y-%m-%dT%H:%M:%S.%fZ")
+                last_join_dt = datetime.strptime(last_join, "%Y-%m-%dT%H:%M:%S.%fZ")
             except Exception:
                 try:
-                    last_join_dt = datetime.strptime(player_data['lastJoin'], "%Y-%m-%dT%H:%M:%SZ")
+                    last_join_dt = datetime.strptime(last_join, "%Y-%m-%dT%H:%M:%SZ")
                 except Exception:
                     last_join_dt = None
         else:
             last_join_dt = None
-        last_seen_list.append((member, last_join_dt))
-    # Noneは未来扱いで一番新しい方にソート
-    last_seen_list.sort(key=lambda x: x[1] or datetime.max)
-    # 上位limit件のみ
-    return last_seen_list[:limit]
+        results.append((m, last_join_dt))
+    return results
 
 # /member list のためのページ送りView
 class MemberListView(discord.ui.View):
@@ -287,9 +300,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
 
         # sortが"last_seen"なら最終ログイン順で上位10名のみ出す（ページングなし）
         if sort == "last_seen":
-            all_members = get_all_linked_members()
-            # APIから全員のlastJoin取得して古い順
-            last_seen_members = await get_last_seen_dict(self.api, all_members, limit=10)
+            last_seen_members = await get_last_seen_dict_db(limit=10)
             # last_seen時はページングなし
             view = MemberListView(self, 1, 1, rank, sort, last_seen_members=last_seen_members)
             embed = await view.create_embed()
