@@ -30,11 +30,6 @@ def extract_online_members(guild_data):
     return online_members
 
 def remove_party_events_from_window(window, party, time_threshold=2):
-    """
-    windowからpartyに該当するクリアイベントを除去
-    - party: {"raid_name", "clear_time", "members"}
-    - time_threshold: clear_time一致判定の許容秒数
-    """
     to_remove = []
     for e in window:
         if (
@@ -47,14 +42,12 @@ def remove_party_events_from_window(window, party, time_threshold=2):
         try:
             window.remove(e)
         except ValueError:
-            pass  # 既に消えてた場合
+            pass
 
 async def get_player_data(api, uuid):
-    # uuidでAPI取得、nameは後で紐づけ
     return await api.get_nori_player_data(uuid)
 
 def is_duplicate_event(event, window, threshold_sec=2):
-    """window内にほぼ同時刻・同じplayer・同じraidのイベントがあるか判定"""
     for e in window:
         if (
             e["player"] == event["player"] and
@@ -65,11 +58,34 @@ def is_duplicate_event(event, window, threshold_sec=2):
     return False
 
 def cleanup_old_events(window, max_age_sec=500):
-    """windowからmax_age_secより前のイベントを除去"""
     now = datetime.utcnow()
-    # dequeの先頭から古いイベントを削除
     while window and (now - window[0]["clear_time"]).total_seconds() > max_age_sec:
         window.popleft()
+
+async def get_all_mcid_and_uuid_from_guild(guild_data):
+    mcid_uuid_list = []
+    for rank, members in guild_data["members"].items():
+        if not isinstance(members, dict):
+            continue
+        for mcid, info in members.items():
+            uuid = info.get("uuid")
+            if uuid:
+                mcid_uuid_list.append((mcid, uuid))
+            else:
+                mcid_uuid_list.append((mcid, None))
+    return mcid_uuid_list
+
+async def get_all_players_lastjoin(api, mcid_uuid_list):
+    async def get_lastjoin(mcid, uuid):
+        # uuid優先、なければmcidで問い合わせる
+        player_data = await api.get_nori_player_data(uuid or mcid)
+        if player_data and "lastJoin" in player_data:
+            return (mcid, player_data["lastJoin"])
+        else:
+            return (mcid, None)
+    tasks = [get_lastjoin(mcid, uuid) for mcid, uuid in mcid_uuid_list]
+    results = await asyncio.gather(*tasks)
+    return results
 
 async def track_guild_raids(bot=None, loop_interval=120):
     api = WynncraftAPI()
@@ -82,42 +98,33 @@ async def track_guild_raids(bot=None, loop_interval=120):
             await asyncio.sleep(10)
             continue
 
-        # --- ここで全メンバーlastJoinキャッシュDBへ ---
-        db_last_join_cache = []
-        for rank, members in guild_data["members"].items():
-            if not isinstance(members, dict):
-                continue
-            for mcid, info in members.items():
-                lj = info.get("lastJoin") or info.get("last_seen")
-                # lastJoin: 取得できなければNone
-                db_last_join_cache.append((mcid, lj))
-        # DBにバルクアップサート
-        await asyncio.to_thread(upsert_last_join_cache, db_last_join_cache)
+        # --- 全メンバーのlastJoinを個別APIで取得しキャッシュDBへ ---
+        mcid_uuid_list = await get_all_mcid_and_uuid_from_guild(guild_data)
+        results = await get_all_players_lastjoin(api, mcid_uuid_list)
+        await asyncio.to_thread(upsert_last_join_cache, results)
         # --- ここまで ---
 
         # online_members抽出（uuid・name・serverセット）
         online_members = extract_online_members(guild_data)
-        
+
         if not online_members:
             logger.info("オンラインメンバーがいません。")
             await asyncio.sleep(loop_interval)
             continue
-        
-        # uuidベースでAPI取得
+
         player_tasks = [get_player_data(api, member["uuid"]) for member in online_members]
         player_results = await asyncio.gather(*player_tasks)
-        
+
         clear_events = []
         now = datetime.utcnow()
 
-        # クリアイベント抽出
         for member, pdata in zip(online_members, player_results):
             uuid = member["uuid"]
             name = member["name"]
             server = pdata.get("server") or member.get("server")
             raids = pdata.get("globalData", {}).get("raids", {}).get("list", {})
             if not raids or len(raids) == 0:
-                continue  # このループはスキップ
+                continue
             previous = previous_player_data.get(uuid)
             await asyncio.to_thread(insert_server_log, name, now, server)
             for raid in [
@@ -136,7 +143,6 @@ async def track_guild_raids(bot=None, loop_interval=120):
                         "clear_time": now,
                         "server": previous.get("server", server)
                     }
-                    # 重複排除（window＋同ループ内）
                     if not is_duplicate_event(event, clear_events_window) and not is_duplicate_event(event, clear_events):
                         clear_events.append(event)
                         logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{previous.get('server', server)}")
@@ -148,15 +154,12 @@ async def track_guild_raids(bot=None, loop_interval=120):
             }
         logger.info("ETKWメンバー情報取得完了！")
 
-        # windowに今回のイベントを追加（重複排除）
         for event in clear_events:
             if not is_duplicate_event(event, clear_events_window):
                 clear_events_window.append(event)
 
-        # 100秒より前のイベントをwindowから除去
         cleanup_old_events(clear_events_window, max_age_sec=500)
 
-        # パーティ推定＆DB保存・通知（window全体を渡す）
         parties = estimate_and_save_parties(list(clear_events_window), window=clear_events_window)
         for party in parties:
             for member in party["members"]:
@@ -174,10 +177,8 @@ async def track_guild_raids(bot=None, loop_interval=120):
                 except Exception as e:
                     logger.error(f"通知Embed送信失敗: {e}")
 
-            # --- party通知後にwindowから該当イベント除去 ---
             remove_party_events_from_window(clear_events_window, party, time_threshold=2)
 
-        # サーバーログのクリーンアップ（4分保持）
         await asyncio.to_thread(cleanup_old_server_logs, 5)
         elapsed = time.time() - start_time
         sleep_time = max(loop_interval - elapsed, 0)
