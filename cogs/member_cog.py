@@ -88,7 +88,13 @@ class MemberListView(discord.ui.View):
             embed.description = "表示するメンバーがいません。"
             return embed
         # escape_markdownを利用
-        lines = [f"- **{discord.utils.escape_markdown(member['mcid'])}** （<@{member['discord_id']}>）" for member in members_on_page]
+        lines = []
+        for member in members_on_page:
+            mcid = discord.utils.escape_markdown(member['mcid'])
+            if member.get('discord_id'):
+                lines.append(f"- **{mcid}** （<@{member['discord_id']}>）")
+            else:
+                lines.append(f"- **{mcid}** （Discordなし）")
         embed.description = "\n".join(lines)
         embed.set_footer(text=f"Page {self.current_page}/{self.total_pages} | Minister Chikuwa")
         return embed
@@ -137,21 +143,22 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         await interaction.response.send_message(f"✅ メンバー通知チャンネルを {channel.mention} に設定しました。", ephemeral=True)
 
     @app_commands.command(name="add", description="メンバーを登録")
+    @app_commands.describe(discord_user="登録したいDiscordユーザー（いない場合は入力不要、またはNone）")
     @app_commands.checks.has_permissions(administrator=True)
-    async def add(self, interaction: discord.Interaction, mcid: str, discord_user: discord.User):
+    async def add(self, interaction: discord.Interaction, mcid: str, discord_user: discord.User = None):
         await interaction.response.defer(ephemeral=True)
-
+    
         # 権限チェック
         if interaction.user.id not in AUTHORIZED_USER_IDS:
             await send_authorized_only_message(interaction)
             return
-
-        # WynncraftAPIからギルドデータを取得して、その中にMCIDがいるか調べる
+    
+        # ギルドメンバーか確認
         guild_data = await self.api.get_guild_by_prefix("ETKW")
         if not guild_data:
             await interaction.followup.send("ギルドデータの取得に失敗しました。")
             return
-
+    
         ingame_rank = None
         members_dict = guild_data.get('members', {})
         found = False
@@ -162,15 +169,17 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
                 ingame_rank = rank.capitalize()
                 found = True
                 break
-
         if not found:
             await interaction.followup.send("❌ そのプレイヤーはギルドに所属していません。綴りを再確認してください。")
             return
-
-        # 登録
-        success = add_member(mcid, discord_user.id, ingame_rank)
+    
+        # discord_userがNoneの場合も許可
+        discord_id = discord_user.id if discord_user is not None else None
+    
+        success = add_member(mcid, discord_id, ingame_rank)
         if success:
-            await interaction.followup.send(f"✅ メンバー `{mcid}` を `{discord_user.display_name}` としてランク `{ingame_rank}` で登録しました。")
+            user_str = discord_user.display_name if discord_user else "Discordなし"
+            await interaction.followup.send(f"✅ メンバー `{mcid}` を `{user_str}` としてランク `{ingame_rank}` で登録しました。")
         else:
             await interaction.followup.send("❌ メンバーの登録に失敗しました。")
 
