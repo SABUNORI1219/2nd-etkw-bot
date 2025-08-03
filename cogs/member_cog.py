@@ -32,6 +32,7 @@ SORT_CHOICES = [
 ]
 
 def humanize_timedelta(dt: datetime) -> str:
+    from math import floor
     now = datetime.now(timezone.utc)
     # dtがnaiveならUTC付与
     if dt.tzinfo is None:
@@ -47,12 +48,12 @@ def humanize_timedelta(dt: datetime) -> str:
     if hours < 24:
         return f"{hours} hours ago"
     days = hours // 24
-    if days < 7:
+    if days < 30:
         return f"{days} days ago"
-    weeks = days // 7
-    if weeks < 52:
-        return f"{weeks} weeks ago"
-    years = days // 365
+    months = floor(days / 30)
+    if months < 12:
+        return f"{months} months ago"
+    years = floor(days / 365)
     return f"{years} years ago"
 
 def sort_members_rank_order(members):
