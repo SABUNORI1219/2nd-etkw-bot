@@ -39,7 +39,7 @@ def create_table():
         cur.execute('''
             CREATE TABLE IF NOT EXISTS linked_members (
                 mcid TEXT PRIMARY KEY,
-                discord_id BIGINT NOT NULL,
+                discord_id BIGINT,
                 ingame_rank TEXT NOT NULL
             );
         ''')
