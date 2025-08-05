@@ -75,16 +75,23 @@ async def get_all_mcid_and_uuid_from_guild(guild_data):
                 mcid_uuid_list.append((mcid, None))
     return mcid_uuid_list
 
-async def get_all_players_lastjoin(api, mcid_uuid_list):
+async def get_all_players_lastjoin(api, mcid_uuid_list, batch_size=5, batch_sleep=1.5):
     async def get_lastjoin(mcid, uuid):
-        # uuid優先、なければmcidで問い合わせる
-        player_data = await api.get_nori_player_data(uuid or mcid)
-        if player_data and "lastJoin" in player_data:
-            return (mcid, player_data["lastJoin"])
-        else:
+        try:
+            player_data = await api.get_nori_player_data(uuid or mcid)
+            if player_data and "lastJoin" in player_data:
+                return (mcid, player_data["lastJoin"])
+            else:
+                return (mcid, None)
+        except Exception as e:
+            logger.error(f"[get_lastjoin] {mcid}: {repr(e)}", exc_info=True)
             return (mcid, None)
-    tasks = [get_lastjoin(mcid, uuid) for mcid, uuid in mcid_uuid_list]
-    results = await asyncio.gather(*tasks)
+    results = []
+    for i in range(0, len(mcid_uuid_list), batch_size):
+        batch = mcid_uuid_list[i:i+batch_size]
+        batch_results = await asyncio.gather(*(get_lastjoin(mcid, uuid) for mcid, uuid in batch))
+        results.extend(batch_results)
+        await asyncio.sleep(batch_sleep)
     return results
 
 async def track_guild_raids(bot=None, loop_interval=120):
