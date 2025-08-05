@@ -49,7 +49,7 @@ class WynncraftAPI:
                     logger.error(f"APIから予期せぬエラー: Status {response.status}, URL: {url}")
                     return None
             except Exception as e:
-                logger.error(f"リクエスト中に予期せぬエラー: {e}")
+                logger.error(f"リクエスト中に予期せぬエラー: {repr(e)}", exc_info=True)
                 await asyncio.sleep(2)
         
         logger.error(f"最大再試行回数({max_retries}回)に達しました。URL: {url}")
