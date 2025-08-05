@@ -82,17 +82,18 @@ async def get_all_players_lastjoin(api, mcid_uuid_list, batch_size=5, batch_slee
             if player_data and "lastJoin" in player_data:
                 return (mcid, player_data["lastJoin"])
             else:
-                return (mcid, None)
+                return None
         except Exception as e:
             logger.error(f"[get_lastjoin] {mcid}: {repr(e)}", exc_info=True)
-            return (mcid, None)
+            return None
     results = []
     for i in range(0, len(mcid_uuid_list), batch_size):
         batch = mcid_uuid_list[i:i+batch_size]
         batch_results = await asyncio.gather(*(get_lastjoin(mcid, uuid) for mcid, uuid in batch))
         results.extend(batch_results)
         await asyncio.sleep(batch_sleep)
-    return results
+    # Noneを除外
+    return [r for r in results if r is not None]
 
 async def track_guild_raids(bot=None, loop_interval=120):
     api = WynncraftAPI()
