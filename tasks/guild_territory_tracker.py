@@ -113,13 +113,35 @@ async def track_guild_territories(loop_interval=60):
             if prefix:
                 current_guild_territories[prefix].add(tname)
 
-        # 履歴更新処理
+        # ------ 修正ポイント: 領地の所有権が変わったら全ギルドから領地を消す ------
+        # まず「APIに存在する全領地名」を列挙
+        all_territory_names = set(territory_data.keys())
+        # 今回サイクルで「どのギルドがどの領地を所有しているか」の逆引き
+        territory_to_current_guild = {}
+        for guild_prefix, terrs in current_guild_territories.items():
+            for t in terrs:
+                # もし同じ領地が複数ギルドに出現したら警告
+                if t in territory_to_current_guild:
+                    logger.warning(f"[GuildTerritoryTracker] 領地 {t} が複数ギルド({territory_to_current_guild[t]}, {guild_prefix})で同時所有状態")
+                territory_to_current_guild[t] = guild_prefix
+
+        # 全ギルドのhistから「今所有していない領地」を消す
+        for g in list(guild_territory_history.keys()):
+            hist = guild_territory_history[g]
+            for tname in list(hist.keys()):
+                # 領地の現所有ギルドが自分でなければ完全に消す
+                if tname in territory_to_current_guild:
+                    if territory_to_current_guild[tname] != g:
+                        del hist[tname]
+                else:
+                    # そもそもAPIから消えている領地（たぶん有り得ないが）も消す
+                    del hist[tname]
+            if not hist:
+                del guild_territory_history[g]
+
+        # ------ 履歴更新処理 ------
         for guild_prefix, curr_territories in current_guild_territories.items():
             hist = guild_territory_history[guild_prefix]
-            # 消失判定
-            for tname in list(hist.keys()):
-                if tname not in curr_territories and hist[tname].get("lost") is None:
-                    hist[tname]["lost"] = now
             # 新規取得 or 継続所有
             for tname in curr_territories:
                 if tname in hist:
