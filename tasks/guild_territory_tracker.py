@@ -38,8 +38,11 @@ def get_effective_owned_territories(guild_prefix, current_time=None):
         lost_time = info.get("lost")
         if lost_time is None:
             result.add(tname)
-        elif (current_time - lost_time) <= timedelta(hours=1):
-            result.add(tname)
+        else:
+            if lost_time.tzinfo is None:
+                lost_time = lost_time.replace(tzinfo=timezone.utc)
+            if (current_time - lost_time) <= timedelta(hours=1):
+                result.add(tname)
     return result
 
 def get_current_owned_territories(guild_prefix):
