@@ -372,6 +372,30 @@ def get_all_linked_members(rank_filter: str = None) -> list:
         if conn: conn.close()
     return results
 
+def set_discord_id_null(mcid: str = None, discord_id: int = None) -> bool:
+    if not mcid and not discord_id:
+        return False
+    sql = "UPDATE linked_members SET discord_id = NULL WHERE "
+    params = []
+    if mcid:
+        sql += "mcid = %s"
+        params.append(mcid)
+    else:
+        sql += "discord_id = %s"
+        params.append(discord_id)
+    conn = get_conn()
+    if conn is None: return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, tuple(params))
+            conn.commit()
+        return cur.rowcount > 0
+    except Exception as e:
+        logger.error(f"[DB Handler] discord_id NULL化に失敗: {e}")
+        return False
+    finally:
+        if conn: conn.close()
+
 def upsert_last_join_cache(last_join_list):
     if not last_join_list:
         return
