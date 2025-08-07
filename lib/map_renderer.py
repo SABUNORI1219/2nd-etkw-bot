@@ -102,7 +102,19 @@ class MapRenderer:
         total_res = self._sum_resources(owned_territories)
 
         # Step2: HQ決定ロジック
-        # (A) Conn含むExt同数複数→Conn多い方
+
+        # top5中、Ext最大値グループ以外でConnが2個以上多いものがあればそちらをHQ
+        ext_max = top5[0]["ext"]
+        ext_tops = [x for x in top5 if x["ext"] == ext_max]
+        # Ext最大グループ以外
+        candidates_not_ext_top = [x for x in top5 if x not in ext_tops]
+        if candidates_not_ext_top:
+            conn_max_in_ext_top = max(x["conn"] for x in ext_tops)
+            for cand in candidates_not_ext_top:
+                if cand["conn"] - conn_max_in_ext_top >= 2:
+                    return cand["name"], hq_stats, top5, total_res
+            
+        # Conn含むExt同数複数→Conn多い方
         ext_max = top5[0]["ext"]
         ext_tops = [x for x in top5 if x["ext"] == ext_max]
         if len(ext_tops) > 1:
@@ -114,12 +126,12 @@ class MapRenderer:
             conn_max = top5[0]["conn"]
             conn_maxs = [top5[0]]
 
-        # (B) 所持領地6個以下→Time Held最長
+        # 所持領地6個以下→Time Held最長
         if len(owned_territories) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
 
-        # (C) Conn同数&Ext<20で街領地あればそれを優先
+        # Conn同数&Ext<20で街領地あればそれを優先
         if len(conn_maxs) > 1 and conn_maxs[0]["conn"] == conn_maxs[-1]["conn"]:
             if conn_maxs[0]["ext"] < 20:
                 city = next((x for x in conn_maxs if x["is_city"]), None)
@@ -130,7 +142,7 @@ class MapRenderer:
                 hq_max = max(conn_maxs, key=lambda x: x["hq_buff"])
                 return hq_max["name"], hq_stats, top5, total_res
 
-        # (D) Ext,Conn同値→資源判定
+        # Ext,Conn同値→資源判定
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
             res_priority = ["crops", "ore", "wood", "fish"]
             # 一番生産量のない資源
