@@ -32,6 +32,10 @@ async def member_rank_sync_task(api: WynncraftAPI):
         try:
             logger.info("[MemberSync] ランク同期タスク開始")
             guild_members = await fetch_guild_members(api)
+            if not guild_members:
+                logger.warning("[MemberSync] APIからのギルドデータ取得失敗、同期処理をスキップ")
+                await asyncio.sleep(120)
+                continue
             page = 1
             while True:
                 db_members, total_pages = get_linked_members_page(page=page, per_page=50)
@@ -59,6 +63,10 @@ async def member_remove_sync_task(bot, api: WynncraftAPI):
         try:
             logger.info("[MemberSync] ギルド脱退検知タスク開始")
             guild_members = await fetch_guild_members(api)
+            if not guild_members:
+                logger.warning("[MemberSync] APIからのギルドデータ取得失敗、削除検知処理をスキップ")
+                await asyncio.sleep(120)
+                continue
             api_mcids = set(guild_members.keys())
             page = 1
             while True:
