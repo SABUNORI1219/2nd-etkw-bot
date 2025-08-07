@@ -233,12 +233,11 @@ class MapRenderer:
             y1, y2 = y1 * self.scale_factor, y2 * self.scale_factor
             width = abs(x2 - x1)
             height = abs(y2 - y1)
-            # 前までのロジックで使っていた上限値
+            # プレフィクス描画のための比率設定
+            crown_size = int(min(width, height) * 0.9)
             scaled_font_size = max(12, int(self.font.size * self.scale_factor))
             crown_size_limit = int(scaled_font_size * 1.8)
             crown_size_limit = max(28, min(crown_size_limit, 120))
-            # 領地の短辺の90%を王冠サイズ、ただし上限つき
-            crown_size = int(min(width, height) * 0.9)
             crown_size = max(18, min(crown_size, crown_size_limit))
 
             crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
@@ -246,10 +245,11 @@ class MapRenderer:
             crown_y = int(py - crown_size/2)
             map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
 
-            # --- プレフィクスのフォントサイズも王冠サイズに厳密フィット ---
-            prefix_font_size = crown_size
-            font_found = False
-            for test_size in range(crown_size, 5, -1):
+            # --- プレフィクスのフォントサイズを「縦横比」両方fitで決定 ---
+            max_font_size = crown_size
+            min_font_size = 6
+            fit_font_size = min_font_size
+            for test_size in range(max_font_size, min_font_size - 1, -1):
                 try:
                     test_font = ImageFont.truetype(FONT_PATH, test_size)
                 except IOError:
@@ -257,13 +257,12 @@ class MapRenderer:
                 bbox = test_font.getbbox(prefix)
                 text_width = bbox[2] - bbox[0]
                 text_height = bbox[3] - bbox[1]
-                if text_width <= crown_size and text_height <= crown_size:
-                    prefix_font_size = test_size
-                    font_found = True
+                if text_width <= crown_size * 0.92 and text_height <= crown_size * 0.72:
+                    fit_font_size = test_size
                     break
-            if font_found:
-                prefix_font = ImageFont.truetype(FONT_PATH, prefix_font_size)
-            else:
+            try:
+                prefix_font = ImageFont.truetype(FONT_PATH, fit_font_size)
+            except IOError:
                 prefix_font = ImageFont.load_default()
             bbox = prefix_font.getbbox(prefix)
             text_width = bbox[2] - bbox[0]
