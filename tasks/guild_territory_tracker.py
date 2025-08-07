@@ -133,6 +133,5 @@ async def track_guild_territories(loop_interval=60):
         logger.info(f"[GuildTerritoryTracker] 領地履歴キャッシュ＆DB永続化: {len(guild_territory_history)} ギルド")
         await asyncio.sleep(loop_interval)
 
-def setup_guild_territory_tracker(loop):
-    """Bot起動時に呼び出し"""
-    loop.create_task(track_guild_territories(loop_interval=60))
+async def setup(bot):
+    bot.loop.create_task(track_guild_territories(loop_interval=60))
