@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 import logging
 from datetime import datetime, timezone
+import re
 
 from lib.wynncraft_api import WynncraftAPI
 from lib.db import (
@@ -44,7 +45,6 @@ SORT_CHOICES = [
 def humanize_timedelta(dt: datetime) -> str:
     from math import floor
     now = datetime.now(timezone.utc)
-    # dtがnaiveならUTC付与
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     delta = now - dt
@@ -86,13 +86,7 @@ def get_linked_members_page_ranked(page=1, rank_filter=None, per_page=10):
     return members_sorted[start:end], total_pages
 
 async def get_last_seen_dict_db(limit=10):
-    """
-    last_join_cacheテーブルから古い順で上位limit件を取得しlinked_members情報と紐付けて返す
-    戻り値: [(member_dict, last_seen_datetime), ...]
-    """
-    # 1. last_join_cacheから上位N件
     last_join_rows = get_last_join_cache(top_n=limit)
-    # 2. MCID→linked_members情報取得
     mcids = [row[0] for row in last_join_rows]
     all_members = get_all_linked_members()
     member_dict = {m['mcid']: m for m in all_members}
@@ -114,7 +108,14 @@ async def get_last_seen_dict_db(limit=10):
         results.append((m, last_join_dt))
     return results
 
-# /member list のためのページ送りView
+def extract_role_display_name(role_name: str) -> str:
+    """
+    ロール名から [★★] や [ABC] など [ ] で囲まれた部分を全て除去し、残りの文字列を返す。
+    例: "[★★] 2nd Example [ABC]" -> "2nd Example"
+    """
+    s = re.sub(r"\s*\[.*?]\s*", " ", role_name)
+    return s.strip()
+
 class MemberListView(discord.ui.View):
     def __init__(self, cog_instance, initial_page: int, total_pages: int, rank_filter: str, sort_by: str, last_seen_members=None):
         super().__init__(timeout=180.0)
@@ -124,7 +125,7 @@ class MemberListView(discord.ui.View):
         self.total_pages = total_pages
         self.rank_filter = rank_filter
         self.sort_by = sort_by
-        self.last_seen_members = last_seen_members  # [(member, last_seen_dt)]
+        self.last_seen_members = last_seen_members
         self.update_buttons()
 
     async def create_embed(self) -> discord.Embed:
@@ -137,7 +138,6 @@ class MemberListView(discord.ui.View):
                     discord_str = f"<@{member['discord_id']}>"
                 else:
                     discord_str = "Discordなし"
-                # ↓ここを修正
                 if last_seen_dt:
                     last_seen_str = humanize_timedelta(last_seen_dt)
                 else:
@@ -173,7 +173,6 @@ class MemberListView(discord.ui.View):
         return embed
 
     def update_buttons(self):
-        # last_seenの時はページングしない
         if self.sort_by == "last_seen":
             self.children[0].disabled = True
             self.children[1].disabled = True
@@ -207,7 +206,6 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         if linked_member:
             remove_member(discord_id=member.id)
             logger.info(f"--- [MemberSync] {member.display_name} がサーバーから退出したため、連携を解除しました。")
-            # Discord退出通知
             await notify_member_left_discord(self.bot, linked_member)
 
     @app_commands.command(name="channel", description="メンバー通知用のチャンネルを設定")
@@ -255,37 +253,39 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             await interaction.followup.send(f"✅ メンバー `{mcid}` を `{user_str}` としてランク `{ingame_rank}` で登録しました。")
         else:
             await interaction.followup.send("❌ メンバーの登録に失敗しました。")
+            return
 
         if discord_user is not None:
-                guild: discord.Guild = interaction.guild
-                if guild is not None:
+            guild: discord.Guild = interaction.guild
+            if guild is not None:
+                try:
+                    member: discord.Member = guild.get_member(discord_user.id)
+                    if member is None:
+                        member = await guild.fetch_member(discord_user.id)
+                except Exception:
+                    member = None
+
+                if member is not None:
+                    role_id = RANK_ROLE_ID_MAP.get(ingame_rank)
+                    role_obj = None
+                    if role_id:
+                        role_obj = guild.get_role(role_id)
+                        if role_obj:
+                            try:
+                                await member.add_roles(role_obj, reason="ギルドランク連携")
+                            except Exception as e:
+                                logger.error(f"ロール付与エラー: {e}")
+
+                    # ロール名から[★★]や[ ]内の文字を除外
+                    if role_obj:
+                        role_name = extract_role_display_name(role_obj.name)
+                    else:
+                        role_name = ingame_rank
+                    new_nick = f"{role_name} {mcid}"
                     try:
-                        member: discord.Member = guild.get_member(discord_user.id)
-                        if member is None:
-                            # メンバー取得できなければfetch
-                            member = await guild.fetch_member(discord_user.id)
-                    except Exception:
-                        member = None
-    
-                    if member is not None:
-                        # 付与するロールID
-                        role_id = RANK_ROLE_ID_MAP.get(ingame_rank)
-                        role_obj = None
-                        if role_id:
-                            role_obj = guild.get_role(role_id)
-                            if role_obj:
-                                try:
-                                    await member.add_roles(role_obj, reason="ギルドランク連携")
-                                except Exception as e:
-                                    logger.error(f"ロール付与エラー: {e}")
-    
-                        # ニックネーム編集: <ロール名> <MCID>
-                        role_name = role_obj.name if role_obj else ingame_rank
-                        new_nick = f"{role_name} {mcid}"
-                        try:
-                            await member.edit(nick=new_nick, reason="ギルドメンバー登録時の自動ニックネーム設定")
-                        except Exception as e:
-                            logger.error(f"ニックネーム編集エラー: {e}")
+                        await member.edit(nick=new_nick, reason="ギルドメンバー登録時の自動ニックネーム設定")
+                    except Exception as e:
+                        logger.error(f"ニックネーム編集エラー: {e}")
 
     @app_commands.command(name="remove", description="メンバーの登録を解除")
     @app_commands.checks.has_permissions(administrator=True)
@@ -346,16 +346,13 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             await send_authorized_only_message(interaction)
             return
 
-        # sortが"last_seen"なら最終ログイン順で上位10名のみ出す（ページングなし）
         if sort == "last_seen":
             last_seen_members = await get_last_seen_dict_db(limit=10)
-            # last_seen時はページングなし
             view = MemberListView(self, 1, 1, rank, sort, last_seen_members=last_seen_members)
             embed = await view.create_embed()
             await interaction.followup.send(embed=embed, view=view)
             return
 
-        # rankでの絞り込みはrank引数でのみ
         if rank in RANK_ORDER:
             _, total_pages = get_linked_members_page_ranked(page=1, rank_filter=rank)
         else:
