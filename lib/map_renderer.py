@@ -79,7 +79,6 @@ class MapRenderer:
         return total
 
     def _pick_hq_candidate(self, owned_territories, territory_api_data):
-        # Step1: HQ候補5つピックアップ (Conn含むExt多い順)
         hq_stats = []
         for t in owned_territories:
             conn, ext, hq_buff = self._calc_conn_ext_hqbuff(owned_territories, t)
@@ -96,12 +95,10 @@ class MapRenderer:
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
             })
-        # Conn含むExt多い順→Conn多い順→HQバフ多い順→取得時刻古い順
         hq_stats.sort(key=lambda x: (-x["ext"], -x["conn"], -x["hq_buff"], x["acquired"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
 
-        # --- Conn2個以上多いもの優先ロジック ---
         ext_max = top5[0]["ext"]
         ext_tops = [x for x in top5 if x["ext"] == ext_max]
         candidates_not_ext_top = [x for x in top5 if x not in ext_tops]
@@ -111,7 +108,6 @@ class MapRenderer:
                 if cand["conn"] - conn_max_in_ext_top >= 2:
                     return cand["name"], hq_stats, top5, total_res
 
-        # (A) Conn含むExt同数複数→Conn多い方
         ext_max = top5[0]["ext"]
         ext_tops = [x for x in top5 if x["ext"] == ext_max]
         if len(ext_tops) > 1:
@@ -123,26 +119,21 @@ class MapRenderer:
             conn_max = top5[0]["conn"]
             conn_maxs = [top5[0]]
 
-        # (B) 所持領地6個以下→Time Held最長
         if len(owned_territories) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
 
-        # (C) Conn同数&Ext<20で街領地あればそれを優先
         if len(conn_maxs) > 1 and conn_maxs[0]["conn"] == conn_maxs[-1]["conn"]:
             if conn_maxs[0]["ext"] < 20:
                 city = next((x for x in conn_maxs if x["is_city"]), None)
                 if city:
                     return city["name"], hq_stats, top5, total_res
             else:
-                # Ext20以上はHQバフ高い方
                 hq_max = max(conn_maxs, key=lambda x: x["hq_buff"])
                 return hq_max["name"], hq_stats, top5, total_res
 
-        # (D) Ext,Conn同値→資源判定
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
             res_priority = ["crops", "ore", "wood", "fish"]
-            # 一番生産量のない資源
             min_val = float("inf")
             min_type = None
             for rtype in res_priority:
@@ -150,7 +141,6 @@ class MapRenderer:
                 if val > 0 and val < min_val:
                     min_val = val
                     min_type = rtype
-            # その資源を生産する領地のうち、HQ候補地に一番近い
             if min_type:
                 from math import inf
                 def trading_route_distance(start, goals):
@@ -240,7 +230,6 @@ class MapRenderer:
                 color_rgb = self._hex_to_rgb(color_hex)
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
-                # HQ領地はprefix描画をスキップ
                 if hq_territories and name in hq_territories:
                     continue
                 draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
@@ -251,7 +240,6 @@ class MapRenderer:
             map_img = self.resized_map.copy()
         else:
             map_img = map_to_draw_on
-        # HQ候補名リストを先に決定
         prefix_to_territories = {}
         for name, info in territory_data.items():
             prefix = info.get("guild", {}).get("prefix", "")
@@ -263,10 +251,8 @@ class MapRenderer:
             candidate_territories = owned_territories_map[prefix] if owned_territories_map and prefix in owned_territories_map else owned
             hq_name, _, _, _ = self._pick_hq_candidate(candidate_territories, territory_api_data)
             hq_names.add(hq_name)
-        # 領地四角描画時にHQ名リストを渡す
         self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map, hq_territories=hq_names)
         draw = ImageDraw.Draw(map_img)
-        # HQの王冠＆prefix描画
         for prefix, owned in prefix_to_territories.items():
             candidate_territories = owned_territories_map[prefix] if owned_territories_map and prefix in owned_territories_map else owned
             hq_name, _, _, _ = self._pick_hq_candidate(candidate_territories, territory_api_data)
@@ -282,14 +268,24 @@ class MapRenderer:
                 py -= box[1]
             color_hex = guild_color_map.get(prefix, "#FFFFFF")
             color_rgb = self._hex_to_rgb(color_hex)
-            scaled_font_size = max(12, int(self.font.size * self.scale_factor))
-            crown_size = int(scaled_font_size * 1.8)
-            crown_size = max(28, min(crown_size, 120))
+
+            # --- 領地サイズに合わせて王冠サイズを決定 ---
+            x1, y1 = self._coord_to_pixel(loc["start"][0], loc["start"][1])
+            x2, y2 = self._coord_to_pixel(loc["end"][0], loc["end"][1])
+            x1, x2 = x1 * self.scale_factor, x2 * self.scale_factor
+            y1, y2 = y1 * self.scale_factor, y2 * self.scale_factor
+            width = abs(x2 - x1)
+            height = abs(y2 - y1)
+            # 領地の短辺の90%を王冠サイズ(ただし最小18, 最大64)
+            crown_size = int(min(width, height) * 0.9)
+            crown_size = max(18, min(crown_size, 64))
+
             crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
             crown_x = int(px - crown_size/2)
             crown_y = int(py - crown_size/2)
             map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
-            # プレフィクスのフォントサイズを王冠幅に合わせて自動調整
+
+            # --- プレフィクスのフォントサイズも王冠サイズに厳密フィット ---
             prefix_font_size = crown_size
             font_found = False
             for test_size in range(crown_size, 5, -1):
@@ -297,10 +293,12 @@ class MapRenderer:
                     test_font = ImageFont.truetype(FONT_PATH, test_size)
                 except IOError:
                     test_font = ImageFont.load_default()
+                # bbox = (x_min, y_min, x_max, y_max)
                 bbox = test_font.getbbox(prefix)
                 text_width = bbox[2] - bbox[0]
                 text_height = bbox[3] - bbox[1]
-                if text_width <= crown_size:
+                # 幅・高さが王冠枠内に収まるサイズまで縮小
+                if text_width <= crown_size and text_height <= crown_size:
                     prefix_font_size = test_size
                     font_found = True
                     break
