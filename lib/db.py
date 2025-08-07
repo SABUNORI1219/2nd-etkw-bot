@@ -71,6 +71,22 @@ def upsert_guild_territory_state(guild_territory_history):
     try:
         with conn.cursor() as cur:
             rows = []
+            # --- まず全territory_nameの最新所有ギルドを逆引きで求める ---
+            territory_latest_owner = {}
+            for g, tdict in guild_territory_history.items():
+                for t, info in tdict.items():
+                    lost = info.get("lost")
+                    # lost==Noneなら現所有
+                    if lost is None:
+                        territory_latest_owner[t] = g
+            # --- 既存DBから全レコード取得し、「複数ギルド所有」レコードをクリーンアップ ---
+            cur.execute("SELECT guild_prefix, territory_name FROM guild_territory_state")
+            existing = cur.fetchall()
+            for g, t in existing:
+                if t in territory_latest_owner and territory_latest_owner[t] != g:
+                    # 他ギルドが現所有ならこのギルド分は消す
+                    cur.execute("DELETE FROM guild_territory_state WHERE guild_prefix=%s AND territory_name=%s", (g, t))
+            # --- 通常のアップサート ---
             for g, tdict in guild_territory_history.items():
                 for t, info in tdict.items():
                     acquired = info.get("acquired")
@@ -395,3 +411,4 @@ def get_last_join_cache(top_n=10):
     finally:
         if conn:
             conn.close()
+
