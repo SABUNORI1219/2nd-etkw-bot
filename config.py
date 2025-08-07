@@ -36,6 +36,16 @@ RESOURCE_EMOJIS = {
 
 RESTRICTION = 1132652296635961385
 
+# ここにランク→ロールIDのマッピング
+RANK_ROLE_ID_MAP = {
+    "Owner": 1240476623090876516,
+    "Chief": 1138142855517446144,
+    "Strategist": 1166030526214320178,
+    "Captain": 1166035741189607494,
+    "Recruiter": 1166036063081467914,
+    "Recruit": 1166036348050886657,
+}
+
 async def send_authorized_only_message(interaction: discord.Interaction, user_ids=None):
     """
     指定ユーザー以外がコマンド実行時に警告メッセージを返す共通関数。
