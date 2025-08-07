@@ -262,6 +262,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
                         role_obj = guild.get_role(role_id)
                         if role_obj:
                             try:
+                                await member.add_roles(ETKW, reason="デフォルトのロール")
                                 await member.add_roles(role_obj, reason="ギルドランク連携")
                             except Exception as e:
                                 logger.error(f"ロール付与エラー: {e}")
