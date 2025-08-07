@@ -4,7 +4,7 @@ import logging
 from lib.wynncraft_api import WynncraftAPI
 from lib.db import get_linked_members_page, add_member, remove_member, get_member
 from lib.discord_notify import notify_member_removed
-from config import GUILD_NAME, RANK_ROLE_ID_MAP
+from config import GUILD_NAME, RANK_ROLE_ID_MAP, ETKW
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,8 @@ async def member_remove_sync_task(bot, api: WynncraftAPI):
                                         role = guild.get_role(role_id)
                                         if role:
                                             try:
-                                                await member.remove_roles(role, reason="ゲーム脱退時連携ロール解除")
+                                                await member.remove_roles(ETKW, reason="ゲーム脱退時連携ロール解除-デフォルト")
+                                                await member.remove_roles(role, reason="ゲーム脱退時連携ロール解除‐ランク")
                                             except Exception as e:
                                                 logger.error(f"ロール削除エラー: {e}")
                                     break  # 見つかったら他のguild見ない
