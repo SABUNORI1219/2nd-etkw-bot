@@ -224,9 +224,13 @@ class MapRenderer:
             y1, y2 = y1 * self.scale_factor, y2 * self.scale_factor
             width = abs(x2 - x1)
             height = abs(y2 - y1)
-            # 領地の短辺の90%を王冠サイズ(ただし最小18, 最大64)
+            # 前までのロジックで使っていた上限値
+            scaled_font_size = max(12, int(self.font.size * self.scale_factor))
+            crown_size_limit = int(scaled_font_size * 1.8)
+            crown_size_limit = max(28, min(crown_size_limit, 120))
+            # 領地の短辺の90%を王冠サイズ、ただし上限つき
             crown_size = int(min(width, height) * 0.9)
-            crown_size = max(18, min(crown_size, 64))
+            crown_size = max(18, min(crown_size, crown_size_limit))
 
             crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
             crown_x = int(px - crown_size/2)
@@ -267,7 +271,7 @@ class MapRenderer:
                 stroke_fill="black"
             )
         return map_img, [(0, 0, "", hq_name) for hq_name in hq_names]
-
+    
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict, owned_territories_map=None) -> tuple[discord.File | None, discord.Embed | None]:
         if not territories_to_render:
             return None, None
