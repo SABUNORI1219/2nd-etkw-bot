@@ -26,6 +26,16 @@ RANK_CHOICES = [
     for rank in RANK_ORDER
 ]
 
+# ここにランク→ロールIDのマッピング
+RANK_ROLE_ID_MAP = {
+    "Owner": 1240476623090876516,
+    "Chief": 1138142855517446144,
+    "Strategist": 1166030526214320178,
+    "Captain": 1166035741189607494,
+    "Recruiter": 1166036063081467914,
+    "Recruit": 1166036348050886657,
+}
+
 # ソート順の選択肢（rankは除外）
 SORT_CHOICES = [
     app_commands.Choice(name="Last Seen (最終ログインが古い順)", value="last_seen")
@@ -245,6 +255,37 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             await interaction.followup.send(f"✅ メンバー `{mcid}` を `{user_str}` としてランク `{ingame_rank}` で登録しました。")
         else:
             await interaction.followup.send("❌ メンバーの登録に失敗しました。")
+
+        if discord_user is not None:
+                guild: discord.Guild = interaction.guild
+                if guild is not None:
+                    try:
+                        member: discord.Member = guild.get_member(discord_user.id)
+                        if member is None:
+                            # メンバー取得できなければfetch
+                            member = await guild.fetch_member(discord_user.id)
+                    except Exception:
+                        member = None
+    
+                    if member is not None:
+                        # 付与するロールID
+                        role_id = RANK_ROLE_ID_MAP.get(ingame_rank)
+                        role_obj = None
+                        if role_id:
+                            role_obj = guild.get_role(role_id)
+                            if role_obj:
+                                try:
+                                    await member.add_roles(role_obj, reason="ギルドランク連携")
+                                except Exception as e:
+                                    logger.error(f"ロール付与エラー: {e}")
+    
+                        # ニックネーム編集: <ロール名> <MCID>
+                        role_name = role_obj.name if role_obj else ingame_rank
+                        new_nick = f"{role_name} {mcid}"
+                        try:
+                            await member.edit(nick=new_nick, reason="ギルドメンバー登録時の自動ニックネーム設定")
+                        except Exception as e:
+                            logger.error(f"ニックネーム編集エラー: {e}")
 
     @app_commands.command(name="remove", description="メンバーの登録を解除")
     @app_commands.checks.has_permissions(administrator=True)
