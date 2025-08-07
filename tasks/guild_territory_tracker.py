@@ -23,9 +23,15 @@ def _str_to_dt(dtstr):
     if dtstr is None:
         return None
     if isinstance(dtstr, datetime):
+        # ここでtzinfoがなければ強制的にUTCをつける
+        if dtstr.tzinfo is None:
+            return dtstr.replace(tzinfo=timezone.utc)
         return dtstr
     # 末尾Zあり/なし両対応
-    return datetime.fromisoformat(dtstr.replace("Z", "+00:00"))
+    dt = datetime.fromisoformat(dtstr.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
 
 def get_effective_owned_territories(guild_prefix, current_time=None):
     """
@@ -39,6 +45,7 @@ def get_effective_owned_territories(guild_prefix, current_time=None):
         if lost_time is None:
             result.add(tname)
         else:
+            # lost_timeがnaiveならUTCを付与
             if lost_time.tzinfo is None:
                 lost_time = lost_time.replace(tzinfo=timezone.utc)
             if (current_time - lost_time) <= timedelta(hours=1):
@@ -58,11 +65,17 @@ def get_territory_held_time(guild_prefix, territory_name, now=None):
     info = guild_territory_history[guild_prefix].get(territory_name)
     if not info or not info.get("acquired"):
         return 0
+    acquired = info.get("acquired")
+    if acquired and acquired.tzinfo is None:
+        acquired = acquired.replace(tzinfo=timezone.utc)
     if info.get("lost"):
-        return int((info["lost"] - info["acquired"]).total_seconds())
+        lost = info.get("lost")
+        if lost and lost.tzinfo is None:
+            lost = lost.replace(tzinfo=timezone.utc)
+        return int((lost - acquired).total_seconds())
     if not now:
         now = datetime.now(timezone.utc)
-    return int((now - info["acquired"]).total_seconds())
+    return int((now - acquired).total_seconds())
 
 def sync_history_from_db():
     """
@@ -112,8 +125,11 @@ async def track_guild_territories(loop_interval=60):
                 if tname in hist:
                     # 継続所有
                     if hist[tname].get("lost"):
+                        lost_time = hist[tname]["lost"]
+                        if lost_time and lost_time.tzinfo is None:
+                            lost_time = lost_time.replace(tzinfo=timezone.utc)
                         # 1時間以内に奪われていた→再取得扱い
-                        if (now - hist[tname]["lost"]) <= timedelta(hours=1):
+                        if (now - lost_time) <= timedelta(hours=1):
                             hist[tname]["lost"] = None
                         else:
                             hist[tname] = {"acquired": now, "lost": None}
@@ -126,8 +142,11 @@ async def track_guild_territories(loop_interval=60):
             hist = guild_territory_history[guild_prefix]
             for tname in list(hist.keys()):
                 lost_at = hist[tname].get("lost")
-                if lost_at and (now - lost_at) > timedelta(hours=1):
-                    del hist[tname]
+                if lost_at:
+                    if lost_at.tzinfo is None:
+                        lost_at = lost_at.replace(tzinfo=timezone.utc)
+                    if (now - lost_at) > timedelta(hours=1):
+                        del hist[tname]
             if not hist:
                 del guild_territory_history[guild_prefix]
 
