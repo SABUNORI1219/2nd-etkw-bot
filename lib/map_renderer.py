@@ -240,6 +240,9 @@ class MapRenderer:
                 color_rgb = self._hex_to_rgb(color_hex)
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
+                # HQ領地はprefix描画をスキップ
+                if hq_territories and name in hq_territories:
+                    continue
                 draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
         return map_to_draw_on
 
@@ -248,15 +251,22 @@ class MapRenderer:
             map_img = self.resized_map.copy()
         else:
             map_img = map_to_draw_on
-        self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map)
-        draw = ImageDraw.Draw(map_img)
+        # HQ候補名リストを先に決定
         prefix_to_territories = {}
         for name, info in territory_data.items():
             prefix = info.get("guild", {}).get("prefix", "")
             if not prefix:
                 continue
             prefix_to_territories.setdefault(prefix, set()).add(name)
-        hq_marks = []
+        hq_names = set()
+        for prefix, owned in prefix_to_territories.items():
+            candidate_territories = owned_territories_map[prefix] if owned_territories_map and prefix in owned_territories_map else owned
+            hq_name, _, _, _ = self._pick_hq_candidate(candidate_territories, territory_api_data)
+            hq_names.add(hq_name)
+        # 領地四角描画時にHQ名リストを渡す
+        self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map, hq_territories=hq_names)
+        draw = ImageDraw.Draw(map_img)
+        # HQの王冠＆prefix描画
         for prefix, owned in prefix_to_territories.items():
             candidate_territories = owned_territories_map[prefix] if owned_territories_map and prefix in owned_territories_map else owned
             hq_name, _, _, _ = self._pick_hq_candidate(candidate_territories, territory_api_data)
@@ -270,11 +280,8 @@ class MapRenderer:
             if is_zoomed and box:
                 px -= box[0]
                 py -= box[1]
-            hq_marks.append((px, py, prefix, hq_name))
             color_hex = guild_color_map.get(prefix, "#FFFFFF")
             color_rgb = self._hex_to_rgb(color_hex)
-        
-            # --- 王冠サイズ ---
             scaled_font_size = max(12, int(self.font.size * self.scale_factor))
             crown_size = int(scaled_font_size * 1.8)
             crown_size = max(28, min(crown_size, 120))
@@ -282,10 +289,8 @@ class MapRenderer:
             crown_x = int(px - crown_size/2)
             crown_y = int(py - crown_size/2)
             map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
-        
-            # --- プレフィクスを王冠の上に描画 ---
-            # プレフィックスのフォントサイズを王冠幅に合わせて自動調整
-            prefix_font_size = crown_size  # 初期値: 王冠幅と同じ
+            # プレフィクスのフォントサイズを王冠幅に合わせて自動調整
+            prefix_font_size = crown_size
             font_found = False
             for test_size in range(crown_size, 5, -1):
                 try:
@@ -306,9 +311,8 @@ class MapRenderer:
             bbox = prefix_font.getbbox(prefix)
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
-            # プレフィックスの中心Xは王冠の中心、Yは王冠の上端のやや上
             text_x = px
-            text_y = crown_y - text_height // 2 - 2  # 王冠の上端より少し上
+            text_y = crown_y - text_height // 2 - 2
             draw.text(
                 (text_x, text_y),
                 prefix,
@@ -318,7 +322,7 @@ class MapRenderer:
                 stroke_width=2,
                 stroke_fill="black"
             )
-        return map_img, hq_marks
+        return map_img, [(0, 0, "", hq_name) for hq_name in hq_names]
 
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict, owned_territories_map=None) -> tuple[discord.File | None, discord.Embed | None]:
         if not territories_to_render:
