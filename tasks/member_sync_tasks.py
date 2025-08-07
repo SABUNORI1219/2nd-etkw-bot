@@ -2,16 +2,13 @@ import asyncio
 import logging
 
 from lib.wynncraft_api import WynncraftAPI
-from lib.db import get_linked_members_page, add_member, remove_member
+from lib.db import get_linked_members_page, add_member, remove_member, get_member
 from lib.discord_notify import notify_member_removed
-from config import GUILD_NAME
+from config import GUILD_NAME, RANK_ROLE_ID_MAP
 
 logger = logging.getLogger(__name__)
 
 async def fetch_guild_members(api: WynncraftAPI) -> dict:
-    """
-    Wynncraft Guild APIから全メンバーを「MCID→Rank」のdictで返す
-    """
     guild_data = await api.get_guild_by_prefix("ETKW")
     if not guild_data or 'members' not in guild_data:
         logger.warning("[MemberSync] ギルドAPI取得失敗")
@@ -20,14 +17,11 @@ async def fetch_guild_members(api: WynncraftAPI) -> dict:
     for rank, rank_members in guild_data['members'].items():
         if rank == "total":
             continue
-        for mcid in rank_members.keys():  # ←ここを修正
+        for mcid in rank_members.keys():
             members[mcid] = rank.capitalize()
     return members
 
 async def member_rank_sync_task(api: WynncraftAPI):
-    """
-    APIのランク情報でDBのメンバーランクを自動同期（通知不要）
-    """
     while True:
         try:
             logger.info("[MemberSync] ランク同期タスク開始")
@@ -56,9 +50,6 @@ async def member_rank_sync_task(api: WynncraftAPI):
         await asyncio.sleep(120)
 
 async def member_remove_sync_task(bot, api: WynncraftAPI):
-    """
-    APIのメンバーリストでDBから消すべき人を検知し、通知＆DB削除
-    """
     while True:
         try:
             logger.info("[MemberSync] ギルド脱退検知タスク開始")
@@ -76,6 +67,21 @@ async def member_remove_sync_task(bot, api: WynncraftAPI):
                 for dbm in db_members:
                     mcid = dbm['mcid']
                     if mcid not in api_mcids:
+                        # --- ゲーム脱退時のみロール削除 ---
+                        if dbm.get('discord_id'):
+                            # BotがいるGuildインスタンスを取得
+                            for guild in bot.guilds:
+                                member = guild.get_member(dbm['discord_id'])
+                                if member:
+                                    role_id = RANK_ROLE_ID_MAP.get(dbm.get('rank'))
+                                    if role_id:
+                                        role = guild.get_role(role_id)
+                                        if role:
+                                            try:
+                                                await member.remove_roles(role, reason="ゲーム脱退時連携ロール解除")
+                                            except Exception as e:
+                                                logger.error(f"ロール削除エラー: {e}")
+                                    break  # 見つかったら他のguild見ない
                         await notify_member_removed(bot, dbm)
                         logger.info(f"[MemberSync] {mcid} がギルドから脱退→DBから削除")
                         remove_member(mcid=mcid)
