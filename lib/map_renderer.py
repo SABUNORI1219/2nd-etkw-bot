@@ -250,7 +250,6 @@ class MapRenderer:
             prefix_to_territories.setdefault(prefix, set()).add(name)
         hq_marks = []
         for prefix, owned in prefix_to_territories.items():
-            # DB・キャッシュから「現在所有＋1時間以内失領」リストを得る場合はowned_territories_map[prefix]を利用
             candidate_territories = owned_territories_map[prefix] if owned_territories_map and prefix in owned_territories_map else owned
             hq_name, _, _, _ = self._pick_hq_candidate(candidate_territories, territory_api_data)
             loc = self.local_territories.get(hq_name, {}).get("Location")
@@ -266,18 +265,47 @@ class MapRenderer:
             hq_marks.append((px, py, prefix, hq_name))
             color_hex = guild_color_map.get(prefix, "#FFFFFF")
             color_rgb = self._hex_to_rgb(color_hex)
+        
+            # --- 王冠サイズ ---
             scaled_font_size = max(12, int(self.font.size * self.scale_factor))
-            try:
-                scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
-            except IOError:
-                scaled_font = ImageFont.load_default()
             crown_size = int(scaled_font_size * 1.8)
             crown_size = max(28, min(crown_size, 120))
             crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
             crown_x = int(px - crown_size/2)
             crown_y = int(py - crown_size/2)
             map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
-            draw.text((px, py), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
+        
+            # --- プレフィクスを王冠の上に描画 ---
+            # プレフィックスのフォントサイズを王冠幅に合わせて自動調整
+            prefix_font_size = crown_size  # 初期値: 王冠幅と同じ
+            font_found = False
+            for test_size in range(crown_size, 5, -1):
+                try:
+                    test_font = ImageFont.truetype(FONT_PATH, test_size)
+                except IOError:
+                    test_font = ImageFont.load_default()
+                text_width, text_height = test_font.getsize(prefix)
+                if text_width <= crown_size:
+                    prefix_font_size = test_size
+                    font_found = True
+                    break
+            if font_found:
+                prefix_font = ImageFont.truetype(FONT_PATH, prefix_font_size)
+            else:
+                prefix_font = ImageFont.load_default()
+            text_width, text_height = prefix_font.getsize(prefix)
+            # プレフィックスの中心Xは王冠の中心、Yは王冠の上端のやや上
+            text_x = px
+            text_y = crown_y - text_height // 2 - 2  # 王冠の上端より少し上
+            draw.text(
+                (text_x, text_y),
+                prefix,
+                font=prefix_font,
+                fill=color_rgb,
+                anchor="mm",
+                stroke_width=2,
+                stroke_fill="black"
+            )
         return map_img, hq_marks
 
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict, owned_territories_map=None) -> tuple[discord.File | None, discord.Embed | None]:
