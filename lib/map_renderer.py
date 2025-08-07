@@ -79,113 +79,103 @@ class MapRenderer:
         return total
 
     def _pick_hq_candidate(self, owned_territories, territory_api_data):
+        # Step1: HQ候補5つピックアップ (Conn含むExt多い順)
         hq_stats = []
         for t in owned_territories:
             conn, ext, hq_buff = self._calc_conn_ext_hqbuff(owned_territories, t)
             acquired = territory_api_data.get(t, {}).get("acquired", "")
             if not acquired:
                 acquired = "9999-12-31T23:59:59.999999Z"
+            is_city = self._is_city_territory(self.local_territories[t])
             hq_stats.append({
                 "name": t,
                 "conn": conn,
                 "ext": ext,
-                # 新フィールド: Connを除いたExt
-                "ext_without_conn": ext - conn if ext >= conn else 0,
                 "hq_buff": hq_buff,
-                "is_city": self._is_city_territory(self.local_territories[t]),
+                "is_city": is_city,
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
             })
-        # Ext多い順、Conn多い順、バフ多い順でソート
-        hq_stats.sort(key=lambda x: (-x["ext"], -x["conn"], -x["hq_buff"]))
+        # Conn含むExt多い順→Conn多い順→HQバフ多い順→取得時刻古い順
+        hq_stats.sort(key=lambda x: (-x["ext"], -x["conn"], -x["hq_buff"], x["acquired"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
 
-        # --- ここだけ「Connを含まないExt」で最大を判定 ---
-        ext_top = max(top5, key=lambda x: x["ext_without_conn"])
-        for t in top5[1:]:
-            if t["conn"] - ext_top["conn"] >= 2:
-                return t["name"], hq_stats, top5, total_res
+        # Step2: HQ決定ロジック
+        # (A) Conn含むExt同数複数→Conn多い方
+        ext_max = top5[0]["ext"]
+        ext_tops = [x for x in top5 if x["ext"] == ext_max]
+        if len(ext_tops) > 1:
+            conn_max = max(x["conn"] for x in ext_tops)
+            conn_maxs = [x for x in ext_tops if x["conn"] == conn_max]
+            if len(conn_maxs) == 1:
+                return conn_maxs[0]["name"], hq_stats, top5, total_res
+        else:
+            conn_max = top5[0]["conn"]
+            conn_maxs = [top5[0]]
 
-        # 小規模条件
-        if len(owned_territories) <= 6 and all(x["conn"] < 3 for x in top5):
+        # (B) 所持領地6個以下→Time Held最長
+        if len(owned_territories) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
 
-        # Ext最大グループ（通常規定）判定
-        ext_max_val = ext_top["ext"]
-        ext_tops = [x for x in top5 if x["ext"] == ext_max_val]
-        conn_max_val = max([x["conn"] for x in ext_tops])
-        conn_maxs = [x for x in ext_tops if x["conn"] == conn_max_val]
-
-        hq_buff_max = max([x["hq_buff"] for x in top5])
-        candidate_group = [
-            x for x in top5
-            if x["conn"] == conn_max_val
-                and x["ext"] < 20
-                and abs(x["hq_buff"] - hq_buff_max) < 100
-        ]
-        if candidate_group:
-            city = next((x for x in candidate_group if x["is_city"]), None)
-            if city:
-                return city["name"], hq_stats, top5, total_res
-            if candidate_group[0]["ext"] >= 20:
-                hq_max = max(candidate_group, key=lambda x: x["hq_buff"])
-                return hq_max["name"], hq_stats, top5, total_res
-
-        if len(conn_maxs) == 1:
-            return conn_maxs[0]["name"], hq_stats, top5, total_res
-
-        diff = abs(conn_maxs[0]["hq_buff"] - conn_maxs[-1]["hq_buff"])
-        if diff < 100 and conn_maxs[0]["conn"] == conn_maxs[-1]["conn"]:
+        # (C) Conn同数&Ext<20で街領地あればそれを優先
+        if len(conn_maxs) > 1 and conn_maxs[0]["conn"] == conn_maxs[-1]["conn"]:
             if conn_maxs[0]["ext"] < 20:
                 city = next((x for x in conn_maxs if x["is_city"]), None)
                 if city:
                     return city["name"], hq_stats, top5, total_res
             else:
+                # Ext20以上はHQバフ高い方
                 hq_max = max(conn_maxs, key=lambda x: x["hq_buff"])
                 return hq_max["name"], hq_stats, top5, total_res
 
-        res_priority = ["crops", "ore", "wood", "fish"]
-        min_val = float("inf")
-        min_type = None
-        for rtype in res_priority:
-            val = total_res.get(rtype, 0)
-            if val > 0 and val < min_val:
-                min_val = val
-                min_type = rtype
-
-        res_territories = [x for x in hq_stats if int(x["resources"].get(min_type, "0")) > 0]
-        if res_territories and conn_maxs:
-            def trading_route_distance(start, goals, allow_owned_only=True):
-                queue = collections.deque()
-                visited = set()
-                queue.append((start, 0))
-                while queue:
-                    current, dist = queue.popleft()
-                    if current in visited:
-                        continue
-                    visited.add(current)
-                    if current in goals:
-                        return dist
-                    neighbors = self.local_territories.get(current, {}).get("Trading Routes", [])
-                    if allow_owned_only:
+        # (D) Ext,Conn同値→資源判定
+        if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
+            res_priority = ["crops", "ore", "wood", "fish"]
+            # 一番生産量のない資源
+            min_val = float("inf")
+            min_type = None
+            for rtype in res_priority:
+                val = total_res.get(rtype, 0)
+                if val > 0 and val < min_val:
+                    min_val = val
+                    min_type = rtype
+            # その資源を生産する領地のうち、HQ候補地に一番近い
+            if min_type:
+                from math import inf
+                def trading_route_distance(start, goals):
+                    queue = collections.deque()
+                    visited = set()
+                    queue.append((start, 0))
+                    while queue:
+                        current, dist = queue.popleft()
+                        if current in visited:
+                            continue
+                        visited.add(current)
+                        if current in goals:
+                            return dist
+                        neighbors = self.local_territories.get(current, {}).get("Trading Routes", [])
                         neighbors = [n for n in neighbors if n in owned_territories]
-                    queue.extend((n, dist+1) for n in neighbors)
-                return float("inf")
+                        queue.extend((n, dist+1) for n in neighbors)
+                    return inf
+                res_territories = [x for x in hq_stats if int(x["resources"].get(min_type, "0")) > 0]
+                res_names = [x["name"] for x in res_territories]
+                min_dist = inf
+                best_cand = conn_maxs[0]
+                for cand in conn_maxs:
+                    d = trading_route_distance(cand["name"], set(res_names))
+                    if d < min_dist:
+                        min_dist = d
+                        best_cand = cand
+                    elif d == min_dist:
+                        cand_res = int(self.local_territories[cand["name"]].get("resources", {}).get(min_type, "0"))
+                        best_res = int(self.local_territories[best_cand["name"]].get("resources", {}).get(min_type, "0"))
+                        if cand_res > best_res:
+                            best_cand = cand
+                return best_cand["name"], hq_stats, top5, total_res
+        return conn_maxs[0]["name"], hq_stats, top5, total_res
 
-            res_territory_names = [x["name"] for x in res_territories]
-            min_dist = float("inf")
-            best_cand = conn_maxs[0]
-            for cand in conn_maxs:
-                d = trading_route_distance(cand["name"], set(res_territory_names))
-                if d < min_dist:
-                    min_dist = d
-                    best_cand = cand
-            return best_cand["name"], hq_stats, top5, total_res
-        else:
-            return conn_maxs[0]["name"], hq_stats, top5, total_res
-    
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None):
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
@@ -244,7 +234,7 @@ class MapRenderer:
                 draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
         return map_to_draw_on
 
-    def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False, map_to_draw_on=None):
+    def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False, map_to_draw_on=None, owned_territories_map=None):
         # 修正: 必ずmap_to_draw_onを使う。Noneなら全体コピー
         if map_to_draw_on is None:
             map_img = self.resized_map.copy()
@@ -260,7 +250,9 @@ class MapRenderer:
             prefix_to_territories.setdefault(prefix, set()).add(name)
         hq_marks = []
         for prefix, owned in prefix_to_territories.items():
-            hq_name, _, _, _ = self._pick_hq_candidate(owned, territory_api_data)
+            # DB・キャッシュから「現在所有＋1時間以内失領」リストを得る場合はowned_territories_map[prefix]を利用
+            candidate_territories = owned_territories_map[prefix] if owned_territories_map and prefix in owned_territories_map else owned
+            hq_name, _, _, _ = self._pick_hq_candidate(candidate_territories, territory_api_data)
             loc = self.local_territories.get(hq_name, {}).get("Location")
             if not loc:
                 continue
@@ -288,7 +280,7 @@ class MapRenderer:
             draw.text((px, py), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
         return map_img, hq_marks
 
-    def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict) -> tuple[discord.File | None, discord.Embed | None]:
+    def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict, owned_territories_map=None) -> tuple[discord.File | None, discord.Embed | None]:
         if not territories_to_render:
             return None, None
         try:
@@ -322,7 +314,8 @@ class MapRenderer:
                 territory_api_data=territory_data,
                 box=box,
                 is_zoomed=is_zoomed,
-                map_to_draw_on=map_to_draw_on
+                map_to_draw_on=map_to_draw_on,
+                owned_territories_map=owned_territories_map
             )
 
             map_bytes = BytesIO()
