@@ -101,20 +101,17 @@ class MapRenderer:
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
 
-        # Step2: HQ決定ロジック
-
-        # top5中、Ext最大値グループ以外でConnが2個以上多いものがあればそちらをHQ
+        # --- Conn2個以上多いもの優先ロジック ---
         ext_max = top5[0]["ext"]
         ext_tops = [x for x in top5 if x["ext"] == ext_max]
-        # Ext最大グループ以外
         candidates_not_ext_top = [x for x in top5 if x not in ext_tops]
         if candidates_not_ext_top:
             conn_max_in_ext_top = max(x["conn"] for x in ext_tops)
             for cand in candidates_not_ext_top:
                 if cand["conn"] - conn_max_in_ext_top >= 2:
                     return cand["name"], hq_stats, top5, total_res
-            
-        # Conn含むExt同数複数→Conn多い方
+
+        # (A) Conn含むExt同数複数→Conn多い方
         ext_max = top5[0]["ext"]
         ext_tops = [x for x in top5 if x["ext"] == ext_max]
         if len(ext_tops) > 1:
@@ -126,12 +123,12 @@ class MapRenderer:
             conn_max = top5[0]["conn"]
             conn_maxs = [top5[0]]
 
-        # 所持領地6個以下→Time Held最長
+        # (B) 所持領地6個以下→Time Held最長
         if len(owned_territories) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
 
-        # Conn同数&Ext<20で街領地あればそれを優先
+        # (C) Conn同数&Ext<20で街領地あればそれを優先
         if len(conn_maxs) > 1 and conn_maxs[0]["conn"] == conn_maxs[-1]["conn"]:
             if conn_maxs[0]["ext"] < 20:
                 city = next((x for x in conn_maxs if x["is_city"]), None)
@@ -142,7 +139,7 @@ class MapRenderer:
                 hq_max = max(conn_maxs, key=lambda x: x["hq_buff"])
                 return hq_max["name"], hq_stats, top5, total_res
 
-        # Ext,Conn同値→資源判定
+        # (D) Ext,Conn同値→資源判定
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
             res_priority = ["crops", "ore", "wood", "fish"]
             # 一番生産量のない資源
@@ -247,7 +244,6 @@ class MapRenderer:
         return map_to_draw_on
 
     def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False, map_to_draw_on=None, owned_territories_map=None):
-        # 修正: 必ずmap_to_draw_onを使う。Noneなら全体コピー
         if map_to_draw_on is None:
             map_img = self.resized_map.copy()
         else:
@@ -296,7 +292,9 @@ class MapRenderer:
                     test_font = ImageFont.truetype(FONT_PATH, test_size)
                 except IOError:
                     test_font = ImageFont.load_default()
-                text_width, text_height = test_font.getsize(prefix)
+                bbox = test_font.getbbox(prefix)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
                 if text_width <= crown_size:
                     prefix_font_size = test_size
                     font_found = True
@@ -305,7 +303,9 @@ class MapRenderer:
                 prefix_font = ImageFont.truetype(FONT_PATH, prefix_font_size)
             else:
                 prefix_font = ImageFont.load_default()
-            text_width, text_height = prefix_font.getsize(prefix)
+            bbox = prefix_font.getbbox(prefix)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
             # プレフィックスの中心Xは王冠の中心、Yは王冠の上端のやや上
             text_x = px
             text_y = crown_y - text_height // 2 - 2  # 王冠の上端より少し上
