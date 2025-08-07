@@ -27,16 +27,6 @@ RANK_CHOICES = [
     for rank in RANK_ORDER
 ]
 
-# ここにランク→ロールIDのマッピング
-RANK_ROLE_ID_MAP = {
-    "Owner": 1240476623090876516,
-    "Chief": 1138142855517446144,
-    "Strategist": 1166030526214320178,
-    "Captain": 1166035741189607494,
-    "Recruiter": 1166036063081467914,
-    "Recruit": 1166036348050886657,
-}
-
 # ソート順の選択肢（rankは除外）
 SORT_CHOICES = [
     app_commands.Choice(name="Last Seen (最終ログインが古い順)", value="last_seen")
