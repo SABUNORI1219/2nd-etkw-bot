@@ -3,6 +3,7 @@ import logging
 import psycopg2
 from psycopg2.extras import execute_values
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +47,74 @@ def create_table():
         cur.execute('''
             CREATE TABLE IF NOT EXISTS last_join_cache (
                 mcid TEXT PRIMARY KEY,
-                last_join TEXT  -- ISO8601文字列, 取得できない場合はNULL
+                last_join TEXT
             );
         ''')
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS guild_territory_state (
+                guild_prefix TEXT,
+                territory_name TEXT,
+                acquired TIMESTAMP,
+                lost TIMESTAMP,
+                PRIMARY KEY (guild_prefix, territory_name)
+            );
+        """)
         conn.commit()
     conn.close()
-    logger.info("guild_raid_historyテーブルを作成/確認しました")
+    logger.info("全テーブルを作成/確認しました")
+
+def upsert_guild_territory_state(guild_territory_history):
+    """
+    {guild_prefix: {territory_name: {"acquired": dt, "lost": dt or None}}}
+    """
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            rows = []
+            for g, tdict in guild_territory_history.items():
+                for t, info in tdict.items():
+                    acquired = info.get("acquired")
+                    lost = info.get("lost")
+                    rows.append((
+                        g, t,
+                        acquired if isinstance(acquired, datetime) else None,
+                        lost if isinstance(lost, datetime) else None
+                    ))
+            if rows:
+                execute_values(
+                    cur,
+                    """
+                    INSERT INTO guild_territory_state (guild_prefix, territory_name, acquired, lost)
+                    VALUES %s
+                    ON CONFLICT (guild_prefix, territory_name)
+                    DO UPDATE SET acquired = EXCLUDED.acquired, lost = EXCLUDED.lost
+                    """,
+                    rows
+                )
+            conn.commit()
+    except Exception as e:
+        logger.error(f"upsert_guild_territory_state failed: {e}")
+    finally:
+        if conn: conn.close()
+
+def get_guild_territory_state():
+    """
+    すべてのguild_territory_stateを {guild_prefix: {territory_name: {"acquired":..., "lost":...}}} 形式で返す
+    """
+    conn = get_conn()
+    result = defaultdict(dict)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT guild_prefix, territory_name, acquired, lost FROM guild_territory_state
+            """)
+            for g, t, acq, lost in cur.fetchall():
+                result[g][t] = {"acquired": acq, "lost": lost}
+    except Exception as e:
+        logger.error(f"get_guild_territory_state failed: {e}")
+    finally:
+        if conn: conn.close()
+    return result
 
 def insert_history(raid_name, clear_time, member):
     try:
@@ -65,17 +128,15 @@ def insert_history(raid_name, clear_time, member):
         conn.close()
     except Exception as e:
         logger.error(f"insert_history failed: {raid_name}, {clear_time}, {member}, error={e}")
-    
+
 def reset_player_raid_count(player, raid_name, count):
     conn = get_conn()
     with conn.cursor() as cur:
-        # まず、該当player/raid_nameの履歴を削除
         cur.execute(
             "DELETE FROM guild_raid_history WHERE member=%s AND raid_name=%s",
             (player, raid_name)
         )
         now = datetime.utcnow()
-        # 指定回数だけinsert
         if count > 0:
             execute_values(
                 cur,
@@ -88,13 +149,6 @@ def reset_player_raid_count(player, raid_name, count):
 from datetime import datetime
 
 def fetch_history(raid_name=None, date_from=None):
-    """
-    ギルドレイド履歴を取得する。
-    - raid_name: レイド名で絞り込み（Noneなら全件）
-    - date_from: 指定日時以降で絞り込み（Noneなら全期間）。
-      'YYYY-MM-DD', 'YYYY-MM', 'YYYY' の文字列も対応。
-    戻り値: (id, raid_name, clear_time, member(str)) のリスト
-    """
     conn = get_conn()
     with conn.cursor() as cur:
         sql = "SELECT id, raid_name, clear_time, member FROM guild_raid_history WHERE 1=1"
@@ -103,28 +157,25 @@ def fetch_history(raid_name=None, date_from=None):
             sql += " AND raid_name = %s"
             params.append(raid_name)
         if date_from:
-            # 年・月単位など柔軟に対応
             dt = None
             if isinstance(date_from, str):
-                if len(date_from) == 10:  # YYYY-MM-DD
+                if len(date_from) == 10:
                     try:
                         dt = datetime.strptime(date_from, "%Y-%m-%d")
                     except Exception:
                         pass
-                elif len(date_from) == 7:  # YYYY-MM
+                elif len(date_from) == 7:
                     try:
                         dt = datetime.strptime(date_from, "%Y-%m")
                     except Exception:
                         pass
-                elif len(date_from) == 4:  # YYYY
+                elif len(date_from) == 4:
                     try:
                         dt = datetime.strptime(date_from, "%Y")
                     except Exception:
                         pass
-                # 不正な形式は無視
             elif isinstance(date_from, datetime):
                 dt = date_from
-            # datetime型に変換できた場合だけフィルタ
             if dt is not None:
                 sql += " AND clear_time >= %s"
                 params.append(dt)
@@ -132,13 +183,12 @@ def fetch_history(raid_name=None, date_from=None):
         cur.execute(sql, params)
         rows = cur.fetchall()
     conn.close()
-    # memberはstr型で返す
     result = []
     for row in rows:
         member = row[3]
         result.append((row[0], row[1], row[2], str(member)))
     return result
-    
+
 def insert_server_log(player_name, timestamp, server):
     conn = get_conn()
     with conn.cursor() as cur:
@@ -185,7 +235,6 @@ def get_config(key):
     return row[0] if row else None
 
 def cleanup_old_server_logs(minutes=5):
-    """player_server_logのminutes分より前のデータを削除"""
     conn = get_conn()
     with conn.cursor() as cur:
         threshold = datetime.utcnow() - timedelta(minutes=minutes)
@@ -195,7 +244,6 @@ def cleanup_old_server_logs(minutes=5):
     logger.info(f"{minutes}分より前のplayer_server_logを削除しました")
 
 def add_member(mcid: str, discord_id: int, rank: str) -> bool:
-    """新しいメンバーを登録する"""
     sql = "INSERT INTO linked_members (mcid, discord_id, ingame_rank) VALUES (%s, %s, %s) ON CONFLICT(mcid) DO UPDATE SET discord_id = EXCLUDED.discord_id, ingame_rank = EXCLUDED.ingame_rank"
     conn = get_conn()
     if conn is None: return False
@@ -211,9 +259,7 @@ def add_member(mcid: str, discord_id: int, rank: str) -> bool:
         if conn: conn.close()
 
 def remove_member(mcid: str = None, discord_id: int = None) -> bool:
-    """メンバーを登録解除する"""
     if not mcid and not discord_id: return False
-    
     sql = "DELETE FROM linked_members WHERE "
     params = []
     if mcid:
@@ -222,14 +268,13 @@ def remove_member(mcid: str = None, discord_id: int = None) -> bool:
     else:
         sql += "discord_id = %s"
         params.append(discord_id)
-        
     conn = get_conn()
     if conn is None: return False
     try:
         with conn.cursor() as cur:
             cur.execute(sql, tuple(params))
             conn.commit()
-        return cur.rowcount > 0 # 1行以上削除されたらTrue
+        return cur.rowcount > 0
     except Exception as e:
         logger.error(f"[DB Handler] メンバーの削除に失敗: {e}")
         return False
@@ -237,7 +282,6 @@ def remove_member(mcid: str = None, discord_id: int = None) -> bool:
         if conn: conn.close()
 
 def get_member(mcid: str = None, discord_id: int = None) -> dict | None:
-    """単一のメンバー情報を取得する"""
     if not mcid and not discord_id: return None
     sql = "SELECT mcid, discord_id, ingame_rank FROM linked_members WHERE "
     params = []
@@ -247,7 +291,6 @@ def get_member(mcid: str = None, discord_id: int = None) -> dict | None:
     else:
         sql += "discord_id = %s"
         params.append(discord_id)
-        
     conn = get_conn()
     if conn is None: return None
     try:
@@ -264,7 +307,6 @@ def get_member(mcid: str = None, discord_id: int = None) -> dict | None:
         if conn: conn.close()
 
 def get_linked_members_page(page: int = 1, per_page: int = 10, rank_filter: str = None) -> tuple[list, int]:
-    """登録済みメンバーのリストをページ指定で取得する"""
     offset = (page - 1) * per_page
     conn = get_conn()
     if conn is None: return [], 0
@@ -284,7 +326,6 @@ def get_linked_members_page(page: int = 1, per_page: int = 10, rank_filter: str 
         with conn.cursor() as cur:
             cur.execute(count_sql, [rank_filter] if rank_filter else [])
             total_count = cur.fetchone()[0]
-            
             cur.execute(data_sql, params)
             results = [{"mcid": r[0], "discord_id": r[1], "rank": r[2]} for r in cur.fetchall()]
     except Exception as e:
@@ -316,10 +357,6 @@ def get_all_linked_members(rank_filter: str = None) -> list:
     return results
 
 def upsert_last_join_cache(last_join_list):
-    """
-    last_join_list: [(mcid, last_join_str or None), ...]
-    登録済みならUPDATE、なければINSERT
-    """
     if not last_join_list:
         return
     conn = get_conn()
@@ -342,10 +379,6 @@ def upsert_last_join_cache(last_join_list):
             conn.close()
 
 def get_last_join_cache(top_n=10):
-    """
-    last_join_cacheからlast_joinが古い順で上位N件を返す
-    戻り値: [(mcid, last_join_str or None)]
-    """
     conn = get_conn()
     try:
         with conn.cursor() as cur:
