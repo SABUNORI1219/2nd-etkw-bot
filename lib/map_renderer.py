@@ -79,7 +79,6 @@ class MapRenderer:
         return total
 
     def _pick_hq_candidate(self, owned_territories, territory_api_data):
-        # Step1: HQ候補5つピックアップ (Conn含むExt多い順)
         hq_stats = []
         for t in owned_territories:
             conn, ext, hq_buff = self._calc_conn_ext_hqbuff(owned_territories, t)
@@ -101,20 +100,17 @@ class MapRenderer:
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
 
-        # --- Connが2個以上多いもの優先ロジック ---
-        # ここで「top5内でConn最大」と「それ以外でConn2以上差」を正しく判定
-        top5_conn_max = max(x["conn"] for x in top5)
-        conn2plus = [x for x in top5 if x["conn"] >= top5_conn_max + 2]
-        if conn2plus:
-            # Connが2個以上多いものがいれば、それをHQに
-            # 複数あればその中でConn含むExt最大
-            max_conn_ext = max(x["conn"] + x["ext"] for x in conn2plus)
-            cand = [x for x in conn2plus if (x["conn"] + x["ext"]) == max_conn_ext]
-            if len(cand) == 1:
-                return cand[0]["name"], hq_stats, top5, total_res
-            # さらに複数ならConn→Ext→HQバフ→取得時刻
-            cand.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
-            return cand[0]["name"], hq_stats, top5, total_res
+        # 1. Connが2個以上多いもの優先（top5内のConn最大を基準に判定）
+        top5_conns = [x["conn"] for x in top5]
+        # すべてのConn値を比較して、他より2以上多いものを集める
+        conn2plus_cands = []
+        for cand in top5:
+            if all((cand["conn"] - other["conn"] >= 2) for other in top5 if other != cand):
+                conn2plus_cands.append(cand)
+        if conn2plus_cands:
+            # 複数あればConn→Ext→HQバフ→取得時刻の順で選ぶ
+            conn2plus_cands.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
+            return conn2plus_cands[0]["name"], hq_stats, top5, total_res
 
         # (A) Conn含むExt同数複数→Conn多い方
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
@@ -134,7 +130,6 @@ class MapRenderer:
 
         # (C) Conn同数&Ext<20で街領地あればそれを優先
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] for x in conn_maxs):
-            # Conn同値グループでExt<20
             ext_lt20 = [x for x in conn_maxs if x["ext"] < 20]
             city = next((x for x in ext_lt20 if x["is_city"]), None)
             if city:
