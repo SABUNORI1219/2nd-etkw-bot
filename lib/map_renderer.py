@@ -100,97 +100,36 @@ class MapRenderer:
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
 
-        # 1. Connが2個以上多いもの優先（top5内のConn最大を基準に判定）
-        top5_conns = [x["conn"] for x in top5]
-        # すべてのConn値を比較して、他より2以上多いものを集める
-        conn2plus_cands = []
-        for cand in top5:
-            if all((cand["conn"] - other["conn"] >= 2) for other in top5 if other != cand):
-                conn2plus_cands.append(cand)
-        if conn2plus_cands:
-            # 複数あればConn→Ext→HQバフ→取得時刻の順で選ぶ
-            conn2plus_cands.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
-            return conn2plus_cands[0]["name"], hq_stats, top5, total_res
+        # --- 修正: Conn > Ext最大グループのConn + 2 なら優先 ---
+        max_ext = max(x["ext"] for x in top5)
+        ext_max_group = [x for x in top5 if x["ext"] == max_ext]
+        ext_max_conn = max(x["conn"] for x in ext_max_group)
+        # Ext最大グループのConnより2以上多い領地があれば最優先
+        conn2plus_candidates = [x for x in top5 if x["conn"] >= ext_max_conn + 2]
+        if conn2plus_candidates:
+            # 複数ならConn→Ext→HQバフ→取得時刻の順
+            conn2plus_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
+            return conn2plus_candidates[0]["name"], hq_stats, top5, total_res
 
-        # (A) Conn含むExt同数複数→Conn多い方
-        max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
-        conn_ext_tops = [x for x in top5 if x["conn"] + x["ext"] == max_conn_ext]
-        if len(conn_ext_tops) > 1:
-            conn_max_in_group = max(x["conn"] for x in conn_ext_tops)
-            conn_maxs = [x for x in conn_ext_tops if x["conn"] == conn_max_in_group]
-            if len(conn_maxs) == 1:
-                return conn_maxs[0]["name"], hq_stats, top5, total_res
+        # --- 通常ロジック: Ext最大グループ内で判定 ---
+        # (A) Conn同数かつExt<20で街領地があればそれを優先
+        ext_max_group_conns = [x["conn"] for x in ext_max_group]
+        conn_max_in_ext = max(ext_max_group_conns)
+        conn_maxs = [x for x in ext_max_group if x["conn"] == conn_max_in_ext]
+        # 複数Conn最大が同じ場合
+        if len(conn_maxs) > 1:
+            # Ext<20なら街優先（Almuj/Ruined Villaパターン）
+            if conn_maxs[0]["ext"] < 20:
+                city = next((x for x in conn_maxs if x["is_city"]), None)
+                if city:
+                    return city["name"], hq_stats, top5, total_res
+            # それ以外はそのままConn最大/Ext最大の最初
+            return conn_maxs[0]["name"], hq_stats, top5, total_res
         else:
-            conn_maxs = conn_ext_tops
+            # Conn最大が1つならそれ
+            return conn_maxs[0]["name"], hq_stats, top5, total_res
 
-        # (B) 所持領地6個以下→Time Held最長
-        if len(owned_territories) <= 6:
-            oldest = min(top5, key=lambda x: x["acquired"] or "9999")
-            return oldest["name"], hq_stats, top5, total_res
-
-        # (C) Conn同数&Ext<20で街領地あればそれを優先
-        if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] for x in conn_maxs):
-            ext_lt20 = [x for x in conn_maxs if x["ext"] < 20]
-            city = next((x for x in ext_lt20 if x["is_city"]), None)
-            if city:
-                return city["name"], hq_stats, top5, total_res
-            # Ext>=20ならConn含むExtが最大
-            ext_ge20 = [x for x in conn_maxs if x["ext"] >= 20]
-            if ext_ge20:
-                conn_ext_max = max(x["conn"] + x["ext"] for x in ext_ge20)
-                ext_maxs = [x for x in ext_ge20 if (x["conn"] + x["ext"]) == conn_ext_max]
-                if len(ext_maxs) == 1:
-                    return ext_maxs[0]["name"], hq_stats, top5, total_res
-                else:
-                    hq_max = max(ext_maxs, key=lambda x: x["hq_buff"])
-                    return hq_max["name"], hq_stats, top5, total_res
-
-        # (D) Ext,Conn同値→資源判定
-        if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
-            res_priority = ["crops", "ore", "wood", "fish"]
-            # 一番生産量のない資源
-            min_val = float("inf")
-            min_type = None
-            for rtype in res_priority:
-                val = total_res.get(rtype, 0)
-                if val > 0 and val < min_val:
-                    min_val = val
-                    min_type = rtype
-            # その資源を生産する領地のうち、HQ候補地に一番近い
-            if min_type:
-                from math import inf
-                def trading_route_distance(start, goals):
-                    queue = collections.deque()
-                    visited = set()
-                    queue.append((start, 0))
-                    while queue:
-                        current, dist = queue.popleft()
-                        if current in visited:
-                            continue
-                        visited.add(current)
-                        if current in goals:
-                            return dist
-                        neighbors = self.local_territories.get(current, {}).get("Trading Routes", [])
-                        neighbors = [n for n in neighbors if n in owned_territories]
-                        queue.extend((n, dist+1) for n in neighbors)
-                    return inf
-                res_territories = [x for x in hq_stats if int(x["resources"].get(min_type, "0")) > 0]
-                res_names = [x["name"] for x in res_territories]
-                min_dist = inf
-                best_cand = conn_maxs[0]
-                for cand in conn_maxs:
-                    d = trading_route_distance(cand["name"], set(res_names))
-                    if d < min_dist:
-                        min_dist = d
-                        best_cand = cand
-                    elif d == min_dist:
-                        cand_res = int(self.local_territories[cand["name"]].get("resources", {}).get(min_type, "0"))
-                        best_res = int(self.local_territories[best_cand["name"]].get("resources", {}).get(min_type, "0"))
-                        if cand_res > best_res:
-                            best_cand = cand
-                return best_cand["name"], hq_stats, top5, total_res
-
-        # どれも該当しない場合はtop5の最初
+        # --- 万が一上記に該当しなければtop5の最初 ---
         return top5[0]["name"], hq_stats, top5, total_res
 
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None):
