@@ -260,10 +260,16 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
                     role_obj = None
                     if role_id:
                         role_obj = guild.get_role(role_id)
+                    if ETKW:  # ETKWはint型のロールIDの場合
+                        etkw_role = guild.get_role(ETKW)
                         if role_obj:
                             try:
-                                await member.add_roles(ETKW, reason="デフォルトのロール")
                                 await member.add_roles(role_obj, reason="ギルドランク連携")
+                            except Exception as e:
+                                logger.error(f"ロール付与エラー: {e}")
+                        if etkw_role:
+                            try:
+                                await member.add_roles(etkw_role, reason="デフォルトのロール")
                             except Exception as e:
                                 logger.error(f"ロール付与エラー: {e}")
 
@@ -274,7 +280,10 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
                         role_name = ingame_rank
                     new_nick = f"{role_name} {mcid}"
                     try:
-                        await member.edit(nick=new_nick, reason="ギルドメンバー登録時の自動ニックネーム設定")
+                        if not member.guild_permissions.administrator:
+                            await member.edit(nick=new_nick, reason="ギルドメンバー登録時の自動ニックネーム設定")
+                        else:
+                            logger.warning(f"管理者権限ユーザー({member})のニックネームは編集できません")
                     except Exception as e:
                         logger.error(f"ニックネーム編集エラー: {e}")
 
