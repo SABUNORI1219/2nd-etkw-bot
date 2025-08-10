@@ -202,7 +202,7 @@ Total Level: {total_level:,}
             return
 
         logger.info(f"--- [API] プレイヤー'{player}'のデータをAPIから取得します。")
-        api_data = await self.wynn_api.get_nori_player_data(player)
+        api_data = await self.wynn_api.get_official_player_data(player)
 
         # 1. エラー返却なら即「見つかりませんでした」
         if not api_data or (isinstance(api_data, dict) and "Error" in api_data):
