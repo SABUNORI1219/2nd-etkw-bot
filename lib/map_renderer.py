@@ -99,18 +99,15 @@ class MapRenderer:
         hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
-
-        # 1. Connが2個以上多いもの優先（top5内のConn最大を基準に判定）
-        top5_conns = [x["conn"] for x in top5]
-        conn2plus_cands = []
+    
+        # 1. Connが2個以上多いもの優先（top5内のConn最大を基準に判定、Ext最大グループでなくても良い！）
+        conn_vals = [x["conn"] for x in top5]
         for cand in top5:
+            # 他の全ての候補より2以上多いConn
             if all((cand["conn"] - other["conn"] >= 2) for other in top5 if other != cand):
-                conn2plus_cands.append(cand)
-        if conn2plus_cands:
-            conn2plus_cands.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
-            return conn2plus_cands[0]["name"], hq_stats, top5, total_res
-
-        # (A) Conn含むExt同数複数→Conn多い方
+                return cand["name"], hq_stats, top5, total_res
+    
+        # (A) Conn含むExt多い順トップグループ内でConn最大を優先
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
         conn_ext_tops = [x for x in top5 if x["conn"] + x["ext"] == max_conn_ext]
         if len(conn_ext_tops) > 1:
@@ -120,18 +117,19 @@ class MapRenderer:
                 return conn_maxs[0]["name"], hq_stats, top5, total_res
         else:
             conn_maxs = conn_ext_tops
-
-        # (B) 所持領地6個以下→Time Held最長
+    
+        # (B) 所持領地6個以下→取得時刻最古
         if len(owned_territories) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
-
-        # (C) Conn同数&Ext<20で街領地あればそれを優先
+    
+        # (C) Conn同値&Ext<20で街領地あればそれを優先
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] for x in conn_maxs):
             ext_lt20 = [x for x in conn_maxs if x["ext"] < 20]
             city = next((x for x in ext_lt20 if x["is_city"]), None)
             if city:
                 return city["name"], hq_stats, top5, total_res
+            # Ext>=20ならConn含むExtが最大
             ext_ge20 = [x for x in conn_maxs if x["ext"] >= 20]
             if ext_ge20:
                 conn_ext_max = max(x["conn"] + x["ext"] for x in ext_ge20)
@@ -141,7 +139,7 @@ class MapRenderer:
                 else:
                     hq_max = max(ext_maxs, key=lambda x: x["hq_buff"])
                     return hq_max["name"], hq_stats, top5, total_res
-
+    
         # (D) Ext,Conn同値→資源判定
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
             res_priority = ["crops", "ore", "wood", "fish"]
@@ -184,7 +182,8 @@ class MapRenderer:
                         if cand_res > best_res:
                             best_cand = cand
                 return best_cand["name"], hq_stats, top5, total_res
-
+    
+        # どれにも該当しなければtop5の最初
         return top5[0]["name"], hq_stats, top5, total_res
 
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None):
