@@ -78,7 +78,7 @@ async def get_all_mcid_and_uuid_from_guild(guild_data):
 async def get_all_players_lastjoin(api, mcid_uuid_list, batch_size=5, batch_sleep=1.5):
     async def get_lastjoin(mcid, uuid):
         try:
-            player_data = await api.get_nori_player_data(uuid or mcid)
+            player_data = await api.get_official_player_data(uuid or mcid)
             if player_data and "lastJoin" in player_data:
                 return (mcid, player_data["lastJoin"])
             else:
@@ -105,12 +105,6 @@ async def track_guild_raids(bot=None, loop_interval=120):
             logger.warning("guild_data取得失敗。10秒後に再試行します。")
             await asyncio.sleep(10)
             continue
-
-        # --- 全メンバーのlastJoinを個別APIで取得しキャッシュDBへ ---
-        mcid_uuid_list = await get_all_mcid_and_uuid_from_guild(guild_data)
-        results = await get_all_players_lastjoin(api, mcid_uuid_list)
-        await asyncio.to_thread(upsert_last_join_cache, results)
-        # --- ここまで ---
 
         # online_members抽出（uuid・name・serverセット）
         online_members = extract_online_members(guild_data)
@@ -186,8 +180,14 @@ async def track_guild_raids(bot=None, loop_interval=120):
                     logger.error(f"通知Embed送信失敗: {e}")
 
             remove_party_events_from_window(clear_events_window, party, time_threshold=2)
-
         await asyncio.to_thread(cleanup_old_server_logs, 5)
+
+        # --- 全メンバーのlastJoinを個別APIで取得しキャッシュDBへ ---
+        mcid_uuid_list = await get_all_mcid_and_uuid_from_guild(guild_data)
+        results = await get_all_players_lastjoin(api, mcid_uuid_list)
+        await asyncio.to_thread(upsert_last_join_cache, results)
+        # --- ここまで ---
+        
         elapsed = time.time() - start_time
         sleep_time = max(loop_interval - elapsed, 0)
         logger.info(f"次回まで{sleep_time:.1f}秒待機（処理時間: {elapsed:.1f}秒）")
