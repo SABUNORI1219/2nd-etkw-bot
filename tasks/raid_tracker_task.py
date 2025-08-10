@@ -45,7 +45,7 @@ def remove_party_events_from_window(window, party, time_threshold=2):
             pass
 
 async def get_player_data(api, uuid):
-    return await api.get_nori_player_data(uuid)
+    return await api.get_official_player_data(uuid)
 
 def is_duplicate_event(event, window, threshold_sec=2):
     for e in window:
