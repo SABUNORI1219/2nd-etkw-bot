@@ -28,19 +28,18 @@ class WynncraftAPI:
         max_retries = 5
         for i in range(max_retries):
             try:
-                # ▼▼▼【あなたの修正を反映】…ここで正しく使う▼▼▼
                 async with session.get(url, timeout=10) as response:
                     if 200 <= response.status < 300:
                         if response.content_length != 0:
                             return await response.json()
                         return None
 
-                    non_retryable_codes = [400, 404]
+                    non_retryable_codes = [400, 404, 429]
                     if response.status in non_retryable_codes:
                         logger.warning(f"APIが{response.status}エラーを返しました。対象が見つかりません。URL: {url}")
                         return None # 再試行せずに即座に終了
                     
-                    retryable_codes = [408, 429, 500, 502, 503, 504]
+                    retryable_codes = [408, 500, 502, 503, 504]
                     if response.status in retryable_codes:
                         logger.warning(f"APIがステータス{response.status}を返しました。再試行します... ({i+1}/{max_retries})")
                         await asyncio.sleep(5)
