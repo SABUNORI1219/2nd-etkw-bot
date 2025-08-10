@@ -59,14 +59,17 @@ class WynncraftAPI:
         """Wynncraft公式APIから、フルネームでギルドデータを取得する"""
         url = WYNN_GUILD_BY_NAME_API_URL.format(quote(guild_name))
         data = await self._make_request(url)
-        # ▼▼▼【修正点】あなたの提案通り、シンプルなreturn文に戻す▼▼▼
         return data if data else None
 
     async def get_guild_by_prefix(self, guild_prefix: str) -> dict | None:
         """Wynncraft公式APIから、プレフィックスでギルドデータを取得する"""
         url = WYNN_GUILD_BY_PREFIX_API_URL.format(quote(guild_prefix))
         data = await self._make_request(url)
-        # ▼▼▼【修正点】あなたの提案通り、シンプルなreturn文に戻す▼▼▼
+        return data if data else None
+
+    async def get_official_player_data(self, player_data: str) -> dict | list | None:
+        url = WYNN_PLAYER_API_URL.format(quote(player_data))
+        data = await self._make_request(url)
         return data if data else None
         
     async def get_nori_guild_data(self, guild_identifier: str) -> dict | list | None:
