@@ -85,43 +85,43 @@ class MapRenderer:
             acquired = territory_api_data.get(t, {}).get("acquired", "")
             if not acquired:
                 acquired = "9999-12-31T23:59:59.999999Z"
-            is_city = self._is_city_territory(self.local_territories[t])
             hq_stats.append({
                 "name": t,
                 "conn": conn,
                 "ext": ext,
                 "hq_buff": hq_buff,
-                "is_city": is_city,
+                "is_city": self._is_city_territory(self.local_territories[t]),
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
             })
+    
         # Conn含むExt多い順→Conn多い順→HQバフ多い順→取得時刻古い順
-        hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
+        hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["hq_buff"], x["acquired"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
     
-        # 1. Connが2個以上多いもの優先（top5全体で判定！Ext最大グループ関係なし！）
+        # 1. Connが2個以上多いものがあればExt最大でなくともそれを絶対優先
         for cand in top5:
             if all((cand["conn"] - other["conn"] >= 2) for other in top5 if other != cand):
                 return cand["name"], hq_stats, top5, total_res
     
-        # (A) Conn+Ext最大グループ内でConn最大優先
+        # 2. Conn含むExtの数が同数の領地が2つ以上ピックされた場合、Connが多いほうを優先
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
         conn_ext_tops = [x for x in top5 if x["conn"] + x["ext"] == max_conn_ext]
         if len(conn_ext_tops) > 1:
-            conn_max_in_group = max(x["conn"] for x in conn_ext_tops)
-            conn_maxs = [x for x in conn_ext_tops if x["conn"] == conn_max_in_group]
+            conn_max_val = max(x["conn"] for x in conn_ext_tops)
+            conn_maxs = [x for x in conn_ext_tops if x["conn"] == conn_max_val]
             if len(conn_maxs) == 1:
                 return conn_maxs[0]["name"], hq_stats, top5, total_res
         else:
             conn_maxs = conn_ext_tops
     
-        # (B) 領地6個以下なら取得時刻最古
+        # 3. 所持領地が6個以下の場合、Time Heldが一番長い箇所
         if len(owned_territories) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
     
-        # (C) Conn同値&Ext<20内に街領地あればそれを優先
+        # 4. Connの数が同じかつExt<20でcityが含まれていればそれを優先。Ext>=20ならConn含むExtが最大の方を優先。
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] for x in conn_maxs):
             ext_lt20 = [x for x in conn_maxs if x["ext"] < 20]
             city = next((x for x in ext_lt20 if x["is_city"]), None)
@@ -137,7 +137,7 @@ class MapRenderer:
                     hq_max = max(ext_maxs, key=lambda x: x["hq_buff"])
                     return hq_max["name"], hq_stats, top5, total_res
     
-        # (D) Conn,Ext同値なら資源バランス優先
+        # 5. Conn,Ext同値なら資源バランス優先
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
             res_priority = ["crops", "ore", "wood", "fish"]
             min_val = float("inf")
@@ -148,7 +148,6 @@ class MapRenderer:
                     min_val = val
                     min_type = rtype
             if min_type:
-                from math import inf
                 def trading_route_distance(start, goals):
                     queue = collections.deque()
                     visited = set()
@@ -163,10 +162,10 @@ class MapRenderer:
                         neighbors = self.local_territories.get(current, {}).get("Trading Routes", [])
                         neighbors = [n for n in neighbors if n in owned_territories]
                         queue.extend((n, dist+1) for n in neighbors)
-                    return inf
+                    return float("inf")
                 res_territories = [x for x in hq_stats if int(x["resources"].get(min_type, "0")) > 0]
                 res_names = [x["name"] for x in res_territories]
-                min_dist = inf
+                min_dist = float("inf")
                 best_cand = conn_maxs[0]
                 for cand in conn_maxs:
                     d = trading_route_distance(cand["name"], set(res_names))
@@ -180,8 +179,8 @@ class MapRenderer:
                             best_cand = cand
                 return best_cand["name"], hq_stats, top5, total_res
     
-        # どれにも該当しなければtop5の最初
-        return top5[0]["name"], hq_stats, top5, total_res
+        # 6. それでも決まらなければconn_maxs[0]
+        return conn_maxs[0]["name"], hq_stats, top5, total_res
 
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None):
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
