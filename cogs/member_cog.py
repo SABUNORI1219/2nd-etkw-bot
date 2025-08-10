@@ -269,7 +269,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
                                 logger.error(f"ロール付与エラー: {e}")
                         if etkw_role:
                             try:
-                                await member.add_roles(etkw_role, reason="デフォルトのロール")
+                                await member.add_roles(etkw_role, reason="ちくわロール")
                             except Exception as e:
                                 logger.error(f"ロール付与エラー: {e}")
 
@@ -321,7 +321,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         if not db_data:
             await interaction.followup.send("指定されたメンバーは登録されていません。"); return
 
-        player_data = await self.api.get_nori_player_data(db_data['mcid'])
+        player_data = await self.api.get_official_player_data(db_data['mcid'])
         last_seen = "N/A"
         if player_data and 'lastJoin' in player_data:
             last_seen = player_data['lastJoin'].split('T')[0]
