@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from lib.wynncraft_api import WynncraftAPI
-from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN
+from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN, AUTHORIZED_USER_IDS
 from lib.cache_handler import CacheHandler
 
 class PlayerSelectView(discord.ui.View):
@@ -192,6 +192,14 @@ Total Level: {total_level:,}
     @app_commands.describe(player="MCID or UUID")
     async def player(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
+
+        # 権限チェック
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await interaction.followup.send(
+                "`/player`コマンドは現在APIの仕様変更によりリワーキング中です。\n"
+                "`/player` command is reworking due to API feature rework right now."
+            )
+            return
 
         cache_key = f"player_{player.lower()}"
         cached_data = self.cache.get_cache(cache_key)
