@@ -480,18 +480,10 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
     async def rename(self, interaction: discord.Interaction, name: str):
         await interaction.response.defer(ephemeral=True)
 
-        guild: discord.Guild | None = interaction.guild
-        if guild is None:
-            await interaction.followup.send("ギルド内でのみ使用可能です。")
-            return
-
         member: discord.Member = interaction.user  # 実行者自身
 
         # 実行許可ロール判定
-        allowed_role_ids = set(RENAME_ALLOWED_ROLE_IDS)
-        if not allowed_role_ids:
-            # 未設定なら「いずれかのランクロール」を所持していれば許可にする（必要ならここで拒否に変更）
-            allowed_role_ids = set(RANK_ROLE_ID_MAP.values())
+        allowed_role_ids = set(ETKW)
 
         member_role_ids = {r.id for r in member.roles}
         if allowed_role_ids.isdisjoint(member_role_ids):
