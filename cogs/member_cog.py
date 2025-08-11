@@ -374,46 +374,12 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
 
     @app_commands.command(name="promote", description="対象ユーザーのDiscord内ランクを昇格")
     @app_commands.describe(user="昇格するユーザー")
+    @app_commands.checks.has_permissions(administrator=True)
     async def promote(self, interaction: discord.Interaction, user: discord.User):
         await interaction.response.defer(ephemeral=True)
 
-        if not PROMOTION_ROLE_MAP:
-            await interaction.followup.send("昇格マップ (PROMOTION_ROLE_MAP) が設定されていません。config.py を確認してください。")
-            return
-
-        # 実行権限: 指定ロール or AUTHORIZED_USER_IDS
-        executor: discord.Member | None = guild.get_member(interaction.user.id)
-        if executor is None:
-            try:
-                executor = await guild.fetch_member(interaction.user.id)
-            except Exception:
-                executor = None
-        if executor is None:
-            await interaction.followup.send("実行者の取得に失敗しました。")
-            return
-
-        permitted = False
-        if PROMOTE_ALLOWED_EXECUTOR_ROLE_IDS:
-            exec_role_ids = {r.id for r in executor.roles}
-            if not set(PROMOTE_ALLOWED_EXECUTOR_ROLE_IDS).isdisjoint(exec_role_ids):
-                permitted = True
-        if executor.id in AUTHORIZED_USER_IDS:
-            permitted = True
-
-        if not permitted:
-            await interaction.followup.send("このコマンドを実行する権限がありません。")
-            return
-
         # 対象メンバー
-        target: discord.Member | None = guild.get_member(user.id)
-        if target is None:
-            try:
-                target = await guild.fetch_member(user.id)
-            except Exception:
-                target = None
-        if target is None:
-            await interaction.followup.send("対象ユーザーを取得できませんでした。")
-            return
+        target = interaction.user.id
 
         target_role_ids = {r.id for r in target.roles}
 
