@@ -48,6 +48,10 @@ RANK_ROLE_ID_MAP = {
     "Recruit": 1166036348050886657,
 }
 
+PROMOTION_ROLE_MAP = {
+    1138142855517446144: 1132652296635961385  # Fabled -> Mythic
+}
+
 async def send_authorized_only_message(interaction: discord.Interaction, user_ids=None):
     """
     指定ユーザー以外がコマンド実行時に警告メッセージを返す共通関数。
