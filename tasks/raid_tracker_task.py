@@ -193,5 +193,5 @@ async def track_guild_raids(bot=None, loop_interval=120):
         logger.info(f"次回まで{sleep_time:.1f}秒待機（処理時間: {elapsed:.1f}秒）")
         await asyncio.sleep(sleep_time)
 
-async def setup(bot):
-    bot.loop.create_task(track_guild_raids(bot, loop_interval=120))
+# async def setup(bot):
+  # bot.loop.create_task(track_guild_raids(bot, loop_interval=120))
