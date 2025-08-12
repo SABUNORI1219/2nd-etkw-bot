@@ -143,7 +143,7 @@ class MemberListView(discord.ui.View):
                 else:
                     last_seen_str = "N/A"
                 lines.append(f"- **{mcid}** （{discord_str}） - Last Seen: {last_seen_str}")
-            embed = discord.Embed(title=embed_title, color=EMBED_COLOR_BLUE)
+            embed = discord.Embed(title=embed_title, color=discord.Color.green())
             if not lines:
                 embed.description = "表示するメンバーがいません。"
             else:
@@ -157,7 +157,7 @@ class MemberListView(discord.ui.View):
         else:
             members_on_page, self.total_pages = get_linked_members_page_ranked(page=self.current_page)
             embed_title = "メンバーリスト"
-        embed = discord.Embed(title=embed_title, color=EMBED_COLOR_BLUE)
+        embed = discord.Embed(title=embed_title, color=discord.Color.green())
         if not members_on_page:
             embed.description = "表示するメンバーがいません。"
             return embed
@@ -417,7 +417,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             last_seen = player_data['lastJoin'].split('T')[0]
         # それ以外は "N/A" のまま
         
-        embed = discord.Embed(title=db_data['mcid'], color=EMBED_COLOR_BLUE)
+        embed = discord.Embed(title=db_data['mcid'], color=discord.Color.green())
         embed.add_field(name="Rank", value=f"`{db_data['rank']}`", inline=False)
         embed.add_field(name="Last Seen", value=f"`{last_seen}`", inline=False)
         if db_data['discord_id']:
