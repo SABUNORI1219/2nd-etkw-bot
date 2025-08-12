@@ -408,13 +408,15 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
 
         db_data = get_member(mcid=mcid, discord_id=discord_user.id if discord_user else None)
         if not db_data:
-            await interaction.followup.send("指定されたメンバーは登録されていません。"); return
-
+            await interaction.followup.send("指定されたメンバーは登録されていません。")
+            return
+        
         player_data = await self.api.get_official_player_data(db_data['mcid'])
         last_seen = "N/A"
-        if player_data and 'lastJoin' in player_data:
+        if player_data and player_data.get('lastJoin'):
             last_seen = player_data['lastJoin'].split('T')[0]
-
+        # それ以外は "N/A" のまま
+        
         embed = discord.Embed(title=db_data['mcid'], color=EMBED_COLOR_BLUE)
         embed.add_field(name="Rank", value=f"`{db_data['rank']}`", inline=False)
         embed.add_field(name="Last Seen", value=f"`{last_seen}`", inline=False)
@@ -422,7 +424,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             embed.add_field(name="Discord", value=f"<@{db_data['discord_id']}>", inline=False)
         else:
             embed.add_field(name="Discord", value="Discordなし", inline=False)
-
+        
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="list", description="登録メンバーの一覧を表示")
