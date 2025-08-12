@@ -48,6 +48,16 @@ RANK_ROLE_ID_MAP = {
     "Recruit": 1166036348050886657,
 }
 
+ROLE_ID_TO_RANK = {
+    1240476623090876516: "Owner",   # Owner Chikuwa-Chikuwa Kaiseki
+    1132652296635961385: "Chief",   # Mythic Chikuwa-Gomoku-ni
+    1138142855517446144: "Chief",   # Fabled Chikuwa-Nishime
+    1166030526214320178: "Strategist",   # Set Chikuwa-Oden
+    1166035741189607494: "Captain",   # Unique Chikuwa-Isobe Tempura
+    1166036063081467914: "Recruiter",   # Normal Chikuwa-Stuffed Chikuwa
+    1166036348050886657: "Chikuwa"   # Chikuwa-Raw Chikuwa
+}
+
 PROMOTION_ROLE_MAP = {
     1138142855517446144: 1132652296635961385  # Fabled -> Mythic
 }
