@@ -206,6 +206,7 @@ class MapRenderer:
         upscaled_map = map_to_draw_on.resize((up_w, up_h), resample=Image.Resampling.LANCZOS)
         draw = ImageDraw.Draw(upscaled_map)
 
+        # --- コネクション線（細線） ---
         for name, data in self.local_territories.items():
             if "Trading Routes" not in data or "Location" not in data:
                 continue
@@ -229,12 +230,17 @@ class MapRenderer:
             except KeyError:
                 continue
 
+        # --- 領地描画 ---
         scaled_font_size = max(12, int(self.font.size * self.scale_factor))
         try:
             scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
         except IOError:
             scaled_font = ImageFont.load_default()
 
+        # 領地塗りつぶし・枠・テキスト
+        # ここはアップスケールしない（元画像に直接描画したい場合はdrawを使い分けること）
+        # 下記は従来通り map_to_draw_on 用の座標
+        draw_down = ImageDraw.Draw(map_to_draw_on)
         for name, info in territory_data.items():
             if 'location' not in info or 'guild' not in info:
                 continue
@@ -253,16 +259,18 @@ class MapRenderer:
                 prefix = info["guild"]["prefix"]
                 color_hex = guild_color_map.get(prefix, "#FFFFFF")
                 color_rgb = self._hex_to_rgb(color_hex)
-                overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
-                draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
+                # 領地塗りつぶし
+                draw_down.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
+                # 領地枠
+                draw_down.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
                 if hq_territories and name in hq_territories:
                     continue
-                draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
+                draw_down.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
 
-        # 描画が終わったら元サイズに縮小
+        # --- コネクション線だけ縮小して合成 ---
         result_map = upscaled_map.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
-        # 元のmap_to_draw_onに戻す
-        map_to_draw_on.paste(result_map)
+        # ここで線だけ合成する（RGBA前提）
+        map_to_draw_on.alpha_composite(result_map)
         return map_to_draw_on
 
     def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False, map_to_draw_on=None, owned_territories_map=None):
