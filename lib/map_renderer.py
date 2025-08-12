@@ -201,12 +201,11 @@ class MapRenderer:
         return top5[0]["name"], hq_stats, top5, total_res
 
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None, upscale_factor=2):
-        # --- 1. コネクション線だけをアップスケール画像に描画 ---
+        # --- 1. コネクション線だけを高解像度透明キャンバスに描画 ---
         up_w, up_h = int(map_to_draw_on.width * upscale_factor), int(map_to_draw_on.height * upscale_factor)
         # 完全な透明キャンバス
-        upscaled_lines = Image.new("RGBA", (up_w, up_h), (0,0,0,0))
+        upscaled_lines = Image.new("RGBA", (up_w, up_h), (0, 0, 0, 0))
         draw_lines = ImageDraw.Draw(upscaled_lines)
-    
         for name, data in self.local_territories.items():
             if "Trading Routes" not in data or "Location" not in data:
                 continue
@@ -228,13 +227,12 @@ class MapRenderer:
                     draw_lines.line(points, fill=(*color_rgb, 180), width=3)
             except KeyError:
                 continue
-    
         # コネクション線だけ縮小して透明画像として戻す
         lines_down = upscaled_lines.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
         # 元画像に線だけ合成
         map_to_draw_on.alpha_composite(lines_down)
     
-        # --- 2. 領地矩形・テキストは map_to_draw_on へ直接描画 ---
+        # --- 2. 領地描画は今まで通り ---
         scaled_font_size = max(12, int(self.font.size * self.scale_factor))
         try:
             scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
@@ -260,11 +258,13 @@ class MapRenderer:
                 prefix = info["guild"]["prefix"]
                 color_hex = guild_color_map.get(prefix, "#FFFFFF")
                 color_rgb = self._hex_to_rgb(color_hex)
+                # 完全に従来通りの半透明塗りつぶし
                 draw_down.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                 draw_down.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
                 if hq_territories and name in hq_territories:
                     continue
-                draw_down.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
+                draw_down.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font,
+                               fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
     
         return map_to_draw_on
 
