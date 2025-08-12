@@ -223,9 +223,14 @@ class MapRenderer:
                     if is_zoomed and box:
                         l_px1_rel, l_px2_rel = l_scaled_px1 - box[0], l_scaled_px2 - box[0]
                         l_py1_rel, l_py2_rel = l_scaled_py1 - box[1], l_scaled_py2 - box[1]
-                        draw.line([(l_px1_rel, l_py1_rel), (l_px2_rel, l_py2_rel)], fill=(10, 10, 10, 128), width=2)
+                        points = [(l_px1_rel, l_py1_rel), (l_px2_rel, l_py2_rel)]
                     else:
-                        draw.line([(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)], fill=(10, 10, 10, 128), width=2)
+                        points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
+                    color_rgb = (10, 10, 10)
+                    # 1pxメイン
+                    draw.line(points, fill=(*color_rgb, 200), width=1)
+                    # 2px薄く
+                    draw.line(points, fill=(*color_rgb, 80), width=2)
             except KeyError:
                 continue
 
