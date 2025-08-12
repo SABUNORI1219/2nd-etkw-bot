@@ -223,7 +223,7 @@ class MapRenderer:
                     l_scaled_px2, l_scaled_py2 = l_px2 * self.scale_factor * upscale_factor, l_py2 * self.scale_factor * upscale_factor
                     points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
                     color_rgb = (30, 30, 30)
-                    draw_lines.line(points, fill=(*color_rgb, 180), width=3)
+                    draw_lines.line(points, fill=(*color_rgb, 180), width=4)
             except KeyError:
                 continue
         lines_down = upscaled_lines.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
