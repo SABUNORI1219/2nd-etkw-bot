@@ -307,7 +307,6 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
                         logger.error(f"ニックネーム編集エラー: {e}")
 
     @app_commands.command(name="remove", description="メンバーの登録を解除")
-    @app_commands.checks.has_permissions(administrator=True)
     async def remove(self, interaction: discord.Interaction, mcid: str = None, discord_user: discord.User = None):
         await interaction.response.defer()
 
@@ -328,6 +327,32 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         if not mcid and not discord_user:
             await interaction.followup.send("MCIDまたはDiscordユーザーのどちらかを指定してください。"); return
 
+        # Discordメンバー取得
+        target_member: discord.Member = None
+        display_str = None
+        if discord_user is not None:
+            target_member = guild.get_member(discord_user.id)
+            if target_member is None:
+                try:
+                    target_member = await guild.fetch_member(discord_user.id)
+                except Exception:
+                    target_member = None
+            display_str = discord_user.display_name
+        elif mcid is not None:
+            # DBからdiscord_id取得
+            db_data = get_member(mcid=mcid)
+            if db_data and db_data.get("discord_id"):
+                discord_id = db_data["discord_id"]
+                target_member = guild.get_member(discord_id)
+                if target_member is None:
+                    try:
+                        target_member = await guild.fetch_member(discord_id)
+                    except Exception:
+                        target_member = None
+                display_str = db_data.get("mcid")
+            else:
+                display_str = mcid
+
         success = remove_member(mcid=mcid, discord_id=discord_user.id if discord_user else None)
         if success:
             target = mcid if mcid else discord_user.display_name
@@ -335,13 +360,39 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         else:
             await interaction.followup.send("❌ 登録解除に失敗したか、対象のメンバーが見つかりませんでした。")
 
+        if target_member is not None:
+            # ニックネームを元に戻す（None＝デフォルト名に戻す）
+            try:
+                if not target_member.guild_permissions.administrator:
+                    await target_member.edit(nick=None, reason="removeコマンドによるニックネームリセット")
+            except Exception as e:
+                logger.error(f"remove ニックネームリセット失敗: {e}")
+
+            # ROLE_ID_TO_RANK内のロールを全て削除
+            roles_to_remove = [role for role in target_member.roles if role.id in ROLE_ID_TO_RANK]
+            if roles_to_remove:
+                try:
+                    await target_member.remove_roles(*roles_to_remove, reason="removeコマンドによるランクロール削除")
+                except Exception as e:
+                    logger.error(f"remove ランクロール削除失敗: {e}")
+
     @app_commands.command(name="search", description="登録メンバーを検索")
     async def search(self, interaction: discord.Interaction, mcid: str = None, discord_user: discord.User = None):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
+        guild: discord.Guild | None = interaction.guild
+        if guild is None:
+            await interaction.followup.send("サーバー内でのみ使用できます。")
             return
+
+        member: discord.Member = interaction.user
+
+        # 権限判定-Ticket Chikuwa
+        if Ticket:
+            etkw_role = guild.get_role(Ticket)
+            if etkw_role and etkw_role.id not in [r.id for r in member.roles]:
+                await interaction.followup.send("このコマンドを使う権限がありません。")
+                return
 
         if not mcid and not discord_user:
             await interaction.followup.send("MCIDまたはDiscordユーザーのどちらかを指定してください。"); return
