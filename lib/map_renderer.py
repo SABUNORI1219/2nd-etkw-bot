@@ -226,7 +226,7 @@ class MapRenderer:
                         points = [(l_px1_rel, l_py1_rel), (l_px2_rel, l_py2_rel)]
                     else:
                         points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
-                    color_rgb = (10, 10, 10)
+                    color_rgb = (30, 30, 30)
                     # 1pxメイン
                     draw.line(points, fill=(*color_rgb, 140), width=1)
                     # 2px薄く
