@@ -31,6 +31,17 @@ class HelpCog(commands.Cog):
         )
 
         embed.add_field(
+            name="👤 Empire of TKW情報",
+            value="`/member add <mcid> [discord_user]`: メンバーをリストに登録。discord_userが指定されていない場合は、「discordなし」になります。\n"
+                  "`/member remove [mcid] [discord_user]`: メンバーをリストから削除。MCIDまたはDiscrod IDで指定。どちらも入力された場合は、MCIDが優先されます。\n"
+                  "`/member search [mcid] [discord_user]`: メンバーの個人の情報を表示。MCIDまたはDiscrod IDで指定。どちらも入力された場合は、MCIDが優先されます。\n"
+                  "`/member list [rank] [sort]`: メンバーリストを表示。rankでゲーム内ランクでの絞り込みが可能。sortでは最終ログイン順で表示できます。\n"
+                  "`/member promote <user>`: Discord IDを指定。現在は**煮しめ**から**五目煮**への昇格のみができます。管理者のみ実行可能。\n"
+                  "`/member rename <name>`: 自身のDiscord上での表示名を変更。ロール名含む32文字まで入力できます。",
+            inline=False # このフィールドは横幅をすべて使う
+        )
+
+        embed.add_field(
             name="🗺️ テリトリー関連",
             value="`/territory map [guild]`: テリトリーマップを生成します。HQの位置はあくまで推定です。\n"
                   "`/territory status <territory>`: テリトリーのステータスを表示します。",
