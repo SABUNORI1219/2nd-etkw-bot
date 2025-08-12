@@ -23,6 +23,7 @@ from config import (
     send_authorized_only_message,
     RANK_ROLE_ID_MAP,
     ETKW,
+    Ticket,
     PROMOTION_ROLE_MAP,
     ROLE_ID_TO_RANK
 )
@@ -217,13 +218,22 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
 
     @app_commands.command(name="add", description="メンバーを登録")
     @app_commands.describe(discord_user="登録したいDiscordユーザー（いない場合は入力不要、またはNone）")
-    @app_commands.checks.has_permissions(administrator=True)
     async def add(self, interaction: discord.Interaction, mcid: str, discord_user: discord.User = None):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
+        guild: discord.Guild | None = interaction.guild
+        if guild is None:
+            await interaction.followup.send("サーバー内でのみ使用できます。")
             return
+
+        member: discord.Member = interaction.user
+
+        # 権限判定-Ticket Chikuwa
+        if Ticket:
+            etkw_role = guild.get_role(Ticket)
+            if etkw_role and etkw_role.id not in [r.id for r in member.roles]:
+                await interaction.followup.send("このコマンドを使う権限がありません。")
+                return
 
         guild_data = await self.api.get_guild_by_prefix("ETKW")
         if not guild_data:
@@ -299,11 +309,21 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
     @app_commands.command(name="remove", description="メンバーの登録を解除")
     @app_commands.checks.has_permissions(administrator=True)
     async def remove(self, interaction: discord.Interaction, mcid: str = None, discord_user: discord.User = None):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
+        guild: discord.Guild | None = interaction.guild
+        if guild is None:
+            await interaction.followup.send("サーバー内でのみ使用できます。")
             return
+
+        member: discord.Member = interaction.user
+
+        # 権限判定-Ticket Chikuwa
+        if Ticket:
+            etkw_role = guild.get_role(Ticket)
+            if etkw_role and etkw_role.id not in [r.id for r in member.roles]:
+                await interaction.followup.send("このコマンドを使う権限がありません。")
+                return
 
         if not mcid and not discord_user:
             await interaction.followup.send("MCIDまたはDiscordユーザーのどちらかを指定してください。"); return
@@ -351,9 +371,19 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
     async def list(self, interaction: discord.Interaction, rank: str = None, sort: str = None):
         await interaction.response.defer(ephemeral=True)
 
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
+        guild: discord.Guild | None = interaction.guild
+        if guild is None:
+            await interaction.followup.send("サーバー内でのみ使用できます。")
             return
+
+        member: discord.Member = interaction.user
+
+        # 権限判定-Ticket Chikuwa
+        if Ticket:
+            etkw_role = guild.get_role(Ticket)
+            if etkw_role and etkw_role.id not in [r.id for r in member.roles]:
+                await interaction.followup.send("このコマンドを使う権限がありません。")
+                return
 
         if sort == "last_seen":
             last_seen_members = await get_last_seen_dict_db(limit=10)
