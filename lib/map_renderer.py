@@ -432,75 +432,79 @@ class MapRenderer:
             logger.error(f"マップ生成中にエラー: {e}", exc_info=True)
             return None, None
 
-    def create_single_territory_image(self, territory: str, territory_data: dict, guild_color_map: dict) -> BytesIO | None:
-        logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
-        try:
-            terri_data = self.local_territories.get(territory)
-            if not terri_data or 'Location' not in terri_data:
-                logger.error(f"'{territory}'にLocationデータがありません。")
-                return None
-            
-            map_to_draw_on = self.resized_map.copy()
-            box = None
-            all_x, all_y = [], []
-            is_zoomed = None
-
-            self.map_on_process, _ = self.draw_guild_hq_on_map(
-                territory_data=territory_data,
-                guild_color_map=guild_color_map,
-                territory_api_data=territory_data,
-                box=box,
-                is_zoomed=is_zoomed,
-                map_to_draw_on=map_to_draw_on
-            )
-            
-            loc = terri_data.get("Location", {})
-            
-            px1, py1 = self._coord_to_pixel(*loc.get("start", [0, 0]))
-            px2, py2 = self._coord_to_pixel(*loc.get("end", [0, 0]))
-
-            px1, py1 = px1 * self.scale_factor, py1 * self.scale_factor
-            px2, py2 = px2 * self.scale_factor, py2 * self.scale_factor
-
-            left = min(px1, px2)
-            right = max(px1, px2)
-            top = min(py1, py2)
-            bottom = max(py1, py2)
-
-            padding = 50
-
-            box = (
-                max(0, left - padding),
-                max(0, top - padding),
-                min(self.map_on_process.width, right + padding),
-                min(self.map_on_process.height, bottom + padding)
-            )
-
-            if not (box[0] < box[2] and box[1] < box[3]):
-                logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。Box: {box}")
-                return None
-
-            center_x = (px1 + px2) / 2
-            center_y = (py1 + py2) / 2
-            territory_width = abs(px2 - px1)
-            territory_height = abs(py2 - py1)
-            highlight_radius = int(sqrt(territory_width ** 2 + territory_height ** 2) / 2)
-
-            draw = ImageDraw.Draw(self.map_on_process)
-            draw.ellipse(
-                [(center_x - highlight_radius, center_y - highlight_radius),
-                 (center_x + highlight_radius, center_y + highlight_radius)],
-                outline="gold",
-                width=3
-            )
-                
-            cropped_image = self.map_on_process.crop(box)
-            map_bytes = BytesIO()
-            cropped_image.save(map_bytes, format='PNG')
-            map_bytes.seek(0)
-            logger.info(f"--- [MapRenderer] ✅ 画像生成成功。")
-            
-            return map_bytes
-        except Exception as e:
-            logger.error(f"単一テリトリー画像の生成中にエラー: {e}")
+    def create_single_territory_image(self, territory: str, guild_color_map: dict) -> BytesIO | None:
+    logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
+    try:
+        terri_data = self.local_territories.get(territory)
+        if not terri_data or 'Location' not in terri_data:
+            logger.error(f"'{territory}'にLocationデータがありません。")
             return None
+
+        # --- ここでDB履歴を参照し、所有ギルドを判定 ---
+        sync_history_from_db()
+        db_state = get_guild_territory_state()
+        owner_prefix = None
+        for prefix, terrs in db_state.items():
+            if territory in get_effective_owned_territories(prefix):
+                owner_prefix = prefix
+                break
+
+        if not owner_prefix:
+            logger.error(f"領地 {territory} の所有ギルドが1時間ルール下にも見つかりません")
+            return None
+
+        map_to_draw_on = self.resized_map.copy()
+        box = None
+
+        # 領地名→所有ギルドの色を取得
+        color_hex = guild_color_map.get(owner_prefix, "#FFFFFF")
+        color_rgb = self._hex_to_rgb(color_hex)
+
+        # 領地の位置
+        loc = terri_data.get("Location", {})
+        px1, py1 = self._coord_to_pixel(*loc.get("start", [0, 0]))
+        px2, py2 = self._coord_to_pixel(*loc.get("end", [0, 0]))
+        px1, py1 = px1 * self.scale_factor, py1 * self.scale_factor
+        px2, py2 = px2 * self.scale_factor, py2 * self.scale_factor
+
+        left = min(px1, px2)
+        right = max(px1, px2)
+        top = min(py1, py2)
+        bottom = max(py1, py2)
+        padding = 50
+        box = (
+            max(0, left - padding),
+            max(0, top - padding),
+            min(self.resized_map.width, right + padding),
+            min(self.resized_map.height, bottom + padding)
+        )
+
+        if not (box[0] < box[2] and box[1] < box[3]):
+            logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。Box: {box}")
+            return None
+
+        center_x = (px1 + px2) / 2
+        center_y = (py1 + py2) / 2
+        territory_width = abs(px2 - px1)
+        territory_height = abs(py2 - py1)
+        highlight_radius = int(sqrt(territory_width ** 2 + territory_height ** 2) / 2)
+
+        draw = ImageDraw.Draw(map_to_draw_on)
+        draw.ellipse(
+            [(center_x - highlight_radius, center_y - highlight_radius),
+             (center_x + highlight_radius, center_y + highlight_radius)],
+            outline="gold",
+            width=3
+        )
+        # 領地全体を色で塗る
+        draw.rectangle([left, top, right, bottom], outline=color_rgb, width=5)
+
+        cropped_image = map_to_draw_on.crop(box)
+        map_bytes = BytesIO()
+        cropped_image.save(map_bytes, format='PNG')
+        map_bytes.seek(0)
+        logger.info(f"--- [MapRenderer] ✅ 画像生成成功。")
+        return map_bytes
+    except Exception as e:
+        logger.error(f"単一テリトリー画像の生成中にエラー: {e}")
+        return None
