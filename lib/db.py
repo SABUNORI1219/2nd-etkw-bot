@@ -65,45 +65,43 @@ def create_table():
 
 def upsert_guild_territory_state(guild_territory_history):
     """
-    {guild_prefix: {territory_name: {"acquired": dt, "lost": dt or None}}}
+    {guild_prefix: {territory_name: {"acquired": dt, "lost": dt or None, "from_guild": str|None, "to_guild": str|None}}}
     """
     conn = get_conn()
     try:
         with conn.cursor() as cur:
             rows = []
-            # --- まず全territory_nameの最新所有ギルドを逆引きで求める ---
             territory_latest_owner = {}
             for g, tdict in guild_territory_history.items():
                 for t, info in tdict.items():
                     lost = info.get("lost")
-                    # lost==Noneなら現所有
                     if lost is None:
                         territory_latest_owner[t] = g
-            # --- 既存DBから全レコード取得し、「複数ギルド所有」レコードをクリーンアップ ---
             cur.execute("SELECT guild_prefix, territory_name FROM guild_territory_state")
             existing = cur.fetchall()
             for g, t in existing:
                 if t in territory_latest_owner and territory_latest_owner[t] != g:
-                    # 他ギルドが現所有ならこのギルド分は消す
                     cur.execute("DELETE FROM guild_territory_state WHERE guild_prefix=%s AND territory_name=%s", (g, t))
-            # --- 通常のアップサート ---
             for g, tdict in guild_territory_history.items():
                 for t, info in tdict.items():
                     acquired = info.get("acquired")
                     lost = info.get("lost")
+                    from_guild = info.get("from_guild")
+                    to_guild = info.get("to_guild")
                     rows.append((
                         g, t,
                         acquired if isinstance(acquired, datetime) else None,
-                        lost if isinstance(lost, datetime) else None
+                        lost if isinstance(lost, datetime) else None,
+                        from_guild, to_guild
                     ))
             if rows:
                 execute_values(
                     cur,
                     """
-                    INSERT INTO guild_territory_state (guild_prefix, territory_name, acquired, lost)
+                    INSERT INTO guild_territory_state (guild_prefix, territory_name, acquired, lost, from_guild, to_guild)
                     VALUES %s
                     ON CONFLICT (guild_prefix, territory_name)
-                    DO UPDATE SET acquired = EXCLUDED.acquired, lost = EXCLUDED.lost
+                    DO UPDATE SET acquired = EXCLUDED.acquired, lost = EXCLUDED.lost, from_guild = EXCLUDED.from_guild, to_guild = EXCLUDED.to_guild
                     """,
                     rows
                 )
@@ -115,17 +113,22 @@ def upsert_guild_territory_state(guild_territory_history):
 
 def get_guild_territory_state():
     """
-    すべてのguild_territory_stateを {guild_prefix: {territory_name: {"acquired":..., "lost":...}}} 形式で返す
+    すべてのguild_territory_stateを {guild_prefix: {territory_name: {"acquired":..., "lost":..., "from_guild":..., "to_guild":...}}} 形式で返す
     """
     conn = get_conn()
     result = defaultdict(dict)
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT guild_prefix, territory_name, acquired, lost FROM guild_territory_state
+                SELECT guild_prefix, territory_name, acquired, lost, from_guild, to_guild FROM guild_territory_state
             """)
-            for g, t, acq, lost in cur.fetchall():
-                result[g][t] = {"acquired": acq, "lost": lost}
+            for g, t, acq, lost, from_guild, to_guild in cur.fetchall():
+                result[g][t] = {
+                    "acquired": acq,
+                    "lost": lost,
+                    "from_guild": from_guild,
+                    "to_guild": to_guild
+                }
     except Exception as e:
         logger.error(f"get_guild_territory_state failed: {e}")
     finally:
