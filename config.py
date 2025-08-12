@@ -61,6 +61,7 @@ ROLE_ID_TO_RANK = {
 
 PROMOTION_ROLE_MAP = {
     1138142855517446144: 1132652296635961385  # Fabled -> Mythic
+    1132652296635961385: 1127967768520704250  # Mythic -> Shiny Mythic
 }
 
 async def send_authorized_only_message(interaction: discord.Interaction, user_ids=None):
