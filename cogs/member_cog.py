@@ -538,8 +538,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             base_nick = base_nick[:32]
 
         try:
-            if not target.guild_permissions.administrator:
-                await target.edit(nick=base_nick, reason="昇格による接頭辞更新")
+            await target.edit(nick=base_nick, reason="昇格による接頭辞更新")
         except Exception as e:
             logger.error(f"昇格ニックネーム変更失敗: {e}")
 
