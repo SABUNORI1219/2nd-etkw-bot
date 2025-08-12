@@ -205,6 +205,7 @@ class MapRenderer:
         up_w, up_h = int(map_to_draw_on.width * upscale_factor), int(map_to_draw_on.height * upscale_factor)
         upscaled_lines = Image.new("RGBA", (up_w, up_h), (0, 0, 0, 0))
         draw_lines = ImageDraw.Draw(upscaled_lines)
+    
         for name, data in self.local_territories.items():
             if "Trading Routes" not in data or "Location" not in data:
                 continue
@@ -221,15 +222,25 @@ class MapRenderer:
                     z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
                     l_px2, l_py2 = self._coord_to_pixel(x2, z2)
                     l_scaled_px2, l_scaled_py2 = l_px2 * self.scale_factor * upscale_factor, l_py2 * self.scale_factor * upscale_factor
-                    points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
+    
+                    # ここでズーム時はbox補正する
+                    if is_zoomed and box:
+                        l_px1_rel, l_py1_rel = l_scaled_px1 - box[0] * upscale_factor, l_py1 - box[1] * upscale_factor
+                        l_px2_rel, l_py2_rel = l_scaled_px2 - box[0] * upscale_factor, l_py2 - box[1] * upscale_factor
+                        points = [(l_px1_rel, l_py1_rel), (l_px2_rel, l_py2_rel)]
+                    else:
+                        points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
+    
                     color_rgb = (30, 30, 30)
                     draw_lines.line(points, fill=(*color_rgb, 180), width=4)
             except KeyError:
                 continue
+    
+        # コネクション線だけ縮小して透明画像として戻す
         lines_down = upscaled_lines.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
         map_to_draw_on.alpha_composite(lines_down)
     
-        # 2. 領地半透明矩形は overlay に描く
+        # 2. 領地半透明矩形は overlay に描く（コピペでOK）
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
         draw = ImageDraw.Draw(map_to_draw_on)
@@ -261,8 +272,15 @@ class MapRenderer:
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
                 if hq_territories and name in hq_territories:
                     continue
-                draw.text(((x_min + x_max)/2, (y_min + y_max)/2), prefix, font=scaled_font, fill=color_rgb, anchor="mm", stroke_width=2, stroke_fill="black")
-        # overlayを合成
+                draw.text(
+                    ((x_min + x_max) / 2, (y_min + y_max) / 2),
+                    prefix,
+                    font=scaled_font,
+                    fill=color_rgb,
+                    anchor="mm",
+                    stroke_width=2,
+                    stroke_fill="black"
+                )
         map_to_draw_on.alpha_composite(overlay)
         return map_to_draw_on
 
