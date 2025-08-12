@@ -77,13 +77,13 @@ async def notify_member_removed(bot, member_data):
         logger.warning("メンバー通知チャンネルが見つかりません")
         return
     embed = discord.Embed(
-        title="Guild Member Removed",
+        title="ゲーム内Guildのメンバーが退出しました",
         color=discord.Color.red()
     )
     embed.add_field(name="MCID", value=f"`{member_data.get('mcid', 'N/A')}`", inline=True)
     embed.add_field(name="Discord", value=f"<@{member_data.get('discord_id', 'N/A')}>", inline=True)
     embed.add_field(name="Rank", value=f"`{member_data.get('rank', 'N/A')}`", inline=True)
-    embed.set_footer(text="Member Removal | Minister Chikuwa")
+    embed.set_footer(text="脱退通知 | Minister Chikuwa")
     await channel.send(embed=embed)
     logger.info(f"Guild脱退通知: {member_data}")
 
@@ -98,12 +98,12 @@ async def notify_member_left_discord(bot, member_data):
         logger.warning("メンバー通知チャンネルが見つかりません")
         return
     embed = discord.Embed(
-        title="Discord Member Left",
+        title="Discordのメンバーが退出しました",
         color=discord.Color.orange()
     )
     embed.add_field(name="MCID", value=f"`{member_data.get('mcid', 'N/A')}`", inline=True)
     embed.add_field(name="Discord", value=f"<@{member_data.get('discord_id', 'N/A')}>", inline=True)
     embed.add_field(name="Rank", value=f"`{member_data.get('rank', 'N/A')}`", inline=True)
-    embed.set_footer(text="Discord Leave | Minister Chikuwa")
+    embed.set_footer(text="脱退通知 | Minister Chikuwa")
     await channel.send(embed=embed)
     logger.info(f"Discord退出通知: {member_data}")
