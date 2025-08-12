@@ -23,7 +23,8 @@ from config import (
     send_authorized_only_message,
     RANK_ROLE_ID_MAP,
     ETKW,
-    PROMOTION_ROLE_MAP
+    PROMOTION_ROLE_MAP,
+    ROLE_ID_TO_RANK
 )
 
 logger = logging.getLogger(__name__)
@@ -476,14 +477,19 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
                 await interaction.followup.send("このコマンドを使う権限がありません。")
                 return
 
-        # ランクロール探索
-        member_role_ids = {r.id for r in member.roles}
+        # ランクロール特定
+        current_rank = None
         current_rank_role_obj = None
-        for rank in RANK_ORDER:
-            rid = RANK_ROLE_ID_MAP.get(rank)
-            if rid and rid in member_role_ids:
-                current_rank_role_obj = guild.get_role(rid)
+        for role in member.roles:
+            rank = ROLE_ID_TO_RANK.get(role.id)
+            if rank:
+                current_rank = rank
+                current_rank_role_obj = role
                 break
+        
+        if current_rank is None:
+            await interaction.followup.send("ランクロールを検出できませんでした。")
+            return
 
         if current_rank_role_obj:
             prefix = extract_role_display_name(current_rank_role_obj.name)
