@@ -14,6 +14,10 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_PATH = os.path.join(project_root, "assets", "map")
 FONT_PATH = os.path.join(project_root, "assets", "fonts", "NotoSansJP-Bold.ttf")
 
+# DBとキャッシュから履歴情報を取得
+from lib.db import get_guild_territory_state
+from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db
+
 class MapRenderer:
     def __init__(self):
         try:
@@ -78,9 +82,21 @@ class MapRenderer:
                 total[k] += int(res.get(k, "0"))
         return total
 
-    def _pick_hq_candidate(self, owned_territories, territory_api_data):
+    def _get_owned_territories_map_from_db(self):
+        """
+        DBから「ギルドごとに '現所有+直近1時間以内に失領' を含む領地名セット」を返す
+        """
+        sync_history_from_db()  # 必ず最新化
+        db_state = get_guild_territory_state()
+        # {prefix: set(territory_name)}
+        return {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
+
+    def _pick_hq_candidate(self, owned_territories, territory_api_data, exclude_lost=None):
+        # exclude_lost: HQ候補から除外したい領地名(set)
         hq_stats = []
         for t in owned_territories:
+            if exclude_lost and t in exclude_lost:
+                continue
             conn, ext, hq_buff = self._calc_conn_ext_hqbuff(owned_territories, t)
             acquired = territory_api_data.get(t, {}).get("acquired", "")
             if not acquired:
@@ -95,6 +111,8 @@ class MapRenderer:
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
             })
+        if not hq_stats:
+            return None, [], [], {}
         # Conn含むExt多い順→Conn多い順→HQバフ多い順→取得時刻古い順
         hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
         top5 = hq_stats[:5]
@@ -104,10 +122,8 @@ class MapRenderer:
         max_ext = max(x["ext"] for x in top5)
         ext_max_group = [x for x in top5 if x["ext"] == max_ext]
         ext_max_conn = max(x["conn"] for x in ext_max_group)
-        # Ext最大グループのConnより2以上多い領地があれば最優先
         conn2plus_candidates = [x for x in top5 if x["conn"] >= ext_max_conn + 2]
         if conn2plus_candidates:
-            # 複数ならConn→Ext→HQバフ→取得時刻の順
             conn2plus_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
             return conn2plus_candidates[0]["name"], hq_stats, top5, total_res
 
@@ -131,17 +147,13 @@ class MapRenderer:
         ext_max_group_conns = [x["conn"] for x in ext_max_group]
         conn_max_in_ext = max(ext_max_group_conns)
         conn_maxs = [x for x in ext_max_group if x["conn"] == conn_max_in_ext]
-        # 複数Conn最大が同じ場合
         if len(conn_maxs) > 1:
-            # Ext<20なら街優先（Almuj/Ruined Villaパターン）
             if conn_maxs[0]["ext"] < 20:
                 city = next((x for x in conn_maxs if x["is_city"]), None)
                 if city:
                     return city["name"], hq_stats, top5, total_res
-            # それ以外はそのままConn最大/Ext最大の最初
             return conn_maxs[0]["name"], hq_stats, top5, total_res
         else:
-            # Conn最大が1つならそれ
             return conn_maxs[0]["name"], hq_stats, top5, total_res
 
         # 5. Conn,Ext同値なら資源バランス優先
@@ -186,7 +198,6 @@ class MapRenderer:
                             best_cand = cand
                 return best_cand["name"], hq_stats, top5, total_res
 
-        # --- 万が一上記に該当しなければtop5の最初 ---
         return top5[0]["name"], hq_stats, top5, total_res
 
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None):
@@ -254,22 +265,48 @@ class MapRenderer:
             map_img = self.resized_map.copy()
         else:
             map_img = map_to_draw_on
+
+        # ここでprefix_to_territoriesはAPIからでなくowned_territories_mapから構成する
         prefix_to_territories = {}
-        for name, info in territory_data.items():
-            prefix = info.get("guild", {}).get("prefix", "")
-            if not prefix:
-                continue
-            prefix_to_territories.setdefault(prefix, set()).add(name)
+        if owned_territories_map:
+            for prefix, terrset in owned_territories_map.items():
+                prefix_to_territories[prefix] = set(terrset)
+        else:
+            # fallback: APIの直所有
+            for name, info in territory_data.items():
+                prefix = info.get("guild", {}).get("prefix", "")
+                if not prefix:
+                    continue
+                prefix_to_territories.setdefault(prefix, set()).add(name)
+
+        # HQ候補地から「1時間以内に失領した領地」を除外
+        db_state = get_guild_territory_state()
         hq_names = set()
         for prefix, owned in prefix_to_territories.items():
-            candidate_territories = owned_territories_map[prefix] if owned_territories_map and prefix in owned_territories_map else owned
+            # 直近1時間以内に奪われた領地
+            lost_only = set()
+            for t in db_state.get(prefix, {}):
+                lost_time = db_state[prefix][t].get("lost")
+                if lost_time is not None:
+                    # HQ候補地から除外
+                    lost_only.add(t)
+            # 有効なHQ候補のみで選定
+            candidate_territories = owned - lost_only
             hq_name, _, _, _ = self._pick_hq_candidate(candidate_territories, territory_api_data)
-            hq_names.add(hq_name)
+            if hq_name:
+                hq_names.add(hq_name)
         self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map, hq_territories=hq_names)
         draw = ImageDraw.Draw(map_img)
         for prefix, owned in prefix_to_territories.items():
-            candidate_territories = owned_territories_map[prefix] if owned_territories_map and prefix in owned_territories_map else owned
+            lost_only = set()
+            for t in db_state.get(prefix, {}):
+                lost_time = db_state[prefix][t].get("lost")
+                if lost_time is not None:
+                    lost_only.add(t)
+            candidate_territories = owned - lost_only
             hq_name, _, _, _ = self._pick_hq_candidate(candidate_territories, territory_api_data)
+            if not hq_name:
+                continue
             loc = self.local_territories.get(hq_name, {}).get("Location")
             if not loc:
                 continue
@@ -283,18 +320,15 @@ class MapRenderer:
             color_hex = guild_color_map.get(prefix, "#FFFFFF")
             color_rgb = self._hex_to_rgb(color_hex)
 
-            # --- 領地サイズに合わせて王冠サイズを決定 ---
             x1, y1 = self._coord_to_pixel(loc["start"][0], loc["start"][1])
             x2, y2 = self._coord_to_pixel(loc["end"][0], loc["end"][1])
             x1, x2 = x1 * self.scale_factor, x2 * self.scale_factor
             y1, y2 = y1 * self.scale_factor, y2 * self.scale_factor
             width = abs(x2 - x1)
             height = abs(y2 - y1)
-            # 前までのロジックで使っていた上限値
             scaled_font_size = max(12, int(self.font.size * self.scale_factor))
             crown_size_limit = int(scaled_font_size * 1.8)
             crown_size_limit = max(28, min(crown_size_limit, 120))
-            # 領地の短辺の90%を王冠サイズ、ただし上限つき
             crown_size = int(min(width, height) * 0.9)
             crown_size = max(18, min(crown_size, crown_size_limit))
 
@@ -303,7 +337,6 @@ class MapRenderer:
             crown_y = int(py - crown_size/2)
             map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
 
-            # --- プレフィクスのフォントサイズも王冠サイズに厳密フィット ---
             prefix_font_size = crown_size
             font_found = False
             for test_size in range(crown_size, 5, -1):
@@ -339,6 +372,8 @@ class MapRenderer:
         return map_img, [(0, 0, "", hq_name) for hq_name in hq_names]
     
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict, owned_territories_map=None) -> tuple[discord.File | None, discord.Embed | None]:
+        if owned_territories_map is None:
+            owned_territories_map = self._get_owned_territories_map_from_db()
         if not territories_to_render:
             return None, None
         try:
