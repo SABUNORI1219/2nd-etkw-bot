@@ -370,11 +370,19 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
 
             # ROLE_ID_TO_RANK内のロールを全て削除
             roles_to_remove = [role for role in target_member.roles if role.id in ROLE_ID_TO_RANK]
+            if ETKW:  # ETKWはint型のロールIDの場合
+                        etkw_role = guild.get_role(ETKW)
             if roles_to_remove:
                 try:
                     await target_member.remove_roles(*roles_to_remove, reason="removeコマンドによるランクロール削除")
                 except Exception as e:
                     logger.error(f"remove ランクロール削除失敗: {e}")
+
+            if etkw_role:
+                try:
+                    await target_member.remove_roles(etkw_role, reason="ちくわロール")
+                except Exception as e:
+                    logger.error(f"ロール削除エラー: {e}")
 
     @app_commands.command(name="search", description="登録メンバーを検索")
     async def search(self, interaction: discord.Interaction, mcid: str = None, discord_user: discord.User = None):
