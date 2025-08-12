@@ -125,16 +125,20 @@ async def track_guild_territories(loop_interval=60):
                     logger.warning(f"[GuildTerritoryTracker] 領地 {t} が複数ギルド({territory_to_current_guild[t]}, {guild_prefix})で同時所有状態")
                 territory_to_current_guild[t] = guild_prefix
 
-        # 全ギルドのhistから「今所有していない領地」を消す
         for g in list(guild_territory_history.keys()):
             hist = guild_territory_history[g]
             for tname in list(hist.keys()):
-                # 領地の現所有ギルドが自分でなければ完全に消す
-                if tname in territory_to_current_guild:
-                    if territory_to_current_guild[tname] != g:
-                        del hist[tname]
+                # 今APIで他のギルドが所有している場合
+                current_owner = territory_to_current_guild.get(tname)
+                if current_owner:
+                    if current_owner != g:
+                        # まだlostが記録されてない場合のみ
+                        if hist[tname].get("lost") is None:
+                            hist[tname]["lost"] = now
+                            hist[tname]["from_guild"] = g
+                            hist[tname]["to_guild"] = current_owner
                 else:
-                    # そもそもAPIから消えている領地（たぶん有り得ないが）も消す
+                    # APIから消えている領地は削除
                     del hist[tname]
             if not hist:
                 del guild_territory_history[g]
