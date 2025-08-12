@@ -204,10 +204,11 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
     async def on_member_remove(self, member: discord.Member):
         linked_member = get_member(discord_id=member.id)
         if linked_member:
-            remove_member(discord_id=member.id)
-            logger.info(f"--- [MemberSync] {member.display_name} がサーバーから退出したため、連携を解除しました。")
+            # discord_idだけ解除
+            add_member(linked_member["mcid"], None, linked_member["rank"])
+            logger.info(f"--- [MemberSync] {member.display_name} がサーバーから退出したため、discord_idを解除しました。")
             await notify_member_left_discord(self.bot, linked_member)
-
+    
     @app_commands.command(name="channel", description="メンバー通知用のチャンネルを設定")
     async def set_member_notify_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
         if interaction.user.id not in AUTHORIZED_USER_IDS:
