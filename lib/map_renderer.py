@@ -228,9 +228,9 @@ class MapRenderer:
                         points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
                     color_rgb = (10, 10, 10)
                     # 1pxメイン
-                    draw.line(points, fill=(*color_rgb, 200), width=1)
+                    draw.line(points, fill=(*color_rgb, 140), width=1)
                     # 2px薄く
-                    draw.line(points, fill=(*color_rgb, 80), width=2)
+                    draw.line(points, fill=(*color_rgb, 30), width=2)
             except KeyError:
                 continue
 
