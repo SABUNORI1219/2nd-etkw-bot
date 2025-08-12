@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 
 from lib.wynncraft_api import WynncraftAPI
 from lib.db import get_linked_members_page, add_member, remove_member, get_member
@@ -42,7 +43,7 @@ async def member_rank_sync_task(api: WynncraftAPI, bot=None):
                     if api_rank and api_rank != db_rank:
                         add_member(mcid, dbm['discord_id'], api_rank)
                         logger.info(f"[MemberSync] {mcid} ランク {db_rank}→{api_rank} で更新")
-                        # ここからロール付与・ニックネーム変更
+                        # ロール付与・ニックネーム変更
                         if bot and dbm.get('discord_id'):
                             for guild in bot.guilds:
                                 member = guild.get_member(dbm['discord_id'])
@@ -71,7 +72,6 @@ async def member_rank_sync_task(api: WynncraftAPI, bot=None):
                                             except Exception as e:
                                                 logger.error(f"[MemberSync] ETKWロール付与失敗: {e}")
                                     # 4. ニックネーム変更（ロール名から[]除去）
-                                    # 新ランクロールのdisplay名をprefixに
                                     prefix = new_role.name if new_role else api_rank
                                     prefix = re.sub(r"\s*\[.*?]\s*", " ", prefix).strip()
                                     new_nick = f"{prefix} {mcid}"
@@ -108,20 +108,32 @@ async def member_remove_sync_task(bot, api: WynncraftAPI):
                 for dbm in db_members:
                     mcid = dbm['mcid']
                     if mcid not in api_mcids:
-                        # --- ゲーム脱退時のみロール削除 ---
+                        # --- ゲーム脱退時のみロール削除・ニックネームリセット ---
                         if dbm.get('discord_id'):
                             for guild in bot.guilds:
                                 member = guild.get_member(dbm['discord_id'])
                                 if member:
-                                    role_id = RANK_ROLE_ID_MAP.get(dbm.get('rank'))
-                                    if role_id:
-                                        role = guild.get_role(role_id)
-                                        if role:
+                                    # ランクロール削除
+                                    roles_to_remove = [role for role in member.roles if role.id in ROLE_ID_TO_RANK]
+                                    if roles_to_remove:
+                                        try:
+                                            await member.remove_roles(*roles_to_remove, reason="ゲーム脱退時ランクロール削除")
+                                        except Exception as e:
+                                            logger.error(f"ゲーム脱退時ランクロール削除エラー: {e}")
+                                    # ETKWロール削除
+                                    if ETKW:
+                                        etkw_role = guild.get_role(ETKW)
+                                        if etkw_role:
                                             try:
-                                                await member.remove_roles(ETKW, reason="ゲーム脱退時連携ロール解除-デフォルト")
-                                                await member.remove_roles(role, reason="ゲーム脱退時連携ロール解除‐ランク")
+                                                await member.remove_roles(etkw_role, reason="ゲーム脱退時ETKWロール削除")
                                             except Exception as e:
-                                                logger.error(f"ロール削除エラー: {e}")
+                                                logger.error(f"ゲーム脱退時ETKWロール削除エラー: {e}")
+                                    # ニックネームリセット
+                                    try:
+                                        if not member.guild_permissions.administrator:
+                                            await member.edit(nick=None, reason="ゲーム脱退時ニックネームリセット")
+                                    except Exception as e:
+                                        logger.error(f"ゲーム脱退時ニックネームリセット失敗: {e}")
                                     break
                         await notify_member_removed(bot, dbm)
                         logger.info(f"[MemberSync] {mcid} がギルドから脱退→DBから削除")
