@@ -273,6 +273,7 @@ class MapRenderer:
                 t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
             x_min, x_max = sorted([t_px1_rel, t_px2_rel])
             y_min, y_max = sorted([t_py1_rel, t_py2_rel])
+            logger.info(f"[DEBUG] 領地: {name} | x: {x_min}-{x_max} | y: {y_min}-{y_max} | img: {map_to_draw_on.width}x{map_to_draw_on.height} | box: {box}")
             # クロップ範囲内判定（0 <= x_max, x_min <= width, ...）
             if x_max >= 0 and y_max >= 0 and x_min <= map_to_draw_on.width and y_min <= map_to_draw_on.height:
                 prefix = info["guild"]["prefix"]
