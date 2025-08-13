@@ -75,6 +75,5 @@ async def send_authorized_only_message(interaction: discord.Interaction, user_id
     # mention形式のユーザー名リストを作る
     mentions = ", ".join([f"<@{uid}>" for uid in user_ids])
     await interaction.response.send_message(
-        f"このコマンドは {mentions} のみ使用できます！",
-        ephemeral=True
+        f"このコマンドは現在{mentions}のみ使用できます！"
     )
