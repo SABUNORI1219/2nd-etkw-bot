@@ -274,11 +274,13 @@ class MapRenderer:
                 t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
             x_min, x_max = sorted([t_px1_rel, t_px2_rel])
             y_min, y_max = sorted([t_py1_rel, t_py2_rel])
-            # ここで判定はmap_to_draw_onのサイズのみを使う（アップスケールの影響を絶対排除）
-            if x_max >= 0 and y_max >= 0 and x_min <= map_to_draw_on.width and y_min <= map_to_draw_on.height:
-                prefix = info["guild"]["prefix"]
-                color_hex = guild_color_map.get(prefix, "#FFFFFF")
-                color_rgb = self._hex_to_rgb(color_hex)
+            # デバッグログ
+            logger.warning(f"[DEBUG] 領地: {name} | x: {x_min}-{x_max} | y: {y_min}-{y_max} | img: {map_to_draw_on.width}x{map_to_draw_on.height} | box: {box}")
+            prefix = info["guild"]["prefix"] if "guild" in info else ""
+            color_hex = guild_color_map.get(prefix, "#FFFFFF")
+            color_rgb = self._hex_to_rgb(color_hex)
+            # 判定式を一時的に緩和して必ず描画されるように
+            if True:  # x_max >= 0 and y_max >= 0 and x_min <= map_to_draw_on.width and y_min <= map_to_draw_on.height:
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
                 if hq_territories and name in hq_territories:
