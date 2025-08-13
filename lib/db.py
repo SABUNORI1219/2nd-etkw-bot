@@ -56,6 +56,8 @@ def create_table():
                 territory_name TEXT,
                 acquired TIMESTAMP,
                 lost TIMESTAMP,
+                from_guild TEXT,
+                to_guild TEXT,
                 PRIMARY KEY (guild_prefix, territory_name)
             );
         """)
@@ -64,24 +66,10 @@ def create_table():
     logger.info("全テーブルを作成/確認しました")
 
 def upsert_guild_territory_state(guild_territory_history):
-    """
-    {guild_prefix: {territory_name: {"acquired": dt, "lost": dt or None, "from_guild": str|None, "to_guild": str|None}}}
-    """
     conn = get_conn()
     try:
         with conn.cursor() as cur:
             rows = []
-            territory_latest_owner = {}
-            for g, tdict in guild_territory_history.items():
-                for t, info in tdict.items():
-                    lost = info.get("lost")
-                    if lost is None:
-                        territory_latest_owner[t] = g
-            cur.execute("SELECT guild_prefix, territory_name FROM guild_territory_state")
-            existing = cur.fetchall()
-            for g, t in existing:
-                if t in territory_latest_owner and territory_latest_owner[t] != g:
-                    cur.execute("DELETE FROM guild_territory_state WHERE guild_prefix=%s AND territory_name=%s", (g, t))
             for g, tdict in guild_territory_history.items():
                 for t, info in tdict.items():
                     acquired = info.get("acquired")
