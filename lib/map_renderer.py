@@ -259,11 +259,15 @@ class MapRenderer:
         except IOError:
             scaled_font = ImageFont.load_default()
 
-        for name, info in self.local_territories.items():
-            if 'Location' not in info or 'guild' not in info:
-                continue
-            t_px1, t_py1 = self._coord_to_pixel(*info["Location"]["start"])
-            t_px2, t_py2 = self._coord_to_pixel(*info["Location"]["end"])
+        for name, info in territory_data.items():
+            static = self.local_territories.get(name)
+            if not static or "Location" not in static:
+                continue  # 座標がなければ描画不可
+            if "guild" not in info or not info["guild"].get("prefix"):
+                continue  # 所有ギルド情報がなければ描画不可
+        
+            t_px1, t_py1 = self._coord_to_pixel(*static["Location"]["start"])
+            t_px2, t_py2 = self._coord_to_pixel(*static["Location"]["end"])
             t_scaled_px1, t_scaled_py1 = t_px1 * self.scale_factor, t_py1 * self.scale_factor
             t_scaled_px2, t_scaled_py2 = t_px2 * self.scale_factor, t_py2 * self.scale_factor
             if is_zoomed and box:
@@ -273,26 +277,22 @@ class MapRenderer:
                 t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
             x_min, x_max = sorted([t_px1_rel, t_px2_rel])
             y_min, y_max = sorted([t_py1_rel, t_py2_rel])
-            # デバッグログ
-            logger.warning(f"[DEBUG] 領地: {name} | x: {x_min}-{x_max} | y: {y_min}-{y_max} | img: {map_to_draw_on.width}x{map_to_draw_on.height} | box: {box}")
-            prefix = info["guild"]["prefix"] if "guild" in info else ""
+            prefix = info["guild"]["prefix"]
             color_hex = guild_color_map.get(prefix, "#FFFFFF")
             color_rgb = self._hex_to_rgb(color_hex)
-            # 判定式を一時的に緩和して必ず描画されるように
-            if True:  # x_max >= 0 and y_max >= 0 and x_min <= map_to_draw_on.width and y_min <= map_to_draw_on.height:
-                overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
-                draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
-                if hq_territories and name in hq_territories:
-                    continue
-                draw.text(
-                    ((x_min + x_max) / 2, (y_min + y_max) / 2),
-                    prefix,
-                    font=scaled_font,
-                    fill=color_rgb,
-                    anchor="mm",
-                    stroke_width=2,
-                    stroke_fill="black"
-                )
+            overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
+            draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
+            if hq_territories and name in hq_territories:
+                continue
+            draw.text(
+                ((x_min + x_max) / 2, (y_min + y_max) / 2),
+                prefix,
+                font=scaled_font,
+                fill=color_rgb,
+                anchor="mm",
+                stroke_width=2,
+                stroke_fill="black"
+            )
         map_to_draw_on.alpha_composite(overlay)
         return map_to_draw_on
 
