@@ -555,7 +555,7 @@ class MapRenderer:
         # 枠線
         color_hex = guild_color_map.get(owner_prefix, "#FFFFFF")
         color_rgb = self._hex_to_rgb(color_hex)
-        draw.rectangle([left, top, right, bottom], outline=color_rgb, width=5)
+        draw.rectangle([left, top, right, bottom], outline=color_rgb, width=2)
     
         # クロップ
         cropped_image = final_map.crop(box)
