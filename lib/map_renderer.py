@@ -545,6 +545,10 @@ class MapRenderer:
         highlight_radius = int(sqrt(territory_width ** 2 + territory_height ** 2) / 2)
     
         draw = ImageDraw.Draw(final_map)
+        # 枠線
+        color_hex = guild_color_map.get(owner_prefix, "#FFFFFF")
+        color_rgb = self._hex_to_rgb(color_hex)
+        draw.rectangle([left, top, right, bottom], outline=color_rgb, width=2)
         # 円
         draw.ellipse(
             [(center_x - highlight_radius, center_y - highlight_radius),
@@ -552,10 +556,6 @@ class MapRenderer:
             outline="gold",
             width=3
         )
-        # 枠線
-        color_hex = guild_color_map.get(owner_prefix, "#FFFFFF")
-        color_rgb = self._hex_to_rgb(color_hex)
-        draw.rectangle([left, top, right, bottom], outline=color_rgb, width=2)
     
         # クロップ
         cropped_image = final_map.crop(box)
