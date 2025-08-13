@@ -25,6 +25,7 @@ class MapRenderer:
             self.crown_img = Image.open(os.path.join(ASSETS_PATH, "crown.png")).convert("RGBA")
             with open(os.path.join(ASSETS_PATH, "territories.json"), "r", encoding='utf-8') as f:
                 self.local_territories = json.load(f)
+            logger.warning(f"[DEBUG] self.local_territories keys: {list(self.local_territories.keys())}, length={len(self.local_territories)}")
             self.font = ImageFont.truetype(FONT_PATH, 40)
 
             TARGET_WIDTH = 1600
