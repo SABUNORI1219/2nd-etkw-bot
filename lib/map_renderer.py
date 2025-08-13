@@ -126,23 +126,22 @@ class MapRenderer:
     
         # 1. Connが2個以上多い領地がある場合のみConn最大を優先
         max_conn = max(x["conn"] for x in top5)
-        conn_values = [x["conn"] for x in top5]
-        conn2plus_exists = any((max_conn - c) >= 2 for c in conn_values if c != max_conn)
-        if conn2plus_exists:
-            conn_maxs = [x for x in top5 if x["conn"] == max_conn]
-            return conn_maxs[0]["name"], hq_stats, top5, total_res
+        conn_maxs = [x for x in top5 if x["conn"] == max_conn]
+        if len(conn_maxs) == 1:
+            # Conn最大値が1つだけ
+            if any((max_conn - x["conn"]) >= 2 for x in top5 if x["conn"] != max_conn):
+                return conn_maxs[0]["name"], hq_stats, top5, total_res
     
         # 2. Conn含むExt合計が最大のもの（同値複数ならConn多い方）
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
-        conn_ext_maxs = [x for x in top5 if (x["conn"] + x["ext"]) == max_conn_ext]
-        if conn_ext_maxs:
-            # Conn多い方、同値なら取得時刻古い方
-            conn_max_val = max(x["conn"] for x in conn_ext_maxs)
-            candidates = [x for x in conn_ext_maxs if x["conn"] == conn_max_val]
-            if candidates:
-                # 取得時刻古い順
-                oldest = min(candidates, key=lambda x: x["acquired"] or "9999")
-                return oldest["name"], hq_stats, top5, total_res
+        conn_ext_group = [x for x in top5 if (x["conn"] + x["ext"]) == max_conn_ext]
+        if len(conn_ext_group) > 1:
+            conn_max_val = max(x["conn"] for x in conn_ext_group)
+            candidates = [x for x in conn_ext_group if x["conn"] == conn_max_val]
+            oldest = min(candidates, key=lambda x: x["acquired"] or "9999")
+            return oldest["name"], hq_stats, top5, total_res
+        else:
+            return conn_ext_group[0]["name"], hq_stats, top5, total_res
     
         # 3. 所持領地が6個以下なら取得時刻最古
         if len(owned_territories) <= 6:
