@@ -200,8 +200,17 @@ class MapRenderer:
 
         return top5[0]["name"], hq_stats, top5, total_res
 
-    def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None, upscale_factor=2):
-        # 1. コネクション線だけを高解像度透明キャンバスに描画
+    def _draw_trading_and_territories(
+        self,
+        map_to_draw_on,
+        box,
+        is_zoomed,
+        territory_data,
+        guild_color_map,
+        hq_territories=None,
+        upscale_factor=2
+    ):
+        # 1. コネクション線（全領地分描画・座標補正あり）
         up_w, up_h = int(map_to_draw_on.width * upscale_factor), int(map_to_draw_on.height * upscale_factor)
         upscaled_lines = Image.new("RGBA", (up_w, up_h), (0, 0, 0, 0))
         draw_lines = ImageDraw.Draw(upscaled_lines)
@@ -223,10 +232,12 @@ class MapRenderer:
                     l_px2, l_py2 = self._coord_to_pixel(x2, z2)
                     l_scaled_px2, l_scaled_py2 = l_px2 * self.scale_factor * upscale_factor, l_py2 * self.scale_factor * upscale_factor
     
-                    # ここでズーム時はbox補正する
+                    # ズーム時はboxオフセットを引く
                     if is_zoomed and box:
-                        l_px1_rel, l_py1_rel = l_scaled_px1 - box[0] * upscale_factor, l_py1 - box[1] * upscale_factor
-                        l_px2_rel, l_py2_rel = l_scaled_px2 - box[0] * upscale_factor, l_py2 - box[1] * upscale_factor
+                        l_px1_rel = l_scaled_px1 - box[0] * upscale_factor
+                        l_py1_rel = l_scaled_py1 - box[1] * upscale_factor
+                        l_px2_rel = l_scaled_px2 - box[0] * upscale_factor
+                        l_py2_rel = l_scaled_py2 - box[1] * upscale_factor
                         points = [(l_px1_rel, l_py1_rel), (l_px2_rel, l_py2_rel)]
                     else:
                         points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
@@ -236,11 +247,10 @@ class MapRenderer:
             except KeyError:
                 continue
     
-        # コネクション線だけ縮小して透明画像として戻す
         lines_down = upscaled_lines.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
         map_to_draw_on.alpha_composite(lines_down)
     
-        # 2. 領地半透明矩形は overlay に描く（コピペでOK）
+        # 2. 領地半透明矩形・テキスト（全領地分描画・座標補正あり）
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
         draw = ImageDraw.Draw(map_to_draw_on)
@@ -250,11 +260,11 @@ class MapRenderer:
         except IOError:
             scaled_font = ImageFont.load_default()
     
-        for name, info in territory_data.items():
-            if 'location' not in info or 'guild' not in info:
+        for name, info in self.local_territories.items():
+            if 'Location' not in info or 'guild' not in info:
                 continue
-            t_px1, t_py1 = self._coord_to_pixel(*info["location"]["start"])
-            t_px2, t_py2 = self._coord_to_pixel(*info["location"]["end"])
+            t_px1, t_py1 = self._coord_to_pixel(*info["Location"]["start"])
+            t_px2, t_py2 = self._coord_to_pixel(*info["Location"]["end"])
             t_scaled_px1, t_scaled_py1 = t_px1 * self.scale_factor, t_py1 * self.scale_factor
             t_scaled_px2, t_scaled_py2 = t_px2 * self.scale_factor, t_py2 * self.scale_factor
             if is_zoomed and box:
@@ -264,6 +274,7 @@ class MapRenderer:
                 t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
             x_min, x_max = sorted([t_px1_rel, t_px2_rel])
             y_min, y_max = sorted([t_py1_rel, t_py2_rel])
+            # クロップ範囲に入ってる領地だけ描画
             if x_max > 0 and y_max > 0 and x_min < map_to_draw_on.width and y_min < map_to_draw_on.height:
                 prefix = info["guild"]["prefix"]
                 color_hex = guild_color_map.get(prefix, "#FFFFFF")
