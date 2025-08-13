@@ -210,7 +210,7 @@ class MapRenderer:
         hq_territories=None,
         upscale_factor=2
     ):
-        # コネクション線描画（成功しているのでそのまま）
+        # コネクション線描画（upscale_factorあり）
         up_w, up_h = int(map_to_draw_on.width * upscale_factor), int(map_to_draw_on.height * upscale_factor)
         upscaled_lines = Image.new("RGBA", (up_w, up_h), (0, 0, 0, 0))
         draw_lines = ImageDraw.Draw(upscaled_lines)
@@ -232,7 +232,6 @@ class MapRenderer:
                     l_px2, l_py2 = self._coord_to_pixel(x2, z2)
                     l_scaled_px2, l_scaled_py2 = l_px2 * self.scale_factor * upscale_factor, l_py2 * self.scale_factor * upscale_factor
     
-                    # ズーム時はboxオフセットを引く
                     if is_zoomed and box:
                         l_px1_rel = l_scaled_px1 - box[0] * upscale_factor
                         l_py1_rel = l_scaled_py1 - box[1] * upscale_factor
@@ -250,7 +249,7 @@ class MapRenderer:
         lines_down = upscaled_lines.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
         map_to_draw_on.alpha_composite(lines_down)
     
-        # 領地矩形描画（全領地分・必ずbox補正・RGBAで）
+        # 領地矩形描画（upscale_factorなし・box補正あり）
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
         draw = ImageDraw.Draw(map_to_draw_on)
@@ -261,7 +260,6 @@ class MapRenderer:
             scaled_font = ImageFont.load_default()
     
         for name, info in self.local_territories.items():
-            # ここは必ず'Location'と'guild'が必要
             if 'Location' not in info or 'guild' not in info:
                 continue
             t_px1, t_py1 = self._coord_to_pixel(*info["Location"]["start"])
@@ -275,8 +273,8 @@ class MapRenderer:
                 t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
             x_min, x_max = sorted([t_px1_rel, t_px2_rel])
             y_min, y_max = sorted([t_py1_rel, t_py2_rel])
-            # クロップ範囲内判定（0 < x_max, x_min < width, ...）
-            if x_max > 0 and y_max > 0 and x_min < map_to_draw_on.width and y_min < map_to_draw_on.height:
+            # クロップ範囲内判定（0 <= x_max, x_min <= width, ...）
+            if x_max >= 0 and y_max >= 0 and x_min <= map_to_draw_on.width and y_min <= map_to_draw_on.height:
                 prefix = info["guild"]["prefix"]
                 color_hex = guild_color_map.get(prefix, "#FFFFFF")
                 color_rgb = self._hex_to_rgb(color_hex)
