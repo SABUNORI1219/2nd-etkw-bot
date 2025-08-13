@@ -50,7 +50,8 @@ RANK_ROLE_ID_MAP = {
 }
 
 ROLE_ID_TO_RANK = {
-    1240476623090876516: "Owner",   # Owner Chikuwa-Chikuwa Kaiseki
+    1240476623090876516: "Owner",   # Owner Chikuwa-Owner
+    1127967768520704250: "Chief",   # Shiny Mythic Chikuwa-Chikuwa Kaiseki
     1132652296635961385: "Chief",   # Mythic Chikuwa-Gomoku-ni
     1138142855517446144: "Chief",   # Fabled Chikuwa-Nishime
     1166030526214320178: "Strategist",   # Set Chikuwa-Oden
