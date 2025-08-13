@@ -418,6 +418,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         # それ以外は "N/A" のまま
         
         embed = discord.Embed(title=db_data['mcid'], color=discord.Color.green())
+        embed.set_thumbnail(url=f"https://www.mc-heads.net/head/{db_data['mcid']}")
         embed.add_field(name="Rank", value=f"`{db_data['rank']}`", inline=False)
         embed.add_field(name="Last Seen", value=f"`{last_seen}`", inline=False)
         if db_data['discord_id']:
