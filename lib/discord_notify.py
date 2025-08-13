@@ -102,7 +102,10 @@ async def notify_member_left_discord(bot, member_data):
         color=discord.Color.orange()
     )
     embed.add_field(name="MCID", value=f"`{member_data.get('mcid', 'N/A')}`", inline=True)
-    embed.add_field(name="Discord", value=f"<@{member_data.get('discord_id', 'N/A')}>", inline=True)
+    if member_data['discord_id']:
+        embed.add_field(name="Discord", value=f"<@{member_data.get('discord_id', 'N/A')}>", inline=True)
+    else:
+        embed.add_field(name="Discord", value="Discordなし", inline=True)
     embed.add_field(name="Rank", value=f"`{member_data.get('rank', 'N/A')}`", inline=True)
     embed.set_footer(text="脱退通知 | Minister Chikuwa")
     await channel.send(embed=embed)
