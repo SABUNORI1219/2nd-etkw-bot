@@ -215,7 +215,8 @@ class MapRenderer:
         up_w, up_h = int(map_to_draw_on.width * upscale_factor), int(map_to_draw_on.height * upscale_factor)
         upscaled_lines = Image.new("RGBA", (up_w, up_h), (0, 0, 0, 0))
         draw_lines = ImageDraw.Draw(upscaled_lines)
-    
+
+        logger.warning(f"[DEBUG] _draw_trading_and_territories: keys={list(self.local_territories.keys())}, length={len(self.local_territories)}")
         for name, data in self.local_territories.items():
             if "Trading Routes" not in data or "Location" not in data:
                 continue
