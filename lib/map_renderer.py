@@ -124,11 +124,10 @@ class MapRenderer:
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
     
-        # 1. Connが2個以上多いものがあればそれを優先
+        # 1. Connが2個以上多い領地がある場合のみConn最大を優先
         max_conn = max(x["conn"] for x in top5)
-        conn2plus = [x for x in top5 if (max_conn - x["conn"]) >= 2]
-        if conn2plus:
-            # Connが最大なもの
+        conn_values = [x["conn"] for x in top5]
+        if any((max_conn - c) >= 2 for c in conn_values if c != max_conn):
             conn_maxs = [x for x in top5 if x["conn"] == max_conn]
             return conn_maxs[0]["name"], hq_stats, top5, total_res
     
