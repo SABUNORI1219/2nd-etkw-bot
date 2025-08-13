@@ -93,7 +93,7 @@ class MapRenderer:
 
     def _pick_hq_candidate(self, owned_territories, territory_api_data, exclude_lost=None):
         """
-        HQ候補地判定ロジック
+        HQ候補地判定ロジック（方針に完全準拠版）
         owned_territories: 領地名セット
         territory_api_data: API取得領地データ
         exclude_lost: HQ候補から除外する領地(set)
@@ -102,7 +102,7 @@ class MapRenderer:
         for t in owned_territories:
             if exclude_lost and t in exclude_lost:
                 continue
-            conn, ext, hq_buff = self._calc_conn_ext_hqbuff(owned_territories, t)
+            conn, ext, _ = self._calc_conn_ext_hqbuff(owned_territories, t)  # HQバフは不要
             acquired = territory_api_data.get(t, {}).get("acquired", "")
             if not acquired:
                 acquired = "9999-12-31T23:59:59.999999Z"
@@ -111,7 +111,6 @@ class MapRenderer:
                 "name": t,
                 "conn": conn,
                 "ext": ext,
-                "hq_buff": hq_buff,
                 "is_city": is_city,
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
@@ -120,45 +119,55 @@ class MapRenderer:
         if not hq_stats:
             return None, [], [], {}
     
-        # Conn含むExt多い順→Conn多い順→HQバフ多い順→取得時刻古い順
-        hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
+        # Conn含むExt多い順→Conn多い順→取得時刻古い順
+        hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], x["acquired"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
     
-        # 1. Conn > Ext最大グループのConn + 2 なら優先
-        max_ext = max(x["ext"] for x in top5)
-        ext_max_group = [x for x in top5 if x["ext"] == max_ext]
-        ext_max_conn = max(x["conn"] for x in ext_max_group)
-        conn2plus_candidates = [x for x in top5 if x["conn"] >= ext_max_conn + 2]
-        if conn2plus_candidates:
-            conn2plus_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
-            return conn2plus_candidates[0]["name"], hq_stats, top5, total_res
-    
-        # 2. Conn最大グループでConn+Ext<20なら街領地優先
+        # 1. Connが2個以上多いものがあればそれを優先
         max_conn = max(x["conn"] for x in top5)
-        conn_eq_group = [x for x in top5 if x["conn"] == max_conn]
-        conn_ext_lt20 = [x for x in conn_eq_group if (x["conn"] + x["ext"]) < 20]
-        if conn_ext_lt20:
-            city = next((x for x in conn_ext_lt20 if x["is_city"]), None)
-            if city:
-                return city["name"], hq_stats, top5, total_res
-            conn_ext_max = max(x["conn"] + x["ext"] for x in conn_ext_lt20)
-            ext_maxs = [x for x in conn_ext_lt20 if (x["conn"] + x["ext"]) == conn_ext_max]
-            return ext_maxs[0]["name"], hq_stats, top5, total_res
-        # Ext>=20ならConn+Ext最大の方を優先
-        conn_ext_ge20 = [x for x in conn_eq_group if (x["conn"] + x["ext"]) >= 20]
-        if conn_ext_ge20:
-            conn_ext_max = max(x["conn"] + x["ext"] for x in conn_ext_ge20)
-            ext_maxs = [x for x in conn_ext_ge20 if (x["conn"] + x["ext"]) == conn_ext_max]
-            return ext_maxs[0]["name"], hq_stats, top5, total_res
+        conn2plus = [x for x in top5 if (max_conn - x["conn"]) >= 2]
+        if conn2plus:
+            # Connが最大なもの
+            conn_maxs = [x for x in top5 if x["conn"] == max_conn]
+            return conn_maxs[0]["name"], hq_stats, top5, total_res
     
-        # 3. 所持領地が6個以下の場合、Time Heldが一番長い箇所
+        # 2. Conn含むExt合計が最大のもの（同値複数ならConn多い方）
+        max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
+        conn_ext_group = [x for x in top5 if (x["conn"] + x["ext"]) == max_conn_ext]
+        if len(conn_ext_group) > 1:
+            conn_max_val = max(x["conn"] for x in conn_ext_group)
+            conn_maxs = [x for x in conn_ext_group if x["conn"] == conn_max_val]
+            if len(conn_maxs) == 1:
+                return conn_maxs[0]["name"], hq_stats, top5, total_res
+        else:
+            conn_maxs = conn_ext_group
+    
+        # 3. 所持領地が6個以下なら取得時刻最古
         if len(owned_territories) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
     
-        # 4. Conn,Ext同値なら資源バランス優先
-        if len(conn_eq_group) > 1 and all(x["conn"] == conn_eq_group[0]["conn"] and x["ext"] == conn_eq_group[0]["ext"] for x in conn_eq_group):
+        # 4. Conn同値かつConn+Ext<20なら街領地優先
+        if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] for x in conn_maxs):
+            conn_ext_lt20 = [x for x in conn_maxs if (x["conn"] + x["ext"]) < 20]
+            if conn_ext_lt20:
+                city = next((x for x in conn_ext_lt20 if x["is_city"]), None)
+                if city:
+                    return city["name"], hq_stats, top5, total_res
+                # 街領地なければConn+Ext最大
+                conn_ext_max = max(x["conn"] + x["ext"] for x in conn_ext_lt20)
+                ext_maxs = [x for x in conn_ext_lt20 if (x["conn"] + x["ext"]) == conn_ext_max]
+                return ext_maxs[0]["name"], hq_stats, top5, total_res
+            # Ext>=20ならConn+Ext最大
+            conn_ext_ge20 = [x for x in conn_maxs if (x["conn"] + x["ext"]) >= 20]
+            if conn_ext_ge20:
+                conn_ext_max = max(x["conn"] + x["ext"] for x in conn_ext_ge20)
+                ext_maxs = [x for x in conn_ext_ge20 if (x["conn"] + x["ext"]) == conn_ext_max]
+                return ext_maxs[0]["name"], hq_stats, top5, total_res
+    
+        # 5. Conn,Ext同値なら資源バランス優先
+        if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
             res_priority = ["crops", "ore", "wood", "fish"]
             min_val = float("inf")
             min_type = None
@@ -186,8 +195,8 @@ class MapRenderer:
                 res_territories = [x for x in hq_stats if int(x["resources"].get(min_type, "0")) > 0]
                 res_names = [x["name"] for x in res_territories]
                 min_dist = float("inf")
-                best_cand = conn_eq_group[0]
-                for cand in conn_eq_group:
+                best_cand = conn_maxs[0]
+                for cand in conn_maxs:
                     d = trading_route_distance(cand["name"], set(res_names))
                     if d < min_dist:
                         min_dist = d
