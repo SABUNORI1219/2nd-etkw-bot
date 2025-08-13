@@ -201,99 +201,99 @@ class MapRenderer:
 
         return top5[0]["name"], hq_stats, top5, total_res
 
-        def _draw_trading_and_territories(
-            self,
-            map_to_draw_on,
-            box,
-            is_zoomed,
-            territory_data,
-            guild_color_map,
-            hq_territories=None,
-            upscale_factor=2
-        ):
-            # コネクション線の描画（アップスケールはコネクション線だけ！）
-            up_w, up_h = int(map_to_draw_on.width * upscale_factor), int(map_to_draw_on.height * upscale_factor)
-            upscaled_lines = Image.new("RGBA", (up_w, up_h), (0, 0, 0, 0))
-            draw_lines = ImageDraw.Draw(upscaled_lines)
-    
-            for name, data in self.local_territories.items():
-                if "Trading Routes" not in data or "Location" not in data:
-                    continue
-                try:
-                    x1 = (data["Location"]["start"][0] + data["Location"]["end"][0]) // 2
-                    z1 = (data["Location"]["start"][1] + data["Location"]["end"][1]) // 2
-                    l_px1, l_py1 = self._coord_to_pixel(x1, z1)
-                    l_scaled_px1, l_scaled_py1 = l_px1 * self.scale_factor * upscale_factor, l_py1 * self.scale_factor * upscale_factor
-                    for destination_name in data["Trading Routes"]:
-                        dest_data = self.local_territories.get(destination_name)
-                        if not dest_data or "Location" not in dest_data:
-                            continue
-                        x2 = (dest_data["Location"]["start"][0] + dest_data["Location"]["end"][0]) // 2
-                        z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
-                        l_px2, l_py2 = self._coord_to_pixel(x2, z2)
-                        l_scaled_px2, l_scaled_py2 = l_px2 * self.scale_factor * upscale_factor, l_py2 * self.scale_factor * upscale_factor
-    
-                        if is_zoomed and box:
-                            l_px1_rel = l_scaled_px1 - box[0] * upscale_factor
-                            l_py1_rel = l_scaled_py1 - box[1] * upscale_factor
-                            l_px2_rel = l_scaled_px2 - box[0] * upscale_factor
-                            l_py2_rel = l_scaled_py2 - box[1] * upscale_factor
-                            points = [(l_px1_rel, l_py1_rel), (l_px2_rel, l_py2_rel)]
-                        else:
-                            points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
-    
-                        color_rgb = (30, 30, 30)
-                        draw_lines.line(points, fill=(*color_rgb, 180), width=4)
-                except KeyError:
-                    continue
-    
-            lines_down = upscaled_lines.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
-            map_to_draw_on.alpha_composite(lines_down)
-    
-            # 領地描画（アップスケールは絶対使わない！！）
-            overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
-            overlay_draw = ImageDraw.Draw(overlay)
-            draw = ImageDraw.Draw(map_to_draw_on)
-            scaled_font_size = max(12, int(self.font.size * self.scale_factor))
+    def _draw_trading_and_territories(
+        self,
+        map_to_draw_on,
+        box,
+        is_zoomed,
+        territory_data,
+        guild_color_map,
+        hq_territories=None,
+        upscale_factor=2
+    ):
+        # コネクション線の描画（アップスケールはコネクション線だけ！）
+        up_w, up_h = int(map_to_draw_on.width * upscale_factor), int(map_to_draw_on.height * upscale_factor)
+        upscaled_lines = Image.new("RGBA", (up_w, up_h), (0, 0, 0, 0))
+        draw_lines = ImageDraw.Draw(upscaled_lines)
+
+        for name, data in self.local_territories.items():
+            if "Trading Routes" not in data or "Location" not in data:
+                continue
             try:
-                scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
-            except IOError:
-                scaled_font = ImageFont.load_default()
-    
-            for name, info in self.local_territories.items():
-                if 'Location' not in info or 'guild' not in info:
-                    continue
-                t_px1, t_py1 = self._coord_to_pixel(*info["Location"]["start"])
-                t_px2, t_py2 = self._coord_to_pixel(*info["Location"]["end"])
-                t_scaled_px1, t_scaled_py1 = t_px1 * self.scale_factor, t_py1 * self.scale_factor
-                t_scaled_px2, t_scaled_py2 = t_px2 * self.scale_factor, t_py2 * self.scale_factor
-                if is_zoomed and box:
-                    t_px1_rel, t_px2_rel = t_scaled_px1 - box[0], t_scaled_px2 - box[0]
-                    t_py1_rel, t_py2_rel = t_scaled_py1 - box[1], t_scaled_py2 - box[1]
-                else:
-                    t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
-                x_min, x_max = sorted([t_px1_rel, t_px2_rel])
-                y_min, y_max = sorted([t_py1_rel, t_py2_rel])
-                # ここで判定はmap_to_draw_onのサイズのみを使う（アップスケールの影響を絶対排除）
-                if x_max >= 0 and y_max >= 0 and x_min <= map_to_draw_on.width and y_min <= map_to_draw_on.height:
-                    prefix = info["guild"]["prefix"]
-                    color_hex = guild_color_map.get(prefix, "#FFFFFF")
-                    color_rgb = self._hex_to_rgb(color_hex)
-                    overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
-                    draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
-                    if hq_territories and name in hq_territories:
+                x1 = (data["Location"]["start"][0] + data["Location"]["end"][0]) // 2
+                z1 = (data["Location"]["start"][1] + data["Location"]["end"][1]) // 2
+                l_px1, l_py1 = self._coord_to_pixel(x1, z1)
+                l_scaled_px1, l_scaled_py1 = l_px1 * self.scale_factor * upscale_factor, l_py1 * self.scale_factor * upscale_factor
+                for destination_name in data["Trading Routes"]:
+                    dest_data = self.local_territories.get(destination_name)
+                    if not dest_data or "Location" not in dest_data:
                         continue
-                    draw.text(
-                        ((x_min + x_max) / 2, (y_min + y_max) / 2),
-                        prefix,
-                        font=scaled_font,
-                        fill=color_rgb,
-                        anchor="mm",
-                        stroke_width=2,
-                        stroke_fill="black"
-                    )
-            map_to_draw_on.alpha_composite(overlay)
-            return map_to_draw_on
+                    x2 = (dest_data["Location"]["start"][0] + dest_data["Location"]["end"][0]) // 2
+                    z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
+                    l_px2, l_py2 = self._coord_to_pixel(x2, z2)
+                    l_scaled_px2, l_scaled_py2 = l_px2 * self.scale_factor * upscale_factor, l_py2 * self.scale_factor * upscale_factor
+
+                    if is_zoomed and box:
+                        l_px1_rel = l_scaled_px1 - box[0] * upscale_factor
+                        l_py1_rel = l_scaled_py1 - box[1] * upscale_factor
+                        l_px2_rel = l_scaled_px2 - box[0] * upscale_factor
+                        l_py2_rel = l_scaled_py2 - box[1] * upscale_factor
+                        points = [(l_px1_rel, l_py1_rel), (l_px2_rel, l_py2_rel)]
+                    else:
+                        points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
+
+                    color_rgb = (30, 30, 30)
+                    draw_lines.line(points, fill=(*color_rgb, 180), width=4)
+            except KeyError:
+                continue
+
+        lines_down = upscaled_lines.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
+        map_to_draw_on.alpha_composite(lines_down)
+
+        # 領地描画（アップスケールは絶対使わない！！）
+        overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
+        overlay_draw = ImageDraw.Draw(overlay)
+        draw = ImageDraw.Draw(map_to_draw_on)
+        scaled_font_size = max(12, int(self.font.size * self.scale_factor))
+        try:
+            scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
+        except IOError:
+            scaled_font = ImageFont.load_default()
+
+        for name, info in self.local_territories.items():
+            if 'Location' not in info or 'guild' not in info:
+                continue
+            t_px1, t_py1 = self._coord_to_pixel(*info["Location"]["start"])
+            t_px2, t_py2 = self._coord_to_pixel(*info["Location"]["end"])
+            t_scaled_px1, t_scaled_py1 = t_px1 * self.scale_factor, t_py1 * self.scale_factor
+            t_scaled_px2, t_scaled_py2 = t_px2 * self.scale_factor, t_py2 * self.scale_factor
+            if is_zoomed and box:
+                t_px1_rel, t_px2_rel = t_scaled_px1 - box[0], t_scaled_px2 - box[0]
+                t_py1_rel, t_py2_rel = t_scaled_py1 - box[1], t_scaled_py2 - box[1]
+            else:
+                t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
+            x_min, x_max = sorted([t_px1_rel, t_px2_rel])
+            y_min, y_max = sorted([t_py1_rel, t_py2_rel])
+            # ここで判定はmap_to_draw_onのサイズのみを使う（アップスケールの影響を絶対排除）
+            if x_max >= 0 and y_max >= 0 and x_min <= map_to_draw_on.width and y_min <= map_to_draw_on.height:
+                prefix = info["guild"]["prefix"]
+                color_hex = guild_color_map.get(prefix, "#FFFFFF")
+                color_rgb = self._hex_to_rgb(color_hex)
+                overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
+                draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
+                if hq_territories and name in hq_territories:
+                    continue
+                draw.text(
+                    ((x_min + x_max) / 2, (y_min + y_max) / 2),
+                    prefix,
+                    font=scaled_font,
+                    fill=color_rgb,
+                    anchor="mm",
+                    stroke_width=2,
+                    stroke_fill="black"
+                )
+        map_to_draw_on.alpha_composite(overlay)
+        return map_to_draw_on
 
     def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False, map_to_draw_on=None, owned_territories_map=None):
         if map_to_draw_on is None:
