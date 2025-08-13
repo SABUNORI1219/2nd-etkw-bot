@@ -474,9 +474,6 @@ class MapRenderer:
         territory_data: dict,
         guild_color_map: dict
     ) -> BytesIO | None:
-        """
-        領地名、APIの全territoryデータ、ギルドカラーマップを受け取り、単一領地画像を生成する。
-        """
         logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
     
         # 静的データ（位置等）はself.local_territoriesから
@@ -496,13 +493,30 @@ class MapRenderer:
             logger.error(f"領地 {territory} の所有ギルドprefixがAPIデータにありません")
             return None
     
+        # 全領地描画（コネクション線・矩形・HQ王冠・プレフィクス含む）
         map_to_draw_on = self.resized_map.copy()
+        # boxはまだ未設定
         box = None
+        # HQ候補計算
+        owned_territories_map = None  # 必要なら設定
     
-        color_hex = guild_color_map.get(owner_prefix, "#FFFFFF")
-        color_rgb = self._hex_to_rgb(color_hex)
+        # ここで全体描画
+        # territory_dataはAPI, guild_color_mapは色
+        # box, is_zoomedはNone/FalseでOK（単一領地なので）
+        # HQ王冠も通常通り描画される
+        final_map, _ = self.draw_guild_hq_on_map(
+            territory_data=territory_data,
+            guild_color_map=guild_color_map,
+            territory_api_data=territory_data,
+            box=None,
+            is_zoomed=False,
+            map_to_draw_on=map_to_draw_on,
+            owned_territories_map=owned_territories_map
+        )
     
-        loc = terri_static.get("Location", {})
+        # ここで「指定領地だけ」枠線・円など強調
+        static = terri_static
+        loc = static.get("Location", {})
         px1, py1 = self._coord_to_pixel(*loc.get("start", [0, 0]))
         px2, py2 = self._coord_to_pixel(*loc.get("end", [0, 0]))
         px1, py1 = px1 * self.scale_factor, py1 * self.scale_factor
@@ -530,18 +544,24 @@ class MapRenderer:
         territory_height = abs(py2 - py1)
         highlight_radius = int(sqrt(territory_width ** 2 + territory_height ** 2) / 2)
     
-        draw = ImageDraw.Draw(map_to_draw_on)
+        draw = ImageDraw.Draw(final_map)
+        # 円
         draw.ellipse(
             [(center_x - highlight_radius, center_y - highlight_radius),
              (center_x + highlight_radius, center_y + highlight_radius)],
             outline="gold",
             width=3
         )
+        # 枠線
+        color_hex = guild_color_map.get(owner_prefix, "#FFFFFF")
+        color_rgb = self._hex_to_rgb(color_hex)
         draw.rectangle([left, top, right, bottom], outline=color_rgb, width=5)
     
-        cropped_image = map_to_draw_on.crop(box)
+        # クロップ
+        cropped_image = final_map.crop(box)
         map_bytes = BytesIO()
         cropped_image.save(map_bytes, format='PNG')
         map_bytes.seek(0)
         logger.info(f"--- [MapRenderer] ✅ 画像生成成功。")
         return map_bytes
+    
