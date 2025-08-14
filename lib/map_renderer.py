@@ -121,19 +121,28 @@ class MapRenderer:
         total_res = self._sum_resources(owned_territories)
         logger.info(f"[HQ候補] {debug_prefix}: top5 = {[{'name': x['name'], 'conn': x['conn'], 'ext': x['ext'], 'hq_buff': x['hq_buff'], 'is_city': x['is_city'], 'acquired': x['acquired']} for x in top5]} (全{len(hq_stats)}件)")
     
-        # Conn最大値がユニークで、他全てより2以上多い
-        max_conn = max(x["conn"] for x in top5)
-        conn_max_cands = [x for x in top5 if x["conn"] == max_conn]
-        conn_diffs = [max_conn - x["conn"] for x in top5 if x["conn"] != max_conn]
-        logger.info(f"[HQ候補] {debug_prefix}: Conn最大値: {max_conn} / Conn最大グループ: {[x['name'] for x in conn_max_cands]} / Conn差分: {conn_diffs}")
-        if len(conn_max_cands) == 1 and all(diff >= 2 for diff in conn_diffs):
-            logger.info(f"[HQ候補] {debug_prefix}: Conn最大値({conn_max_cands[0]['name']})がConn2全差分岐でHQ選定")
-            return conn_max_cands[0]["name"], hq_stats, top5, total_res
-    
-        # Conn+Ext最大グループ→Conn最大ユニークならHQ
+        # Conn+Ext最大グループ（ネットワーク力最強グループ）抽出
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
         conn_ext_tops = [x for x in top5 if x["conn"] + x["ext"] == max_conn_ext]
-        logger.info(f"[HQ候補] {debug_prefix}: Conn+Ext最大グループ: {[x['name'] for x in conn_ext_tops]}")
+        conn_ext_top_names = [x["name"] for x in conn_ext_tops]
+        logger.info(f"[HQ候補] {debug_prefix}: Conn+Ext最大グループ: {conn_ext_top_names}")
+    
+        # Conn+Ext最大グループ以外のtop5領地で、Conn値が2個以上多いやつを探す
+        other_top5 = [x for x in top5 if x not in conn_ext_tops]
+        hq_conn_candidates = []
+        max_group_conn = max(x["conn"] for x in conn_ext_tops)
+        for cand in other_top5:
+            if cand["conn"] - max_group_conn >= 2:
+                hq_conn_candidates.append(cand)
+        logger.info(f"[HQ候補] {debug_prefix}: Conn+Ext最大グループ以外でConn2差候補: {[x['name'] for x in hq_conn_candidates]}")
+    
+        # もし該当があればその中でConn値最大のものをHQに
+        if hq_conn_candidates:
+            hq_conn_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
+            logger.info(f"[HQ候補] {debug_prefix}: Conn2差分岐でHQ選定: {hq_conn_candidates[0]['name']}")
+            return hq_conn_candidates[0]["name"], hq_stats, top5, total_res
+    
+        # Conn+Ext最大グループ内で複数ある場合はConn最大ユニークならHQ
         if len(conn_ext_tops) > 1:
             conn_max_in_group = max(x["conn"] for x in conn_ext_tops)
             conn_maxs = [x for x in conn_ext_tops if x["conn"] == conn_max_in_group]
@@ -144,7 +153,7 @@ class MapRenderer:
         else:
             conn_maxs = conn_ext_tops
     
-        # 領地6個以下なら取得時刻最古
+        # 所持領地6個以下なら取得時刻最古
         if len(owned_territories) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             logger.info(f"[HQ候補] {debug_prefix}: 領地6以下分岐でHQ選定: {oldest['name']}")
@@ -218,8 +227,8 @@ class MapRenderer:
                 return best_cand["name"], hq_stats, top5, total_res
     
         # fallback
-        logger.info(f"[HQ候補] {debug_prefix}: fallback分岐（top5最初）でHQ選定: {top5[0]['name']}")
-        return top5[0]["name"], hq_stats, top5, total_res
+        logger.info(f"[HQ候補] {debug_prefix}: fallback分岐（Conn+Ext最大グループ代表）でHQ選定: {conn_ext_tops[0]['name']}")
+        return conn_ext_tops[0]["name"], hq_stats, top5, total_res
 
     def _draw_trading_and_territories(
         self,
