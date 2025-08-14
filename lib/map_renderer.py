@@ -121,17 +121,13 @@ class MapRenderer:
         total_res = self._sum_resources(owned_territories)
         logger.info(f"[HQ候補] {debug_prefix}: top5 = {[{'name': x['name'], 'conn': x['conn'], 'ext': x['ext'], 'hq_buff': x['hq_buff'], 'is_city': x['is_city'], 'acquired': x['acquired']} for x in top5]} (全{len(hq_stats)}件)")
     
-        # 1. Connが2個以上多いもの優先（top5内のConn最大を基準に判定）
-        top5_conns = [x["conn"] for x in top5]
-        conn2plus_cands = []
-        for cand in top5:
-            if all((cand["conn"] - other["conn"] >= 2) for other in top5 if other != cand):
-                conn2plus_cands.append(cand)
-        logger.info(f"[HQ候補] {debug_prefix}: Conn2差候補: {[x['name'] for x in conn2plus_cands]}")
-        if conn2plus_cands:
-            conn2plus_cands.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
-            logger.info(f"[HQ候補] {debug_prefix}: Conn2差分岐でHQ選定: {conn2plus_cands[0]['name']}")
-            return conn2plus_cands[0]["name"], hq_stats, top5, total_res
+        # 1. Ext最大の領地と他4つのConn値比較（Ext最大領地がConn2差ならそれをHQに）
+        ext_max_cand = top5[0]
+        conn_diffs = [ext_max_cand["conn"] - x["conn"] for x in top5[1:]]
+        logger.info(f"[HQ候補] {debug_prefix}: Ext最大領地({ext_max_cand['name']}) Conn差分: {conn_diffs}")
+        if all(diff >= 2 for diff in conn_diffs):
+            logger.info(f"[HQ候補] {debug_prefix}: Ext最大領地({ext_max_cand['name']})がConn2差分岐でHQ選定")
+            return ext_max_cand["name"], hq_stats, top5, total_res
     
         # 2. Conn含むExt同数複数→Conn多い方
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
