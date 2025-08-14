@@ -112,20 +112,17 @@ class MapRenderer:
             })
     
         if not hq_stats:
-            logger.info(f"[HQ候補] {debug_prefix}: 候補なし")
             return None, [], [], {}
     
         # Conn+Ext多い順→Conn多い順→HQバフ多い順→取得時刻古い順
         hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
-        logger.info(f"[HQ候補] {debug_prefix}: top5 = {[{'name': x['name'], 'conn': x['conn'], 'ext': x['ext'], 'hq_buff': x['hq_buff'], 'is_city': x['is_city'], 'acquired': x['acquired']} for x in top5]} (全{len(hq_stats)}件)")
     
         # Conn+Ext最大グループ（ネットワーク力最強グループ）抽出
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
         conn_ext_tops = [x for x in top5 if x["conn"] + x["ext"] == max_conn_ext]
         conn_ext_top_names = [x["name"] for x in conn_ext_tops]
-        logger.info(f"[HQ候補] {debug_prefix}: Conn+Ext最大グループ: {conn_ext_top_names}")
     
         # Conn+Ext最大グループ以外のtop5領地で、Conn値が2個以上多いやつを探す
         other_top5 = [x for x in top5 if x not in conn_ext_tops]
@@ -134,21 +131,17 @@ class MapRenderer:
         for cand in other_top5:
             if cand["conn"] - max_group_conn >= 2:
                 hq_conn_candidates.append(cand)
-        logger.info(f"[HQ候補] {debug_prefix}: Conn+Ext最大グループ以外でConn2差候補: {[x['name'] for x in hq_conn_candidates]}")
     
         # もし該当があればその中でConn値最大のものをHQに
         if hq_conn_candidates:
             hq_conn_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
-            logger.info(f"[HQ候補] {debug_prefix}: Conn2差分岐でHQ選定: {hq_conn_candidates[0]['name']}")
             return hq_conn_candidates[0]["name"], hq_stats, top5, total_res
     
         # Conn+Ext最大グループ内で複数ある場合はConn最大ユニークならHQ
         if len(conn_ext_tops) > 1:
             conn_max_in_group = max(x["conn"] for x in conn_ext_tops)
             conn_maxs = [x for x in conn_ext_tops if x["conn"] == conn_max_in_group]
-            logger.info(f"[HQ候補] {debug_prefix}: Conn+Ext最大グループ内Conn最大: {[x['name'] for x in conn_maxs]}")
             if len(conn_maxs) == 1:
-                logger.info(f"[HQ候補] {debug_prefix}: Conn+Ext最大グループ内Conn最大単独分岐でHQ選定: {conn_maxs[0]['name']}")
                 return conn_maxs[0]["name"], hq_stats, top5, total_res
         else:
             conn_maxs = conn_ext_tops
@@ -156,7 +149,6 @@ class MapRenderer:
         # 所持領地6個以下なら取得時刻最古
         if len(owned_territories) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
-            logger.info(f"[HQ候補] {debug_prefix}: 領地6以下分岐でHQ選定: {oldest['name']}")
             return oldest["name"], hq_stats, top5, total_res
     
         # Conn同数&Ext<20で街領地あれば優先
@@ -164,21 +156,16 @@ class MapRenderer:
             ext_lt20 = [x for x in conn_maxs if x["ext"] < 20]
             logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20グループ: {[x['name'] for x in ext_lt20]}")
             city = next((x for x in ext_lt20 if x["is_city"]), None)
-            logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20グループに街領地: {city['name'] if city else 'なし'}")
             if city:
-                logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20街領地優先分岐でHQ選定: {city['name']}")
                 return city["name"], hq_stats, top5, total_res
             ext_ge20 = [x for x in conn_maxs if x["ext"] >= 20]
             if ext_ge20:
                 conn_ext_max = max(x["conn"] + x["ext"] for x in ext_ge20)
                 ext_maxs = [x for x in ext_ge20 if (x["conn"] + x["ext"]) == conn_ext_max]
-                logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext>=20グループ: {[x['name'] for x in ext_maxs]}")
                 if len(ext_maxs) == 1:
-                    logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext>=20グループExt+Conn最大単独分岐でHQ選定: {ext_maxs[0]['name']}")
                     return ext_maxs[0]["name"], hq_stats, top5, total_res
                 else:
                     hq_max = max(ext_maxs, key=lambda x: x["hq_buff"])
-                    logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext>=20グループHQバフ最大分岐でHQ選定: {hq_max['name']}")
                     return hq_max["name"], hq_stats, top5, total_res
     
         # Ext,Conn同値→資源判定
@@ -191,7 +178,6 @@ class MapRenderer:
                 if val > 0 and val < min_val:
                     min_val = val
                     min_type = rtype
-            logger.info(f"[HQ候補] {debug_prefix}: Conn,Ext同値資源バランス分岐判定: min_type={min_type}, min_val={min_val}")
             if min_type:
                 from math import inf
                 def trading_route_distance(start, goals):
@@ -223,11 +209,9 @@ class MapRenderer:
                         best_res = int(self.local_territories[best_cand["name"]].get("resources", {}).get(min_type, "0"))
                         if cand_res > best_res:
                             best_cand = cand
-                logger.info(f"[HQ候補] {debug_prefix}: Conn,Ext同値資源バランス分岐でHQ選定: {best_cand['name']}")
                 return best_cand["name"], hq_stats, top5, total_res
     
         # fallback
-        logger.info(f"[HQ候補] {debug_prefix}: fallback分岐（Conn+Ext最大グループ代表）でHQ選定: {conn_ext_tops[0]['name']}")
         return conn_ext_tops[0]["name"], hq_stats, top5, total_res
 
     def _draw_trading_and_territories(
