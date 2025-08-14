@@ -133,10 +133,6 @@ class Territory(commands.GroupCog, name="territory"):
         await interaction.response.defer()
         logger.info(f"--- [TerritoryCmd] /territory map が実行されました by {interaction.user}")
 
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
-            return
-
         # WynncraftAPIで領地データ・ギルドカラー取得
         territory_data = await self.wynn_api.get_territory_list()
         guild_color_map = await self.wynn_api.get_guild_color_map()
@@ -183,10 +179,6 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.describe(territory="Territory Name")
     async def status(self, interaction: discord.Interaction, territory: str):
         await interaction.response.defer()
-
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
-            return
 
         static_data = self.map_renderer.local_territories.get(territory)
         guild_color_map = await self.wynn_api.get_guild_color_map()
