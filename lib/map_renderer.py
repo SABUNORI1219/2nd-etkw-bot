@@ -144,14 +144,15 @@ class MapRenderer:
             logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20グループ: {[x['name'] for x in conn_ext_lt20]}")
             city = next((x for x in conn_ext_lt20 if x["is_city"]), None)
             logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20グループに街領地: {city['name'] if city else 'なし'}")
-            if city:
-                logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20街領地優先分岐でHQ選定: {city['name']}")
-                return city["name"], hq_stats, top5, total_res
-            # 街領地なければExt最大
-            conn_ext_max = max(x["ext"] for x in conn_ext_lt20)
-            ext_maxs = [x for x in conn_ext_lt20 if x["ext"] == conn_ext_max]
-            logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20分岐（街領地なし）Ext最大でHQ選定: {ext_maxs[0]['name']}")
-            return ext_maxs[0]["name"], hq_stats, top5, total_res
+            if conn_ext_lt20:
+                if city:
+                    logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20街領地優先分岐でHQ選定: {city['name']}")
+                    return city["name"], hq_stats, top5, total_res
+                else:
+                    conn_ext_max = max(x["ext"] for x in conn_ext_lt20)
+                    ext_maxs = [x for x in conn_ext_lt20 if x["ext"] == conn_ext_max]
+                    logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20分岐（街領地なし）Ext最大でHQ選定: {ext_maxs[0]['name']}")
+                    return ext_maxs[0]["name"], hq_stats, top5, total_res
     
         # 4. Ext最大値グループ（同値複数ならConn値が大きい方、Connまで同じなら取得時刻最古）
         max_ext = max(x["ext"] for x in top5)
