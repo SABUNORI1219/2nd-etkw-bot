@@ -120,7 +120,7 @@ class MapRenderer:
             return None, [], [], {}
     
         # Conn含むExt多い順→Conn多い順→取得時刻古い順
-        hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], x["acquired"]))
+        hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(owned_territories)
     
