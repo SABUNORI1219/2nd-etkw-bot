@@ -97,6 +97,9 @@ class MapRenderer:
         all_owned_territories: Conn/Ext計算用（現所有＋1時間以内失領）
         exclude_lost: 1時間以内失領領地セット（HQ候補から除外）
         """
+        import collections
+        logger = logging.getLogger(__name__)
+
         # Conn/Ext計算用セット（現所有+1時間以内失領）を用意
         if all_owned_territories is None:
             all_owned_territories = set(hq_candidates) | (exclude_lost or set())
@@ -170,26 +173,14 @@ class MapRenderer:
             return oldest["name"], hq_stats, top5, total_res
 
         # Conn同数&Ext<20で街領地あれば優先
-        if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] for x in conn_maxs):
-            ext_lt20 = [x for x in conn_maxs if x["ext"] < 20]
-            logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20グループ: {[x['name'] for x in ext_lt20]}")
+        max_conn = max(x["conn"] for x in top5)
+        conn_top_group = [x for x in top5 if x["conn"] == max_conn]
+        if len(conn_top_group) > 1:
+            ext_lt20 = [x for x in conn_top_group if x["ext"] < 20]
             city = next((x for x in ext_lt20 if x["is_city"]), None)
-            logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20グループに街領地: {city['name'] if city else 'なし'}")
             if city:
-                logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20街領地優先分岐でHQ選定: {city['name']}")
+                logger.info(f"[HQ候補] {debug_prefix}: Conn最大グループExt<20街領地優先分岐でHQ選定: {city['name']}")
                 return city["name"], hq_stats, top5, total_res
-            ext_ge20 = [x for x in conn_maxs if x["ext"] >= 20]
-            if ext_ge20:
-                conn_ext_max = max(x["conn"] + x["ext"] for x in ext_ge20)
-                ext_maxs = [x for x in ext_ge20 if (x["conn"] + x["ext"]) == conn_ext_max]
-                logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext>=20グループ: {[x['name'] for x in ext_maxs]}")
-                if len(ext_maxs) == 1:
-                    logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext>=20グループExt+Conn最大単独分岐でHQ選定: {ext_maxs[0]['name']}")
-                    return ext_maxs[0]["name"], hq_stats, top5, total_res
-                else:
-                    hq_max = max(ext_maxs, key=lambda x: x["hq_buff"])
-                    logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext>=20グループHQバフ最大分岐でHQ選定: {hq_max['name']}")
-                    return hq_max["name"], hq_stats, top5, total_res
 
         # Ext,Conn同値→資源判定
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
