@@ -209,15 +209,15 @@ UUID: {uuid}
         color = discord.Color.green() if is_online else discord.Color.dark_red()
         embed = discord.Embed( description=description, color=color )
 
-            embed.title = f"{escaped_username}"
+        embed.title = f"{escaped_username}"
     
-    embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{uuid}/right")
-    
-    embed.set_footer(
-        text=f"{username}'s Stats | Minister Chikuwa",
-        icon_url=f"https://www.mc-heads.net/avatar/{uuid}"
-    )
-    return embed
+        embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{uuid}/right")
+        
+        embed.set_footer(
+            text=f"{username}'s Stats | Minister Chikuwa",
+            icon_url=f"https://www.mc-heads.net/avatar/{uuid}"
+        )
+        return embed
 
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.command(name="player", description="プレイヤーのステータスを表示")
