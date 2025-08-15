@@ -91,12 +91,23 @@ class MapRenderer:
         # {prefix: set(territory_name)}
         return {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
 
-    def _pick_hq_candidate(self, owned_territories, territory_api_data, exclude_lost=None, debug_prefix=None):
+    def _pick_hq_candidate(self, hq_candidates, territory_api_data, all_owned_territories=None, exclude_lost=None, debug_prefix=None):
+        """
+        hq_candidates: HQ候補地（現所有のみ）
+        all_owned_territories: Conn/Ext計算用（現所有＋1時間以内失領）
+        exclude_lost: 1時間以内失領領地セット（HQ候補から除外）
+        """
+        import collections
+        logger = logging.getLogger(__name__)
+
+        # Conn/Ext計算用セット（現所有+1時間以内失領）を用意
+        if all_owned_territories is None:
+            all_owned_territories = set(hq_candidates) | (exclude_lost or set())
+
         hq_stats = []
-        for t in owned_territories:
-            if exclude_lost and t in exclude_lost:
-                continue
-            conn, ext, hq_buff = self._calc_conn_ext_hqbuff(owned_territories, t)
+        # HQ候補（現所有のみ）でループ
+        for t in hq_candidates:
+            conn, ext, hq_buff = self._calc_conn_ext_hqbuff(all_owned_territories, t)
             acquired = territory_api_data.get(t, {}).get("acquired", "")
             if not acquired:
                 acquired = "9999-12-31T23:59:59.999999Z"
@@ -110,20 +121,19 @@ class MapRenderer:
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
             })
-    
+
         if not hq_stats:
             return None, [], [], {}
-    
+
         # Conn+Ext多い順→Conn多い順→HQバフ多い順→取得時刻古い順
         hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
         top5 = hq_stats[:5]
-        total_res = self._sum_resources(owned_territories)
-    
+        total_res = self._sum_resources(all_owned_territories)
+
         # Conn+Ext最大グループ（ネットワーク力最強グループ）抽出
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
         conn_ext_tops = [x for x in top5 if x["conn"] + x["ext"] == max_conn_ext]
-        conn_ext_top_names = [x["name"] for x in conn_ext_tops]
-    
+
         # Conn+Ext最大グループ以外のtop5領地で、Conn値が2個以上多いやつを探す
         other_top5 = [x for x in top5 if x not in conn_ext_tops]
         hq_conn_candidates = []
@@ -131,12 +141,12 @@ class MapRenderer:
         for cand in other_top5:
             if cand["conn"] - max_group_conn >= 2:
                 hq_conn_candidates.append(cand)
-    
+
         # もし該当があればその中でConn値最大のものをHQに
         if hq_conn_candidates:
             hq_conn_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
             return hq_conn_candidates[0]["name"], hq_stats, top5, total_res
-    
+
         # Conn+Ext最大グループ内で複数ある場合はConn最大ユニークならHQ
         if len(conn_ext_tops) > 1:
             conn_max_in_group = max(x["conn"] for x in conn_ext_tops)
@@ -145,16 +155,15 @@ class MapRenderer:
                 return conn_maxs[0]["name"], hq_stats, top5, total_res
         else:
             conn_maxs = conn_ext_tops
-    
+
         # 所持領地6個以下なら取得時刻最古
-        if len(owned_territories) <= 6:
+        if len(hq_candidates) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
-    
+
         # Conn同数&Ext<20で街領地あれば優先
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] for x in conn_maxs):
             ext_lt20 = [x for x in conn_maxs if x["ext"] < 20]
-            logger.info(f"[HQ候補] {debug_prefix}: Conn同値Ext<20グループ: {[x['name'] for x in ext_lt20]}")
             city = next((x for x in ext_lt20 if x["is_city"]), None)
             if city:
                 return city["name"], hq_stats, top5, total_res
@@ -167,7 +176,7 @@ class MapRenderer:
                 else:
                     hq_max = max(ext_maxs, key=lambda x: x["hq_buff"])
                     return hq_max["name"], hq_stats, top5, total_res
-    
+
         # Ext,Conn同値→資源判定
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
             res_priority = ["crops", "ore", "wood", "fish"]
@@ -192,7 +201,7 @@ class MapRenderer:
                         if current in goals:
                             return dist
                         neighbors = self.local_territories.get(current, {}).get("Trading Routes", [])
-                        neighbors = [n for n in neighbors if n in owned_territories]
+                        neighbors = [n for n in neighbors if n in all_owned_territories]
                         queue.extend((n, dist+1) for n in neighbors)
                     return inf
                 res_territories = [x for x in hq_stats if int(x["resources"].get(min_type, "0")) > 0]
@@ -210,7 +219,7 @@ class MapRenderer:
                         if cand_res > best_res:
                             best_cand = cand
                 return best_cand["name"], hq_stats, top5, total_res
-    
+
         # fallback
         return conn_ext_tops[0]["name"], hq_stats, top5, total_res
 
@@ -329,32 +338,47 @@ class MapRenderer:
                     continue
                 prefix_to_territories.setdefault(prefix, set()).add(name)
 
-        # HQ候補地から「1時間以内に失領した領地」を除外
         db_state = get_guild_territory_state()
         hq_names = set()
         for prefix, owned in prefix_to_territories.items():
+            # 全領地（現所有＋1時間以内失領）
+            all_owned = set(get_effective_owned_territories(prefix))
             # 直近1時間以内に奪われた領地
             lost_only = set()
             for t in db_state.get(prefix, {}):
                 lost_time = db_state[prefix][t].get("lost")
                 if lost_time is not None:
-                    # HQ候補地から除外
                     lost_only.add(t)
-            # 有効なHQ候補のみで選定
+            # HQ候補地（現所有のみ）
             candidate_territories = owned - lost_only
-            hq_name, _, _, _ = self._pick_hq_candidate(candidate_territories, territory_api_data)
+            hq_name, _, _, _ = self._pick_hq_candidate(
+                candidate_territories,
+                territory_api_data,
+                all_owned_territories=all_owned,
+                exclude_lost=lost_only,
+                debug_prefix=prefix
+            )
             if hq_name:
                 hq_names.add(hq_name)
         self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map, hq_territories=hq_names)
         draw = ImageDraw.Draw(map_img)
         for prefix, owned in prefix_to_territories.items():
+            # 全領地（現所有＋1時間以内失領）
+            all_owned = set(get_effective_owned_territories(prefix))
+            # 直近1時間以内に奪われた領地
             lost_only = set()
             for t in db_state.get(prefix, {}):
                 lost_time = db_state[prefix][t].get("lost")
                 if lost_time is not None:
                     lost_only.add(t)
             candidate_territories = owned - lost_only
-            hq_name, _, _, _ = self._pick_hq_candidate(candidate_territories, territory_api_data)
+            hq_name, _, _, _ = self._pick_hq_candidate(
+                candidate_territories,
+                territory_api_data,
+                all_owned_territories=all_owned,
+                exclude_lost=lost_only,
+                debug_prefix=prefix
+            )
             if not hq_name:
                 continue
             loc = self.local_territories.get(hq_name, {}).get("Location")
@@ -578,4 +602,3 @@ class MapRenderer:
         map_bytes.seek(0)
         logger.info(f"--- [MapRenderer] ✅ 画像生成成功。")
         return map_bytes
-    
