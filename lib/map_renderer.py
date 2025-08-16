@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_PATH = os.path.join(project_root, "assets", "map")
-FONT_PATH = os.path.join(project_root, "assets", "fonts", "NotoSansJP-Bold.ttf")
+FONT_PATH = os.path.join(project_root, "assets", "fonts", "Minecraftia-Regular.ttf")
 
 # DBとキャッシュから履歴情報を取得
 from lib.db import get_guild_territory_state
