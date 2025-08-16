@@ -9,6 +9,8 @@ WYNN_GUILD_BY_NAME_API_URL = "https://api.wynncraft.com/v3/guild/{}"
 WYNN_GUILD_BY_PREFIX_API_URL = "https://api.wynncraft.com/v3/guild/prefix/{}"
 GUILD_NAME = "Empire of TKW"
 
+WYNNCRAFT_API_TOKEN = os.getenv('WYNN_API_TOKEN')
+
 # Discord関連 (環境変数から読み込み)
 TRACKING_CHANNEL_ID = int(os.getenv('NOTIFICATION_CHANNEL_ID', 0))
 
