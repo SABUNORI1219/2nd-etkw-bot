@@ -94,6 +94,11 @@ class PlayerCog(commands.Cog):
             return f"{val:,}"
         return str(val)
 
+    def content_format_stat(self, val):
+        if isinstance(val, int) or isinstance(val, float):
+            return f"{val:>6,}"
+        return f"{str(val):>6}"
+
     def _create_player_embed(self, data: dict) -> discord.Embed:
         username = self._safe_get(data, ['username'])
         escaped_username = discord.utils.escape_markdown(username)
@@ -183,12 +188,12 @@ Total Level: {self.format_stat(total_level)}
 ╔═══════════╦════════╗
 ║  Content  ║ Clears ║
 ╠═══════════╬════════╣
-║ NOTG      ║ {notg:>6,} ║
-║ NOL       ║ {nol:>6,} ║
-║ TCC       ║ {tcc:>6,} ║
-║ TNA       ║ {tna:>6,} ║
-║ Dungeons  ║ {dungeons:>6,} ║
-║ All Raids ║ {total_raids:>6,} ║
+║ NOTG      ║ {self.content_format_stat(notg)} ║
+║ NOL       ║ {self.content_format_stat(nol)} ║
+║ TCC       ║ {self.content_format_stat(tcc)} ║
+║ TNA       ║ {self.content_format_stat(tna)} ║
+║ Dungeons  ║ {self.content_format_stat(dungeons)} ║
+║ All Raids ║ {self.content_format_stat(total_raids)} ║
 ╚═══════════╩════════╝
 ```
 **UUID: {uuid}**
