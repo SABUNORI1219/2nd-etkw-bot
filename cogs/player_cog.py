@@ -100,6 +100,15 @@ class PlayerCog(commands.Cog):
         else:
             return f" {str(val)}"
 
+    def format_datetime_iso(self, dt_str):
+        if not dt_str or "T" not in dt_str:
+            return "非公開"
+        try:
+            dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return "非公開"
+
     def _create_player_embed(self, data: dict) -> discord.Embed:
         username = self._safe_get(data, ['username'])
         escaped_username = discord.utils.escape_markdown(username)
@@ -115,16 +124,11 @@ class PlayerCog(commands.Cog):
         guild_rank_stars = self._safe_get(data, ['guild', 'rankStars'], "")
         guild_display = f"[{guild_prefix}] {guild_name} / {guild_rank}[{guild_rank_stars}]" if guild_name != "N/A" else "N/A"
 
-        first_join = self._safe_get(data, ['firstJoin'], "N/A")
-        first_join_display = first_join.split('T')[0] if first_join != "N/A" else "非公開"
+        first_join_raw = self._safe_get(data, ['firstJoin'], None)
+        first_join_display = format_datetime_iso(first_join_raw)
 
-        last_join_str = self._safe_get(data, ['lastJoin'], "1970-01-01T00:00:00.000Z")
-        try:
-            last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
-            time_diff = datetime.now(timezone.utc) - last_join_dt
-        except Exception:
-            last_join_dt = datetime(1970, 1, 1, tzinfo=timezone.utc)
-            time_diff = timedelta(days=0)
+        last_join_raw = self._safe_get(data, ['lastJoin'], None)
+        last_join_display = format_datetime_iso(last_join_raw) + f" [{stream_status}]" if last_join_raw else "非公開"
 
         server_value_for_stream = self._safe_get(data, ['server'], None)
         stream_status = "🟢Stream" if server_value_for_stream is None and time_diff.total_seconds() < 60 else "❌Stream"
@@ -164,19 +168,10 @@ class PlayerCog(commands.Cog):
         total_raids = self._safe_get(data, ['globalData', 'raids', 'total'], "非公開")
         if dungeons == "非公開" or total_raids == "非公開": is_partial_private = True
 
-        # キャラ情報
-        active_char_uuid = self._safe_get(data, ['activeCharacter'])
-        char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
-        char_type = self._safe_get(char_obj, ['type'], "非公開")
-        nickname = self._safe_get(char_obj, ['nickname'], "非公開")
-        reskin = self._safe_get(char_obj, ['reskin'], "非公開")
-        active_char_info = f"{reskin} ({nickname}) on {server}" if reskin != "非公開" else f"{char_type} ({nickname}) on {server}"
-
         description = f"""
     [公式サイトへのリンク](https://wynncraft.com/stats/player/{username})
 ```python
 [{support_rank_display}] {username} is {'online' if is_online else 'offline'}
-Active Character: {active_char_info}
 Guild: {guild_display}
 First Joined: {first_join}
 Last Seen: {last_join_display}
