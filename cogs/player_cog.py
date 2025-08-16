@@ -75,8 +75,8 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
     if uuid:
         try:
             skin_url = f"https://vzge.me/bust/256/{uuid}"
-            headers = {"User-Agent": "Mozilla/5.0"}
-            skin_res = requests.get(skin_url)
+            headers = {'User-Agent': 'DiscordBot/1.0'}
+            skin_res = requests.get(skin_url, headers=headers)
             logger.info(f"Skin GET url: {skin_url} status: {skin_res.status_code}")
             if skin_res.status_code != 200:
                 raise Exception(f"skin url response: {skin_res.status_code}")
