@@ -72,112 +72,100 @@ class PlayerCog(commands.Cog):
         self.cache = CacheHandler()
         logger.info("--- [CommandsCog] プレイヤーCogが読み込まれました。")
 
-    # 指定されたデータを安全に取得するためのヘルパー関数
     def _safe_get(self, data: dict, keys: list, default: any = "N/A"):
-        logger.info(f"[safe_get] data={data}, keys={keys}, default={default}")
         v = data
         for key in keys:
             if not isinstance(v, dict):
-                logger.info(f"[safe_get] key={key}でdictじゃない: {v}")
                 return default
             v = v.get(key)
-            logger.info(f"[safe_get] key={key}, 現値={v}")
             if v is None:
-                logger.info(f"[safe_get] key={key}でNone: default={default}")
                 return default
-        logger.info(f"[safe_get] 結果={v}")
         return v
 
+    def _fallback_stat(self, data: dict, keys_global: list, keys_ranking: list, keys_prev: list, default="非公開"):
+        # globalData優先、ranking→previousRanking→default
+        val = self._safe_get(data, keys_global, None)
+        if val is not None:
+            return val
+        val = self._safe_get(data, keys_ranking, None)
+        if val is not None:
+            return val
+        val = self._safe_get(data, keys_prev, None)
+        if val is not None:
+            return val
+        return default
+
     def _create_player_embed(self, data: dict) -> discord.Embed:
-        logger.info(f"[create_player_embed] raw_data={data}")
         username = self._safe_get(data, ['username'])
         escaped_username = discord.utils.escape_markdown(username)
-        
         uuid = self._safe_get(data, ['uuid'])
         raw_support_rank = self._safe_get(data, ['supportRank'], "Player")
-        if raw_support_rank.lower() == "vipplus":
-            support_rank_display = "Vip+"
-        else:
-            support_rank_display = raw_support_rank.capitalize()
+        support_rank_display = "Vip+" if raw_support_rank.lower() == "vipplus" else raw_support_rank.capitalize()
         is_online = self._safe_get(data, ['online'], False)
         server = self._safe_get(data, ['server'], "Unknown")
-        
+
         guild_name = self._safe_get(data, ['guild', 'name'], "N/A")
         guild_prefix = self._safe_get(data, ['guild', 'prefix'], "")
         guild_rank = self._safe_get(data, ['guild', 'rank'], "")
         guild_rank_stars = self._safe_get(data, ['guild', 'rankStars'], "")
         guild_display = f"[{guild_prefix}] {guild_name} / {guild_rank}[{guild_rank_stars}]" if guild_name != "N/A" else "N/A"
 
-        first_join = self._safe_get(data, ['firstJoin'], "N/A").split('T')[0]
-        logger.info(f"[create_player_embed] first_join={first_join}")
+        first_join = self._safe_get(data, ['firstJoin'], "N/A")
+        first_join_display = first_join.split('T')[0] if first_join != "N/A" else "非公開"
 
         last_join_str = self._safe_get(data, ['lastJoin'], "1970-01-01T00:00:00.000Z")
-        logger.info(f"[create_player_embed] last_join_str={last_join_str}")
         try:
             last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
             time_diff = datetime.now(timezone.utc) - last_join_dt
-        except Exception as e:
-            logger.error(f"[create_player_embed] last_join_dt parse error: {e}")
+        except Exception:
             last_join_dt = datetime(1970, 1, 1, tzinfo=timezone.utc)
             time_diff = timedelta(days=0)
-        
+
         server_value_for_stream = self._safe_get(data, ['server'], None)
-
-        # serverがnull、かつ最終ログインが1分以内(60秒)の場合のみストリーム中と判断
-        if server_value_for_stream is None and time_diff.total_seconds() < 60:
-            stream_status = "🟢Stream"
-        else:
-            stream_status = "❌Stream"
-        
-        last_join_display = f"{last_join_str.split('T')[0]} [{stream_status}]"
-        logger.info(f"[create_player_embed] last_join_display={last_join_display}")
-
-        active_char_uuid = self._safe_get(data, ['activeCharacter'])
-        logger.info(f"[create_player_embed] active_char_uuid={active_char_uuid}")
-        
-        char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
-        logger.info(f"[create_player_embed] char_obj={char_obj}")
-        char_type = self._safe_get(char_obj, ['type'])
-        nickname = self._safe_get(char_obj, ['nickname'])
-        reskin = self._safe_get(char_obj, ['reskin'])
-
-        if reskin != "N/A":
-            active_char_info = f"{reskin} ({nickname}) on {server}"
-        else:
-            active_char_info = f"{char_type} ({nickname}) on {server}"
-        logger.info(f"[create_player_embed] active_char_info={active_char_info}")
-
-        killed_mobs = self._safe_get(data, ['globalData', 'mobsKilled'], 0)
-        chests_found = self._safe_get(data, ['globalData', 'chestsFound'], 0)
-        playtime = self._safe_get(data, ['playtime'], 0)
-        wars = self._safe_get(data, ['globalData', 'wars'], 0)
-        logger.info(f"[create_player_embed] killed_mobs={killed_mobs}, chests_found={chests_found}, playtime={playtime}, wars={wars}")
-
-        war_rank = self._safe_get(data, ['ranking', 'warsCompletion'], 'N/A')
-        war_rank_display = f"#{war_rank:,}" if isinstance(war_rank, int) else war_rank
-        logger.info(f"[create_player_embed] war_rank={war_rank}, war_rank_display={war_rank_display}")
-
-        pvp_kills = self._safe_get(data, ['globalData', 'pvp', 'kills'], 0)
-        pvp_deaths = self._safe_get(data, ['globalData', 'pvp', 'deaths'], 0)
-        quests = self._safe_get(data, ['globalData', 'completedQuests'], 0)
-        total_level = self._safe_get(data, ['globalData', 'totalLevel'], 0)
-
-        logger.info(f"[create_player_embed] pvp_kills={pvp_kills}, pvp_deaths={pvp_deaths}, quests={quests}, total_level={total_level}")
-
-        raid_list = self._safe_get(data, ['globalData', 'raids', 'list'], {})
-        logger.info(f"[create_player_embed] raid_list={raid_list}")
-        notg = self._safe_get(raid_list, ["Nest of the Grootslangs"], 0)
-        nol = self._safe_get(raid_list, ["Orphion's Nexus of Light"], 0)
-        tcc = self._safe_get(raid_list, ["The Canyon Colossus"], 0)
-        tna = self._safe_get(raid_list, ["The Nameless Anomaly"], 0)
-        logger.info(f"[create_player_embed] raid clears: NOTG={notg}, NOL={nol}, TCC={tcc}, TNA={tna}")
-
-        dungeons = self._safe_get(data, ['globalData', 'dungeons', 'total'], 0)
-        total_raids = self._safe_get(data, ['globalData', 'raids', 'total'], 0)
-        logger.info(f"[create_player_embed] dungeons={dungeons}, total_raids={total_raids}")
+        stream_status = "🟢Stream" if server_value_for_stream is None and time_diff.total_seconds() < 60 else "❌Stream"
+        last_join_display = f"{last_join_str.split('T')[0]} [{stream_status}]" if last_join_str else "非公開"
 
         restrictions = self._safe_get(data, ['restrictions'], {})
-        logger.info(f"[create_player_embed] restrictions={restrictions}")
+        is_partial_private = False
+
+        # fallback取得
+        killed_mobs = self._fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
+        if killed_mobs == "非公開": is_partial_private = True
+        chests_found = self._fallback_stat(data, ['globalData', 'chestsFound'], ['ranking', 'chestsFound'], ['previousRanking', 'chestsFound'])
+        if chests_found == "非公開": is_partial_private = True
+        playtime = self._fallback_stat(data, ['playtime'], ['ranking', 'playtime'], ['previousRanking', 'playtime'])
+        if playtime == "非公開": is_partial_private = True
+        wars = self._fallback_stat(data, ['globalData', 'wars'], ['ranking', 'warsCompletion'], ['previousRanking', 'warsCompletion'])
+        if wars == "非公開": is_partial_private = True
+
+        war_rank = self._safe_get(data, ['ranking', 'warsCompletion'], '非公開')
+        if war_rank == "非公開": is_partial_private = True
+        war_rank_display = f"#{war_rank:,}" if isinstance(war_rank, int) else war_rank
+
+        pvp_kills = self._fallback_stat(data, ['globalData', 'pvp', 'kills'], ['ranking', 'pvpKills'], ['previousRanking', 'pvpKills'])
+        pvp_deaths = self._fallback_stat(data, ['globalData', 'pvp', 'deaths'], ['ranking', 'pvpDeaths'], ['previousRanking', 'pvpDeaths'])
+        quests = self._fallback_stat(data, ['globalData', 'completedQuests'], ['ranking', 'completedQuests'], ['previousRanking', 'completedQuests'])
+        total_level = self._fallback_stat(data, ['globalData', 'totalLevel'], ['ranking', 'totalLevel'], ['previousRanking', 'totalLevel'])
+
+        # Raids/dungeons
+        raid_list = self._safe_get(data, ['globalData', 'raids', 'list'], {})
+        notg = self._safe_get(raid_list, ["Nest of the Grootslangs"], "非公開")
+        nol = self._safe_get(raid_list, ["Orphion's Nexus of Light"], "非公開")
+        tcc = self._safe_get(raid_list, ["The Canyon Colossus"], "非公開")
+        tna = self._safe_get(raid_list, ["The Nameless Anomaly"], "非公開")
+        if notg == "非公開" or nol == "非公開" or tcc == "非公開" or tna == "非公開": is_partial_private = True
+
+        dungeons = self._safe_get(data, ['globalData', 'dungeons', 'total'], "非公開")
+        total_raids = self._safe_get(data, ['globalData', 'raids', 'total'], "非公開")
+        if dungeons == "非公開" or total_raids == "非公開": is_partial_private = True
+
+        # キャラ情報
+        active_char_uuid = self._safe_get(data, ['activeCharacter'])
+        char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
+        char_type = self._safe_get(char_obj, ['type'], "非公開")
+        nickname = self._safe_get(char_obj, ['nickname'], "非公開")
+        reskin = self._safe_get(char_obj, ['reskin'], "非公開")
+        active_char_info = f"{reskin} ({nickname}) on {server}" if reskin != "非公開" else f"{char_type} ({nickname}) on {server}"
 
         description = f"""
     [公式サイトへのリンク](https://wynncraft.com/stats/player/{username})
@@ -204,19 +192,24 @@ Total Level: {total_level:,}
 ║ Dungeons  ║ {dungeons:>6,} ║
 ║ All Raids ║ {total_raids:>6,} ║
 ╚═══════════╩════════╝
-UUID: {uuid}
+```
+**UUID: {uuid}**
 """
-        color = discord.Color.green() if is_online else discord.Color.dark_red()
-        embed = discord.Embed( description=description, color=color )
-
+        color = discord.Color.green() if is_online else discord.Color.dark_red() 
+        embed = discord.Embed(
+            description=description,
+            color=color
+        )
+        
         embed.title = f"{escaped_username}"
-    
+        
         embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{uuid}/right")
         
+        footer_text = f"{username}'s Stats | Minister Chikuwa" if is_partial_private: footer_text += " | ※一部の情報は非公開です" 
         embed.set_footer(
-            text=f"{username}'s Stats | Minister Chikuwa",
+            text=footer_text,
             icon_url=f"https://www.mc-heads.net/avatar/{uuid}"
-        )
+        ) 
         return embed
 
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
@@ -296,4 +289,3 @@ UUID: {uuid}
         await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
 
 async def setup(bot: commands.Bot): await bot.add_cog(PlayerCog(bot))
-    
