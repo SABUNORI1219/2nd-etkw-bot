@@ -11,15 +11,15 @@ from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
+# フォントパス（arial.ttf優先・なければデフォルト）
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FONT_PATH = os.path.join(project_root, "assets", "fonts", "times.ttf")
+FONT_PATH = os.path.join(project_root, "assets", "fonts", "arial.ttf")
 
 from lib.wynncraft_api import WynncraftAPI
 from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN, AUTHORIZED_USER_IDS
 from lib.cache_handler import CacheHandler
 
 def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
-    # データ読み込み
     username = data.get("username", "Player")
     rank = data.get("rank", "Champion")
     guild = data.get("guild", "[ETKW] Empire of TKW")
@@ -55,54 +55,55 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
         img.putpixel((x, y), (c, c, c))
     img = img.filter(ImageFilter.GaussianBlur(0.3))
 
-    # フォント準備    
+    # フォント準備（arial.ttf優先・なければデフォルト）
     try:
         title_font = ImageFont.truetype(FONT_PATH, 72)
         header_font = ImageFont.truetype(FONT_PATH, 40)
         text_font = ImageFont.truetype(FONT_PATH, 28)
         small_font = ImageFont.truetype(FONT_PATH, 22)
     except Exception as e:
-        # フォントエラーは必ずログ出力（重要）
         logger.error(f"Font load failed: {e}")
-        # デフォルトフォント必須
         title_font = ImageFont.load_default()
         header_font = ImageFont.load_default()
         text_font = ImageFont.load_default()
         small_font = ImageFont.load_default()
+
     # 外枠
     margin = 40
     draw.rectangle([margin, margin, W - margin, H - margin], outline=(40, 30, 20), width=6)
 
-    # --- タイトル ---
-    draw.text((W//2 - 200, 60), f"The Wynncraft Gazette", font=title_font, fill=(20, 10, 10))
+    # タイトル（座標を左寄りに修正）
+    draw.text((60, 60), f"The Wynncraft Gazette", font=title_font, fill=(20, 10, 10))
 
-    # --- プレイヤー名 & ランク ---
+    # プレイヤー名 & ランク（座標を左寄りに修正）
     draw.text((60, 160), f"[{rank}] {username}", font=header_font, fill=(40, 20, 20))
 
-    # --- ギルド情報 ---
-    draw.text((250, 220), guild, font=header_font, fill=(30, 20, 20))
-    draw.text((250, 270), guild_rank, font=text_font, fill=(30, 20, 20))
-    draw.text((250, 320), f"First Joined: {first_join}", font=text_font, fill=(30, 20, 20))
-    draw.text((250, 360), f"Last Seen: {last_seen}", font=text_font, fill=(30, 20, 20))
+    # ギルド情報（座標を左寄りに修正）
+    draw.text((60, 220), guild, font=header_font, fill=(30, 20, 20))
+    draw.text((60, 270), guild_rank, font=text_font, fill=(30, 20, 20))
+    draw.text((60, 320), f"First Joined: {first_join}", font=text_font, fill=(30, 20, 20))
+    draw.text((60, 360), f"Last Seen: {last_seen}", font=text_font, fill=(30, 20, 20))
 
-    # スキン画像取得＆貼り付け
+    # スキン画像取得＆貼り付け（User-Agent修正、エラー時は枠・赤で埋める）
     if uuid:
         try:
             skin_url = f"https://vzge.me/bust/256/{uuid}"
-            headers = {'User-Agent': 'DiscordBot/1.0'}
+            headers = {"User-Agent": "Mozilla/5.0"}
             skin_res = requests.get(skin_url, headers=headers)
+            logger.info(f"Skin GET url: {skin_url} status: {skin_res.status_code}")
             if skin_res.status_code != 200:
                 raise Exception(f"skin url response: {skin_res.status_code}")
             skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
             skin = skin.resize((120, 120), Image.LANCZOS)
-            img.paste(skin, (60, 120), mask=skin)
+            img.paste(skin, (860, 60), mask=skin)
         except Exception as e:
-            draw.rectangle([60, 120, 180, 240], fill=(160,160,160))
+            logger.error(f"Skin image load failed: {e}")
+            draw.rectangle([860, 60, 980, 180], fill=(160,0,0))
 
-    # --- セクション罫線 ---
+    # セクション罫線
     draw.line((60, 430, 940, 430), fill=(50, 30, 20), width=4)
 
-    # --- 左右2カラム ---
+    # 左右2カラム（座標見直し）
     col1_x, col2_x = 80, 540
     y_start = 460
     spacing = 50
@@ -111,6 +112,7 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
         f"Mobs {mobs:,}",
         f"Playtime {playtime} h",
         f"War {war_count} {war_rank}",
+        f"PvP {pvp_k} K / {pvp_d} D",
         f"Quests {quests_done}",
         f"Total Level {total_level}"
     ]
@@ -131,7 +133,7 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
         draw.text((col2_x, y), text, font=text_font, fill=(20, 20, 20))
         y += spacing
 
-    # --- Raids & Dungeons ---
+    # Raids & Dungeons
     draw.line((60, 720, 940, 720), fill=(50, 30, 20), width=4)
     draw.text((60, 740), "Content Clears", font=header_font, fill=(30, 20, 20))
 
@@ -141,7 +143,7 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
         draw.text((280, y), f"{v}", font=text_font, fill=(20, 20, 20))
         y += 40
 
-    # --- フッター ---
+    # フッター
     draw.line((60, H-120, 940, H-120), fill=(50, 30, 20), width=3)
     draw.text((80, H-100), f"UUID {uuid}", font=small_font, fill=(20, 20, 20))
     draw.text((80, H-70), footer, font=small_font, fill=(20, 20, 20))
