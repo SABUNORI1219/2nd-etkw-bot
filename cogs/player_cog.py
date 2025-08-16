@@ -68,7 +68,7 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
         title_font = ImageFont.load_default()
         header_font = ImageFont.load_default()
         text_font = ImageFont.load_default()
-    small_font = ImageFont.load_default()
+        small_font = ImageFont.load_default()
     # 外枠
     margin = 40
     draw.rectangle([margin, margin, W - margin, H - margin], outline=(40, 30, 20), width=6)
