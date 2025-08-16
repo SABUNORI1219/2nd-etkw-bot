@@ -125,10 +125,10 @@ class PlayerCog(commands.Cog):
         guild_display = f"[{guild_prefix}] {guild_name} / {guild_rank}[{guild_rank_stars}]" if guild_name != "N/A" else "N/A"
 
         first_join_raw = self._safe_get(data, ['firstJoin'], None)
-        first_join_display = format_datetime_iso(first_join_raw)
+        first_join_display = self.format_datetime_iso(first_join_raw)
 
         last_join_raw = self._safe_get(data, ['lastJoin'], None)
-        last_join_display = format_datetime_iso(last_join_raw) + f" [{stream_status}]" if last_join_raw else "非公開"
+        last_join_display = self.format_datetime_iso(last_join_raw) + f" [{stream_status}]" if last_join_raw else "非公開"
 
         server_value_for_stream = self._safe_get(data, ['server'], None)
         stream_status = "🟢Stream" if server_value_for_stream is None and time_diff.total_seconds() < 60 else "❌Stream"
