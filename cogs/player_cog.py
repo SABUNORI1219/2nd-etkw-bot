@@ -56,11 +56,19 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
     img = img.filter(ImageFilter.GaussianBlur(0.3))
 
     # フォント準備    
-    title_font = ImageFont.truetype(FONT_PATH, 72)   # 新聞タイトル用
-    header_font = ImageFont.truetype(FONT_PATH, 40)  # 見出し
-    text_font = ImageFont.truetype(FONT_PATH, 28)      # 本文
-    small_font = ImageFont.truetype(FONT_PATH, 22)     # 小さめ
-
+    try:
+        title_font = ImageFont.truetype(FONT_PATH, 72)
+        header_font = ImageFont.truetype(FONT_PATH, 40)
+        text_font = ImageFont.truetype(FONT_PATH, 28)
+        small_font = ImageFont.truetype(FONT_PATH, 22)
+    except Exception as e:
+        # フォントエラーは必ずログ出力（重要）
+        logger.error(f"Font load failed: {e}")
+        # デフォルトフォント必須
+        title_font = ImageFont.load_default()
+        header_font = ImageFont.load_default()
+        text_font = ImageFont.load_default()
+    small_font = ImageFont.load_default()
     # 外枠
     margin = 40
     draw.rectangle([margin, margin, W - margin, H - margin], outline=(40, 30, 20), width=6)
