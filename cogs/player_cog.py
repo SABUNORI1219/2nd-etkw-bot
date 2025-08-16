@@ -43,110 +43,98 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
     uuid = data.get("uuid", "")
     footer = f"{username}'s Stats | Minister Chikuwa"
 
-    # キャンバスセットアップ
-    W, H = 800, 600
+    # キャンバスサイズ
+    W, H = 800, 1100
     img = Image.new("RGB", (W, H), (233, 223, 197))
     draw = ImageDraw.Draw(img)
 
-    # 背景にざらつきノイズ追加
-    for _ in range(20000):
-        x, y = random.randint(0, W-1), random.randint(0, H-1)
+    # 背景にノイズで紙質っぽさを追加
+    for _ in range(30000):
+        x, y = random.randint(0, W - 1), random.randint(0, H - 1)
         c = random.randint(200, 235)
         img.putpixel((x, y), (c, c, c))
-    img = img.filter(ImageFilter.GaussianBlur(0.3))
+    img = img.filter(ImageFilter.GaussianBlur(0.4))
 
-    # フォント準備（arial.ttf優先・なければデフォルト）
+    # フォント（なければデフォルト）
     try:
-        title_font = ImageFont.truetype(FONT_PATH, 72)
-        header_font = ImageFont.truetype(FONT_PATH, 40)
+        title_font = ImageFont.truetype(FONT_PATH, 44)
+        header_font = ImageFont.truetype(FONT_PATH, 32)
         text_font = ImageFont.truetype(FONT_PATH, 28)
         small_font = ImageFont.truetype(FONT_PATH, 22)
-    except Exception as e:
-        logger.error(f"Font load failed: {e}")
+    except:
         title_font = ImageFont.load_default()
         header_font = ImageFont.load_default()
         text_font = ImageFont.load_default()
         small_font = ImageFont.load_default()
 
     # 外枠
-    margin = 40
-    draw.rectangle([margin, margin, W - margin, H - margin], outline=(40, 30, 20), width=6)
+    margin = 30
+    draw.rectangle([margin, margin, W - margin, H - margin], outline=(60, 40, 20), width=4)
 
-    # タイトル（座標を左寄りに修正）
-    draw.text((100,100), "The Wynncraft Gazette", font=title_font, fill=(0,0,0))
+    # プレイヤー名とランク
+    draw.text((50, 50), f"[{rank}] {username}", font=title_font, fill=(120, 20, 20))
 
-    # プレイヤー名 & ランク（座標を左寄りに修正）
-    draw.text((60, 160), f"[{rank}] {username}", font=header_font, fill=(40, 20, 20))
-
-    # ギルド情報（座標を左寄りに修正）
-    draw.text((60, 220), guild, font=header_font, fill=(30, 20, 20))
-    draw.text((60, 270), guild_rank, font=text_font, fill=(30, 20, 20))
-    draw.text((60, 320), f"First Joined: {first_join}", font=text_font, fill=(30, 20, 20))
-    draw.text((60, 360), f"Last Seen: {last_seen}", font=text_font, fill=(30, 20, 20))
-
-    # スキン画像取得＆貼り付け（User-Agent修正、エラー時は枠・赤で埋める）
+    # スキン画像
     if uuid:
         try:
-            skin_url = f"https://vzge.me/bust/256/{uuid}"
+            skin_url = f"https://vzge.me/bust/128/{uuid}"
             headers = {"User-Agent": "Mozilla/5.0"}
             skin_res = requests.get(skin_url, headers=headers)
-            logger.info(f"Skin GET url: {skin_url} status: {skin_res.status_code}")
-            if skin_res.status_code != 200:
-                raise Exception(f"skin url response: {skin_res.status_code}")
-            skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
-            skin = skin.resize((120, 120), Image.LANCZOS)
-            img.paste(skin, (860, 60), mask=skin)
-        except Exception as e:
-            logger.error(f"Skin image load failed: {e}")
-            draw.rectangle([860, 60, 980, 180], fill=(160,0,0))
+            if skin_res.status_code == 200:
+                skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
+                skin = skin.resize((120, 120), Image.LANCZOS)
+                img.paste(skin, (50, 110), mask=skin)
+        except:
+            draw.rectangle([50, 110, 170, 230], fill=(160, 0, 0))
 
-    # セクション罫線
-    draw.line((60, 430, 940, 430), fill=(50, 30, 20), width=4)
+    # ギルド・日時
+    draw.text((200, 110), guild, font=header_font, fill=(30, 20, 20))
+    draw.text((200, 150), guild_rank, font=text_font, fill=(30, 20, 20))
+    draw.text((200, 190), f"First Joined: {first_join}", font=text_font, fill=(30, 20, 20))
+    draw.text((200, 220), f"Last Seen: {last_seen}", font=text_font, fill=(30, 20, 20))
 
-    # 左右2カラム（座標見直し）
-    col1_x, col2_x = 80, 540
-    y_start = 460
-    spacing = 50
+    # セクション線
+    draw.line((50, 280, W - 50, 280), fill=(50, 30, 20), width=2)
 
+    # 左右カラム（統計）
     left_stats = [
         f"Mobs {mobs:,}",
-        f"Playtime {playtime} h",
+        f"Playtime {playtime} hours",
         f"War {war_count} {war_rank}",
-        f"PvP {pvp_k} K / {pvp_d} D",
         f"Quests {quests_done}",
         f"Total Level {total_level}"
     ]
-
     right_stats = [
         f"Chests {chests:,}",
+        f"PvP {pvp_k} K/{pvp_d} D",
         f"Quests Total {quests_total}",
         f"Total Level {total_level}"
     ]
 
-    y = y_start
+    y = 310
     for text in left_stats:
-        draw.text((col1_x, y), text, font=text_font, fill=(20, 20, 20))
-        y += spacing
+        draw.text((60, y), text, font=text_font, fill=(20, 20, 20))
+        y += 40
 
-    y = y_start
+    y = 310
     for text in right_stats:
-        draw.text((col2_x, y), text, font=text_font, fill=(20, 20, 20))
-        y += spacing
+        draw.text((400, y), text, font=text_font, fill=(20, 20, 20))
+        y += 40
 
     # Raids & Dungeons
-    draw.line((60, 720, 940, 720), fill=(50, 30, 20), width=4)
-    draw.text((60, 740), "Content Clears", font=header_font, fill=(30, 20, 20))
+    draw.line((50, 530, W - 50, 530), fill=(50, 30, 20), width=2)
+    draw.text((60, 550), "Content Clears", font=header_font, fill=(30, 20, 20))
 
-    y = 800
+    y = 600
     for k, v in clears.items():
         draw.text((80, y), f"{k}", font=text_font, fill=(20, 20, 20))
         draw.text((280, y), f"{v}", font=text_font, fill=(20, 20, 20))
         y += 40
 
-    # フッター
-    draw.line((60, H-120, 940, H-120), fill=(50, 30, 20), width=3)
-    draw.text((80, H-100), f"UUID {uuid}", font=small_font, fill=(20, 20, 20))
-    draw.text((80, H-70), footer, font=small_font, fill=(20, 20, 20))
+    # UUID & Footer
+    draw.line((50, H - 150, W - 50, H - 150), fill=(50, 30, 20), width=2)
+    draw.text((60, H - 130), f"UUID {uuid}", font=small_font, fill=(20, 20, 20))
+    draw.text((60, H - 100), footer, font=small_font, fill=(20, 20, 20))
 
     # 保存
     img.save(output)
