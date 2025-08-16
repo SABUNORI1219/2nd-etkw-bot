@@ -180,12 +180,12 @@ Active Character: {active_char_info}
 Guild: {guild_display}
 First Joined: {first_join}
 Last Seen: {last_join_display}
-Mobs Killed: {format_stat(killed_mobs)}
-Playtime: {format_stat(playtime)} hours
-War Count: {format_stat(wars)} [{war_rank_display}]
-PvP: {format_stat(pvp_kills)} K / {format_stat(pvp_deaths)} D
-Quests Total: {format_stat(quests)}
-Total Level: {format_stat(total_level)}
+Mobs Killed: {self.format_stat(killed_mobs)}
+Playtime: {self.format_stat(playtime)} hours
+War Count: {self.format_stat(wars)} [{war_rank_display}]
+PvP: {self.format_stat(pvp_kills)} K / {self.format_stat(pvp_deaths)} D
+Quests Total: {self.format_stat(quests)}
+Total Level: {self.format_stat(total_level)}
 ╔═══════════╦════════╗
 ║  Content  ║ Clears ║
 ╠═══════════╬════════╣
