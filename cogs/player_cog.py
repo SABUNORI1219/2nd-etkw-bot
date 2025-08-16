@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # フォントパス（arial.ttf優先・なければデフォルト）
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FONT_PATH = os.path.join(project_root, "assets", "fonts", "Arial.ttf")
+FONT_PATH = os.path.join(project_root, "assets", "fonts", "times.ttf")
 
 from lib.wynncraft_api import WynncraftAPI
 from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN, AUTHORIZED_USER_IDS
@@ -44,7 +44,7 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
     footer = f"{username}'s Stats | Minister Chikuwa"
 
     # キャンバスセットアップ
-    W, H = 1000, 1400
+    W, H = 800, 600
     img = Image.new("RGB", (W, H), (233, 223, 197))
     draw = ImageDraw.Draw(img)
 
@@ -73,7 +73,7 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
     draw.rectangle([margin, margin, W - margin, H - margin], outline=(40, 30, 20), width=6)
 
     # タイトル（座標を左寄りに修正）
-    draw.text((60, 60), f"The Wynncraft Gazette", font=title_font, fill=(20, 10, 10))
+    draw.text((100,100), "The Wynncraft Gazette", font=title_font, fill=(0,0,0))
 
     # プレイヤー名 & ランク（座標を左寄りに修正）
     draw.text((60, 160), f"[{rank}] {username}", font=header_font, fill=(40, 20, 20))
