@@ -212,8 +212,8 @@ Total Level: {self.format_stat(total_level)}
 ```
 **UUID: {uuid}**
 """
-if is_partial_private:
-    description += "\n※一部の情報は非公開です"
+        if is_partial_private:
+            description += "\n※一部の情報は非公開です"
 
         color = discord.Color.green() if is_online else discord.Color.dark_red() 
         embed = discord.Embed(
