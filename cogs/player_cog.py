@@ -89,7 +89,7 @@ class PlayerCog(commands.Cog):
             return val
         return default
 
-    def format_stat(val):
+    def format_stat(self, val):
         if isinstance(val, int) or isinstance(val, float):
             return f"{val:,}"
         return str(val)
