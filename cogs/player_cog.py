@@ -18,7 +18,6 @@ class PlayerSelectView(discord.ui.View):
 
         options = []
         for uuid, player_info in player_collision_dict.items():
-            logger.info(f"[PlayerSelectView] プレイヤー候補: uuid={uuid}, info={player_info}")
             if isinstance(player_info, dict):
                 raw_support_rank = player_info.get('supportRank')
                 if raw_support_rank and raw_support_rank.lower() == "vipplus":
@@ -35,28 +34,23 @@ class PlayerSelectView(discord.ui.View):
                     description=f"UUID: {uuid}"
                 ))
 
-        logger.info(f"[PlayerSelectView] options: {options}")
-
         if options:
             self.select_menu = discord.ui.Select(placeholder="プレイヤーを選択してください...", options=options)
             self.select_menu.callback = self.select_callback
             self.add_item(self.select_menu)
             
     async def select_callback(self, interaction: discord.Interaction):
-        logger.info(f"[PlayerSelectView] select_callback: user={interaction.user.id}, owner={self.owner_id}")
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
                 "この操作はコマンドを実行したユーザーのみ有効です。", ephemeral=True
             )
             return
         selected_uuid = self.select_menu.values[0]
-        logger.info(f"[PlayerSelectView] selected_uuid: {selected_uuid}")
         
         self.select_menu.disabled = True
         await interaction.response.edit_message(content="プレイヤー情報を取得中...", view=self)
         
         data = await self.cog_instance.wynn_api.get_nori_player_data(selected_uuid)
-        logger.info(f"[PlayerSelectView] get_nori_player_data: {data}")
         
         if not data or 'uuid' not in data:
             await interaction.message.edit(content="選択されたプレイヤーの情報を取得できませんでした。", embed=None, view=None)
@@ -223,7 +217,6 @@ Total Level: {self.format_stat(total_level)}
     @app_commands.describe(player="MCID or UUID")
     async def player(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
-        logger.info(f"[player command] called by user={interaction.user.id} for player={player}")
     
         # 権限チェック
         if interaction.user.id not in AUTHORIZED_USER_IDS:
@@ -236,7 +229,6 @@ Total Level: {self.format_stat(total_level)}
     
         cache_key = f"player_{player.lower()}"
         cached_data = self.cache.get_cache(cache_key)
-        logger.info(f"[player command] cache_key={cache_key}, cached_data={cached_data}")
         if cached_data:
             logger.info(f"--- [Cache] プレイヤー'{player}'のキャッシュを使用しました。")
             embed = self._create_player_embed(cached_data)
@@ -245,17 +237,14 @@ Total Level: {self.format_stat(total_level)}
     
         logger.info(f"--- [API] プレイヤー'{player}'のデータをAPIから取得します。")
         api_data = await self.wynn_api.get_official_player_data(player)
-        logger.info(f"[player command] api_data={api_data}")
     
         # 1. エラー返却なら即「見つかりませんでした」
         if not api_data or (isinstance(api_data, dict) and "Error" in api_data):
-            logger.info(f"[player command] Not found: {api_data}")
             await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
             return
     
         # 2. 単一プレイヤーデータ（usernameキーあり）ならembed
         if isinstance(api_data, dict) and 'username' in api_data:
-            logger.info(f"[player command] 単一プレイヤーデータ: {api_data}")
             embed = self._create_player_embed(api_data)
             self.cache.set_cache(cache_key, api_data)
             await interaction.followup.send(embed=embed)
@@ -268,7 +257,6 @@ Total Level: {self.format_stat(total_level)}
             len(api_data) == 1 and
             all(isinstance(v, dict) for v in api_data.values())
         ):
-            logger.info(f"[player command] UUIDキー1件: {api_data}")
             player_data = list(api_data.values())[0]
             embed = self._create_player_embed(player_data)
             await interaction.followup.send(embed=embed)
@@ -281,7 +269,6 @@ Total Level: {self.format_stat(total_level)}
             len(api_data) >= 2 and
             all(isinstance(v, dict) for v in api_data.values())
         ):
-            logger.info(f"[player command] UUIDキー複数件: {api_data}")
             view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self, owner_id=interaction.user.id)
             # optionsが実際にあるかチェック
             if hasattr(view, "select_menu") and view.select_menu.options:
@@ -291,7 +278,6 @@ Total Level: {self.format_stat(total_level)}
             return
     
         # 5. それ以外は全部「見つかりませんでした」
-        logger.info(f"[player command] fallback: Not found")
         await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
 
 async def setup(bot: commands.Bot): await bot.add_cog(PlayerCog(bot))
