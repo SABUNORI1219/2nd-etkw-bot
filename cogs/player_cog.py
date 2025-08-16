@@ -128,11 +128,10 @@ class PlayerCog(commands.Cog):
         first_join_display = self.format_datetime_iso(first_join_raw)
 
         last_join_raw = self._safe_get(data, ['lastJoin'], None)
-        last_join_display = self.format_datetime_iso(last_join_raw) + f" [{stream_status}]" if last_join_raw else "非公開"
 
         server_value_for_stream = self._safe_get(data, ['server'], None)
         stream_status = "🟢Stream" if server_value_for_stream is None and time_diff.total_seconds() < 60 else "❌Stream"
-        last_join_display = f"{last_join_str.split('T')[0]} [{stream_status}]" if last_join_str else "非公開"
+        last_join_display = self.format_datetime_iso(last_join_raw) + f" [{stream_status}]" if last_join_raw else "非公開"
 
         restrictions = self._safe_get(data, ['restrictions'], {})
         is_partial_private = False
@@ -173,7 +172,7 @@ class PlayerCog(commands.Cog):
 ```python
 [{support_rank_display}] {username} is {'online' if is_online else 'offline'}
 Guild: {guild_display}
-First Joined: {first_join}
+First Joined: {first_join_display}
 Last Seen: {last_join_display}
 Mobs Killed: {self.format_stat(killed_mobs)}
 Playtime: {self.format_stat(playtime)} hours
