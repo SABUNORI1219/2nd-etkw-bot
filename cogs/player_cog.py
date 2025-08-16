@@ -270,15 +270,6 @@ Total Level: {self.format_stat(total_level)}
     async def player(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
 
-        # 権限チェック
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            logger.info("[player command] 権限なし")
-            await interaction.followup.send(
-                "`/player`コマンドは現在APIの仕様変更によりリワーキング中です。\n"
-                "`/player` command is reworking due to API feature rework right now."
-            )
-            return
-
         cache_key = f"player_{player.lower()}"
         cached_data = self.cache.get_cache(cache_key)
         if cached_data:
