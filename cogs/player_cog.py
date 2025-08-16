@@ -76,11 +76,14 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
         try:
             skin_url = f"https://vzge.me/bust/256/{uuid}"
             skin_res = requests.get(skin_url)
+            logger.info(f"Skin GET url: {skin_url} status: {skin_res.status_code}")
+            if skin_res.status_code != 200:
+                raise Exception(f"skin url response: {skin_res.status_code}")
             skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
             skin = skin.resize((120, 120), Image.LANCZOS)
             img.paste(skin, (60, 120), mask=skin)
         except Exception as e:
-            # 失敗時は灰色で埋める
+            logger.error(f"Skin image load failed: {e}")
             draw.rectangle([60, 120, 180, 240], fill=(160,160,160))
 
     # セクション線１
