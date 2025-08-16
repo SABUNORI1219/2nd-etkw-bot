@@ -96,8 +96,12 @@ class PlayerCog(commands.Cog):
 
     def content_format_stat(self, val):
         if isinstance(val, int) or isinstance(val, float):
+            # 半角数字はカンマ区切り＋右寄せ（6文字幅）
             return f"{val:>6,}"
-        return f"{str(val):>6}"
+        else:
+            # 非公開などの全角文字は全角スペース＋右寄せ（6幅揃え）
+            # "　"（全角スペース）＋"非公開"でだいたい6幅
+            return f"　{str(val):<5}"  # 全角スペース＋左寄せ5文字
 
     def _create_player_embed(self, data: dict) -> discord.Embed:
         username = self._safe_get(data, ['username'])
