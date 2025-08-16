@@ -98,7 +98,7 @@ class PlayerCog(commands.Cog):
         if isinstance(val, int) or isinstance(val, float):
             return f"{val:>6,}"
         else:
-            return f"{str(val)} "
+            return f" {str(val)}"
 
     def _create_player_embed(self, data: dict) -> discord.Embed:
         username = self._safe_get(data, ['username'])
