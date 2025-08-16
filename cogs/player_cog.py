@@ -6,7 +6,7 @@ import logging
 import os
 import requests
 import random
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, features
 from io import BytesIO
 
 logger = logging.getLogger(__name__)
@@ -20,129 +20,14 @@ from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN, AUTHORIZED_USER_IDS
 from lib.cache_handler import CacheHandler
 
 def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
-    username = data.get("username", "Player")
-    rank = data.get("rank", "Champion")
-    guild = data.get("guild", "[ETKW] Empire of TKW")
-    guild_rank = data.get("guild_rank", "CHIEF ★★★★")
-    first_join = data.get("first_join", "2022-10-29")
-    last_seen = data.get("last_seen", "2025-07-11")
-    mobs = data.get("mobs", 1120452)
-    playtime = data.get("playtime", 2495.83)
-    chests = data.get("chests", 9056)
-    war_count = data.get("war_count", 5644)
-    war_rank = data.get("war_rank", "#140")
-    pvp_k = data.get("pvp_k", 0)
-    pvp_d = data.get("pvp_d", 0)
-    quests_done = data.get("quests_done", 736)
-    quests_total = data.get("quests_total", 735)
-    total_level = data.get("total_level", 7406)
-    clears = data.get("clears", {
-        "NOTG": 176, "NOL": 2, "TCC": 236, "TNA": 568,
-        "Dungeons": 601, "All Raids": 982
-    })
-    uuid = data.get("uuid", "")
-    footer = f"{username}'s Stats | Minister Chikuwa"
-
-    # キャンバスサイズ
-    W, H = 800, 1100
-    img = Image.new("RGB", (W, H), (233, 223, 197))
+    logger.warning("Freetype support:", features.check('freetype'))
+    
+    img = Image.new("RGB", (300, 100), (255,255,255))
     draw = ImageDraw.Draw(img)
-
-    # 背景にノイズで紙質っぽさを追加
-    for _ in range(30000):
-        x, y = random.randint(0, W - 1), random.randint(0, H - 1)
-        c = random.randint(200, 235)
-        img.putpixel((x, y), (c, c, c))
-    img = img.filter(ImageFilter.GaussianBlur(0.4))
-
-    # フォント（なければデフォルト）
-    try:
-        title_font = ImageFont.truetype(FONT_PATH, 44)
-        header_font = ImageFont.truetype(FONT_PATH, 32)
-        text_font = ImageFont.truetype(FONT_PATH, 28)
-        small_font = ImageFont.truetype(FONT_PATH, 22)
-    except:
-        logger.warning(f"Font not found: {FONT_PATH}, using default.")
-        title_font = ImageFont.truetype("arial.ttf", 44)
-        header_font = ImageFont.truetype("arial.ttf", 32)
-        text_font = ImageFont.truetype("arial.ttf", 28)
-        small_font = ImageFont.truetype("arial.ttf", 22)
-        
-    # 外枠
-    margin = 30
-    draw.rectangle([margin, margin, W - margin, H - margin], outline=(60, 40, 20), width=4)
-
-    # プレイヤー名とランク
-    draw.text((50, 50), f"[{rank}] {username}", font=title_font, fill=(120, 20, 20))
-
-    # スキン画像
-    if uuid:
-        try:
-            skin_url = f"https://vzge.me/bust/128/{uuid}"
-            headers = {"User-Agent": "Mozilla/5.0"}
-            skin_res = requests.get(skin_url, headers=headers)
-            if skin_res.status_code == 200:
-                skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
-                skin = skin.resize((120, 120), Image.LANCZOS)
-                img.paste(skin, (50, 110), mask=skin)
-        except:
-            draw.rectangle([50, 110, 170, 230], fill=(160, 0, 0))
-
-    # ギルド・日時
-    draw.text((200, 110), guild, font=header_font, fill=(30, 20, 20))
-    draw.text((200, 150), guild_rank, font=text_font, fill=(30, 20, 20))
-    draw.text((200, 190), f"First Joined: {first_join}", font=text_font, fill=(30, 20, 20))
-    draw.text((200, 220), f"Last Seen: {last_seen}", font=text_font, fill=(30, 20, 20))
-
-    # セクション線
-    draw.line((50, 280, W - 50, 280), fill=(50, 30, 20), width=2)
-
-    # 左右カラム（統計）
-    left_stats = [
-        f"Mobs {mobs:,}",
-        f"Playtime {playtime} hours",
-        f"War {war_count} {war_rank}",
-        f"Quests {quests_done}",
-        f"Total Level {total_level}"
-    ]
-    right_stats = [
-        f"Chests {chests:,}",
-        f"PvP {pvp_k} K/{pvp_d} D",
-        f"Quests Total {quests_total}",
-        f"Total Level {total_level}"
-    ]
-
-    y = 310
-    for text in left_stats:
-        draw.text((60, y), text, font=text_font, fill=(20, 20, 20))
-        y += 40
-
-    y = 310
-    for text in right_stats:
-        draw.text((400, y), text, font=text_font, fill=(20, 20, 20))
-        y += 40
-
-    # Raids & Dungeons
-    draw.line((50, 530, W - 50, 530), fill=(50, 30, 20), width=2)
-    draw.text((60, 550), "Content Clears", font=header_font, fill=(30, 20, 20))
-
-    y = 600
-    for k, v in clears.items():
-        draw.text((80, y), f"{k}", font=text_font, fill=(20, 20, 20))
-        draw.text((280, y), f"{v}", font=text_font, fill=(20, 20, 20))
-        y += 40
-
-    # UUID & Footer
-    draw.line((50, H - 150, W - 50, H - 150), fill=(50, 30, 20), width=2)
-    draw.text((60, H - 130), f"UUID {uuid}", font=small_font, fill=(20, 20, 20))
-    draw.text((60, H - 100), footer, font=small_font, fill=(20, 20, 20))
-
-    # TEST
-    draw.rectangle([50, 50, 200, 200], fill=(255,0,0))
-    draw.multiline_text((50, 50), "TEST", fill=(0,0,0), font=ImageFont.load_default())
-
-    # 保存
-    img.save(output)
+    draw.rectangle([10,10,110,60], fill=(255,0,0))
+    draw.text((20,20), "TEST", fill=(0,0,0), font=ImageFont.load_default())
+    img.save("test_text.png")
+    
     logger.info(f"--- [PlayerCog] Saved {output}")
 
 class PlayerCog(commands.Cog):
