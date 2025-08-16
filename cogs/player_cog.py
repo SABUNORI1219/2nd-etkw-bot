@@ -10,6 +10,9 @@ from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FONT_PATH = os.path.join(project_root, "assets", "fonts", "times.ttf")
+
 from lib.wynncraft_api import WynncraftAPI
 from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN, AUTHORIZED_USER_IDS
 from lib.cache_handler import CacheHandler
@@ -40,36 +43,38 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
     footer = f"{username}'s Stats | Minister Chikuwa"
 
     # キャンバスセットアップ
-    W, H = 800, 1100
-    bg_color = (235, 220, 180)
-    img = Image.new("RGB", (W, H), bg_color)
+    W, H = 1000, 1400
+    img = Image.new("RGB", (W, H), (233, 223, 197))
     draw = ImageDraw.Draw(img)
 
-    # フォント準備（環境に合わせて変更してください）
-    try:
-        title_font = ImageFont.truetype("arialbd.ttf", 48)
-        header_font = ImageFont.truetype("arialbd.ttf", 36)
-        text_font = ImageFont.truetype("arial.ttf", 28)
-        small_font = ImageFont.truetype("arial.ttf", 22)
-    except Exception as e:
-        # フォントが無い場合はデフォルト
-        title_font = ImageFont.load_default()
-        header_font = ImageFont.load_default()
-        text_font = ImageFont.load_default()
-        small_font = ImageFont.load_default()
+    # 背景にざらつきノイズ追加
+    for _ in range(20000):
+        x, y = random.randint(0, W-1), random.randint(0, H-1)
+        c = random.randint(200, 235)
+        img.putpixel((x, y), (c, c, c))
+    img = img.filter(ImageFilter.GaussianBlur(0.3))
+
+    # フォント準備    
+    title_font = ImageFont.truetype(FONT_PATH, 72)   # 新聞タイトル用
+    header_font = ImageFont.truetype(FONT_PATH, 40)  # 見出し
+    text_font = ImageFont.truetype(FONT_PATH, 28)      # 本文
+    small_font = ImageFont.truetype(FONT_PATH, 22)     # 小さめ
 
     # 外枠
-    margin = 20
-    draw.rectangle([margin, margin, W - margin, H - margin], outline=(80, 50, 20), width=4)
+    margin = 40
+    draw.rectangle([margin, margin, W - margin, H - margin], outline=(40, 30, 20), width=6)
 
-    # タイトル
-    draw.text((50, 40), f"[{rank}] {username}", font=title_font, fill=(120, 40, 40))
+    # --- タイトル ---
+    draw.text((W//2 - 200, 60), f"The Wynncraft Gazette", font=title_font, fill=(20, 10, 10))
 
-    # ギルド情報
-    draw.text((220, 120), guild, font=header_font, fill=(40, 30, 30))
-    draw.text((220, 170), guild_rank, font=text_font, fill=(40, 30, 30))
-    draw.text((220, 220), f"First Joined: {first_join}", font=text_font, fill=(40, 30, 30))
-    draw.text((220, 260), f"Last Seen: {last_seen}", font=text_font, fill=(40, 30, 30))
+    # --- プレイヤー名 & ランク ---
+    draw.text((60, 160), f"[{rank}] {username}", font=header_font, fill=(40, 20, 20))
+
+    # --- ギルド情報 ---
+    draw.text((250, 220), guild, font=header_font, fill=(30, 20, 20))
+    draw.text((250, 270), guild_rank, font=text_font, fill=(30, 20, 20))
+    draw.text((250, 320), f"First Joined: {first_join}", font=text_font, fill=(30, 20, 20))
+    draw.text((250, 360), f"Last Seen: {last_seen}", font=text_font, fill=(30, 20, 20))
 
     # スキン画像取得＆貼り付け
     if uuid:
@@ -77,46 +82,60 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
             skin_url = f"https://vzge.me/bust/256/{uuid}"
             headers = {'User-Agent': 'DiscordBot/1.0'}
             skin_res = requests.get(skin_url, headers=headers)
-            logger.info(f"Skin GET url: {skin_url} status: {skin_res.status_code}")
             if skin_res.status_code != 200:
                 raise Exception(f"skin url response: {skin_res.status_code}")
             skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
             skin = skin.resize((120, 120), Image.LANCZOS)
             img.paste(skin, (60, 120), mask=skin)
         except Exception as e:
-            logger.error(f"Skin image load failed: {e}")
             draw.rectangle([60, 120, 180, 240], fill=(160,160,160))
 
-    # セクション線１
-    draw.line((50, 320, 750, 320), fill=(60, 40, 20), width=3)
+    # --- セクション罫線 ---
+    draw.line((60, 430, 940, 430), fill=(50, 30, 20), width=4)
 
-    # ステータス（左列）
-    draw.text((60, 340), f"Mobs {mobs:,}", font=text_font, fill=(20, 20, 20))
-    draw.text((60, 380), f"Playtime {playtime} hours", font=text_font, fill=(20, 20, 20))
-    draw.text((60, 440), f"War {war_count} {war_rank}", font=text_font, fill=(20, 20, 20))
-    draw.text((60, 480), f"Quests {quests_done}", font=text_font, fill=(20, 20, 20))
-    draw.text((60, 520), f"Total Level {total_level}", font=text_font, fill=(20, 20, 20))
+    # --- 左右2カラム ---
+    col1_x, col2_x = 80, 540
+    y_start = 460
+    spacing = 50
 
-    # ステータス（右列）
-    draw.text((420, 340), f"Chests {chests:,}", font=text_font, fill=(20, 20, 20))
-    draw.text((420, 380), f"PvP {pvp_k} K / {pvp_d} D", font=text_font, fill=(20, 20, 20))
-    draw.text((420, 440), f"Quests Total {quests_total}", font=text_font, fill=(20, 20, 20))
-    draw.text((420, 480), f"Total Level {total_level}", font=text_font, fill=(20, 20, 20))
+    left_stats = [
+        f"Mobs {mobs:,}",
+        f"Playtime {playtime} h",
+        f"War {war_count} {war_rank}",
+        f"Quests {quests_done}",
+        f"Total Level {total_level}"
+    ]
 
-    # セクション線２
-    draw.line((50, 580, 750, 580), fill=(60, 40, 20), width=3)
+    right_stats = [
+        f"Chests {chests:,}",
+        f"Quests Total {quests_total}",
+        f"Total Level {total_level}"
+    ]
 
-    # Content Clears 表示
-    draw.text((60, 600), "Content Clears", font=header_font, fill=(30, 20, 20))
-    y = 650
-    for key, value in clears.items():
-        draw.text((80, y), f"{key}", font=text_font, fill=(20, 20, 20))
-        draw.text((250, y), f"{value}", font=text_font, fill=(20, 20, 20))
+    y = y_start
+    for text in left_stats:
+        draw.text((col1_x, y), text, font=text_font, fill=(20, 20, 20))
+        y += spacing
+
+    y = y_start
+    for text in right_stats:
+        draw.text((col2_x, y), text, font=text_font, fill=(20, 20, 20))
+        y += spacing
+
+    # --- Raids & Dungeons ---
+    draw.line((60, 720, 940, 720), fill=(50, 30, 20), width=4)
+    draw.text((60, 740), "Content Clears", font=header_font, fill=(30, 20, 20))
+
+    y = 800
+    for k, v in clears.items():
+        draw.text((80, y), f"{k}", font=text_font, fill=(20, 20, 20))
+        draw.text((280, y), f"{v}", font=text_font, fill=(20, 20, 20))
         y += 40
 
-    # UUID & フッター
-    draw.text((420, 650), f"UUID {uuid}", font=small_font, fill=(20, 20, 20))
-    draw.text((420, 720), footer, font=small_font, fill=(20, 20, 20))
+    # --- フッター ---
+    draw.line((60, H-120, 940, H-120), fill=(50, 30, 20), width=3)
+    draw.text((80, H-100), f"UUID {uuid}", font=small_font, fill=(20, 20, 20))
+    draw.text((80, H-70), footer, font=small_font, fill=(20, 20, 20))
 
     # 保存
     img.save(output)
