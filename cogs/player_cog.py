@@ -189,18 +189,31 @@ class PlayerCog(commands.Cog):
             pvp_line = f"PvP: {pvp_kills_display} K / {pvp_deaths_display} D"
 
         # Raids/dungeons
-        raid_list = self._safe_get(data, ['globalData', 'raids', 'list'], {})
-        if not raid_list:  # 空dict判定
-            notg = 0
-            nol = 0
-            tcc = 0
-            tna = 0
+        has_raid_list = (
+            'globalData' in data and
+            isinstance(data['globalData'], dict) and
+            'raids' in data['globalData'] and
+            isinstance(data['globalData']['raids'], dict) and
+            'list' in data['globalData']['raids']
+        )
+        
+        if has_raid_list:
+            raid_list = data['globalData']['raids']['list']
+            if raid_list == {}:
+                notg = 0
+                nol = 0
+                tcc = 0
+                tna = 0
+            else:
+                notg = self._safe_get(raid_list, ["Nest of the Grootslangs"], "非公開")
+                nol = self._safe_get(raid_list, ["Orphion's Nexus of Light"], "非公開")
+                tcc = self._safe_get(raid_list, ["The Canyon Colossus"], "非公開")
+                tna = self._safe_get(raid_list, ["The Nameless Anomaly"], "非公開")
         else:
-            notg = self._safe_get(raid_list, ["Nest of the Grootslangs"], "非公開")
-            nol = self._safe_get(raid_list, ["Orphion's Nexus of Light"], "非公開")
-            tcc = self._safe_get(raid_list, ["The Canyon Colossus"], "非公開")
-            tna = self._safe_get(raid_list, ["The Nameless Anomaly"], "非公開")
-        if notg == "非公開" or nol == "非公開" or tcc == "非公開" or tna == "非公開": is_partial_private = True
+            notg = "非公開"
+            nol = "非公開"
+            tcc = "非公開"
+            tna = "非公開"
 
         dungeons = self._safe_get(data, ['globalData', 'dungeons', 'total'], "非公開")
         total_raids = self._safe_get(data, ['globalData', 'raids', 'total'], "非公開")
