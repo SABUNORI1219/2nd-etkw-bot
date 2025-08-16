@@ -130,6 +130,15 @@ class PlayerCog(commands.Cog):
         last_join_raw = self._safe_get(data, ['lastJoin'], None)
         last_join_display = self.format_datetime_iso(last_join_raw)
 
+        if last_join_raw and "T" in last_join_raw:
+            try:
+                last_join_dt = datetime.fromisoformat(last_join_raw.replace("Z", "+00:00"))
+                time_diff = datetime.now(timezone.utc) - last_join_dt
+            except Exception:
+                time_diff = timedelta(seconds=9999999)
+        else:
+            time_diff = timedelta(seconds=9999999)
+
         server_value_for_stream = self._safe_get(data, ['server'], None)
         stream_status = "🟢Stream" if server_value_for_stream is None and time_diff.total_seconds() < 60 else "❌Stream"
         server_display = f"{server} [{stream_status}]"
