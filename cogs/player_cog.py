@@ -62,11 +62,12 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
         text_font = ImageFont.truetype(FONT_PATH, 28)
         small_font = ImageFont.truetype(FONT_PATH, 22)
     except:
-        title_font = ImageFont.load_default()
-        header_font = ImageFont.load_default()
-        text_font = ImageFont.load_default()
-        small_font = ImageFont.load_default()
-
+        logger.warning(f"Font not found: {FONT_PATH}, using default.")
+        title_font = ImageFont.truetype("arial.ttf", 44)
+        header_font = ImageFont.truetype("arial.ttf", 32)
+        text_font = ImageFont.truetype("arial.ttf", 28)
+        small_font = ImageFont.truetype("arial.ttf", 22)
+        
     # 外枠
     margin = 30
     draw.rectangle([margin, margin, W - margin, H - margin], outline=(60, 40, 20), width=4)
