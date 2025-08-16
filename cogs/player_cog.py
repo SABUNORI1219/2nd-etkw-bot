@@ -76,7 +76,7 @@ class PlayerCog(commands.Cog):
                 return default
         return v
 
-    def _fallback_stat(self, data: dict, keys_global: list, default="非公開"):
+    def _fallback_stat(self, data: dict, keys_global: list, keys_ranking: list, keys_prev: list, default="非公開"):
         # globalData優先、ranking→previousRanking→default
         val = self._safe_get(data, keys_global, None)
         if val is not None:
@@ -138,13 +138,13 @@ class PlayerCog(commands.Cog):
         is_partial_private = False
 
         # fallback取得
-        killed_mobs = self._fallback_stat(data, ['globalData', 'mobsKilled'])
+        killed_mobs = self._fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
         if killed_mobs == "非公開": is_partial_private = True
-        chests_found = self._fallback_stat(data, ['globalData', 'chestsFound'])
+        chests_found = self._fallback_stat(data, ['globalData', 'chestsFound'], ['ranking', 'chestsFound'], ['previousRanking', 'chestsFound'])
         if chests_found == "非公開": is_partial_private = True
-        playtime = self._fallback_stat(data, ['playtime'])
+        playtime = self._fallback_stat(data, ['playtime'], ['ranking', 'playtime'], ['previousRanking', 'playtime'])
         if playtime == "非公開": is_partial_private = True
-        wars = self._fallback_stat(data, ['globalData', 'wars'])
+        wars = self._fallback_stat(data, ['globalData', 'wars'], ['ranking', 'wars'], ['previousRanking', 'wars'])
         if wars == "非公開": is_partial_private = True
 
         war_rank = self._safe_get(data, ['ranking', 'warsCompletion'], '非公開')
