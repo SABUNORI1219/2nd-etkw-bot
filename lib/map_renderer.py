@@ -22,7 +22,7 @@ class MapRenderer:
     def __init__(self):
         try:
             self.map_img = Image.open(os.path.join(ASSETS_PATH, "main-map.png")).convert("RGBA")
-            self.crown_img = Image.open(os.path.join(ASSETS_PATH, "crown.png")).convert("RGBA")
+            self.crown_img = Image.open(os.path.join(ASSETS_PATH, "guild_headquarters.png")).convert("RGBA")
             with open(os.path.join(ASSETS_PATH, "territories.json"), "r", encoding='utf-8') as f:
                 self.local_territories = json.load(f)
             self.font = ImageFont.truetype(FONT_PATH, 40)
