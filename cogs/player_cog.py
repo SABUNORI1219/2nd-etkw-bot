@@ -132,7 +132,7 @@ class PlayerCog(commands.Cog):
 
         server_value_for_stream = self._safe_get(data, ['server'], None)
         stream_status = "🟢Stream" if server_value_for_stream is None and time_diff.total_seconds() < 60 else "❌Stream"
-        server_display = {server } + f" [{stream_status}]"
+        server_display = f"{server} [{stream_status}]"
 
         restrictions = self._safe_get(data, ['restrictions'], {})
         is_partial_private = False
