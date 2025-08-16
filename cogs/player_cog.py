@@ -196,6 +196,8 @@ Total Level: {total_level:,}
 **UUID: {uuid}**
 """
         color = discord.Color.green() if is_online else discord.Color.dark_red() 
+        footer_text = f"{username}'s Stats | Minister Chikuwa" if is_partial_private: footer_text += " | ※一部の情報は非公開です" 
+        
         embed = discord.Embed(
             description=description,
             color=color
@@ -205,7 +207,6 @@ Total Level: {total_level:,}
         
         embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{uuid}/right")
         
-        footer_text = f"{username}'s Stats | Minister Chikuwa" if is_partial_private: footer_text += " | ※一部の情報は非公開です" 
         embed.set_footer(
             text=footer_text,
             icon_url=f"https://www.mc-heads.net/avatar/{uuid}"
