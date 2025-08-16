@@ -76,7 +76,7 @@ class PlayerCog(commands.Cog):
                 return default
         return v
 
-    def _fallback_stat(self, data: dict, keys_global: list, keys_ranking: list, keys_prev: list, default="非公開"):
+    def _fallback_stat(self, data: dict, keys_global: list, default="非公開"):
         # globalData優先、ranking→previousRanking→default
         val = self._safe_get(data, keys_global, None)
         if val is not None:
