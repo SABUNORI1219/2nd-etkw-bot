@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # フォントパス（arial.ttf優先・なければデフォルト）
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FONT_PATH = os.path.join(project_root, "assets", "fonts", "ARIAL.TTF")
+FONT_PATH = os.path.join(project_root, "assets", "fonts", "Arial.ttf")
 
 from lib.wynncraft_api import WynncraftAPI
 from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN, AUTHORIZED_USER_IDS
