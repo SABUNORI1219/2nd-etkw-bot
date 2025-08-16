@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 import logging
 import os
 import requests
+import random
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 
