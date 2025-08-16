@@ -156,6 +156,23 @@ class PlayerCog(commands.Cog):
         quests = self._fallback_stat(data, ['globalData', 'completedQuests'], ['ranking', 'completedQuests'], ['previousRanking', 'completedQuests'])
         total_level = self._fallback_stat(data, ['globalData', 'totalLevel'], ['ranking', 'totalLevel'], ['previousRanking', 'totalLevel'])
 
+        playtime_display = self.format_stat(playtime)
+        if playtime == "非公開":
+            playtime_line = f"Playtime: {playtime_display}"
+        else:
+            playtime_line = f"Playtime: {playtime_display} hours"
+    
+        pvp_kills_display = self.format_stat(pvp_kills)
+        pvp_deaths_display = self.format_stat(pvp_deaths)
+        if pvp_kills == "非公開" and pvp_deaths == "非公開":
+            pvp_line = f"PvP: 非公開"
+        elif pvp_kills == "非公開":
+            pvp_line = f"PvP: 非公開 K / {pvp_deaths_display} D"
+        elif pvp_deaths == "非公開":
+            pvp_line = f"PvP: {pvp_kills_display} K / 非公開 D"
+        else:
+            pvp_line = f"PvP: {pvp_kills_display} K / {pvp_deaths_display} D"
+
         # Raids/dungeons
         raid_list = self._safe_get(data, ['globalData', 'raids', 'list'], {})
         notg = self._safe_get(raid_list, ["Nest of the Grootslangs"], "非公開")
@@ -177,9 +194,9 @@ Guild: {guild_display}
 First Joined: {first_join_display}
 Last Seen: {last_join_display}
 Mobs Killed: {self.format_stat(killed_mobs)}
-Playtime: {self.format_stat(playtime)} hours
+{playtime_line}
 War Count: {self.format_stat(wars)} [{war_rank_display}]
-PvP: {self.format_stat(pvp_kills)} K / {self.format_stat(pvp_deaths)} D
+{pvp_line}
 Quests Total: {self.format_stat(quests)}
 Total Level: {self.format_stat(total_level)}
 ╔═══════════╦════════╗
