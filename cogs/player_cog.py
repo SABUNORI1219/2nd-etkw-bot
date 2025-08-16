@@ -95,6 +95,11 @@ class PlayerCog(commands.Cog):
             return val
         return default
 
+    def format_stat(val):
+        if isinstance(val, int) or isinstance(val, float):
+            return f"{val:,}"
+        return str(val)
+
     def _create_player_embed(self, data: dict) -> discord.Embed:
         username = self._safe_get(data, ['username'])
         escaped_username = discord.utils.escape_markdown(username)
@@ -175,13 +180,12 @@ Active Character: {active_char_info}
 Guild: {guild_display}
 First Joined: {first_join}
 Last Seen: {last_join_display}
-Mobs Killed: {killed_mobs:,}
-Chests Looted: {chests_found:,}
-Playtime: {playtime:,} hours
-War Count: {wars:,} [{war_rank_display}]
-PvP: {pvp_kills:,} K / {pvp_deaths:,} D
-Quests Total: {quests:,}
-Total Level: {total_level:,}
+Mobs Killed: {format_stat(killed_mobs)}
+Playtime: {format_stat(playtime)} hours
+War Count: {format_stat(wars)} [{war_rank_display}]
+PvP: {format_stat(pvp_kills)} K / {format_stat(pvp_deaths)} D
+Quests Total: {format_stat(quests)}
+Total Level: {format_stat(total_level)}
 ╔═══════════╦════════╗
 ║  Content  ║ Clears ║
 ╠═══════════╬════════╣
