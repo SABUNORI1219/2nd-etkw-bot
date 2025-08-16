@@ -397,9 +397,13 @@ class MapRenderer:
             crown_size = int(min(width, height) * 0.9)
             crown_size = max(18, min(crown_size, crown_size_limit))
 
-            crown_img_resized = self.crown_img.resize((crown_size, crown_size), Image.LANCZOS)
-            crown_x = int(px - crown_size/2)
-            crown_y = int(py - crown_size/2)
+            orig_w, orig_h = self.crown_img.size
+            ratio = min(crown_size / orig_w, crown_size / orig_h)
+            new_w = int(orig_w * ratio)
+            new_h = int(orig_h * ratio)
+            crown_img_resized = self.crown_img.resize((new_w, new_h), Image.LANCZOS)
+            crown_x = int(px - new_w/2)
+            crown_y = int(py - new_h/2)
             map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
 
             prefix_font_size = crown_size
