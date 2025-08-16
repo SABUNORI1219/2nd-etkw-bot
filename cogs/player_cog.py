@@ -6,7 +6,7 @@ import logging
 import os
 import requests
 import random
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from io import BytesIO
 
 logger = logging.getLogger(__name__)
