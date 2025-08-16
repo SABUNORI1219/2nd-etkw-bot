@@ -3,6 +3,10 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timezone, timedelta
 import logging
+import os
+import requests
+from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
@@ -10,63 +14,116 @@ from lib.wynncraft_api import WynncraftAPI
 from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN, AUTHORIZED_USER_IDS
 from lib.cache_handler import CacheHandler
 
-class PlayerSelectView(discord.ui.View):
-    def __init__(self, player_collision_dict: dict, cog_instance, owner_id):
-        super().__init__(timeout=60.0)
-        self.cog_instance = cog_instance
-        self.owner_id = owner_id
+def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
+    # データ読み込み
+    username = data.get("username", "Player")
+    rank = data.get("rank", "Champion")
+    guild = data.get("guild", "[ETKW] Empire of TKW")
+    guild_rank = data.get("guild_rank", "CHIEF ★★★★")
+    first_join = data.get("first_join", "2022-10-29")
+    last_seen = data.get("last_seen", "2025-07-11")
+    mobs = data.get("mobs", 1120452)
+    playtime = data.get("playtime", 2495.83)
+    chests = data.get("chests", 9056)
+    war_count = data.get("war_count", 5644)
+    war_rank = data.get("war_rank", "#140")
+    pvp_k = data.get("pvp_k", 0)
+    pvp_d = data.get("pvp_d", 0)
+    quests_done = data.get("quests_done", 736)
+    quests_total = data.get("quests_total", 735)
+    total_level = data.get("total_level", 7406)
+    clears = data.get("clears", {
+        "NOTG": 176, "NOL": 2, "TCC": 236, "TNA": 568,
+        "Dungeons": 601, "All Raids": 982
+    })
+    uuid = data.get("uuid", "")
+    footer = f"{username}'s Stats | Minister Chikuwa"
 
-        options = []
-        for uuid, player_info in player_collision_dict.items():
-            if isinstance(player_info, dict):
-                raw_support_rank = player_info.get('supportRank')
-                if raw_support_rank and raw_support_rank.lower() == "vipplus":
-                    rank_display = "Vip+"
-                elif raw_support_rank and raw_support_rank.lower() == "heroplus":
-                    rank_display = "Hero+"
-                else:
-                    rank_display = (raw_support_rank or 'Player').capitalize()
+    # キャンバスセットアップ
+    W, H = 800, 1100
+    bg_color = (235, 220, 180)
+    img = Image.new("RGB", (W, H), bg_color)
+    draw = ImageDraw.Draw(img)
 
-                stored_name = player_info.get('username', 'Unknown')
-                label_text = f"{stored_name} [{rank_display}]"
-                
-                options.append(discord.SelectOption(
-                    label=label_text, 
-                    value=uuid,
-                    description=f"UUID: {uuid}"
-                ))
+    # フォント準備（環境に合わせて変更してください）
+    try:
+        title_font = ImageFont.truetype("arialbd.ttf", 48)
+        header_font = ImageFont.truetype("arialbd.ttf", 36)
+        text_font = ImageFont.truetype("arial.ttf", 28)
+        small_font = ImageFont.truetype("arial.ttf", 22)
+    except Exception as e:
+        # フォントが無い場合はデフォルト
+        title_font = ImageFont.load_default()
+        header_font = ImageFont.load_default()
+        text_font = ImageFont.load_default()
+        small_font = ImageFont.load_default()
 
-        if options:
-            self.select_menu = discord.ui.Select(placeholder="プレイヤーを選択してください...", options=options)
-            self.select_menu.callback = self.select_callback
-            self.add_item(self.select_menu)
-            
-    async def select_callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.owner_id:
-            await interaction.response.send_message(
-                "この操作はコマンドを実行したユーザーのみ有効です。", ephemeral=True
-            )
-            return
-        selected_uuid = self.select_menu.values[0]
-        
-        self.select_menu.disabled = True
-        await interaction.response.edit_message(content="プレイヤー情報を取得中...", view=self)
-        
-        data = await self.cog_instance.wynn_api.get_nori_player_data(selected_uuid)
-        
-        if not data or 'uuid' not in data:
-            await interaction.message.edit(content="選択されたプレイヤーの情報を取得できませんでした。", embed=None, view=None)
-            return
-            
-        embed = self.cog_instance._create_player_embed(data)
-        await interaction.message.edit(content=None, embed=embed, view=None)
+    # 外枠
+    margin = 20
+    draw.rectangle([margin, margin, W - margin, H - margin], outline=(80, 50, 20), width=4)
+
+    # タイトル
+    draw.text((50, 40), f"[{rank}] {username}", font=title_font, fill=(120, 40, 40))
+
+    # ギルド情報
+    draw.text((220, 120), guild, font=header_font, fill=(40, 30, 30))
+    draw.text((220, 170), guild_rank, font=text_font, fill=(40, 30, 30))
+    draw.text((220, 220), f"First Joined: {first_join}", font=text_font, fill=(40, 30, 30))
+    draw.text((220, 260), f"Last Seen: {last_seen}", font=text_font, fill=(40, 30, 30))
+
+    # スキン画像取得＆貼り付け
+    if uuid:
+        try:
+            skin_url = f"https://vzge.me/bust/256/{uuid}"
+            skin_res = requests.get(skin_url)
+            skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
+            skin = skin.resize((120, 120), Image.LANCZOS)
+            img.paste(skin, (60, 120), mask=skin)
+        except Exception as e:
+            # 失敗時は灰色で埋める
+            draw.rectangle([60, 120, 180, 240], fill=(160,160,160))
+
+    # セクション線１
+    draw.line((50, 320, 750, 320), fill=(60, 40, 20), width=3)
+
+    # ステータス（左列）
+    draw.text((60, 340), f"Mobs {mobs:,}", font=text_font, fill=(20, 20, 20))
+    draw.text((60, 380), f"Playtime {playtime} hours", font=text_font, fill=(20, 20, 20))
+    draw.text((60, 440), f"War {war_count} {war_rank}", font=text_font, fill=(20, 20, 20))
+    draw.text((60, 480), f"Quests {quests_done}", font=text_font, fill=(20, 20, 20))
+    draw.text((60, 520), f"Total Level {total_level}", font=text_font, fill=(20, 20, 20))
+
+    # ステータス（右列）
+    draw.text((420, 340), f"Chests {chests:,}", font=text_font, fill=(20, 20, 20))
+    draw.text((420, 380), f"PvP {pvp_k} K / {pvp_d} D", font=text_font, fill=(20, 20, 20))
+    draw.text((420, 440), f"Quests Total {quests_total}", font=text_font, fill=(20, 20, 20))
+    draw.text((420, 480), f"Total Level {total_level}", font=text_font, fill=(20, 20, 20))
+
+    # セクション線２
+    draw.line((50, 580, 750, 580), fill=(60, 40, 20), width=3)
+
+    # Content Clears 表示
+    draw.text((60, 600), "Content Clears", font=header_font, fill=(30, 20, 20))
+    y = 650
+    for key, value in clears.items():
+        draw.text((80, y), f"{key}", font=text_font, fill=(20, 20, 20))
+        draw.text((250, y), f"{value}", font=text_font, fill=(20, 20, 20))
+        y += 40
+
+    # UUID & フッター
+    draw.text((420, 650), f"UUID {uuid}", font=small_font, fill=(20, 20, 20))
+    draw.text((420, 720), footer, font=small_font, fill=(20, 20, 20))
+
+    # 保存
+    img.save(output)
+    logger.info(f"--- [PlayerCog] Saved {output}")
 
 class PlayerCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
         self.cache = CacheHandler()
-        logger.info("--- [CommandsCog] プレイヤーCogが読み込まれました。")
+        logger.info("--- [PlayerCog] プレイヤーCogが読み込まれました。")
 
     def _safe_get(self, data: dict, keys: list, default: any = "N/A"):
         v = data
@@ -79,7 +136,6 @@ class PlayerCog(commands.Cog):
         return v
 
     def _fallback_stat(self, data: dict, keys_global: list, keys_ranking: list, keys_prev: list, default="非公開"):
-        # globalData優先、ranking→previousRanking→default
         val = self._safe_get(data, keys_global, None)
         if val is not None:
             return val
@@ -96,12 +152,6 @@ class PlayerCog(commands.Cog):
             return f"{val:,}"
         return str(val)
 
-    def content_format_stat(self, val):
-        if isinstance(val, int) or isinstance(val, float):
-            return f"{val:>6,}"
-        else:
-            return f" {str(val)}"
-
     def format_datetime_iso(self, dt_str):
         if not dt_str or "T" not in dt_str:
             return "非公開"
@@ -111,82 +161,60 @@ class PlayerCog(commands.Cog):
         except Exception:
             return "非公開"
 
-    def _create_player_embed(self, data: dict) -> discord.Embed:
-        username = self._safe_get(data, ['username'])
-        escaped_username = discord.utils.escape_markdown(username)
-        uuid = self._safe_get(data, ['uuid'])
-        raw_support_rank = self._safe_get(data, ['supportRank'], "Player")
-        support_rank_display = (
-            "Vip+" if raw_support_rank.lower() == "vipplus"
-            else "Hero+" if raw_support_rank.lower() == "heroplus"
-            else raw_support_rank.capitalize()
-        )
-        is_online = self._safe_get(data, ['online'], False)
-        server = self._safe_get(data, ['server'], "Unknown")
+    @app_commands.command(name="player", description="プレイヤーのステータスを表示")
+    @app_commands.describe(player="MCID or UUID")
+    async def player(self, interaction: discord.Interaction, player: str):
+        await interaction.response.defer()
 
-        guild_name = self._safe_get(data, ['guild', 'name'], "N/A")
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            logger.info("[player command] 権限なし")
+            await interaction.followup.send(
+                "`/player`コマンドは現在APIの仕様変更によりリワーキング中です。\n"
+                "`/player` command is reworking due to API feature rework right now."
+            )
+            return
+
+        cache_key = f"player_{player.lower()}"
+        cached_data = self.cache.get_cache(cache_key)
+        if cached_data:
+            logger.info(f"--- [Cache] プレイヤー'{player}'のキャッシュを使用しました。")
+            data = cached_data
+        else:
+            logger.info(f"--- [API] プレイヤー'{player}'のデータをAPIから取得します。")
+            api_data = await self.wynn_api.get_official_player_data(player)
+            if not api_data or (isinstance(api_data, dict) and "error" in api_data and api_data.get("error") != "MultipleObjectsReturned"):
+                await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
+                return
+            if isinstance(api_data, dict) and 'username' in api_data:
+                data = api_data
+                self.cache.set_cache(cache_key, api_data)
+            else:
+                await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
+                return
+
+        username = data.get("username", "Player")
+        rank = data.get("supportRank", "Player")
+        guild_name = self._safe_get(data, ['guild', 'name'], "")
         guild_prefix = self._safe_get(data, ['guild', 'prefix'], "")
+        guild = f"[{guild_prefix}] {guild_name}" if guild_name else ""
         guild_rank = self._safe_get(data, ['guild', 'rank'], "")
         guild_rank_stars = self._safe_get(data, ['guild', 'rankStars'], "")
-        guild_display = f"[{guild_prefix}] {guild_name} / {guild_rank}[{guild_rank_stars}]" if guild_name != "N/A" else "N/A"
-
-        first_join_raw = self._safe_get(data, ['firstJoin'], None)
-        first_join_display = self.format_datetime_iso(first_join_raw)
-
-        last_join_raw = self._safe_get(data, ['lastJoin'], None)
-        last_join_display = self.format_datetime_iso(last_join_raw)
-
-        if last_join_raw and "T" in last_join_raw:
-            try:
-                last_join_dt = datetime.fromisoformat(last_join_raw.replace("Z", "+00:00"))
-                time_diff = datetime.now(timezone.utc) - last_join_dt
-            except Exception:
-                time_diff = timedelta(seconds=9999999)
-        else:
-            time_diff = timedelta(seconds=9999999)
-
-        server_value_for_stream = self._safe_get(data, ['server'], None)
-        stream_status = "🟢Stream" if server_value_for_stream is None and time_diff.total_seconds() < 60 else "❌Stream"
-        server_display = f"{server} [{stream_status}]"
-
-        restrictions = self._safe_get(data, ['restrictions'], {})
-        is_partial_private = False
-
-        # fallback取得
-        killed_mobs = self._fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
-        if killed_mobs == "非公開": is_partial_private = True
-        chests_found = self._fallback_stat(data, ['globalData', 'chestsFound'], ['ranking', 'chestsFound'], ['previousRanking', 'chestsFound'])
-        if chests_found == "非公開": is_partial_private = True
+        guild_rank_full = f"{guild_rank} {guild_rank_stars}" if guild_rank or guild_rank_stars else ""
+        first_join = self.format_datetime_iso(self._safe_get(data, ['firstJoin'], None))
+        last_seen = self.format_datetime_iso(self._safe_get(data, ['lastJoin'], None))
+        mobs = self._fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
         playtime = self._fallback_stat(data, ['playtime'], ['ranking', 'playtime'], ['previousRanking', 'playtime'])
-        if playtime == "非公開": is_partial_private = True
-        wars = self._fallback_stat(data, ['globalData', 'wars'], ['ranking', 'wars'], ['previousRanking', 'wars'])
-        if wars == "非公開": is_partial_private = True
-
+        chests = self._fallback_stat(data, ['globalData', 'chestsFound'], ['ranking', 'chestsFound'], ['previousRanking', 'chestsFound'])
+        war_count = self._fallback_stat(data, ['globalData', 'wars'], ['ranking', 'wars'], ['previousRanking', 'wars'])
         war_rank = self._safe_get(data, ['ranking', 'warsCompletion'], '非公開')
-        if war_rank == "非公開": is_partial_private = True
-        war_rank_display = f"#{war_rank:,}" if isinstance(war_rank, int) else war_rank
-
-        pvp_kills = self._fallback_stat(data, ['globalData', 'pvp', 'kills'], ['ranking', 'pvpKills'], ['previousRanking', 'pvpKills'])
-        pvp_deaths = self._fallback_stat(data, ['globalData', 'pvp', 'deaths'], ['ranking', 'pvpDeaths'], ['previousRanking', 'pvpDeaths'])
-        quests = self._fallback_stat(data, ['globalData', 'completedQuests'], ['ranking', 'completedQuests'], ['previousRanking', 'completedQuests'])
+        if isinstance(war_rank, int):
+            war_rank = f"#{war_rank:,}"
+        pvp_k = self._fallback_stat(data, ['globalData', 'pvp', 'kills'], ['ranking', 'pvpKills'], ['previousRanking', 'pvpKills'])
+        pvp_d = self._fallback_stat(data, ['globalData', 'pvp', 'deaths'], ['ranking', 'pvpDeaths'], ['previousRanking', 'pvpDeaths'])
+        quests_done = self._fallback_stat(data, ['globalData', 'completedQuests'], ['ranking', 'completedQuests'], ['previousRanking', 'completedQuests'])
+        quests_total = self._safe_get(data, ['globalData', 'questsTotal'], 0)
         total_level = self._fallback_stat(data, ['globalData', 'totalLevel'], ['ranking', 'totalLevel'], ['previousRanking', 'totalLevel'])
-
-        playtime_display = self.format_stat(playtime)
-        if playtime == "非公開":
-            playtime_line = f"Playtime: {playtime_display}"
-        else:
-            playtime_line = f"Playtime: {playtime_display} hours"
-    
-        pvp_kills_display = self.format_stat(pvp_kills)
-        pvp_deaths_display = self.format_stat(pvp_deaths)
-        if pvp_kills == "非公開" and pvp_deaths == "非公開":
-            pvp_line = f"PvP: 非公開"
-        elif pvp_kills == "非公開":
-            pvp_line = f"PvP: 非公開 K / {pvp_deaths_display} D"
-        elif pvp_deaths == "非公開":
-            pvp_line = f"PvP: {pvp_kills_display} K / 非公開 D"
-        else:
-            pvp_line = f"PvP: {pvp_kills_display} K / {pvp_deaths_display} D"
+        uuid = data.get("uuid", "")
 
         # Raids/dungeons
         has_raid_list = (
@@ -196,7 +224,6 @@ class PlayerCog(commands.Cog):
             isinstance(data['globalData']['raids'], dict) and
             'list' in data['globalData']['raids']
         )
-        
         if has_raid_list:
             raid_list = data['globalData']['raids']['list']
             if raid_list == {}:
@@ -214,107 +241,44 @@ class PlayerCog(commands.Cog):
             nol = "非公開"
             tcc = "非公開"
             tna = "非公開"
-
         dungeons = self._safe_get(data, ['globalData', 'dungeons', 'total'], "非公開")
         total_raids = self._safe_get(data, ['globalData', 'raids', 'total'], "非公開")
-        if dungeons == "非公開" or total_raids == "非公開": is_partial_private = True
 
-        description = f"""
-    [公式サイトへのリンク](https://wynncraft.com/stats/player/{username})
-```python
-[{support_rank_display}] {username} is {'online' if is_online else 'offline'}
-Server: {server_display}
-Guild: {guild_display}
-First Joined: {first_join_display}
-Last Seen: {last_join_display}
-Mobs Killed: {self.format_stat(killed_mobs)}
-{playtime_line}
-War Count: {self.format_stat(wars)} [{war_rank_display}]
-{pvp_line}
-Quests Total: {self.format_stat(quests)}
-Total Level: {self.format_stat(total_level)}
-╔═══════════╦════════╗
-║  Content  ║ Clears ║
-╠═══════════╬════════╣
-║ NOTG      ║ {self.content_format_stat(notg)} ║
-║ NOL       ║ {self.content_format_stat(nol)} ║
-║ TCC       ║ {self.content_format_stat(tcc)} ║
-║ TNA       ║ {self.content_format_stat(tna)} ║
-║ Dungeons  ║ {self.content_format_stat(dungeons)} ║
-║ All Raids ║ {self.content_format_stat(total_raids)} ║
-╚═══════════╩════════╝
-```
-**UUID: {uuid}**
-"""
-        if is_partial_private:
-            description += "\n※一部の情報は非公開です"
+        clears = {
+            "NOTG": notg, "NOL": nol, "TCC": tcc, "TNA": tna,
+            "Dungeons": dungeons, "All Raids": total_raids
+        }
 
-        color = discord.Color.green() if is_online else discord.Color.dark_red() 
-        embed = discord.Embed(
-            description=description,
-            color=color
-        )
-        
-        embed.title = f"{escaped_username}"
-        
-        embed.set_thumbnail(url=f"https://www.mc-heads.net/body/{uuid}/right")
+        player_data = {
+            "username": username,
+            "rank": rank,
+            "guild": guild,
+            "guild_rank": guild_rank_full,
+            "first_join": first_join,
+            "last_seen": last_seen,
+            "mobs": mobs if isinstance(mobs, int) else 0,
+            "playtime": playtime if isinstance(playtime, (int, float)) else 0,
+            "chests": chests if isinstance(chests, int) else 0,
+            "war_count": war_count if isinstance(war_count, int) else 0,
+            "war_rank": war_rank,
+            "pvp_k": pvp_k if isinstance(pvp_k, int) else 0,
+            "pvp_d": pvp_d if isinstance(pvp_d, int) else 0,
+            "quests_done": quests_done if isinstance(quests_done, int) else 0,
+            "quests_total": quests_total if isinstance(quests_total, int) else 0,
+            "total_level": total_level if isinstance(total_level, int) else 0,
+            "clears": clears,
+            "uuid": uuid
+        }
 
-        embed.set_footer(
-            text=f"{username}'s Stats | Minister Chikuwa",
-            icon_url=f"https://www.mc-heads.net/avatar/{uuid}"
-        ) 
-        return embed
-
-    @app_commands.command(name="player", description="プレイヤーのステータスを表示")
-    @app_commands.describe(player="MCID or UUID")
-    async def player(self, interaction: discord.Interaction, player: str):
-        await interaction.response.defer()
-
-        # 権限チェック
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            logger.info("[player command] 権限なし")
-            await interaction.followup.send(
-                "`/player`コマンドは現在APIの仕様変更によりリワーキング中です。\n"
-                "`/player` command is reworking due to API feature rework right now."
-            )
-            return
-
-        cache_key = f"player_{player.lower()}"
-        cached_data = self.cache.get_cache(cache_key)
-        if cached_data:
-            logger.info(f"--- [Cache] プレイヤー'{player}'のキャッシュを使用しました。")
-            embed = self._create_player_embed(cached_data)
-            await interaction.followup.send(embed=embed)
-            return
-
-        logger.info(f"--- [API] プレイヤー'{player}'のデータをAPIから取得します。")
-        api_data = await self.wynn_api.get_official_player_data(player)
-
-        # 1. エラー返却なら即「見つかりませんでした」
-        if not api_data or (isinstance(api_data, dict) and "error" in api_data and api_data.get("error") != "MultipleObjectsReturned"):
-            await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
-            return
-
-        # 2. API更新対応: 複数プレイヤーの場合
-        if isinstance(api_data, dict) and api_data.get("error") == "MultipleObjectsReturned" and "objects" in api_data:
-            player_collision_dict = api_data["objects"]
-            view = PlayerSelectView(player_collision_dict=player_collision_dict, cog_instance=self, owner_id=interaction.user.id)
-            if hasattr(view, "select_menu") and view.select_menu.options:
-                await interaction.followup.send(
-                    "複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view
-                )
-            else:
-                await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
-            return
-
-        # 3. 単一プレイヤーデータ（usernameキーあり）ならembed
-        if isinstance(api_data, dict) and 'username' in api_data:
-            embed = self._create_player_embed(api_data)
-            self.cache.set_cache(cache_key, api_data)
-            await interaction.followup.send(embed=embed)
-            return
-
-        # 4. それ以外は全部「見つかりませんでした」
-        await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
+        output_path = f"profile_card_{uuid}.png" if uuid else "profile_card.png"
+        try:
+            generate_profile_card_with_skin(player_data, output=output_path)
+            file = discord.File(output_path, filename=os.path.basename(output_path))
+            await interaction.followup.send(file=file)
+            if os.path.exists(output_path):
+                os.remove(output_path)
+        except Exception as e:
+            logger.error(f"画像生成または送信失敗: {e}")
+            await interaction.followup.send("プロフィール画像生成に失敗しました。")
 
 async def setup(bot: commands.Bot): await bot.add_cog(PlayerCog(bot))
