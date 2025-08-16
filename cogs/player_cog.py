@@ -116,7 +116,11 @@ class PlayerCog(commands.Cog):
         escaped_username = discord.utils.escape_markdown(username)
         uuid = self._safe_get(data, ['uuid'])
         raw_support_rank = self._safe_get(data, ['supportRank'], "Player")
-        support_rank_display = "Vip+" if raw_support_rank.lower() == "vipplus" else raw_support_rank.capitalize()
+        support_rank_display = (
+            "Vip+" if raw_support_rank.lower() == "vipplus"
+            else "Hero+" if raw_support_rank.lower() == "heroplus"
+            else raw_support_rank.capitalize()
+        )
         is_online = self._safe_get(data, ['online'], False)
         server = self._safe_get(data, ['server'], "Unknown")
 
