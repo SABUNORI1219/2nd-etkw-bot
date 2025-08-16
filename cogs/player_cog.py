@@ -231,12 +231,11 @@ Total Level: {self.format_stat(total_level)}
         ) 
         return embed
 
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.command(name="player", description="プレイヤーのステータスを表示")
     @app_commands.describe(player="MCID or UUID")
     async def player(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
-    
+
         # 権限チェック
         if interaction.user.id not in AUTHORIZED_USER_IDS:
             logger.info("[player command] 権限なし")
@@ -245,7 +244,7 @@ Total Level: {self.format_stat(total_level)}
                 "`/player` command is reworking due to API feature rework right now."
             )
             return
-    
+
         cache_key = f"player_{player.lower()}"
         cached_data = self.cache.get_cache(cache_key)
         if cached_data:
@@ -253,50 +252,35 @@ Total Level: {self.format_stat(total_level)}
             embed = self._create_player_embed(cached_data)
             await interaction.followup.send(embed=embed)
             return
-    
+
         logger.info(f"--- [API] プレイヤー'{player}'のデータをAPIから取得します。")
         api_data = await self.wynn_api.get_official_player_data(player)
-    
+
         # 1. エラー返却なら即「見つかりませんでした」
-        if not api_data or (isinstance(api_data, dict) and "Error" in api_data):
+        if not api_data or (isinstance(api_data, dict) and "error" in api_data and api_data.get("error") != "MultipleObjectsReturned"):
             await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
             return
-    
-        # 2. 単一プレイヤーデータ（usernameキーあり）ならembed
+
+        # 2. API更新対応: 複数プレイヤーの場合
+        if isinstance(api_data, dict) and api_data.get("error") == "MultipleObjectsReturned" and "objects" in api_data:
+            player_collision_dict = api_data["objects"]
+            view = PlayerSelectView(player_collision_dict=player_collision_dict, cog_instance=self, owner_id=interaction.user.id)
+            if hasattr(view, "select_menu") and view.select_menu.options:
+                await interaction.followup.send(
+                    "複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view
+                )
+            else:
+                await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
+            return
+
+        # 3. 単一プレイヤーデータ（usernameキーあり）ならembed
         if isinstance(api_data, dict) and 'username' in api_data:
             embed = self._create_player_embed(api_data)
             self.cache.set_cache(cache_key, api_data)
             await interaction.followup.send(embed=embed)
             return
-    
-        # 3. UUIDキーのみ1件ならembed
-        if (
-            isinstance(api_data, dict) and
-            all(len(k) == 36 for k in api_data.keys()) and
-            len(api_data) == 1 and
-            all(isinstance(v, dict) for v in api_data.values())
-        ):
-            player_data = list(api_data.values())[0]
-            embed = self._create_player_embed(player_data)
-            await interaction.followup.send(embed=embed)
-            return
-    
-        # 4. UUIDキーのみ2件以上・値が全部dictならView。空ならエラー
-        if (
-            isinstance(api_data, dict) and
-            all(len(k) == 36 for k in api_data.keys()) and
-            len(api_data) >= 2 and
-            all(isinstance(v, dict) for v in api_data.values())
-        ):
-            view = PlayerSelectView(player_collision_dict=api_data, cog_instance=self, owner_id=interaction.user.id)
-            # optionsが実際にあるかチェック
-            if hasattr(view, "select_menu") and view.select_menu.options:
-                await interaction.followup.send("複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view)
-            else:
-                await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
-            return
-    
-        # 5. それ以外は全部「見つかりませんでした」
+
+        # 4. それ以外は全部「見つかりませんでした」
         await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
 
 async def setup(bot: commands.Bot): await bot.add_cog(PlayerCog(bot))
