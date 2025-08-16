@@ -8,12 +8,16 @@ logger = logging.getLogger(__name__)
 # configからURLテンプレートをインポート
 from config import (
     NORI_GUILD_API_URL, NORI_PLAYER_API_URL,
-    WYNN_PLAYER_API_URL, WYNN_GUILD_BY_NAME_API_URL, WYNN_GUILD_BY_PREFIX_API_URL
+    WYNN_PLAYER_API_URL, WYNN_GUILD_BY_NAME_API_URL,
+    WYNN_GUILD_BY_PREFIX_API_URL, WYNNCRAFT_API_TOKEN
 )
 
 class WynncraftAPI:
     def __init__(self):
-        self.headers = {'User-Agent': 'DiscordBot/1.0'}
+        self.headers = {
+            'User-Agent': 'DiscordBot/1.0',
+            'Authorization': f'Bearer {WYNNCRAFT_API_TOKEN}'
+        }
         self._session = None # ⬅️ 最初はセッションを空にしておく
 
     async def _get_session(self) -> aiohttp.ClientSession:
