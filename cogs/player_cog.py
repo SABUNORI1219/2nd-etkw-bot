@@ -25,7 +25,7 @@ class PlayerSelectView(discord.ui.View):
                 else:
                     rank_display = (raw_support_rank or 'Player').capitalize()
 
-                stored_name = player_info.get('storedName', 'Unknown')
+                stored_name = player_info.get('username', 'Unknown')
                 label_text = f"{stored_name} [{rank_display}]"
                 
                 options.append(discord.SelectOption(
