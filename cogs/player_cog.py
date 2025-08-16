@@ -137,13 +137,13 @@ class PlayerCog(commands.Cog):
         is_partial_private = False
 
         # fallback取得
-        killed_mobs = self._fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
+        killed_mobs = self._fallback_stat(data, ['globalData', 'mobsKilled'])
         if killed_mobs == "非公開": is_partial_private = True
-        chests_found = self._fallback_stat(data, ['globalData', 'chestsFound'], ['ranking', 'chestsFound'], ['previousRanking', 'chestsFound'])
+        chests_found = self._fallback_stat(data, ['globalData', 'chestsFound'])
         if chests_found == "非公開": is_partial_private = True
-        playtime = self._fallback_stat(data, ['playtime'], ['ranking', 'playtime'], ['previousRanking', 'playtime'])
+        playtime = self._fallback_stat(data, ['playtime'])
         if playtime == "非公開": is_partial_private = True
-        wars = self._fallback_stat(data, ['globalData', 'wars'], ['ranking', 'warsCompletion'], ['previousRanking', 'warsCompletion'])
+        wars = self._fallback_stat(data, ['globalData', 'wars'])
         if wars == "非公開": is_partial_private = True
 
         war_rank = self._safe_get(data, ['ranking', 'warsCompletion'], '非公開')
@@ -171,6 +171,7 @@ class PlayerCog(commands.Cog):
     [公式サイトへのリンク](https://wynncraft.com/stats/player/{username})
 ```python
 [{support_rank_display}] {username} is {'online' if is_online else 'offline'}
+Server: {server}
 Guild: {guild_display}
 First Joined: {first_join_display}
 Last Seen: {last_join_display}
