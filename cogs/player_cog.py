@@ -138,7 +138,8 @@ def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
     draw.text((60, H - 100), footer, font=small_font, fill=(20, 20, 20))
 
     # TEST
-    draw.text((50, 50), "TEST", fill=(0,0,0), font=ImageFont.load_default())
+    draw.rectangle([50, 50, 200, 200], fill=(255,0,0))
+    draw.multiline_text((50, 50), "TEST", fill=(0,0,0), font=ImageFont.load_default())
 
     # 保存
     img.save(output)
