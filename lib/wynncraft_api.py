@@ -33,7 +33,7 @@ class WynncraftAPI:
         for i in range(max_retries):
             try:
                 async with session.get(url, timeout=10) as response:
-                    if 200 <= response.status < 300:
+                    if 200 <= response.status < 301:
                         if response.content_length != 0:
                             return await response.json()
                         return None
