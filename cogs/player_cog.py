@@ -22,6 +22,8 @@ class PlayerSelectView(discord.ui.View):
                 raw_support_rank = player_info.get('supportRank')
                 if raw_support_rank and raw_support_rank.lower() == "vipplus":
                     rank_display = "Vip+"
+                elif raw_support_rank and raw_support_rank.lower() == "heroplus":
+                    rank_display = "Hero+"
                 else:
                     rank_display = (raw_support_rank or 'Player').capitalize()
 
