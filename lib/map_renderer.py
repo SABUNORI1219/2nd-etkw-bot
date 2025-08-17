@@ -547,7 +547,7 @@ class MapRenderer:
             owned_territories_map=owned_territories_map
         )
     
-        # ここで「指定領地だけ」枠線・円など強調
+        # ここで「指定領地だけ」円を強調
         static = terri_static
         loc = static.get("Location", {})
         px1, py1 = self._coord_to_pixel(*loc.get("start", [0, 0]))
@@ -578,10 +578,6 @@ class MapRenderer:
         highlight_radius = int(sqrt(territory_width ** 2 + territory_height ** 2) / 2)
     
         draw = ImageDraw.Draw(final_map)
-        # 枠線
-        color_hex = guild_color_map.get(owner_prefix, "#FFFFFF")
-        color_rgb = self._hex_to_rgb(color_hex)
-        draw.rectangle([left, top, right, bottom], outline=color_rgb, width=2)
         # 円
         draw.ellipse(
             [(center_x - highlight_radius, center_y - highlight_radius),
