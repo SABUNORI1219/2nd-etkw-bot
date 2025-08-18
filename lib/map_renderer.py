@@ -537,17 +537,9 @@ class MapRenderer:
             logger.error(f"領地 {territory} の所有ギルドprefixがAPIデータにありません")
             return None
     
-        # 全領地描画（コネクション線・矩形・HQ王冠・プレフィクス含む）
+        owned_territories_map = self._get_owned_territories_map_from_db()
+        
         map_to_draw_on = self.resized_map.copy()
-        # boxはまだ未設定
-        box = None
-        # HQ候補計算
-        owned_territories_map = None  # 必要なら設定
-    
-        # ここで全体描画
-        # territory_dataはAPI, guild_color_mapは色
-        # box, is_zoomedはNone/FalseでOK（単一領地なので）
-        # HQ王冠も通常通り描画される
         final_map, _ = self.draw_guild_hq_on_map(
             territory_data=territory_data,
             guild_color_map=guild_color_map,
