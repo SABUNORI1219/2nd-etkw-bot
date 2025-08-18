@@ -1,52 +1,45 @@
 from PIL import Image, ImageDraw, ImageFilter
 import random
+import math
 
 def generate_profile_card(player_data, output_path="profile_card.png", size=(800, 1100)):
-    # 中央カーキ色
-    base_color = (198, 168, 107)      # 濃いカーキ
-    # 端の焦げ色（カーキ＋焦げ茶＋黒）
-    burn_dark = (65, 53, 38)          # 黒みの焦げ茶
-    burn_mid = (91, 71, 48)           # 焦げ茶
+    # カーキ色（中央紙色）
+    base_color = (198, 168, 107)
+    # 焦げ色（黒みの強い焦げ茶）
+    burn_color = (65, 53, 38)
     W, H = size
 
     img = Image.new("RGBA", (W, H), base_color)
     draw = ImageDraw.Draw(img)
 
-    # --- 周囲を「自然な焦げ」風にする ---
-    max_burn = 60  # 焦げの最大幅
-    for side in ("top", "bottom", "left", "right"):
-        for idx in range(W if side in ("top", "bottom") else H):
-            # 焦げエリアの幅をランダムに
-            burn_width = random.randint(24, max_burn)
-            for b in range(burn_width):
-                # 焦げ色グラデーション（黒み強め→カーキ）
-                ratio = b / burn_width
-                color = (
-                    int(base_color[0] * (1 - ratio) + burn_dark[0] * ratio),
-                    int(base_color[1] * (1 - ratio) + burn_dark[1] * ratio),
-                    int(base_color[2] * (1 - ratio) + burn_dark[2] * ratio),
-                    255
-                )
-                if side == "top":
-                    x, y = idx, b
-                elif side == "bottom":
-                    x, y = idx, H - 1 - b
-                elif side == "left":
-                    x, y = b, idx
-                elif side == "right":
-                    x, y = W - 1 - b, idx
-                # 端っこは一部だけ焦げを強調する（ランダムに濃い点を増やす）
-                if random.random() < 0.18 * (1 - ratio):
-                    color = (
-                        int(burn_mid[0] * (1 - ratio) + burn_dark[0] * ratio),
-                        int(burn_mid[1] * (1 - ratio) + burn_dark[1] * ratio),
-                        int(burn_mid[2] * (1 - ratio) + burn_dark[2] * ratio),
-                        255
-                    )
-                img.putpixel((x, y), color)
+    # --- 端を「焦げムラ」風にする ---
+    max_burn = 65      # 最大焦げ幅
+    min_burn = 28      # 最小焦げ幅
+    burn_variance = 20 # 焦げのムラ強度
 
-    # --- 端を軽くぼかしてなじませる（任意） ---
-    img = img.filter(ImageFilter.GaussianBlur(1.2))
+    # 各ピクセルごとに端からの距離で色を変化させる
+    for y in range(H):
+        for x in range(W):
+            # 距離（端からどれくらいか）
+            dist_left = x
+            dist_right = W - x - 1
+            dist_top = y
+            dist_bottom = H - y - 1
+            dist_min = min(dist_left, dist_right, dist_top, dist_bottom)
+            # ムラ（ノイズで焦げ幅を不規則に）
+            burn_edge = random.randint(min_burn, max_burn) + int(random.gauss(0, burn_variance))
+            burn_edge = max(min_burn, min(max_burn, burn_edge))
+            if dist_min < burn_edge:
+                # ratio: 端(0)〜内側(burn_edge)までグラデ
+                ratio = dist_min / burn_edge
+                # 端ほど焦げ、内側ほどカーキ
+                r = int(base_color[0] * ratio + burn_color[0] * (1-ratio))
+                g = int(base_color[1] * ratio + burn_color[1] * (1-ratio))
+                b = int(base_color[2] * ratio + burn_color[2] * (1-ratio))
+                img.putpixel((x, y), (r, g, b, 255))
+
+    # 軽くぼかして自然になじませる
+    img = img.filter(ImageFilter.GaussianBlur(1.1))
 
     img.save(output_path)
     return output_path
