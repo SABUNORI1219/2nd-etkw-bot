@@ -1,41 +1,99 @@
 from PIL import Image, ImageDraw, ImageFilter
 import random
+import numpy as np
 
 def generate_profile_card(player_data, output_path="profile_card.png", size=(800, 1100)):
-    # --- 1. Wanted風背景生成 ---
+    # 色設定
     base_color = (233, 223, 197)
     edge_color = (60, 40, 20)
-    noise_level = 25000
     W, H = size
-    img = Image.new("RGB", (W, H), base_color)
+
+    # RGBAで作成（端の破れ・透明も表現）
+    img = Image.new("RGBA", (W, H), base_color)
     draw = ImageDraw.Draw(img)
 
-    # 周囲グラデーション（焦げ感）
-    edge_width = 60
-    for i in range(edge_width):
-        color = (
-            int(base_color[0] * (1 - i / edge_width) + edge_color[0] * (i / edge_width)),
-            int(base_color[1] * (1 - i / edge_width) + edge_color[1] * (i / edge_width)),
-            int(base_color[2] * (1 - i / edge_width) + edge_color[2] * (i / edge_width)),
-        )
-        bbox = [i, i, W-i, H-i]
-        draw.ellipse(bbox, outline=color)
+    # --- 1. 端の焦げ＋破れ表現 ---
+    for side in range(4):
+        if side == 0:  # 上側
+            for x in range(W):
+                burn = random.randint(20, 48)
+                for y in range(burn):
+                    alpha = random.randint(120, 255)
+                    color = (
+                        int(base_color[0] * 0.5 + edge_color[0] * 0.5),
+                        int(base_color[1] * 0.5 + edge_color[1] * 0.5),
+                        int(base_color[2] * 0.5 + edge_color[2] * 0.5),
+                        alpha
+                    )
+                    img.putpixel((x, y), color)
+                # 破れ
+                if burn > 40 and random.random() < 0.11:
+                    img.putpixel((x, random.randint(0, 8)), (0, 0, 0, 0))
+        if side == 1:  # 下側
+            for x in range(W):
+                burn = random.randint(20, 48)
+                for y in range(H-1, H-burn, -1):
+                    alpha = random.randint(120, 255)
+                    color = (
+                        int(base_color[0] * 0.5 + edge_color[0] * 0.5),
+                        int(base_color[1] * 0.5 + edge_color[1] * 0.5),
+                        int(base_color[2] * 0.5 + edge_color[2] * 0.5),
+                        alpha
+                    )
+                    img.putpixel((x, y), color)
+                if burn > 40 and random.random() < 0.11:
+                    img.putpixel((x, H-1-random.randint(0,8)), (0, 0, 0, 0))
+        if side == 2:  # 左側
+            for y in range(H):
+                burn = random.randint(20, 48)
+                for x in range(burn):
+                    alpha = random.randint(120, 255)
+                    color = (
+                        int(base_color[0] * 0.5 + edge_color[0] * 0.5),
+                        int(base_color[1] * 0.5 + edge_color[1] * 0.5),
+                        int(base_color[2] * 0.5 + edge_color[2] * 0.5),
+                        alpha
+                    )
+                    img.putpixel((x, y), color)
+                if burn > 40 and random.random() < 0.11:
+                    img.putpixel((random.randint(0,8), y), (0, 0, 0, 0))
+        if side == 3:  # 右側
+            for y in range(H):
+                burn = random.randint(20, 48)
+                for x in range(W-1, W-burn, -1):
+                    alpha = random.randint(120, 255)
+                    color = (
+                        int(base_color[0] * 0.5 + edge_color[0] * 0.5),
+                        int(base_color[1] * 0.5 + edge_color[1] * 0.5),
+                        int(base_color[2] * 0.5 + edge_color[2] * 0.5),
+                        alpha
+                    )
+                    img.putpixel((x, y), color)
+                if burn > 40 and random.random() < 0.11:
+                    img.putpixel((W-1-random.randint(0,8), y), (0, 0, 0, 0))
 
-    # 紙質ノイズ
-    for _ in range(noise_level):
-        x = random.randint(0, W - 1)
-        y = random.randint(0, H - 1)
-        c = random.randint(200, 250)
-        img.putpixel((x, y), (c, c, c))
+    # --- 2. 紙のシワ・ムラ感 ---
+    # 横線（シワ）
+    for i in range(12):
+        y = random.randint(30, H-30)
+        draw.line([(0, y), (W, y)], fill=(180,180,180,60), width=random.randint(1,3))
+    # 縦線（シワ）
+    for i in range(8):
+        x = random.randint(30, W-30)
+        draw.line([(x, 0), (x, H)], fill=(180,180,180,40), width=random.randint(1,2))
 
-    # ガウスぼかし
-    img = img.filter(ImageFilter.GaussianBlur(1.1))
+    # --- 3. ムラノイズ（点描よりムラ感重視） ---
+    arr = np.array(img)
+    noise = np.random.normal(0, 8, (H, W, 1))
+    arr[:,:,:3] = np.clip(arr[:,:,:3] + noise, 0, 255)
+    img = Image.fromarray(arr.astype(np.uint8), "RGBA")
 
-    # 外枠強調
+    # --- 4. 軽いぼかしで馴染ませる ---
+    img = img.filter(ImageFilter.GaussianBlur(1.5))
+
+    # --- 5. 外枠（Wanted感UP） ---
     border_draw = ImageDraw.Draw(img)
-    border_draw.rectangle([10, 10, W-10, H-10], outline=edge_color, width=4)
-
-    # ここに今後プレイヤー情報・スキン描画など追加予定
+    border_draw.rectangle([13, 13, W-13, H-13], outline=edge_color, width=3)
 
     img.save(output_path)
     return output_path
