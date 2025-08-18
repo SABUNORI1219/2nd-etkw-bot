@@ -93,8 +93,8 @@ def generate_profile_card(player_data, output_path="profile_card.png", size=(800
     # 焦げ面積比（端から50px以内のピクセル数÷全ピクセル数）
     burn_area_ratio = edge_mask.sum() / (W*H)
     
-    logger.info("中央平均色:", center_color)
-    logger.info("端平均色:", edge_color)
-    logger.info("焦げ面積比:", burn_area_ratio)
+    logger.info(f"中央平均色: {center_color}")
+    logger.info(f"端平均色: {edge_color}")
+    logger.info(f"焦げ面積比: {burn_area_ratio}")
     
     return output_path
