@@ -4,31 +4,17 @@ from discord.ext import commands
 from datetime import datetime, timezone, timedelta
 import logging
 import os
-import requests
-import random
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, features
-from io import BytesIO
-
-logger = logging.getLogger(__name__)
-
-# フォントパス（arial.ttf優先・なければデフォルト）
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FONT_PATH = os.path.join(project_root, "assets", "fonts", "times.ttf")
 
 from lib.wynncraft_api import WynncraftAPI
 from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN, AUTHORIZED_USER_IDS
 from lib.cache_handler import CacheHandler
 
-def generate_profile_card_with_skin(data, output="profile_card_with_skin.png"):
-    logger.warning("Freetype support:", features.check('freetype'))
-    
-    img = Image.new("RGB", (300, 100), (255,255,255))
-    draw = ImageDraw.Draw(img)
-    draw.rectangle([10,10,110,60], fill=(255,0,0))
-    draw.text((20,20), "TEST", fill=(0,0,0), font=ImageFont.load_default())
-    img.save("test_text.png")
-    
-    logger.info(f"--- [PlayerCog] Saved {output}")
+from lib.profile_renderer import generate_profile_card
+
+logger = logging.getLogger(__name__)
+
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FONT_PATH = os.path.join(project_root, "assets", "fonts", "times.ttf")
 
 class PlayerCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -104,87 +90,12 @@ class PlayerCog(commands.Cog):
                 await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
                 return
 
-        username = data.get("username", "Player")
-        rank = data.get("supportRank", "Player")
-        guild_name = self._safe_get(data, ['guild', 'name'], "")
-        guild_prefix = self._safe_get(data, ['guild', 'prefix'], "")
-        guild = f"[{guild_prefix}] {guild_name}" if guild_name else ""
-        guild_rank = self._safe_get(data, ['guild', 'rank'], "")
-        guild_rank_stars = self._safe_get(data, ['guild', 'rankStars'], "")
-        guild_rank_full = f"{guild_rank} {guild_rank_stars}" if guild_rank or guild_rank_stars else ""
-        first_join = self.format_datetime_iso(self._safe_get(data, ['firstJoin'], None))
-        last_seen = self.format_datetime_iso(self._safe_get(data, ['lastJoin'], None))
-        mobs = self._fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
-        playtime = self._fallback_stat(data, ['playtime'], ['ranking', 'playtime'], ['previousRanking', 'playtime'])
-        chests = self._fallback_stat(data, ['globalData', 'chestsFound'], ['ranking', 'chestsFound'], ['previousRanking', 'chestsFound'])
-        war_count = self._fallback_stat(data, ['globalData', 'wars'], ['ranking', 'wars'], ['previousRanking', 'wars'])
-        war_rank = self._safe_get(data, ['ranking', 'warsCompletion'], '非公開')
-        if isinstance(war_rank, int):
-            war_rank = f"#{war_rank:,}"
-        pvp_k = self._fallback_stat(data, ['globalData', 'pvp', 'kills'], ['ranking', 'pvpKills'], ['previousRanking', 'pvpKills'])
-        pvp_d = self._fallback_stat(data, ['globalData', 'pvp', 'deaths'], ['ranking', 'pvpDeaths'], ['previousRanking', 'pvpDeaths'])
-        quests_done = self._fallback_stat(data, ['globalData', 'completedQuests'], ['ranking', 'completedQuests'], ['previousRanking', 'completedQuests'])
-        quests_total = self._safe_get(data, ['globalData', 'questsTotal'], 0)
-        total_level = self._fallback_stat(data, ['globalData', 'totalLevel'], ['ranking', 'totalLevel'], ['previousRanking', 'totalLevel'])
+        # --- 画像生成 ---
         uuid = data.get("uuid", "")
-
-        # Raids/dungeons
-        has_raid_list = (
-            'globalData' in data and
-            isinstance(data['globalData'], dict) and
-            'raids' in data['globalData'] and
-            isinstance(data['globalData']['raids'], dict) and
-            'list' in data['globalData']['raids']
-        )
-        if has_raid_list:
-            raid_list = data['globalData']['raids']['list']
-            if raid_list == {}:
-                notg = 0
-                nol = 0
-                tcc = 0
-                tna = 0
-            else:
-                notg = self._safe_get(raid_list, ["Nest of the Grootslangs"], "非公開")
-                nol = self._safe_get(raid_list, ["Orphion's Nexus of Light"], "非公開")
-                tcc = self._safe_get(raid_list, ["The Canyon Colossus"], "非公開")
-                tna = self._safe_get(raid_list, ["The Nameless Anomaly"], "非公開")
-        else:
-            notg = "非公開"
-            nol = "非公開"
-            tcc = "非公開"
-            tna = "非公開"
-        dungeons = self._safe_get(data, ['globalData', 'dungeons', 'total'], "非公開")
-        total_raids = self._safe_get(data, ['globalData', 'raids', 'total'], "非公開")
-
-        clears = {
-            "NOTG": notg, "NOL": nol, "TCC": tcc, "TNA": tna,
-            "Dungeons": dungeons, "All Raids": total_raids
-        }
-
-        player_data = {
-            "username": username,
-            "rank": rank,
-            "guild": guild,
-            "guild_rank": guild_rank_full,
-            "first_join": first_join,
-            "last_seen": last_seen,
-            "mobs": mobs if isinstance(mobs, int) else 0,
-            "playtime": playtime if isinstance(playtime, (int, float)) else 0,
-            "chests": chests if isinstance(chests, int) else 0,
-            "war_count": war_count if isinstance(war_count, int) else 0,
-            "war_rank": war_rank,
-            "pvp_k": pvp_k if isinstance(pvp_k, int) else 0,
-            "pvp_d": pvp_d if isinstance(pvp_d, int) else 0,
-            "quests_done": quests_done if isinstance(quests_done, int) else 0,
-            "quests_total": quests_total if isinstance(quests_total, int) else 0,
-            "total_level": total_level if isinstance(total_level, int) else 0,
-            "clears": clears,
-            "uuid": uuid
-        }
-
         output_path = f"profile_card_{uuid}.png" if uuid else "profile_card.png"
         try:
-            generate_profile_card_with_skin(player_data, output=output_path)
+            # ここでWanted風背景画像を生成（今後はプレイヤー情報も描画予定）
+            generate_profile_card(data, output_path)
             file = discord.File(output_path, filename=os.path.basename(output_path))
             await interaction.followup.send(file=file)
             if os.path.exists(output_path):
