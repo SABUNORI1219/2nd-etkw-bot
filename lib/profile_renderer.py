@@ -1,7 +1,10 @@
 from PIL import Image, ImageDraw, ImageFilter
 import random
 import math
+import requests
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 def generate_profile_card(player_data, output_path="profile_card.png", size=(800, 1100)):
     W, H = size
@@ -67,4 +70,30 @@ def generate_profile_card(player_data, output_path="profile_card.png", size=(800
     img = img.filter(ImageFilter.GaussianBlur(1.0))
 
     img.save(output_path)
+
+    # GitHub Raw URL
+    url = "https://raw.githubusercontent.com/SABUNORI1219/2nd-etkw-bot/8a5fbe1dd30546ed3c16aee883e96110c8923b1b/assets/771238F7-E719-41D6-B08A-60692BB81812.png"
+    imga = Image.open(requests.get(url, stream=True).raw).convert('RGB')
+    W, H = imga.size
+    arr = np.array(imga)
+    
+    # 中央の平均色
+    center = arr[H//3:2*H//3, W//3:2*W//3]
+    center_color = tuple(center.reshape(-1, 3).mean(axis=0).astype(int))
+    
+    # 端50pxの平均色（焦げエリア）
+    edge_mask = np.zeros((H,W), dtype=bool)
+    edge_mask[:50,:] = True
+    edge_mask[-50:,:] = True
+    edge_mask[:,:50] = True
+    edge_mask[:,-50:] = True
+    edge_color = tuple(arr[edge_mask].reshape(-1, 3).mean(axis=0).astype(int))
+    
+    # 焦げ面積比（端から50px以内のピクセル数÷全ピクセル数）
+    burn_area_ratio = edge_mask.sum() / (W*H)
+    
+    logger.info("中央平均色:", center_color)
+    logger.info("端平均色:", edge_color)
+    logger.info("焦げ面積比:", burn_area_ratio)
+    
     return output_path
