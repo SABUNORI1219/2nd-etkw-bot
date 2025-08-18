@@ -603,6 +603,5 @@ class MapRenderer:
         cropped_image.save(map_bytes, format='PNG')
         map_bytes.seek(0)
         
-        map_bytes.close()
         del cropped_image, final_map, map_to_draw_on
         return map_bytes
