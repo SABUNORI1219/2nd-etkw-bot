@@ -4,6 +4,7 @@ import os
 import logging
 import json
 import discord
+import time
 from datetime import datetime, timezone, timedelta
 from math import sqrt
 import collections
@@ -33,7 +34,9 @@ class MapRenderer:
             new_h = int(original_h * scale_factor)
             self.resized_map = self.map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
             self.scale_factor = scale_factor
-            logger.info(f"--- [MapRenderer] ベースマップを初期リサイズしました: {TARGET_WIDTH}x{new_h}")
+
+            self._db_cache = None
+            self._db_cache_time = 0
         
         except FileNotFoundError as e:
             logger.error(f"マップ生成に必要なアセットが見つかりません: {e}")
@@ -86,10 +89,15 @@ class MapRenderer:
         """
         DBから「ギルドごとに '現所有+直近1時間以内に失領' を含む領地名セット」を返す
         """
+        now = time.time()
+        if self._db_cache and (now - self._db_cache_time < 60):
+            return self._db_cache
         sync_history_from_db()  # 必ず最新化
         db_state = get_guild_territory_state()
-        # {prefix: set(territory_name)}
-        return {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
+        result = {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
+        self._db_cache = result
+        self._db_cache_time = now
+        return result
 
     def _pick_hq_candidate(self, hq_candidates, territory_api_data, all_owned_territories=None, exclude_lost=None, debug_prefix=None):
         """
@@ -222,7 +230,7 @@ class MapRenderer:
         territory_data,
         guild_color_map,
         hq_territories=None,
-        upscale_factor=2
+        upscale_factor=1.5
     ):
         # コネクション線の描画（アップスケールはコネクション線だけ！）
         up_w, up_h = int(map_to_draw_on.width * upscale_factor), int(map_to_draw_on.height * upscale_factor)
@@ -308,6 +316,7 @@ class MapRenderer:
                 stroke_fill="black"
             )
         map_to_draw_on.alpha_composite(overlay)
+        del overlay, overlay_draw, draw, upscaled_lines, draw_lines
         return map_to_draw_on
 
     def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False, map_to_draw_on=None, owned_territories_map=None):
@@ -495,6 +504,8 @@ class MapRenderer:
             embed.set_image(url="attachment://wynn_map.png")
             embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
 
+            map_bytes.close()
+            del final_map, map_to_draw_on
             return file, embed
 
         except Exception as e:
@@ -591,5 +602,7 @@ class MapRenderer:
         map_bytes = BytesIO()
         cropped_image.save(map_bytes, format='PNG')
         map_bytes.seek(0)
-        logger.info(f"--- [MapRenderer] ✅ 画像生成成功。")
+        
+        map_bytes.close()
+        del cropped_image, final_map, map_to_draw_on
         return map_bytes
