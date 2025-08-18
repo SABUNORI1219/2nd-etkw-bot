@@ -38,7 +38,8 @@ def generate_profile_card(player_data, output_path="profile_card.png", size=(800
     ratio_noise = np.clip(ratio + noise[edge_mask] * 0.08, 0, 1)
 
     img_arr[edge_mask, :3] = (
-        base_color * (1 - ratio_noise) + edge_color * ratio_noise
+        base_color[None, :] * (1 - ratio_noise)[:, None] +
+        edge_color[None, :] * ratio_noise[:, None]
     ).astype(np.uint8)
 
     # 焦げスポット（端50pxだけ）
