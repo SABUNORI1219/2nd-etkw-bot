@@ -264,7 +264,7 @@ class MapRenderer:
                         points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
 
                     color_rgb = (30, 30, 30)
-                    draw_lines.line(points, fill=(*color_rgb, 180), width=4)
+                    draw_lines.line(points, fill=(*color_rgb, 180), width=3)
             except KeyError:
                 continue
 
