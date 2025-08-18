@@ -15,8 +15,8 @@ def generate_profile_card(player_data, output_path="profile_card.png", size=(800
     # --- ノイズ生成（ムラ感・焦げ感を出す） ---
     # Perlinノイズ風：今回はシンプルなランダムノイズを拡大して近似
     noise = np.random.normal(0, 1, (H//8, W//8))
-    noise = np.kron(noise, np.ones((8,8)))  # 拡大して滑らかさ
-    noise = noise[:H, :W]
+    noise = np.kron(noise, np.ones((8,8)))  # 拡大
+    noise = noise[:H, :W]                   # 必ず (H, W) になるように
 
     # --- 端からの距離計算 ---
     yy, xx = np.mgrid[0:H, 0:W]
