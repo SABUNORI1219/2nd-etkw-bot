@@ -2,6 +2,7 @@ from PIL import Image, ImageDraw, ImageFilter
 import random
 import math
 import requests
+import logging
 import numpy as np
 
 logger = logging.getLogger(__name__)
