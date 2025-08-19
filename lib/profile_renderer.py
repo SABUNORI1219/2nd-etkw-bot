@@ -31,7 +31,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     y = y0 + dy + 20
     draw.text((330, 250), f"[{info['guild_prefix']}] {info['guild_name']}", font=font_main, fill=(60,40,30,255))
     y += dy
-    draw.text((x0, y), f"GuildRank: {info['guild_rank']} [{info['guild_rank_stars']}]", font=font_main, fill=(60,40,30,255))
+    draw.text((330, 300), f"GuildRank: {info['guild_rank']} [{info['guild_rank_stars']}]", font=font_main, fill=(60,40,30,255))
     y += dy + 10
     draw.text((x0, y), f"Mobs killed: {info['mobs_killed']:,}", font=font_main, fill=(60,40,30,255))
     y += dy
