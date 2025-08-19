@@ -38,38 +38,39 @@ def generate_profile_card(info, output_path="profile_card.png"):
     rank_text = f"[{info['support_rank_display']}]"
     player_text = info['username']
 
-    # 各描画エリア幅
+    # まずランクの最大フォントサイズを線全体で計算
     rank_area_width = line_right_x - line_left_x
-    # 仮フォントでランクの右端を取得
-    temp_font = ImageFont.truetype(FONT_PATH, 50)
-    bbox_rank = draw.textbbox((line_left_x, headline_y), rank_text, font=temp_font)
-    rank_right_x = bbox_rank[2]
-    player_area_width = line_right_x - rank_right_x if (rank_right_x < line_right_x) else 1
-
-    # 各最大フォントサイズを計算
     rank_fontsize = get_max_fontsize(draw, rank_text, FONT_PATH, rank_area_width)
-    player_fontsize = get_max_fontsize(draw, player_text, FONT_PATH, player_area_width)
-    font_size = min(rank_fontsize, player_fontsize)
-    font_title = ImageFont.truetype(FONT_PATH, font_size)
-
-    # ランク右端を再計算（正しいサイズで）
+    font_title = ImageFont.truetype(FONT_PATH, rank_fontsize)
+    # 本フォントでランク右端取得
     bbox_rank = draw.textbbox((line_left_x, headline_y), rank_text, font=font_title)
     rank_right_x = bbox_rank[2]
+    # プレイヤー名の描画幅再計算
+    player_area_width = line_right_x - rank_right_x
+    # プレイヤー名最大フォントサイズ再計算（ランクと同じフォントサイズを使うため、狭い方に合わせる）
+    player_fontsize = get_max_fontsize(draw, player_text, FONT_PATH, player_area_width)
+    final_fontsize = min(rank_fontsize, player_fontsize)
+    font_title = ImageFont.truetype(FONT_PATH, final_fontsize)
+    # 再度ランク右端取得（最終フォントサイズで）
+    bbox_rank = draw.textbbox((line_left_x, headline_y), rank_text, font=font_title)
+    rank_right_x = bbox_rank[2]
+    # プレイヤー名描画幅
+    player_area_width = line_right_x - rank_right_x
 
     # [ゲーム内ランク]は左揃えで描画
     draw.text((line_left_x, headline_y), rank_text, font=font_title, fill=(60,40,30,255))
 
-    # プレイヤー名の中央揃え範囲を「rankの右端」～「線の右端」にする
+    # プレイヤー名は「rank右端～line右端」で中央揃え
     bbox_player = draw.textbbox((0, 0), player_text, font=font_title)
     player_w = bbox_player[2] - bbox_player[0]
-    player_center_x = (rank_right_x + line_right_x) // 2
-    player_x = player_center_x - player_w // 2
-    # y座標はランクと同じ高さで描画（縦並びにしたい場合は headline_y + rank_h + 余白 などに変更）
+    # プレイヤー名の中央座標
+    player_center_x = rank_right_x + (player_area_width // 2)
+    player_x = player_center_x - (player_w // 2)
     draw.text((player_x, headline_y), player_text, font=font_title, fill=(60,40,30,255))
 
     # ギルドなどの描画
     x0 = 300
-    y0 = headline_y + font_size + 20
+    y0 = headline_y + final_fontsize + 20
     dy = 44
     font_main = ImageFont.truetype(FONT_PATH, 38)
     draw.text((x0, y0), f"[{info['guild_prefix']}] {info['guild_name']}", font=font_main, fill=(60,40,30,255))
