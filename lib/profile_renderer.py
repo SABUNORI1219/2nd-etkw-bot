@@ -31,7 +31,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     y = y0 + dy + 20
     draw.text((330, 250), f"[{info['guild_prefix']}] {info['guild_name']}", font=font_main, fill=(60,40,30,255))
     y += dy
-    draw.text((330, 300), f"GuildRank: {info['guild_rank']} [{info['guild_rank_stars']}]", font=font_main, fill=(60,40,30,255))
+    draw.text((330, 325), f"GuildRank: {info['guild_rank']} [{info['guild_rank_stars']}]", font=font_main, fill=(60,40,30,255))
     y += dy + 10
     draw.text((x0, y), f"Mobs killed: {info['mobs_killed']:,}", font=font_main, fill=(60,40,30,255))
     y += dy
@@ -66,7 +66,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((x0, y), f"UUID: {info['uuid']}", font=font_small, fill=(90,90,90,255))
 
     # スキン画像貼り付け
-    img.paste(PLAYER_BACKGROUND, (110, 290), mask=PLAYER_BACKGROUND)
+    img.paste(PLAYER_BACKGROUND, (110, 280), mask=PLAYER_BACKGROUND)
     uuid = info.get("uuid")
     if uuid:
         try:
