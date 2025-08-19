@@ -17,14 +17,11 @@ def generate_profile_card(info, output_path="profile_card.png"):
     W, H = img.size
 
     # フォント設定
-    font_main = ImageFont.truetype(FONT_PATH, 45)
-    font_small = ImageFont.truetype(FONT_PATH, 40)
     font_title = ImageFont.truetype(FONT_PATH, 50)
-
-    # 位置など仮
-    x0 = 300
-    y0 = 500
-    dy = 44
+    font_main = ImageFont.truetype(FONT_PATH, 45)
+    font_sub = ImageFont.truetype(FONT_PATH, 43)
+    font_small = ImageFont.truetype(FONT_PATH, 40)
+    font_hours = ImageFont.truetype(FONT_PATH, 25)
 
     # 描画（profile_infoの内容を全部使う）
     draw.text((90, 140), f"[{info['support_rank_display']}] {info['username']}", font=font_title, fill=(60,40,30,255))
@@ -37,37 +34,57 @@ def generate_profile_card(info, output_path="profile_card.png"):
     
     draw.text((330, 475), f"Last Seen: {info['last_join']}", font=font_main, fill=(60,40,30,255))
 
-    draw.text((90, 600), f"Mobs killed      {info['mobs_killed']:,}", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 600), "Mobs", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 600), f"{info['mobs_killed']:,}", font=font_sub, fill=(60,40,30,255))
 
-    draw.text((90, 675), f"Playtime         {info['playtime']:,} hours", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 675), "Playtime", font=font_sub, fill=(60,40,30,255))
+    playtime_text = f"{info['playtime']:,}"
+    draw.text((330, 675), playtime_text, font=font_sub, fill=(60,40,30,255))
+    bbox = draw.textbbox((330, 675), playtime_text, font=font_sub)
+    x_hours = bbox[2] + 6
+    draw.text((x_hours, 675 + 8), "hours", font=font_hours, fill=(60,40,30,255))
 
-    draw.text((90, 775), f"Wars             {info['wars']:,} [{info['war_rank_display']}]", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 800), "Wars", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 800), f"{info['wars']:,} (#{info['war_rank_display']})", font=font_sub, fill=(60,40,30,255))
 
-    draw.text((90, 850), f"Quests           {info['quests']:,}", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 875), "Quests", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 875), f"{info['quests']:,}", font=font_sub, fill=(60,40,30,255))
 
-    draw.text((90, 925), f"Total Level     {info['total_level']:,}", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 950), "Total Level", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 950), f"{info['total_level']:,}", font=font_sub, fill=(60,40,30,255))
 
-    draw.text((650, 625), "Chests", font=font_main, fill=(60,40,30,255))
-    draw.text((650, 675), f"{info['chests']:,}", font=font_main, fill=(60,40,30,255))
+    draw.text((700, 600), "Chests", font=font_sub, fill=(60,40,30,255))
+    draw.text((700, 650), f"{info['chests']:,}", font=font_sub, fill=(60,40,30,255))
 
-    draw.text((650, 750), "PvP", font=font_main, fill=(60,40,30,255))
-    draw.text((650, 800), f"{info['pvp']}", font=font_main, fill=(60,40,30,255))
+    draw.text((700, 725), "PvP", font=font_sub, fill=(60,40,30,255))
+    draw.text((700, 775), f"{info['pvp']}", font=font_sub, fill=(60,40,30,255))
 
     # Raid/Dungeon
-    draw.text((100, 1150), f"NOTG        {info['notg']}", font=font_small, fill=(60,40,30,255))
+    draw.text((100, 1150), "NOTG", font=font_small, fill=(60,40,30,255))
+    draw.text((330, 1150), f"{info['notg']}", font=font_small, fill=(60,40,30,255))
 
-    draw.text((100, 1200), f"NOL         {info['nol']}", font=font_small, fill=(60,40,30,255))
+    draw.text((100, 1200), "NOL", font=font_small, fill=(60,40,30,255))
+    draw.text((330, 1200), f"{info['nol']}", font=font_small, fill=(60,40,30,255))
 
-    draw.text((100, 1250), f"TCC         {info['tcc']}", font=font_small, fill=(60,40,30,255))
+    draw.text((100, 1250), "TCC", font=font_small, fill=(60,40,30,255))
+    draw.text((330, 1250), f"{info['tcc']}", font=font_small, fill=(60,40,30,255))
 
-    draw.text((100, 1300), f"TNA         {info['tna']}", font=font_small, fill=(60,40,30,255))
+    draw.text((100, 1300), "TNA", font=font_small, fill=(60,40,30,255))
+    draw.text((330, 1300), f"{info['tna']}", font=font_small, fill=(60,40,30,255))
   
-    draw.text((100, 1350), f"Dungeons    {info['dungeons']}", font=font_small, fill=(60,40,30,255))
+    draw.text((100, 1350), "Dungeons", font=font_small, fill=(60,40,30,255))
+    draw.text((330, 1350), f"{info['dungeons']}", font=font_small, fill=(60,40,30,255))
 
-    draw.text((100, 1400), f"All Raids   {info['all_raids']}", font=font_small, fill=(60,40,30,255))
+    draw.text((100, 1400), "All Raids", font=font_small, fill=(60,40,30,255))
+    draw.text((330, 1400), f"{info['all_raids']}", font=font_small, fill=(60,40,30,255))
 
     # UUID
-    draw.text((475, 1150), f"UUID   {info['uuid']}", font=font_small, fill=(90,90,90,255))
+    uuid = info['uuid']
+    parts = uuid.split('-')
+    line1 = f"{parts[0]}-{parts[1]}"
+    line2 = f"{parts[2]}-{parts[3]}-{parts[4]}"
+    draw.text((475, 1150), f"UUID   {line1}", font=font_small, fill=(90,90,90,255))
+    draw.text((475, 1200), line2, font=font_small, fill=(90,90,90,255))
 
     # スキン画像貼り付け
     img.paste(PLAYER_BACKGROUND, (110, 280), mask=PLAYER_BACKGROUND)
