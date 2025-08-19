@@ -27,7 +27,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     dy = 44
 
     # 描画（profile_infoの内容を全部使う）
-    draw.text((90, 150), f"[{info['support_rank_display']}] {info['username']}", font=font_title, fill=(60,40,30,255))
+    draw.text((90, 140), f"[{info['support_rank_display']}] {info['username']}", font=font_title, fill=(60,40,30,255))
     
     draw.text((330, 250), f"[{info['guild_prefix']}] {info['guild_name']}", font=font_main, fill=(60,40,30,255))
 
@@ -41,17 +41,17 @@ def generate_profile_card(info, output_path="profile_card.png"):
 
     draw.text((90, 675), f"Playtime         {info['playtime']:,} hours", font=font_main, fill=(60,40,30,255))
 
-    draw.text((90, 750), f"Wars             {info['wars']:,} [{info['war_rank_display']}]", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 775), f"Wars             {info['wars']:,} [{info['war_rank_display']}]", font=font_main, fill=(60,40,30,255))
 
-    draw.text((90, 825), f"Quests           {info['quests']:,}", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 850), f"Quests           {info['quests']:,}", font=font_main, fill=(60,40,30,255))
 
-    draw.text((90, 900), f"Total Level     {info['total_level']:,}", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 925), f"Total Level     {info['total_level']:,}", font=font_main, fill=(60,40,30,255))
 
-    draw.text((600, 550), "Chests", font=font_main, fill=(60,40,30,255))
-    draw.text((600, 625), f"{info['chests']:,}", font=font_main, fill=(60,40,30,255))
+    draw.text((650, 625), "Chests", font=font_main, fill=(60,40,30,255))
+    draw.text((650, 675), f"{info['chests']:,}", font=font_main, fill=(60,40,30,255))
 
-    draw.text((600, 710), "PvP", font=font_main, fill=(60,40,30,255))
-    draw.text((600, 785), f"{info['pvp']}", font=font_main, fill=(60,40,30,255))
+    draw.text((650, 750), "PvP", font=font_main, fill=(60,40,30,255))
+    draw.text((650, 800), f"{info['pvp']}", font=font_main, fill=(60,40,30,255))
 
     # Raid/Dungeon
     draw.text((100, 1150), f"NOTG        {info['notg']}", font=font_small, fill=(60,40,30,255))
@@ -67,7 +67,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((100, 1400), f"All Raids   {info['all_raids']}", font=font_small, fill=(60,40,30,255))
 
     # UUID
-    draw.text((500, 1150), f"UUID   {info['uuid']}", font=font_small, fill=(90,90,90,255))
+    draw.text((475, 1150), f"UUID   {info['uuid']}", font=font_small, fill=(90,90,90,255))
 
     # スキン画像貼り付け
     img.paste(PLAYER_BACKGROUND, (110, 280), mask=PLAYER_BACKGROUND)
