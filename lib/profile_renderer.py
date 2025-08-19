@@ -1,56 +1,116 @@
-from PIL import Image, ImageDraw, ImageFilter
-import random
-import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+import requests
+from io import BytesIO
+import logging
 
-def generate_profile_card(player_data, output_path="profile_card.png", size=(800, 1100)):
-    W, H = size
-    base_color = np.array([203, 169, 110])   # 中央の平均色
-    edge_color = np.array([174, 129, 68])    # 焦げ色
-    burn_width = 50                          # 周囲の幅
+# loggingセット
+logger = logging.getLogger(__name__)
 
-    img_arr = np.zeros((H, W, 4), dtype=np.uint8)
-    img_arr[:, :, :3] = base_color
-    img_arr[:, :, 3] = 255
+# 画像やフォントのパス
+BASE_IMG_PATH = "assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png"
+FONT_PATH = "assets/fonts/times.ttf"
 
-    # 紙のザラザラノイズ（全体）
-    noise_strength = 16
-    paper_noise = np.random.normal(0, 1, (H, W, 1))
-    img_arr[:, :, :3] = np.clip(img_arr[:, :, :3] + paper_noise * noise_strength, 0, 255)
+def draw_profile_card(data, output_path="profile_card_output.png"):
+    # ベース画像読み込み
+    img = Image.open(BASE_IMG_PATH).convert("RGBA")
+    draw = ImageDraw.Draw(img)
+    W, H = img.size
 
-    # 端からburn_width以内だけでまばらに焦げスポット
-    yy, xx = np.mgrid[0:H, 0:W]
-    dist_left = xx
-    dist_right = W - xx - 1
-    dist_top = yy
-    dist_bottom = H - yy - 1
-    dist_edge = np.minimum.reduce([dist_left, dist_right, dist_top, dist_bottom])
-    edge_mask = dist_edge < burn_width
+    # フォント（調整はsizeを変えて）
+    font_main = ImageFont.truetype(FONT_PATH, 38)
+    font_small = ImageFont.truetype(FONT_PATH, 28)
+    font_title = ImageFont.truetype(FONT_PATH, 46)
 
-    num_spots = int(W * H * 0.15 // 180)  # 端面積に合わせて
-    for _ in range(num_spots):
-        # 端burn_width以内のランダム座標
-        candidates = np.argwhere(edge_mask)
-        if len(candidates) == 0: break
-        idx = random.randint(0, len(candidates)-1)
-        cy, cx = candidates[idx]
-        spot_radius = random.randint(10, 30)
-        spot_strength = random.uniform(0.3, 0.7)
-        for dx in range(-spot_radius, spot_radius):
-            for dy in range(-spot_radius, spot_radius):
-                nx, ny = cx + dx, cy + dy
-                if 0 <= nx < W and 0 <= ny < H:
-                    # spot範囲が端からはみ出てもOK
-                    d = np.hypot(dx, dy)
-                    if d < spot_radius * (0.8 + 0.3*random.random()):
-                        spot_ratio = spot_strength * (1 - d / spot_radius)
-                        img_arr[ny, nx, :3] = (
-                            img_arr[ny, nx, :3] * (1 - spot_ratio) +
-                            edge_color * spot_ratio
-                        ).astype(np.uint8)
+    # テキスト描画座標（調整用）
+    x0 = 220
+    y0 = 70
+    dy = 44
 
-    # ぼかし控えめ
-    img = Image.fromarray(img_arr, 'RGBA')
-    img = img.filter(ImageFilter.GaussianBlur(0.5))
+    # データ取得
+    username = data.get("username")
+    support_rank_display = data.get("support_rank_display")
+    guild_prefix = data.get("guild_prefix")
+    guild_name = data.get("guild_name")
+    guild_rank = data.get("guild_rank")
+    guild_rank_stars = data.get("guild_rank_stars")
+    mobs_killed = data.get("mobs_killed")
+    playtime = data.get("playtime")
+    wars = data.get("wars")
+    war_rank_display = data.get("war_rank_display")
+    quests = data.get("quests")
+    total_level = data.get("total_level")
+    chests = data.get("chests")
+    pvp = data.get("pvp")
+    notg = data.get("notg")
+    nol = data.get("nol")
+    tcc = data.get("tcc")
+    tna = data.get("tna")
+    dungeons = data.get("dungeons")
+    all_raids = data.get("all_raids")
+    uuid = data.get("uuid")
+
+    # 1. タイトル行
+    draw.text((x0, y0), f"[{support_rank_display}] {username}", font=font_title, fill=(60,40,30,255))
+    y = y0 + dy + 20
+
+    # 2. ギルド情報
+    draw.text((x0, y), f"[{guild_prefix}] {guild_name}", font=font_main, fill=(60,40,30,255))
+    y += dy
+    draw.text((x0, y), f"GuildRank: {guild_rank} [{guild_rank_stars}]", font=font_main, fill=(60,40,30,255))
+    y += dy + 10
+
+    # 3. 各種情報
+    draw.text((x0, y), f"Mobs killed: {mobs_killed:,}", font=font_main, fill=(60,40,30,255))
+    y += dy
+    draw.text((x0, y), f"Playtime: {playtime:,} h", font=font_main, fill=(60,40,30,255))
+    y += dy
+    draw.text((x0, y), f"Wars: {wars:,} [{war_rank_display}]", font=font_main, fill=(60,40,30,255))
+    y += dy
+    draw.text((x0, y), f"Quests: {quests:,}", font=font_main, fill=(60,40,30,255))
+    y += dy
+    draw.text((x0, y), f"Total Level: {total_level:,}", font=font_main, fill=(60,40,30,255))
+    y += dy
+    draw.text((x0, y), f"Chests: {chests:,}", font=font_main, fill=(60,40,30,255))
+    y += dy
+    draw.text((x0, y), f"PvP: {pvp}", font=font_main, fill=(60,40,30,255))
+    y += dy + 10
+
+    # 4. Raid/Dungeon情報
+    draw.text((x0, y), f"NOTG: {notg}", font=font_small, fill=(60,40,30,255))
+    y += dy - 16
+    draw.text((x0, y), f"NOL: {nol}", font=font_small, fill=(60,40,30,255))
+    y += dy - 16
+    draw.text((x0, y), f"TCC: {tcc}", font=font_small, fill=(60,40,30,255))
+    y += dy - 16
+    draw.text((x0, y), f"TNA: {tna}", font=font_small, fill=(60,40,30,255))
+    y += dy - 16
+    draw.text((x0, y), f"Dungeons: {dungeons}", font=font_small, fill=(60,40,30,255))
+    y += dy - 16
+    draw.text((x0, y), f"All Raids: {all_raids}", font=font_small, fill=(60,40,30,255))
+    y += dy
+
+    # 5. UUID
+    draw.text((x0, y), f"UUID: {uuid}", font=font_small, fill=(90,90,90,255))
+
+    # 6. Skin画像貼り付け
+    if uuid:
+        try:
+            skin_url = f"https://vzge.me/bust/256/{uuid}"
+            headers = {"User-Agent": "Mozilla/5.0"}
+            skin_res = requests.get(skin_url, headers=headers)
+            logger.info(f"Skin GET url: {skin_url} status: {skin_res.status_code}")
+            if skin_res.status_code != 200:
+                raise Exception(f"skin url response: {skin_res.status_code}")
+            skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
+            skin = skin.resize((120, 120), Image.LANCZOS)
+            img.paste(skin, (60, 120), mask=skin)
+        except Exception as e:
+            logger.error(f"Skin image load failed: {e}")
+            draw.rectangle([60, 120, 180, 240], fill=(160,160,160))
 
     img.save(output_path)
+    logger.info(f"Profile card saved to {output_path}")
     return output_path
+
+# 使用例（APIデータをdataとして渡す）
+# draw_profile_card(data, output_path="profile_card_output.png")
