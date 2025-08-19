@@ -9,22 +9,49 @@ logger = logging.getLogger(__name__)
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/times.ttf")
 BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png")
 
-def get_max_fontsize(draw, text, font_path, area_width, max_fontsize=90, min_fontsize=28):
-    best_size = min_fontsize
-    best_diff = area_width
-    for size in range(max_fontsize, min_fontsize-1, -1):
-        font = ImageFont.truetype(font_path, size)
-        bbox = draw.textbbox((0, 0), text, font=font)
-        w = bbox[2] - bbox[0]
-        diff = area_width - w
-        logger.info(f"[get_max_fontsize] size={size}, text_width={w}, area_width={area_width}, diff={diff}")
-        if w <= area_width and diff < best_diff:
-            best_size = size
-            best_diff = diff
-            if diff == 0:
-                break
-    logger.info(f"[get_max_fontsize] Selected font size: {best_size} for text '{text}' (diff={best_diff})")
-    return best_size
+def get_exact_fontsize(draw, text, font_path, target_width, max_fontsize=90, min_fontsize=28):
+    """
+    target_widthピッタリになるフォントサイズを計算（小数点サイズも許容）
+    """
+    # まず、最大・最小サイズで幅を計測
+    font_max = ImageFont.truetype(font_path, max_fontsize)
+    w_max = draw.textbbox((0, 0), text, font=font_max)[2]
+    font_min = ImageFont.truetype(font_path, min_fontsize)
+    w_min = draw.textbbox((0, 0), text, font=font_min)[2]
+
+    logger.info(f"[get_exact_fontsize] w_max={w_max} (size={max_fontsize}), w_min={w_min} (size={min_fontsize})")
+
+    # 幅がmaxでもtarget_widthより小さい場合はmaxを返す
+    if w_max <= target_width:
+        logger.info(f"[get_exact_fontsize] max_fontsize fits target_width, use {max_fontsize}")
+        return max_fontsize
+    # 幅がminでもtarget_widthより大きい場合はminを返す
+    if w_min > target_width:
+        logger.info(f"[get_exact_fontsize] min_fontsize too big, use {min_fontsize}")
+        return min_fontsize
+
+    # 2点間で線形補間
+    # (f1, w1), (f2, w2) → target_width になる f
+    # f = f1 + (target_width - w1) / (w2 - w1) * (f2 - f1)
+    f1, w1 = min_fontsize, w_min
+    f2, w2 = max_fontsize, w_max
+    # w2 > w1なので計算
+    font_size = f1 + (target_width - w1) / (w2 - w1) * (f2 - f1)
+    font_size = max(min_fontsize, min(max_fontsize, font_size))
+
+    # Pillowは小数点サイズも受け付ける
+    font_exact = ImageFont.truetype(font_path, int(font_size))
+    w_exact = draw.textbbox((0, 0), text, font=font_exact)[2]
+    logger.info(f"[get_exact_fontsize] font_size={font_size}, w_exact={w_exact}, target_width={target_width}")
+
+    # 640px超の場合は1小さいサイズで再計算
+    if w_exact > target_width:
+        font_exact = ImageFont.truetype(font_path, int(font_size)-1)
+        font_size = int(font_size)-1
+        w_exact = draw.textbbox((0, 0), text, font=font_exact)[2]
+        logger.info(f"[get_exact_fontsize] font_size adjusted to {font_size}, w_exact={w_exact}")
+
+    return font_size
 
 def generate_profile_card(info, output_path="profile_card.png"):
     img = Image.open(BASE_IMG_PATH).convert("RGBA")
@@ -33,21 +60,19 @@ def generate_profile_card(info, output_path="profile_card.png"):
     area_width = 640
     left_x = (W - area_width) // 2
     right_x = left_x + area_width
-    headline_y = 100
+    headline_y = 115
 
     combined_text = f"[{info['support_rank_display']}] {info['username']}"
-    font_size = get_max_fontsize(draw, combined_text, FONT_PATH, area_width)
-    font_title = ImageFont.truetype(FONT_PATH, font_size)
+    font_size = get_exact_fontsize(draw, combined_text, FONT_PATH, area_width)
+    font_title = ImageFont.truetype(FONT_PATH, int(font_size))
     bbox = draw.textbbox((0, 0), combined_text, font=font_title)
     text_w = bbox[2] - bbox[0]
     center_x = (left_x + right_x) // 2
     text_x = center_x - (text_w // 2)
-    text_x = max(left_x, min(text_x, right_x - text_w))
-
     logger.info(f"[generate_profile_card] image_size: {W}x{H}")
     logger.info(f"[generate_profile_card] draw区間: left_x={left_x}, right_x={right_x}, area_width={area_width}")
     logger.info(f"[generate_profile_card] combined_text: '{combined_text}'")
-    logger.info(f"[generate_profile_card] bbox: {bbox}, text_w: {text_w}")
+    logger.info(f"[generate_profile_card] font_size: {font_size}, text_w: {text_w}")
     logger.info(f"[generate_profile_card] center_x: {center_x}, text_x: {text_x}")
     logger.info(f"[generate_profile_card] 右余白: {right_x - (text_x + text_w)}px, 左余白: {text_x - left_x}px")
 
