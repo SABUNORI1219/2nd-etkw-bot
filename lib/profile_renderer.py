@@ -17,7 +17,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     W, H = img.size
 
     # フォント設定
-    font_main = ImageFont.truetype(FONT_PATH, 38)
+    font_main = ImageFont.truetype(FONT_PATH, 45)
     font_small = ImageFont.truetype(FONT_PATH, 28)
     font_title = ImageFont.truetype(FONT_PATH, 50)
 
@@ -29,7 +29,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     # 描画（profile_infoの内容を全部使う）
     draw.text((85, 150), f"[{info['support_rank_display']}] {info['username']}", font=font_title, fill=(60,40,30,255))
     y = y0 + dy + 20
-    draw.text((150, 200), f"[{info['guild_prefix']}] {info['guild_name']}", font=font_main, fill=(60,40,30,255))
+    draw.text((300, 250), f"[{info['guild_prefix']}] {info['guild_name']}", font=font_main, fill=(60,40,30,255))
     y += dy
     draw.text((x0, y), f"GuildRank: {info['guild_rank']} [{info['guild_rank_stars']}]", font=font_main, fill=(60,40,30,255))
     y += dy + 10
