@@ -7,7 +7,7 @@ import os
 logger = logging.getLogger(__name__)
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/times.ttf")
-BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png")
+BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1490.png")
 
 def get_max_fontsize(draw, text, font_path, area_width, max_fontsize=90, min_fontsize=10):
     # 最大サイズから最小サイズまで順に試す
