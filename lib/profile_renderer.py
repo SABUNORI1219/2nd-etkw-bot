@@ -16,8 +16,10 @@ def calc_max_fontsize(draw, text1, text2, font_path, area_width, max_fontsize=90
     """
     for size in range(max_fontsize, min_fontsize-1, -1):
         font = ImageFont.truetype(font_path, size)
-        w1, _ = draw.textsize(text1, font=font)
-        w2, _ = draw.textsize(text2, font=font)
+        bbox1 = draw.textbbox((0, 0), text1, font=font)
+        bbox2 = draw.textbbox((0, 0), text2, font=font)
+        w1 = bbox1[2] - bbox1[0]
+        w2 = bbox2[2] - bbox2[0]
         if w1 < area_width and w2 < area_width:
             return size
     return min_fontsize
@@ -52,9 +54,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
     center_x = (line_left_x + line_right_x) // 2
     player_x = center_x - player_w // 2
     draw.text((player_x, headline_y), player_text, font=font_title, fill=(60,40,30,255))
-
-    # 線を描画（オプション。必要なら）
-    draw.line([(line_left_x, line_y), (line_right_x, line_y)], fill=(80,80,80,255), width=3)
 
     # ギルドなどの描画
     x0 = 300
