@@ -18,7 +18,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
 
     # フォント設定
     font_main = ImageFont.truetype(FONT_PATH, 45)
-    font_small = ImageFont.truetype(FONT_PATH, 35)
+    font_small = ImageFont.truetype(FONT_PATH, 40)
     font_title = ImageFont.truetype(FONT_PATH, 50)
 
     # 位置など仮
@@ -31,43 +31,43 @@ def generate_profile_card(info, output_path="profile_card.png"):
     
     draw.text((330, 250), f"[{info['guild_prefix']}] {info['guild_name']}", font=font_main, fill=(60,40,30,255))
 
-    draw.text((330, 325), f"GuildRank: {info['guild_rank']} [{info['guild_rank_stars']}]", font=font_main, fill=(60,40,30,255))
+    draw.text((330, 325), f"{info['guild_rank']} [{info['guild_rank_stars']}]", font=font_main, fill=(60,40,30,255))
     
     draw.text((330, 400), f"First Join: {info['first_join']}", font=font_main, fill=(60,40,30,255))
     
     draw.text((330, 475), f"Last Seen: {info['last_join']}", font=font_main, fill=(60,40,30,255))
 
-    draw.text((90, 700), f"Mobs killed      {info['mobs_killed']:,}", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 600), f"Mobs killed      {info['mobs_killed']:,}", font=font_main, fill=(60,40,30,255))
 
-    draw.text((90, 775), f"Playtime         {info['playtime']:,} hours", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 675), f"Playtime         {info['playtime']:,} hours", font=font_main, fill=(60,40,30,255))
 
-    draw.text((90, 850), f"Wars             {info['wars']:,} [{info['war_rank_display']}]", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 750), f"Wars             {info['wars']:,} [{info['war_rank_display']}]", font=font_main, fill=(60,40,30,255))
 
-    draw.text((90, 925), f"Quests           {info['quests']:,}", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 825), f"Quests           {info['quests']:,}", font=font_main, fill=(60,40,30,255))
 
-    draw.text((90, 1000), f"Total Level     {info['total_level']:,}", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 900), f"Total Level     {info['total_level']:,}", font=font_main, fill=(60,40,30,255))
 
-    draw.text((600, 650), "Chests", font=font_main, fill=(60,40,30,255))
-    draw.text((600, 725), f"{info['chests']:,}", font=font_main, fill=(60,40,30,255))
+    draw.text((600, 550), "Chests", font=font_main, fill=(60,40,30,255))
+    draw.text((600, 625), f"{info['chests']:,}", font=font_main, fill=(60,40,30,255))
 
-    draw.text((600, 810), "PvP", font=font_main, fill=(60,40,30,255))
-    draw.text((600, 885), f"{info['pvp']}", font=font_main, fill=(60,40,30,255))
+    draw.text((600, 710), "PvP", font=font_main, fill=(60,40,30,255))
+    draw.text((600, 785), f"{info['pvp']}", font=font_main, fill=(60,40,30,255))
 
     # Raid/Dungeon
-    draw.text((100, 1100), f"NOTG        {info['notg']}", font=font_small, fill=(60,40,30,255))
+    draw.text((100, 1150), f"NOTG        {info['notg']}", font=font_small, fill=(60,40,30,255))
 
-    draw.text((100, 1175), f"NOL:        {info['nol']}", font=font_small, fill=(60,40,30,255))
+    draw.text((100, 1200), f"NOL         {info['nol']}", font=font_small, fill=(60,40,30,255))
 
-    draw.text((100, 1250), f"TCC:        {info['tcc']}", font=font_small, fill=(60,40,30,255))
+    draw.text((100, 1250), f"TCC         {info['tcc']}", font=font_small, fill=(60,40,30,255))
 
-    draw.text((100, 1325), f"TNA:        {info['tna']}", font=font_small, fill=(60,40,30,255))
+    draw.text((100, 1300), f"TNA         {info['tna']}", font=font_small, fill=(60,40,30,255))
   
-    draw.text((100, 1400), f"Dungeons:   {info['dungeons']}", font=font_small, fill=(60,40,30,255))
+    draw.text((100, 1350), f"Dungeons    {info['dungeons']}", font=font_small, fill=(60,40,30,255))
 
-    draw.text((100, 1475), f"All Raids:  {info['all_raids']}", font=font_small, fill=(60,40,30,255))
+    draw.text((100, 1400), f"All Raids   {info['all_raids']}", font=font_small, fill=(60,40,30,255))
 
     # UUID
-    draw.text((400, 1150), f"UUID   {info['uuid']}", font=font_small, fill=(90,90,90,255))
+    draw.text((500, 1150), f"UUID   {info['uuid']}", font=font_small, fill=(90,90,90,255))
 
     # スキン画像貼り付け
     img.paste(PLAYER_BACKGROUND, (110, 280), mask=PLAYER_BACKGROUND)
