@@ -22,8 +22,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
     font_title = ImageFont.truetype(FONT_PATH, 50)
 
     # 位置など仮
-    x0 = 220
-    y0 = 70
+    x0 = 300
+    y0 = 500
     dy = 44
 
     # 描画（profile_infoの内容を全部使う）
