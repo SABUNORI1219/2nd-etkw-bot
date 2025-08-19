@@ -18,7 +18,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     # フォント設定
     font_main = ImageFont.truetype(FONT_PATH, 38)
     font_small = ImageFont.truetype(FONT_PATH, 28)
-    font_title = ImageFont.truetype(FONT_PATH, 55)
+    font_title = ImageFont.truetype(FONT_PATH, 50)
 
     # 位置など仮
     x0 = 220
