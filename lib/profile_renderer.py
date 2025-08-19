@@ -66,7 +66,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((x0, y), f"UUID: {info['uuid']}", font=font_small, fill=(90,90,90,255))
 
     # スキン画像貼り付け
-    img.paste(PLAYER_BACKGROUND, (66, 266), mask=PLAYER_BACKGROUND)
+    img.paste(PLAYER_BACKGROUND, (120, 300), mask=PLAYER_BACKGROUND)
     uuid = info.get("uuid")
     if uuid:
         try:
