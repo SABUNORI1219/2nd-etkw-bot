@@ -76,8 +76,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
             if skin_res.status_code != 200:
                 raise Exception(f"skin url response: {skin_res.status_code}")
             skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
-            skin = skin.resize((180, 180), Image.LANCZOS)
-            img.paste(skin, (135, 250), mask=skin)
+            skin = skin.resize((200, 200), Image.LANCZOS)
+            img.paste(skin, (120, 325), mask=skin)
         except Exception as e:
             logger.error(f"Skin image load failed: {e}")
             draw.rectangle([60, 120, 180, 240], fill=(160,160,160))
