@@ -47,6 +47,16 @@ class PlayerCog(commands.Cog):
             data = api_data
             self.cache.set_cache(cache_key, api_data)
 
+        first_join_str = self._safe_get(data, ['firstJoin'], "N/A")
+        first_join_date = first_join_str.split('T')[0] if 'T' in first_join_str else first_join_str
+
+        last_join_str = self._safe_get(data, ['lastJoin'], "1970-01-01T00:00:00.000Z")
+        try:
+            last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
+            last_join_date = last_join_dt.strftime('%Y-%m-%d')
+        except Exception:
+            last_join_date = last_join_str.split('T')[0] if 'T' in last_join_str else last_join_str
+
         # 必要な情報だけdictでまとめる
         profile_info = {
             "username": data.get("username"),
@@ -55,6 +65,8 @@ class PlayerCog(commands.Cog):
             "guild_name": self._safe_get(data, ['guild', 'name'], ""),
             "guild_rank": self._safe_get(data, ['guild', 'rank'], ""),
             "guild_rank_stars": self._safe_get(data, ['guild', 'rankStars'], ""),
+            "first_join": first_join_date,
+            "last_join": last_join_date,
             "mobs_killed": self._safe_get(data, ['globalData', 'killedMobs'], 0),
             "playtime": data.get("playtime", 0),
             "wars": self._safe_get(data, ['globalData', 'wars'], 0),
