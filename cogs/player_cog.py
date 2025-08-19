@@ -1,29 +1,23 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from datetime import datetime, timezone, timedelta
 import logging
 import os
 
 from lib.wynncraft_api import WynncraftAPI
-from config import EMBED_COLOR_BLUE, EMBED_COLOR_GREEN, AUTHORIZED_USER_IDS
+from config import AUTHORIZED_USER_IDS
 from lib.cache_handler import CacheHandler
-
-from lib.profile_renderer import generate_profile_card
+from lib.profile_renderer import generate_profile_card  # データ→画像生成だけ担当
 
 logger = logging.getLogger(__name__)
-
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FONT_PATH = os.path.join(project_root, "assets", "fonts", "times.ttf")
 
 class PlayerCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
         self.cache = CacheHandler()
-        logger.info("--- [PlayerCog] プレイヤーCogが読み込まれました。")
 
-    def _safe_get(self, data: dict, keys: list, default: any = "N/A"):
+    def _safe_get(self, data: dict, keys: list, default=None):
         v = data
         for key in keys:
             if not isinstance(v, dict):
@@ -33,69 +27,55 @@ class PlayerCog(commands.Cog):
                 return default
         return v
 
-    def _fallback_stat(self, data: dict, keys_global: list, keys_ranking: list, keys_prev: list, default="非公開"):
-        val = self._safe_get(data, keys_global, None)
-        if val is not None:
-            return val
-        val = self._safe_get(data, keys_ranking, None)
-        if val is not None:
-            return val
-        val = self._safe_get(data, keys_prev, None)
-        if val is not None:
-            return val
-        return default
-
-    def format_stat(self, val):
-        if isinstance(val, int) or isinstance(val, float):
-            return f"{val:,}"
-        return str(val)
-
-    def format_datetime_iso(self, dt_str):
-        if not dt_str or "T" not in dt_str:
-            return "非公開"
-        try:
-            dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-            return dt.strftime("%Y-%m-%d %H:%M:%S")
-        except Exception:
-            return "非公開"
-
     @app_commands.command(name="player", description="プレイヤーのステータスを表示")
     @app_commands.describe(player="MCID or UUID")
     async def player(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
-
         if interaction.user.id not in AUTHORIZED_USER_IDS:
-            logger.info("[player command] 権限なし")
-            await interaction.followup.send(
-                "`/player`コマンドは現在APIの仕様変更によりリワーキング中です。\n"
-                "`/player` command is reworking due to API feature rework right now."
-            )
+            await interaction.followup.send("権限なし")
             return
 
         cache_key = f"player_{player.lower()}"
         cached_data = self.cache.get_cache(cache_key)
         if cached_data:
-            logger.info(f"--- [Cache] プレイヤー'{player}'のキャッシュを使用しました。")
             data = cached_data
         else:
-            logger.info(f"--- [API] プレイヤー'{player}'のデータをAPIから取得します。")
             api_data = await self.wynn_api.get_official_player_data(player)
-            if not api_data or (isinstance(api_data, dict) and "error" in api_data and api_data.get("error") != "MultipleObjectsReturned"):
+            if not api_data or (isinstance(api_data, dict) and "error" in api_data):
                 await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
                 return
-            if isinstance(api_data, dict) and 'username' in api_data:
-                data = api_data
-                self.cache.set_cache(cache_key, api_data)
-            else:
-                await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
-                return
+            data = api_data
+            self.cache.set_cache(cache_key, api_data)
 
-        # --- 画像生成 ---
-        uuid = data.get("uuid", "")
-        output_path = f"profile_card_{uuid}.png" if uuid else "profile_card.png"
+        # 必要な情報だけdictでまとめる
+        profile_info = {
+            "username": data.get("username"),
+            "support_rank_display": data.get("supportRank", "Player").capitalize(),
+            "guild_prefix": self._safe_get(data, ['guild', 'prefix'], ""),
+            "guild_name": self._safe_get(data, ['guild', 'name'], ""),
+            "guild_rank": self._safe_get(data, ['guild', 'rank'], ""),
+            "guild_rank_stars": self._safe_get(data, ['guild', 'rankStars'], ""),
+            "mobs_killed": self._safe_get(data, ['globalData', 'killedMobs'], 0),
+            "playtime": data.get("playtime", 0),
+            "wars": self._safe_get(data, ['globalData', 'wars'], 0),
+            "war_rank_display": self._safe_get(data, ['ranking', 'warsCompletion'], "N/A"),
+            "quests": self._safe_get(data, ['globalData', 'completedQuests'], 0),
+            "total_level": self._safe_get(data, ['globalData', 'totalLevel'], 0),
+            "chests": self._safe_get(data, ['globalData', 'chestsFound'], 0),
+            "pvp": f"{self._safe_get(data, ['globalData', 'pvp', 'kills'], 0)} K / {self._safe_get(data, ['globalData', 'pvp', 'deaths'], 0)} D",
+            "notg": self._safe_get(data, ['globalData', 'raids', 'list', 'Nest of the Grootslangs'], 0),
+            "nol": self._safe_get(data, ['globalData', 'raids', 'list', "Orphion's Nexus of Light"], 0),
+            "tcc": self._safe_get(data, ['globalData', 'raids', 'list', 'The Canyon Colossus'], 0),
+            "tna": self._safe_get(data, ['globalData', 'raids', 'list', 'The Nameless Anomaly'], 0),
+            "dungeons": self._safe_get(data, ['globalData', 'dungeons', 'total'], 0),
+            "all_raids": self._safe_get(data, ['globalData', 'raids', 'total'], 0),
+            "uuid": data.get("uuid"),
+        }
+
+        # 画像生成（profile_renderer.pyに情報だけ渡す）
+        output_path = f"profile_card_{profile_info['uuid']}.png" if profile_info['uuid'] else "profile_card.png"
         try:
-            # ここでWanted風背景画像を生成（今後はプレイヤー情報も描画予定）
-            generate_profile_card(data, output_path)
+            generate_profile_card(profile_info, output_path)
             file = discord.File(output_path, filename=os.path.basename(output_path))
             await interaction.followup.send(file=file)
             if os.path.exists(output_path):
@@ -104,4 +84,5 @@ class PlayerCog(commands.Cog):
             logger.error(f"画像生成または送信失敗: {e}")
             await interaction.followup.send("プロフィール画像生成に失敗しました。")
 
-async def setup(bot: commands.Bot): await bot.add_cog(PlayerCog(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(PlayerCog(bot))
