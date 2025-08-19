@@ -29,9 +29,9 @@ def generate_profile_card(info, output_path="profile_card.png"):
     img = Image.open(BASE_IMG_PATH).convert("RGBA")
     draw = ImageDraw.Draw(img)
     W, H = img.size
-    left_x = 80
-    right_x = 720
-    area_width = right_x - left_x
+    area_width = 640
+    left_x = (W - area_width) // 2
+    right_x = left_x + area_width
     headline_y = 100
 
     combined_text = f"[{info['support_rank_display']}] {info['username']}"
@@ -39,7 +39,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
     font_title = ImageFont.truetype(FONT_PATH, font_size)
     bbox = draw.textbbox((0, 0), combined_text, font=font_title)
     text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
     center_x = (left_x + right_x) // 2
     text_x = center_x - (text_w // 2)
     text_x = max(left_x, min(text_x, right_x - text_w))
@@ -47,7 +46,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     logger.info(f"[generate_profile_card] image_size: {W}x{H}")
     logger.info(f"[generate_profile_card] draw区間: left_x={left_x}, right_x={right_x}, area_width={area_width}")
     logger.info(f"[generate_profile_card] combined_text: '{combined_text}'")
-    logger.info(f"[generate_profile_card] bbox: {bbox}, text_w: {text_w}, text_h: {text_h}")
+    logger.info(f"[generate_profile_card] bbox: {bbox}, text_w: {text_w}")
     logger.info(f"[generate_profile_card] center_x: {center_x}, text_x: {text_x}")
     logger.info(f"[generate_profile_card] 右余白: {right_x - (text_x + text_w)}px, 左余白: {text_x - left_x}px")
 
