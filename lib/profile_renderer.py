@@ -13,6 +13,7 @@ def calc_max_fontsize(draw, text1, text2, font_path, area_width, max_fontsize=90
     """
     area_width: (int) 右端x座標 - 左端x座標
     両方のテキストがこの幅内に収まる最大のフォントサイズを返す
+    Pillow>=10.0.0対応
     """
     for size in range(max_fontsize, min_fontsize-1, -1):
         font = ImageFont.truetype(font_path, size)
@@ -48,35 +49,40 @@ def generate_profile_card(info, output_path="profile_card.png"):
 
     # [ゲーム内ランク]は左揃えで描画
     draw.text((line_left_x, headline_y), rank_text, font=font_title, fill=(60,40,30,255))
+    bbox_rank = draw.textbbox((line_left_x, headline_y), rank_text, font=font_title)
+    rank_right_x = bbox_rank[2]
 
-    # プレイヤー名は中央揃え
+    # プレイヤー名の中央揃え範囲を「rankの右端」～「線の右端」にする
     bbox_player = draw.textbbox((0, 0), player_text, font=font_title)
     player_w = bbox_player[2] - bbox_player[0]
-    center_x = (line_left_x + line_right_x) // 2
-    player_x = center_x - player_w // 2
+    player_center_x = (rank_right_x + line_right_x) // 2
+    player_x = player_center_x - player_w // 2
+
+    # y座標はランクと同じ高さで描画（縦並びにしたい場合は headline_y + rank_h + 余白 などに変更）
     draw.text((player_x, headline_y), player_text, font=font_title, fill=(60,40,30,255))
 
     # ギルドなどの描画
     x0 = 300
     y0 = headline_y + font_size + 20
     dy = 44
-    draw.text((x0, y0), f"[{info['guild_prefix']}] {info['guild_name']}", font=ImageFont.truetype(FONT_PATH, 38), fill=(60,40,30,255))
+    font_main = ImageFont.truetype(FONT_PATH, 38)
+    draw.text((x0, y0), f"[{info['guild_prefix']}] {info['guild_name']}", font=font_main, fill=(60,40,30,255))
     y = y0 + dy
-    draw.text((x0, y), f"GuildRank: {info['guild_rank']} [{info['guild_rank_stars']}]", font=ImageFont.truetype(FONT_PATH, 38), fill=(60,40,30,255))
+    draw.text((x0, y), f"GuildRank: {info['guild_rank']} [{info['guild_rank_stars']}]", font=font_main, fill=(60,40,30,255))
     y += dy + 10
-    draw.text((x0, y), f"Mobs killed: {info['mobs_killed']:,}", font=ImageFont.truetype(FONT_PATH, 38), fill=(60,40,30,255))
+    draw.text((x0, y), f"Mobs killed: {info['mobs_killed']:,}", font=font_main, fill=(60,40,30,255))
     y += dy
-    draw.text((x0, y), f"Playtime: {info['playtime']:,} h", font=ImageFont.truetype(FONT_PATH, 38), fill=(60,40,30,255))
+    draw.text((x0, y), f"Playtime: {info['playtime']:,} h", font=font_main, fill=(60,40,30,255))
     y += dy
-    draw.text((x0, y), f"Wars: {info['wars']:,} [{info['war_rank_display']}]", font=ImageFont.truetype(FONT_PATH, 38), fill=(60,40,30,255))
+    draw.text((x0, y), f"Wars: {info['wars']:,} [{info['war_rank_display']}]", font=font_main, fill=(60,40,30,255))
     y += dy
-    draw.text((x0, y), f"Quests: {info['quests']:,}", font=ImageFont.truetype(FONT_PATH, 38), fill=(60,40,30,255))
+    draw.text((x0, y), f"Quests: {info['quests']:,}", font=font_main, fill=(60,40,30,255))
     y += dy
-    draw.text((x0, y), f"Total Level: {info['total_level']:,}", font=ImageFont.truetype(FONT_PATH, 38), fill=(60,40,30,255))
+    draw.text((x0, y), f"Total Level: {info['total_level']:,}", font=font_main, fill=(60,40,30,255))
     y += dy
-    draw.text((x0, y), f"Chests: {info['chests']:,}", font=ImageFont.truetype(FONT_PATH, 38), fill=(60,40,30,255))
+    draw.text((x0, y), f"Chests: {info['chests']:,}", font=font_main, fill=(60,40,30,255))
     y += dy
-    draw.text((x0, y), f"PvP: {info['pvp']}", font=ImageFont.truetype(FONT_PATH, 38), fill=(60,40,30,255))
+    draw.text((x0, y), f"PvP: {info['pvp']}", font=font_main, fill=(60,40,30,255))
     y += dy + 10
 
     # Raid/Dungeon
