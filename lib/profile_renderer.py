@@ -35,7 +35,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     line_y = 90  # 適宜調整
 
     # 見出しのy座標
-    headline_y = 60
+    headline_y = 100
 
     # それぞれのテキスト
     rank_text = f"[{info['support_rank_display']}]"
