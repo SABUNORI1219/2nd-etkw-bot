@@ -9,11 +9,16 @@ logger = logging.getLogger(__name__)
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/times.ttf")
 BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png")
 
-def calc_fontsize_by_len(target_width, text, average_char_width=0.6):
-    # average_char_width: フォント1文字あたりの幅（font_sizeに対しての係数、0.6〜0.7くらいで調整）
-    n = len(text)
-    font_size = int(target_width / (n * average_char_width))
-    return font_size
+def get_max_fontsize(draw, text, font_path, area_width, max_fontsize=90, min_fontsize=10):
+    # 最大サイズから最小サイズまで順に試す
+    for size in range(max_fontsize, min_fontsize - 1, -1):
+        font = ImageFont.truetype(font_path, size)
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_w = bbox[2] - bbox[0]
+        if text_w <= area_width:
+            logger.info(f"[get_max_fontsize] size={size}, text_w={text_w}, area_width={area_width}")
+            return size
+    return min_fontsize
 
 def generate_profile_card(info, output_path="profile_card.png"):
     img = Image.open(BASE_IMG_PATH).convert("RGBA")
@@ -25,16 +30,19 @@ def generate_profile_card(info, output_path="profile_card.png"):
     headline_y = 150
 
     combined_text = f"[{info['support_rank_display']}] {info['username']}"
-    font_size = calc_fontsize_by_len(area_width, combined_text, average_char_width=0.6)
+    font_size = get_max_fontsize(draw, combined_text, FONT_PATH, area_width)
     font_title = ImageFont.truetype(FONT_PATH, font_size)
     bbox = draw.textbbox((0, 0), combined_text, font=font_title)
     text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+
     center_x = (left_x + right_x) // 2
     text_x = center_x - (text_w // 2)
+    logger.info(f"[generate_profile_card] left_x={left_x}, right_x={right_x}, area_width={area_width}, text_w={text_w}, text_x={text_x}")
 
-    logger.info(f"[generate_profile_card] font_size={font_size}, text_w={text_w}, area_width={area_width}, len={len(combined_text)}")
+    # 文字列描画
     draw.text((text_x, headline_y), combined_text, font=font_title, fill=(60,40,30,255))
-
+    
     # ギルドなどの描画
     x0 = 300
     y0 = headline_y + font_size + 20
