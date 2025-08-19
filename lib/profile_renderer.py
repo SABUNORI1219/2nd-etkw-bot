@@ -7,7 +7,7 @@ import os
 logger = logging.getLogger(__name__)
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia-Regular.ttf")
-BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1490.png")
+BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png")
 PLAYER_BACKGROUND = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 
 def generate_profile_card(info, output_path="profile_card.png"):
@@ -18,7 +18,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     # フォント設定
     font_main = ImageFont.truetype(FONT_PATH, 38)
     font_small = ImageFont.truetype(FONT_PATH, 28)
-    font_title = ImageFont.truetype(FONT_PATH, 60)
+    font_title = ImageFont.truetype(FONT_PATH, 55)
 
     # 位置など仮
     x0 = 220
