@@ -9,47 +9,26 @@ logger = logging.getLogger(__name__)
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia-Regular.ttf")
 BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1490.png")
 
-def get_max_fontsize(draw, text, font_path, area_width, max_fontsize=90, min_fontsize=10):
-    # 最大サイズから最小サイズまで順に試す
-    for size in range(max_fontsize, min_fontsize - 1, -1):
-        font = ImageFont.truetype(font_path, size)
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_w = bbox[2] - bbox[0]
-        if text_w <= area_width:
-            logger.info(f"[get_max_fontsize] size={size}, text_w={text_w}, area_width={area_width}")
-            return size
-    return min_fontsize
-
 def generate_profile_card(info, output_path="profile_card.png"):
     img = Image.open(BASE_IMG_PATH).convert("RGBA")
     draw = ImageDraw.Draw(img)
+    W, H = img.size
 
-    left_x = 80
-    right_x = 720
-    area_width = right_x - left_x
-    headline_y = 150
-
-    combined_text = f"[{info['support_rank_display']}] {info['username']}"
-    font_size = get_max_fontsize(draw, combined_text, FONT_PATH, area_width)
-    font_title = ImageFont.truetype(FONT_PATH, font_size)
-    bbox = draw.textbbox((0, 0), combined_text, font=font_title)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-
-    center_x = (left_x + right_x) // 2
-    text_x = center_x - (text_w // 2)
-    logger.info(f"[generate_profile_card] left_x={left_x}, right_x={right_x}, area_width={area_width}, text_w={text_w}, text_x={text_x}")
-
-    # 文字列描画
-    draw.text((text_x, headline_y), combined_text, font=font_title, fill=(60,40,30,255))
-    
-    # ギルドなどの描画
-    x0 = 300
-    y0 = headline_y + font_size + 20
-    dy = 44
+    # フォント設定
     font_main = ImageFont.truetype(FONT_PATH, 38)
-    draw.text((x0, y0), f"[{info['guild_prefix']}] {info['guild_name']}", font=font_main, fill=(60,40,30,255))
-    y = y0 + dy
+    font_small = ImageFont.truetype(FONT_PATH, 28)
+    font_title = ImageFont.truetype(FONT_PATH, 60)
+
+    # 位置など仮
+    x0 = 220
+    y0 = 70
+    dy = 44
+
+    # 描画（profile_infoの内容を全部使う）
+    draw.text((80, 150), f"[{info['support_rank_display']}] {info['username']}", font=font_title, fill=(60,40,30,255))
+    y = y0 + dy + 20
+    draw.text((x0, y), f"[{info['guild_prefix']}] {info['guild_name']}", font=font_main, fill=(60,40,30,255))
+    y += dy
     draw.text((x0, y), f"GuildRank: {info['guild_rank']} [{info['guild_rank_stars']}]", font=font_main, fill=(60,40,30,255))
     y += dy + 10
     draw.text((x0, y), f"Mobs killed: {info['mobs_killed']:,}", font=font_main, fill=(60,40,30,255))
@@ -68,7 +47,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
     y += dy + 10
 
     # Raid/Dungeon
-    font_small = ImageFont.truetype(FONT_PATH, 28)
     draw.text((x0, y), f"NOTG: {info['notg']}", font=font_small, fill=(60,40,30,255))
     y += dy - 16
     draw.text((x0, y), f"NOL: {info['nol']}", font=font_small, fill=(60,40,30,255))
@@ -106,5 +84,4 @@ def generate_profile_card(info, output_path="profile_card.png"):
             draw.rectangle([60, 120, 180, 240], fill=(160,160,160))
 
     img.save(output_path)
-    logger.info(f"Profile card saved to {output_path}")
     return output_path
