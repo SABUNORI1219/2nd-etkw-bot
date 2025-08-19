@@ -11,7 +11,7 @@ BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8e
 
 def get_max_fontsize(draw, text, font_path, area_width, max_fontsize=90, min_fontsize=28):
     """
-    指定幅に収まる最大フォントサイズを返す
+    area_widthにぴったり収まる最大フォントサイズを返す
     """
     for size in range(max_fontsize, min_fontsize-1, -1):
         font = ImageFont.truetype(font_path, size)
@@ -24,31 +24,27 @@ def get_max_fontsize(draw, text, font_path, area_width, max_fontsize=90, min_fon
 def generate_profile_card(info, output_path="profile_card.png"):
     img = Image.open(BASE_IMG_PATH).convert("RGBA")
     draw = ImageDraw.Draw(img)
-    W, H = img.size
 
-    # 線の左端と右端と中央
-    line_left_x = 80
-    line_right_x = 720
-    line_center_x = (line_left_x + line_right_x) // 2
-    line_y = 90  # 適宜調整
-
-    # 見出しのy座標
+    # 描画区間
+    left_x = 80
+    right_x = 720
+    center_x = (left_x + right_x) // 2
+    area_width = right_x - left_x
     headline_y = 100
 
     # セットで描画するテキスト
     combined_text = f"[{info['support_rank_display']}] {info['username']}"
-    area_width = line_right_x - line_left_x
 
     # 最大フォントサイズを計算
     font_size = get_max_fontsize(draw, combined_text, FONT_PATH, area_width)
     font_title = ImageFont.truetype(FONT_PATH, font_size)
 
-    # テキストの幅
-    bbox_combined = draw.textbbox((0, 0), combined_text, font=font_title)
-    combined_w = bbox_combined[2] - bbox_combined[0]
+    # テキストの幅を取得
+    bbox = draw.textbbox((0, 0), combined_text, font=font_title)
+    text_w = bbox[2] - bbox[0]
 
-    # 中央揃えのx座標
-    text_x = line_center_x - combined_w // 2
+    # ちょうど中央揃えのx座標（区間の中央 - 文字列幅/2）
+    text_x = center_x - text_w // 2
 
     # 描画
     draw.text((text_x, headline_y), combined_text, font=font_title, fill=(60,40,30,255))
