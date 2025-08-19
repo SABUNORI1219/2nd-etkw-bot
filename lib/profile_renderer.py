@@ -12,6 +12,7 @@ BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8e
 def get_max_fontsize(draw, text, font_path, area_width, max_fontsize=90, min_fontsize=28):
     """
     area_widthにぴったり収まる最大フォントサイズを返す
+    厳密に区間内ピッタリになるもの
     """
     for size in range(max_fontsize, min_fontsize-1, -1):
         font = ImageFont.truetype(font_path, size)
@@ -28,23 +29,27 @@ def generate_profile_card(info, output_path="profile_card.png"):
     # 描画区間
     left_x = 80
     right_x = 720
-    center_x = (left_x + right_x) // 2
     area_width = right_x - left_x
     headline_y = 100
 
     # セットで描画するテキスト
     combined_text = f"[{info['support_rank_display']}] {info['username']}"
 
-    # 最大フォントサイズを計算
+    # 最大フォントサイズを厳密に計算
     font_size = get_max_fontsize(draw, combined_text, FONT_PATH, area_width)
     font_title = ImageFont.truetype(FONT_PATH, font_size)
-
-    # テキストの幅を取得
+    # テキストの幅と高さ
     bbox = draw.textbbox((0, 0), combined_text, font=font_title)
     text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
 
-    # ちょうど中央揃えのx座標（区間の中央 - 文字列幅/2）
-    text_x = center_x - text_w // 2
+    # x座標は中央揃えではなく「区間内中央」になるようにする
+    # 区間中央: (left_x + right_x) // 2
+    center_x = (left_x + right_x) // 2
+    # テキストの表示開始x座標: 区間中央 - (テキスト幅 // 2)
+    text_x = center_x - (text_w // 2)
+    # ただし、区間を越えそうな場合は強制的に区間に収める
+    text_x = max(left_x, min(text_x, right_x - text_w))
 
     # 描画
     draw.text((text_x, headline_y), combined_text, font=font_title, fill=(60,40,30,255))
