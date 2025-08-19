@@ -28,34 +28,29 @@ def get_max_fontsize(draw, text, font_path, area_width, max_fontsize=90, min_fon
 def generate_profile_card(info, output_path="profile_card.png"):
     img = Image.open(BASE_IMG_PATH).convert("RGBA")
     draw = ImageDraw.Draw(img)
-
-    # 描画区間
+    W, H = img.size
     left_x = 80
     right_x = 720
     area_width = right_x - left_x
     headline_y = 100
 
-    # セットで描画するテキスト
     combined_text = f"[{info['support_rank_display']}] {info['username']}"
-    logger.info(f"[generate_profile_card] combined_text: '{combined_text}'")
-
-    # 最大フォントサイズを厳密に計算
     font_size = get_max_fontsize(draw, combined_text, FONT_PATH, area_width)
     font_title = ImageFont.truetype(FONT_PATH, font_size)
-    # テキストの幅と高さ
     bbox = draw.textbbox((0, 0), combined_text, font=font_title)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
-    logger.info(f"[generate_profile_card] final font_size: {font_size}, text_width: {text_w}, text_height: {text_h}")
-
-    # x座標は中央揃えではなく「区間内中央」になるようにする
     center_x = (left_x + right_x) // 2
     text_x = center_x - (text_w // 2)
-    # ただし、区間を越えそうな場合は強制的に区間に収める
     text_x = max(left_x, min(text_x, right_x - text_w))
-    logger.info(f"[generate_profile_card] draw text at x: {text_x}, y: {headline_y}")
 
-    # 描画
+    logger.info(f"[generate_profile_card] image_size: {W}x{H}")
+    logger.info(f"[generate_profile_card] draw区間: left_x={left_x}, right_x={right_x}, area_width={area_width}")
+    logger.info(f"[generate_profile_card] combined_text: '{combined_text}'")
+    logger.info(f"[generate_profile_card] bbox: {bbox}, text_w: {text_w}, text_h: {text_h}")
+    logger.info(f"[generate_profile_card] center_x: {center_x}, text_x: {text_x}")
+    logger.info(f"[generate_profile_card] 右余白: {right_x - (text_x + text_w)}px, 左余白: {text_x - left_x}px")
+
     draw.text((text_x, headline_y), combined_text, font=font_title, fill=(60,40,30,255))
 
     # ギルドなどの描画
