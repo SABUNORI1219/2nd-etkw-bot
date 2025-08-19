@@ -10,20 +10,21 @@ FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/times.ttf")
 BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png")
 
 def get_max_fontsize(draw, text, font_path, area_width, max_fontsize=90, min_fontsize=28):
-    """
-    area_widthにぴったり収まる最大フォントサイズを返す
-    厳密に区間内ピッタリになるもの
-    """
+    best_size = min_fontsize
+    best_diff = area_width
     for size in range(max_fontsize, min_fontsize-1, -1):
         font = ImageFont.truetype(font_path, size)
         bbox = draw.textbbox((0, 0), text, font=font)
         w = bbox[2] - bbox[0]
-        logger.info(f"[get_max_fontsize] size={size}, text_width={w}, area_width={area_width}")
-        if w <= area_width:
-            logger.info(f"[get_max_fontsize] Selected font size: {size} for text '{text}'")
-            return size
-    logger.info(f"[get_max_fontsize] No fitting size found, using min_fontsize: {min_fontsize} for text '{text}'")
-    return min_fontsize
+        diff = area_width - w
+        logger.info(f"[get_max_fontsize] size={size}, text_width={w}, area_width={area_width}, diff={diff}")
+        if w <= area_width and diff < best_diff:
+            best_size = size
+            best_diff = diff
+            if diff == 0:
+                break
+    logger.info(f"[get_max_fontsize] Selected font size: {best_size} for text '{text}' (diff={best_diff})")
+    return best_size
 
 def generate_profile_card(info, output_path="profile_card.png"):
     img = Image.open(BASE_IMG_PATH).convert("RGBA")
