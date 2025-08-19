@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia-Regular.ttf")
 BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1490.png")
+PLAYER_BACKGROUND = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 
 def generate_profile_card(info, output_path="profile_card.png"):
     img = Image.open(BASE_IMG_PATH).convert("RGBA")
@@ -64,6 +65,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((x0, y), f"UUID: {info['uuid']}", font=font_small, fill=(90,90,90,255))
 
     # スキン画像貼り付け
+    img.paste(PLAYER_BACKGROUND, (106, 336), mask=PLAYER_BACKGROUND)
     uuid = info.get("uuid")
     if uuid:
         try:
