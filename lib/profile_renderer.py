@@ -9,19 +9,15 @@ logger = logging.getLogger(__name__)
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/times.ttf")
 BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png")
 
-def calc_max_fontsize(draw, text1, text2, font_path, area_width, max_fontsize=90, min_fontsize=28):
+def get_max_fontsize(draw, text, font_path, area_width, max_fontsize=90, min_fontsize=28):
     """
-    area_width: (int) 右端x座標 - 左端x座標
-    両方のテキストがこの幅内に収まる最大のフォントサイズを返す
-    Pillow>=10.0.0対応
+    指定幅に収まる最大フォントサイズを返す
     """
     for size in range(max_fontsize, min_fontsize-1, -1):
         font = ImageFont.truetype(font_path, size)
-        bbox1 = draw.textbbox((0, 0), text1, font=font)
-        bbox2 = draw.textbbox((0, 0), text2, font=font)
-        w1 = bbox1[2] - bbox1[0]
-        w2 = bbox2[2] - bbox2[0]
-        if w1 < area_width and w2 < area_width:
+        bbox = draw.textbbox((0, 0), text, font=font)
+        w = bbox[2] - bbox[0]
+        if w <= area_width:
             return size
     return min_fontsize
 
@@ -42,22 +38,32 @@ def generate_profile_card(info, output_path="profile_card.png"):
     rank_text = f"[{info['support_rank_display']}]"
     player_text = info['username']
 
-    # 最大フォントサイズを計算
-    max_width = line_right_x - line_left_x
-    font_size = calc_max_fontsize(draw, rank_text, player_text, FONT_PATH, max_width)
+    # 各描画エリア幅
+    rank_area_width = line_right_x - line_left_x
+    # 仮フォントでランクの右端を取得
+    temp_font = ImageFont.truetype(FONT_PATH, 50)
+    bbox_rank = draw.textbbox((line_left_x, headline_y), rank_text, font=temp_font)
+    rank_right_x = bbox_rank[2]
+    player_area_width = line_right_x - rank_right_x if (rank_right_x < line_right_x) else 1
+
+    # 各最大フォントサイズを計算
+    rank_fontsize = get_max_fontsize(draw, rank_text, FONT_PATH, rank_area_width)
+    player_fontsize = get_max_fontsize(draw, player_text, FONT_PATH, player_area_width)
+    font_size = min(rank_fontsize, player_fontsize)
     font_title = ImageFont.truetype(FONT_PATH, font_size)
+
+    # ランク右端を再計算（正しいサイズで）
+    bbox_rank = draw.textbbox((line_left_x, headline_y), rank_text, font=font_title)
+    rank_right_x = bbox_rank[2]
 
     # [ゲーム内ランク]は左揃えで描画
     draw.text((line_left_x, headline_y), rank_text, font=font_title, fill=(60,40,30,255))
-    bbox_rank = draw.textbbox((line_left_x, headline_y), rank_text, font=font_title)
-    rank_right_x = bbox_rank[2]
 
     # プレイヤー名の中央揃え範囲を「rankの右端」～「線の右端」にする
     bbox_player = draw.textbbox((0, 0), player_text, font=font_title)
     player_w = bbox_player[2] - bbox_player[0]
     player_center_x = (rank_right_x + line_right_x) // 2
     player_x = player_center_x - player_w // 2
-
     # y座標はランクと同じ高さで描画（縦並びにしたい場合は headline_y + rank_h + 余白 などに変更）
     draw.text((player_x, headline_y), player_text, font=font_title, fill=(60,40,30,255))
 
