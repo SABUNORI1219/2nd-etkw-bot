@@ -78,6 +78,11 @@ def generate_profile_card(info, output_path="profile_card.png"):
 
     draw.text((text_x, headline_y), combined_text, font=font_title, fill=(60,40,30,255))
 
+    # 既存の描画の後に追加
+    draw.text((text_x, headline_y), combined_text, font=font_title, fill=(60,40,30,255))
+    # 赤枠でbboxを描画
+    draw.rectangle([text_x, headline_y, text_x + text_w, headline_y + (bbox[3] - bbox[1])], outline="red", width=3)
+
     # ギルドなどの描画
     x0 = 300
     y0 = headline_y + font_size + 20
