@@ -24,7 +24,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     dy = 44
 
     # 描画（profile_infoの内容を全部使う）
-    draw.text((250, 100), f"[{info['support_rank_display']}] {info['username']}", font=font_title, fill=(60,40,30,255))
+    draw.text((150, 100), f"[{info['support_rank_display']}] {info['username']}", font=font_title, fill=(60,40,30,255))
     y = y0 + dy + 20
     draw.text((x0, y), f"[{info['guild_prefix']}] {info['guild_name']}", font=font_main, fill=(60,40,30,255))
     y += dy
