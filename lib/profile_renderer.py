@@ -50,7 +50,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((line_left_x, headline_y), rank_text, font=font_title, fill=(60,40,30,255))
 
     # プレイヤー名は中央揃え
-    player_w, player_h = draw.textsize(player_text, font=font_title)
+    bbox_player = draw.textbbox((0, 0), player_text, font=font_title)
+    player_w = bbox_player[2] - bbox_player[0]
     center_x = (line_left_x + line_right_x) // 2
     player_x = center_x - player_w // 2
     draw.text((player_x, headline_y), player_text, font=font_title, fill=(60,40,30,255))
