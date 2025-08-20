@@ -63,8 +63,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
     elif guild_rank_text == "RECRUITER":
         star_num = 1
     draw.text((330, 325), f"{guild_rank_text}", font=font_main, fill=(60,40,30,255))
-    start_x = 330 + 200  # guild_rank_textの右端座標から200px右（調整推奨）
-    y = 300
+    start_x = 330 + 175  # guild_rank_textの右端座標から200px右（調整推奨）
+    y = 350
     for i in range(star_num):
         x = start_x + i * (star_size + 3)
         img.paste(rank_star_img, (x, y), mask=rank_star_img)
@@ -88,7 +88,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((90, 875), "Quests", font=font_sub, fill=(60,40,30,255))
     draw.text((330, 875), f"{info.get('quests', 0):,}", font=font_sub, fill=(60,40,30,255))
 
-    draw.text((90, 950), f"Total Level   {info.get('total_level', 0):,}", font=font_sub, fill=(60,40,30,255))
+    draw.text((90, 950), f"World Events   {info.get('world_events', 0):,}", font=font_sub, fill=(60,40,30,255))
 
     draw.text((650, 600), "Playtime", font=font_sub, fill=(60,40,30,255))
     playtime_text = f"{info.get('playtime', 0):,}"
@@ -109,6 +109,13 @@ def generate_profile_card(info, output_path="profile_card.png"):
     x_d = bbox[2] + 6
     draw.text((x_d, 875 + 18), "D", font=font_mini, fill=(60,40,30,255))
 
+    draw.text((650, 950), "Total Level", font=font_main, fill=(60,40,30,255))
+    total_text = f"{info.get('total_level', 0):,}"
+    draw.text((650, 1025), total_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((650, 1025), total_text, font=font_small)
+    x_lvl = bbox[2] + 3
+    draw.text((x_lvl, 1025 + 18), "lv.", font=font_mini, fill=(60,40,30,255))
+    
     # Raid/Dungeon
     right_edge_x = 440
     raid_keys = [("NOTG", "notg", 1150), ("NOL", "nol", 1200), ("TCC", "tcc", 1250),
