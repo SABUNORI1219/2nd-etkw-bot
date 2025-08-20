@@ -11,7 +11,7 @@ BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8e
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 RANK_STAR_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/rankStar.png")
 
-def add_frame_to_banner_3d(banner_img, final_size=(92, 166), frame_width=8):
+def add_frame_to_banner_3d(banner_img, final_size=(87, 156), frame_width=8):
     # banner_imgは例: (60,134)サイズ
     w, h = final_size
     bw, bh = banner_img.size
@@ -97,10 +97,10 @@ def generate_profile_card(info, output_path="profile_card.png"):
     # guildバナー描画座標
     banner_x = 330
     banner_y = 250
-    banner_size = (76, 150)
+    banner_size = (71, 140)
     if guild_banner_img:
         guild_banner_img = guild_banner_img.resize(banner_size, Image.LANCZOS)
-        framed_banner_img = add_frame_to_banner_3d(guild_banner_img, final_size=(92, 166), frame_width=8)
+        framed_banner_img = add_frame_to_banner_3d(guild_banner_img, final_size=final_size, frame_width=8)
         img.paste(framed_banner_img, (banner_x, banner_y), mask=framed_banner_img)
     else:
         # バナー画像生成失敗時は透明画像 or ダミー
