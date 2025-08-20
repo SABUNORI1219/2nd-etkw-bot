@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia-Regular.ttf")
 BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png")
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
+RANK_STAR_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/rankStar.png")
 
 def generate_profile_card(info, output_path="profile_card.png"):
     try:
@@ -21,8 +22,15 @@ def generate_profile_card(info, output_path="profile_card.png"):
     except Exception as e:
         logger.error(f"PLAYER_BACKGROUND_PATH 読み込み失敗: {e}")
         PLAYER_BACKGROUND = Image.new("RGBA", (200, 200), (200, 200, 200, 255))
+    try:
+        rank_star_img = Image.open(RANK_STAR_PATH).convert("RGBA")
+    except Exception as e:
+        logger.error(f"RANK_STAR_PATH 読み込み失敗: {e}")
+        rank_star_img = Image.new("RGBA", (200, 200), (200, 200, 200, 255))
     draw = ImageDraw.Draw(img)
     W, H = img.size
+    star_size = 32
+    rank_star_img = rank_star_img.resize((star_size, star_size), Image.LANCZOS)
 
     # フォント設定
     try:
@@ -43,18 +51,23 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((330, 250), f"[{info.get('guild_prefix', '')}] {info.get('guild_name', '')}", font=font_main, fill=(60,40,30,255))
 
     guild_rank_text = str(info.get('guild_rank', ''))
-    rankStar_text = ""
+    star_num = 0
     if guild_rank_text == "OWNER":
-        rankStar_text = "★★★★★"
+        star_num = 5
     elif guild_rank_text == "CHIEF":
-        rankStar_text = "★★★★"
+        star_num = 4
     elif guild_rank_text == "STRATEGIST":
-        rankStar_text = "★★★"
+        star_num = 3
     elif guild_rank_text == "CAPTAIN":
-        rankStar_text = "★★"
+        star_num = 2
     elif guild_rank_text == "RECRUITER":
-        rankStar_text = "★"
-    draw.text((330, 325), f"{guild_rank_text} {rankStar_text}", font=font_main, fill=(60,40,30,255))
+        star_num = 1
+    draw.text((330, 325), f"{guild_rank_text}", font=font_main, fill=(60,40,30,255))
+    start_x = 330 + 200  # guild_rank_textの右端座標から200px右（調整推奨）
+    y = 325
+    for i in range(star_num):
+        x = start_x + i * (star_size + 3)
+        img.paste(rank_star_img, (x, y), mask=rank_star_img)
     
     draw.text((330, 400), f"First Join: {info.get('first_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
     draw.text((330, 475), f"Last Seen: {info.get('last_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
@@ -77,21 +90,21 @@ def generate_profile_card(info, output_path="profile_card.png"):
 
     draw.text((90, 950), f"Total Level   {info.get('total_level', 0):,}", font=font_sub, fill=(60,40,30,255))
 
-    draw.text((675, 600), "Playtime", font=font_sub, fill=(60,40,30,255))
+    draw.text((650, 600), "Playtime", font=font_sub, fill=(60,40,30,255))
     playtime_text = f"{info.get('playtime', 0):,}"
-    draw.text((675, 675), playtime_text, font=font_small, fill=(60,40,30,255))
+    draw.text((650, 675), playtime_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((675, 675), playtime_text, font=font_small)
     x_hours = bbox[2] + 3
     draw.text((x_hours, 675 + 18), "hours", font=font_mini, fill=(60,40,30,255))
 
-    draw.text((675, 750), "PvP", font=font_main, fill=(60,40,30,255))
+    draw.text((650, 750), "PvP", font=font_main, fill=(60,40,30,255))
     pk_text = str(info.get('pvp_kill', 0))
     pd_text = str(info.get('pvp_death', 0))
-    draw.text((675, 825), pk_text, font=font_small, fill=(60,40,30,255))
+    draw.text((650, 825), pk_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((675, 825), pk_text, font=font_small)
     x_k = bbox[2] + 6
     draw.text((x_k, 825 + 18), "K", font=font_mini, fill=(60,40,30,255))
-    draw.text((675, 875), pd_text, font=font_small, fill=(60,40,30,255))
+    draw.text((650, 875), pd_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((675, 875), pd_text, font=font_small)
     x_d = bbox[2] + 6
     draw.text((x_d, 875 + 18), "D", font=font_mini, fill=(60,40,30,255))
@@ -109,7 +122,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         bbox = draw.textbbox((0,0), num_text, font=font_raids)
         text_width = bbox[2] - bbox[0]
         x = right_edge_x - text_width + adjust
-        draw.text((x, y + 13), num_text, font=font_mini, fill=(60,40,30,255))
+        draw.text((x, y + 13), num_text, font=font_raids, fill=(60,40,30,255))
 
     # UUID
     uuid = info.get("uuid", "")
