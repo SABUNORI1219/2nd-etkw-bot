@@ -66,8 +66,8 @@ class PlayerCog(commands.Cog):
         profile_info = {
             "username": data.get("username"),
             "support_rank_display": data.get("supportRank", "Player").capitalize(),
-            "guild_prefix": f"{guild_prefix}",
-            "banner_bytes": f"{banner_bytes}",
+            "guild_prefix": guild_prefix,
+            "banner_bytes": banner_bytes,
             "guild_name": self._safe_get(data, ['guild', 'name'], ""),
             "guild_rank": self._safe_get(data, ['guild', 'rank'], ""),
             "guild_rank_stars": self._safe_get(data, ['guild', 'rankStars'], ""),
