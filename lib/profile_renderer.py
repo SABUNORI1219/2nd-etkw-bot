@@ -23,7 +23,7 @@ def add_frame_to_banner_3d(banner_img, final_size=(82, 156), frame_width=8, padd
     inner_pad = (220, 200, 160, 255)  # 額縁とバナーの間の明るめパディング
 
     # キャンバス
-    framed = Image.new("RGBA", (w, h), (0,0,0,0))
+    framed = Image.new("RGBA", (w, h), (255,255,255,255))
     draw = ImageDraw.Draw(framed)
 
     # 枠描画（前回通り）
@@ -46,6 +46,17 @@ def add_frame_to_banner_3d(banner_img, final_size=(82, 156), frame_width=8, padd
     framed.paste(banner_img, (paste_x, paste_y), mask=banner_img)
 
     return framed
+
+def force_opaque(banner_img):
+    if banner_img.mode != "RGBA":
+        banner_img = banner_img.convert("RGBA")
+    px = banner_img.load()
+    bw, bh = banner_img.size
+    for x in range(bw):
+        for y in range(bh):
+            r, g, b, a = px[x, y]
+            px[x, y] = (r, g, b, 255)
+    return banner_img
 
 def generate_profile_card(info, output_path="profile_card.png"):
     try:
@@ -102,6 +113,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     banner_y = 250
     banner_size = (66, 140)
     if guild_banner_img:
+        guild_banner_img = force_opaque(guild_banner_img)
         guild_banner_img = guild_banner_img.resize(banner_size, Image.LANCZOS)
         framed_banner_img = add_frame_to_banner_3d(guild_banner_img, final_size=(82, 156), frame_width=8)
         img.paste(framed_banner_img, (banner_x, banner_y), mask=framed_banner_img)
