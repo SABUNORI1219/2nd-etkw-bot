@@ -103,10 +103,13 @@ def generate_profile_card(info, output_path="profile_card.png"):
     for label, key, y in raid_keys:
         draw.text((100, y), label, font=font_raids, fill=(60,40,30,255))
         num_text = f"{info.get(key, 0)}"
+        digits = len(num_text)
+        # 例：5桁基準で右に+2pxずつズラす
+        adjust = (5 - digits) * 2
         bbox = draw.textbbox((0,0), num_text, font=font_raids)
         text_width = bbox[2] - bbox[0]
-        x = right_edge_x - text_width
-        draw.text((x, y + 15), num_text, font=font_mini, fill=(60,40,30,255))
+        x = right_edge_x - text_width + adjust
+        draw.text((x, y + 13), num_text, font=font_mini, fill=(60,40,30,255))
 
     # UUID
     uuid = info.get("uuid", "")
