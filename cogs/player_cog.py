@@ -72,7 +72,7 @@ class PlayerCog(commands.Cog):
             "wars": self._safe_get(data, ['globalData', 'wars'], 0),
             "war_rank_display": self._safe_get(data, ['ranking', 'warsCompletion'], "N/A"),
             "quests": self._safe_get(data, ['globalData', 'completedQuests'], 0),
-            "world_events" self._safe_get(data, ['globalData', 'worldEvents'], 0),
+            "world_events": self._safe_get(data, ['globalData', 'worldEvents'], 0),
             "total_level": self._safe_get(data, ['globalData', 'totalLevel'], 0),
             "chests": self._safe_get(data, ['globalData', 'chestsFound'], 0),
             "pvp_kill": f"{self._safe_get(data, ['globalData', 'pvp', 'kills'], 0)}",
