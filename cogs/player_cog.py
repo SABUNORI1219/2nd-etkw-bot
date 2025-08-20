@@ -62,17 +62,12 @@ class PlayerCog(commands.Cog):
         guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
         banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner'))
 
-        if banner_bytes:
-            banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
-        else:
-            banner_file = None
-
         # 必要な情報だけdictでまとめる
         profile_info = {
             "username": data.get("username"),
             "support_rank_display": data.get("supportRank", "Player").capitalize(),
             "guild_prefix": f"{guild_prefix}",
-            "banner_file": f"{banner_file}",
+            "banner_bytes": f"{banner_bytes}",
             "guild_name": self._safe_get(data, ['guild', 'name'], ""),
             "guild_rank": self._safe_get(data, ['guild', 'rank'], ""),
             "guild_rank_stars": self._safe_get(data, ['guild', 'rankStars'], ""),
