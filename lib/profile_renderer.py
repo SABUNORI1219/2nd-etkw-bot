@@ -7,7 +7,7 @@ import os
 logger = logging.getLogger(__name__)
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia-Regular.ttf")
-BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png")
+BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/6D026264-766E-41A7-A94A-ACA744575283.png")
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 
 def generate_profile_card(info, output_path="profile_card.png"):
@@ -60,60 +60,53 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((330, 475), f"Last Seen: {info.get('last_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
 
     draw.text((90, 600), "Mobs", font=font_sub, fill=(60,40,30,255))
-    draw.text((330, 600), f"{info.get('mobs_killed', 0):,}", font=font_small, fill=(60,40,30,255))
+    draw.text((330, 600), f"{info.get('mobs_killed', 0):,}", font=font_sub, fill=(60,40,30,255))
 
-    draw.text((90, 675), "Playtime", font=font_sub, fill=(60,40,30,255))
-    playtime_text = f"{info.get('playtime', 0):,}"
-    draw.text((330, 675), playtime_text, font=font_small, fill=(60,40,30,255))
-    bbox = draw.textbbox((330, 675), playtime_text, font=font_small)
-    x_hours = bbox[2] + 3
-    draw.text((x_hours, 675 + 20), "hours", font=font_mini, fill=(60,40,30,255))
+    draw.text((90, 675), "Chests", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 675), f"{info.get('chests', 0):,}", font=font_sub, fill=(60,40,30,255))
 
     draw.text((90, 800), "Wars", font=font_sub, fill=(60,40,30,255))
     wars_text = f"{info.get('wars', 0):,}"
-    draw.text((330, 800), wars_text, font=font_small, fill=(60,40,30,255))
-    bbox = draw.textbbox((330, 800), wars_text, font=font_small)
+    draw.text((330, 800), wars_text, font=font_sub, fill=(60,40,30,255))
+    bbox = draw.textbbox((330, 800), wars_text, font=font_sub)
     x_wars = bbox[2] + 6
-    draw.text((x_wars, 800 + 20), f" #{info.get('war_rank_display', 'N/A')}", font=font_mini, fill=(60,40,30,255))
+    draw.text((x_wars, 800 + 15), f" #{info.get('war_rank_display', 'N/A')}", font=font_mini, fill=(60,40,30,255))
 
     draw.text((90, 875), "Quests", font=font_sub, fill=(60,40,30,255))
-    draw.text((330, 875), f"{info.get('quests', 0):,}", font=font_small, fill=(60,40,30,255))
+    draw.text((330, 875), f"{info.get('quests', 0):,}", font=font_sub, fill=(60,40,30,255))
 
-    draw.text((90, 950), f"Total Level {info.get('total_level', 0):,}", font=font_sub, fill=(60,40,30,255))
+    draw.text((90, 950), f"Total Level   {info.get('total_level', 0):,}", font=font_sub, fill=(60,40,30,255))
 
-    draw.text((675, 600), "Chests", font=font_main, fill=(60,40,30,255))
-    draw.text((675, 675), f"{info.get('chests', 0):,}", font=font_small, fill=(60,40,30,255))
+    draw.text((675, 600), "Playtime", font=font_sub, fill=(60,40,30,255))
+    playtime_text = f"{info.get('playtime', 0):,}"
+    draw.text((675, 675), playtime_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((675, 675), playtime_text, font=font_small)
+    x_hours = bbox[2] + 3
+    draw.text((x_hours, 675 + 15), "hours", font=font_mini, fill=(60,40,30,255))
 
     draw.text((675, 750), "PvP", font=font_main, fill=(60,40,30,255))
     pk_text = str(info.get('pvp_kill', 0))
-    k_text = "K"
-    slash_text = "/"
     pd_text = str(info.get('pvp_death', 0))
     draw.text((675, 825), pk_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((675, 825), pk_text, font=font_small)
     x_k = bbox[2] + 6
-    draw.text((x_k, 825 + 25), k_text, font=font_mini, fill=(60,40,30,255))
-    bbox = draw.textbbox((x_k, 825 + 20), k_text, font=font_mini)
-    x_slash = bbox[2] + 10
-    draw.text((x_slash, 825), slash_text, font=font_small, fill=(60,40,30,255))
-    bbox = draw.textbbox((x_slash, 825), slash_text, font=font_small)
-    x_pd = bbox[2] + 10
-    draw.text((x_pd, 825), pd_text, font=font_small, fill=(60,40,30,255))
-    bbox = draw.textbbox((x_pd, 825), pd_text, font=font_small)
+    draw.text((x_k, 825 + 15), "K", font=font_mini, fill=(60,40,30,255))
+    draw.text((675, 900), pd_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((675, 900), pd_text, font=font_small)
     x_d = bbox[2] + 6
-    draw.text((x_d, 825 + 20), "D", font=font_mini, fill=(60,40,30,255))
+    draw.text((x_d, 900 + 15), "D", font=font_mini, fill=(60,40,30,255))
 
     # Raid/Dungeon
     right_edge_x = 450
     raid_keys = [("NOTG", "notg", 1150), ("NOL", "nol", 1200), ("TCC", "tcc", 1250),
                  ("TNA", "tna", 1300), ("Dungeons", "dungeons", 1350), ("All Raids", "all_raids", 1400)]
     for label, key, y in raid_keys:
-        draw.text((100, y), label, font=font_small, fill=(60,40,30,255))
+        draw.text((100, y), label, font=font_raids, fill=(60,40,30,255))
         num_text = f"{info.get(key, 0)}"
-        bbox = draw.textbbox((0,0), num_text, font=font_small)
+        bbox = draw.textbbox((0,0), num_text, font=font_raids)
         text_width = bbox[2] - bbox[0]
         x = right_edge_x - text_width
-        draw.text((x, y), num_text, font=font_raids, fill=(60,40,30,255))
+        draw.text((x, y + 20), num_text, font=font_mini, fill=(60,40,30,255))
 
     # UUID
     uuid = info.get("uuid", "")
@@ -128,8 +121,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
     else:
         line1 = line2 = ""
     draw.text((475, 1150), "UUID", font=font_raids, fill=(90,90,90,255))
-    draw.text((600, 1150), line1, font=font_uuid, fill=(90,90,90,255))
-    draw.text((475, 1200), line2, font=font_uuid, fill=(90,90,90,255))
+    draw.text((600, 1160), line1, font=font_uuid, fill=(90,90,90,255))
+    draw.text((475, 1210), line2, font=font_uuid, fill=(90,90,90,255))
 
     # スキン画像貼り付け
     img.paste(PLAYER_BACKGROUND, (110, 280), mask=PLAYER_BACKGROUND)
