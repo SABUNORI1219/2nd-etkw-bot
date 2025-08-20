@@ -11,6 +11,12 @@ BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8e
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 RANK_STAR_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/rankStar.png")
 
+def add_padding_to_banner(banner_img, padding=8, pad_color=(255,255,255,0)):
+    w, h = banner_img.size
+    padded = Image.new("RGBA", (w + 2*padding, h + 2*padding), pad_color)
+    padded.paste(banner_img, (padding, padding), mask=banner_img)
+    return padded
+
 def add_frame_to_banner_3d(banner_img, frame_width=8):
     w, h = banner_img.size
     # 基本色
@@ -97,7 +103,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     banner_size = (76, 150)
     if guild_banner_img:
         guild_banner_img = guild_banner_img.resize(banner_size, Image.LANCZOS)
-        # 立体額縁を追加
+        guild_banner_img = add_padding_to_banner(guild_banner_img, padding=8, pad_color=(255,255,255,0))
         guild_banner_img = add_frame_to_banner_3d(guild_banner_img, frame_width=8)
         img.paste(guild_banner_img, (banner_x, banner_y), mask=guild_banner_img)
     else:
