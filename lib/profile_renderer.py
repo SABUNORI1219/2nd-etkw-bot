@@ -29,7 +29,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         rank_star_img = Image.new("RGBA", (200, 200), (200, 200, 200, 255))
     draw = ImageDraw.Draw(img)
     W, H = img.size
-    star_size = 32
+    star_size = 64
     rank_star_img = rank_star_img.resize((star_size, star_size), Image.LANCZOS)
 
     # フォント設定
@@ -64,7 +64,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         star_num = 1
     draw.text((330, 325), f"{guild_rank_text}", font=font_main, fill=(60,40,30,255))
     start_x = 330 + 200  # guild_rank_textの右端座標から200px右（調整推奨）
-    y = 325
+    y = 400
     for i in range(star_num):
         x = start_x + i * (star_size + 3)
         img.paste(rank_star_img, (x, y), mask=rank_star_img)
@@ -93,7 +93,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((650, 600), "Playtime", font=font_sub, fill=(60,40,30,255))
     playtime_text = f"{info.get('playtime', 0):,}"
     draw.text((650, 675), playtime_text, font=font_small, fill=(60,40,30,255))
-    bbox = draw.textbbox((675, 675), playtime_text, font=font_small)
+    bbox = draw.textbbox((650, 675), playtime_text, font=font_small)
     x_hours = bbox[2] + 3
     draw.text((x_hours, 675 + 18), "hours", font=font_mini, fill=(60,40,30,255))
 
@@ -101,16 +101,16 @@ def generate_profile_card(info, output_path="profile_card.png"):
     pk_text = str(info.get('pvp_kill', 0))
     pd_text = str(info.get('pvp_death', 0))
     draw.text((650, 825), pk_text, font=font_small, fill=(60,40,30,255))
-    bbox = draw.textbbox((675, 825), pk_text, font=font_small)
+    bbox = draw.textbbox((650, 825), pk_text, font=font_small)
     x_k = bbox[2] + 6
     draw.text((x_k, 825 + 18), "K", font=font_mini, fill=(60,40,30,255))
     draw.text((650, 875), pd_text, font=font_small, fill=(60,40,30,255))
-    bbox = draw.textbbox((675, 875), pd_text, font=font_small)
+    bbox = draw.textbbox((650, 875), pd_text, font=font_small)
     x_d = bbox[2] + 6
     draw.text((x_d, 875 + 18), "D", font=font_mini, fill=(60,40,30,255))
 
     # Raid/Dungeon
-    right_edge_x = 450
+    right_edge_x = 440
     raid_keys = [("NOTG", "notg", 1150), ("NOL", "nol", 1200), ("TCC", "tcc", 1250),
                  ("TNA", "tna", 1300), ("Dungeons", "dungeons", 1350), ("All Raids", "all_raids", 1400)]
     for label, key, y in raid_keys:
@@ -122,7 +122,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         bbox = draw.textbbox((0,0), num_text, font=font_raids)
         text_width = bbox[2] - bbox[0]
         x = right_edge_x - text_width + adjust
-        draw.text((x, y + 13), num_text, font=font_raids, fill=(60,40,30,255))
+        draw.text((x, y), num_text, font=font_raids, fill=(60,40,30,255))
 
     # UUID
     uuid = info.get("uuid", "")
