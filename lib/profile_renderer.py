@@ -29,7 +29,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         rank_star_img = Image.new("RGBA", (200, 200), (200, 200, 200, 255))
     draw = ImageDraw.Draw(img)
     W, H = img.size
-    star_size = 60
+    star_size = 50
     rank_star_img = rank_star_img.resize((star_size, star_size), Image.LANCZOS)
 
     # フォント設定
@@ -64,7 +64,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         star_num = 1
     draw.text((330, 325), f"{guild_rank_text}", font=font_main, fill=(60,40,30,255))
     start_x = 330 + 175  # guild_rank_textの右端座標から200px右（調整推奨）
-    y = 350
+    y = 325
     for i in range(star_num):
         x = start_x + i * (star_size + 3)
         img.paste(rank_star_img, (x, y), mask=rank_star_img)
@@ -102,11 +102,11 @@ def generate_profile_card(info, output_path="profile_card.png"):
     pd_text = str(info.get('pvp_death', 0))
     draw.text((650, 825), pk_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((650, 825), pk_text, font=font_small)
-    x_k = bbox[2] + 6
+    x_k = bbox[2] + 3
     draw.text((x_k, 825 + 18), "K", font=font_mini, fill=(60,40,30,255))
     draw.text((650, 875), pd_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((650, 875), pd_text, font=font_small)
-    x_d = bbox[2] + 6
+    x_d = bbox[2] + 3
     draw.text((x_d, 875 + 18), "D", font=font_mini, fill=(60,40,30,255))
 
     draw.text((650, 950), "Total Level", font=font_main, fill=(60,40,30,255))
