@@ -11,52 +11,35 @@ BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8e
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 RANK_STAR_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/rankStar.png")
 
-def add_frame_to_banner_3d(banner_img, final_size=(82, 156), frame_width=8, padding=4):
-    w, h = final_size
-    bw, bh = banner_img.size
-
-    # 色定義
+def add_frame_to_banner_3d(banner_img, frame_width=8):
+    w, h = banner_img.size
+    # 基本色
     dark_brown = (60, 40, 30, 255)
     light_brown = (110, 80, 50, 255)
     highlight = (180, 130, 80, 255)
     shadow = (40, 20, 10, 255)
-    inner_pad = (220, 200, 160, 255)  # 額縁とバナーの間の明るめパディング
 
-    # キャンバス
-    framed = Image.new("RGBA", (w, h), (255,255,255,255))
+    framed = Image.new("RGBA", (w, h), (0,0,0,0))
+    framed.paste(banner_img, (0,0), mask=banner_img)
     draw = ImageDraw.Draw(framed)
 
-    # 枠描画（前回通り）
+    # 1. 外枠（こげ茶色）
     for fw in range(frame_width):
         draw.rectangle([fw, fw, w-fw-1, h-fw-1], outline=dark_brown)
-    for fw in range(frame_width-3, frame_width-1):
+
+    # 2. 内枠（明るめ茶色）
+    for fw in range(frame_width-2, frame_width):
         draw.rectangle([fw, fw, w-fw-1, h-fw-1], outline=light_brown)
+
+    # 3. 左上にハイライト、右下にシャドウ（立体感）
+    # 上辺・左辺のハイライト
     draw.line([(frame_width, frame_width), (w-frame_width, frame_width)], fill=highlight, width=3)
     draw.line([(frame_width, frame_width), (frame_width, h-frame_width)], fill=highlight, width=3)
+    # 下辺・右辺のシャドウ
     draw.line([(frame_width, h-frame_width), (w-frame_width, h-frame_width)], fill=shadow, width=3)
     draw.line([(w-frame_width, frame_width), (w-frame_width, h-frame_width)], fill=shadow, width=3)
 
-    # 額縁とバナーの間にパディング（明るめ色で細く囲む）
-    pad_fw = frame_width + padding
-    draw.rectangle([pad_fw, pad_fw, w-pad_fw-1, h-pad_fw-1], outline=inner_pad, width=2)
-
-    # バナー画像貼り付け（より内側に）
-    paste_x = pad_fw + ((w - 2*pad_fw) - bw) // 2
-    paste_y = pad_fw + ((h - 2*pad_fw) - bh) // 2
-    framed.paste(banner_img, (paste_x, paste_y), mask=banner_img)
-
     return framed
-
-def force_opaque(banner_img):
-    if banner_img.mode != "RGBA":
-        banner_img = banner_img.convert("RGBA")
-    px = banner_img.load()
-    bw, bh = banner_img.size
-    for x in range(bw):
-        for y in range(bh):
-            r, g, b, a = px[x, y]
-            px[x, y] = (r, g, b, 255)
-    return banner_img
 
 def generate_profile_card(info, output_path="profile_card.png"):
     try:
@@ -111,12 +94,12 @@ def generate_profile_card(info, output_path="profile_card.png"):
     # guildバナー描画座標
     banner_x = 330
     banner_y = 250
-    banner_size = (66, 140)
+    banner_size = (76, 150)
     if guild_banner_img:
-        guild_banner_img = force_opaque(guild_banner_img)
         guild_banner_img = guild_banner_img.resize(banner_size, Image.LANCZOS)
-        framed_banner_img = add_frame_to_banner_3d(guild_banner_img, final_size=(82, 156), frame_width=8)
-        img.paste(framed_banner_img, (banner_x, banner_y), mask=framed_banner_img)
+        # 立体額縁を追加
+        guild_banner_img = add_frame_to_banner_3d(guild_banner_img, frame_width=8)
+        img.paste(guild_banner_img, (banner_x, banner_y), mask=guild_banner_img)
     else:
         # バナー画像生成失敗時は透明画像 or ダミー
         dummy = Image.new("RGBA", banner_size, (0, 0, 0, 0))
