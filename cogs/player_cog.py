@@ -16,6 +16,7 @@ class PlayerCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
+        self.banner_renderer = BannerRenderer()
         self.cache = CacheHandler()
 
     def _safe_get(self, data: dict, keys: list, default=None):
