@@ -29,7 +29,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         rank_star_img = Image.new("RGBA", (200, 200), (200, 200, 200, 255))
     draw = ImageDraw.Draw(img)
     W, H = img.size
-    star_size = 64
+    star_size = 60
     rank_star_img = rank_star_img.resize((star_size, star_size), Image.LANCZOS)
 
     # フォント設定
@@ -64,7 +64,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         star_num = 1
     draw.text((330, 325), f"{guild_rank_text}", font=font_main, fill=(60,40,30,255))
     start_x = 330 + 200  # guild_rank_textの右端座標から200px右（調整推奨）
-    y = 400
+    y = 300
     for i in range(star_num):
         x = start_x + i * (star_size + 3)
         img.paste(rank_star_img, (x, y), mask=rank_star_img)
