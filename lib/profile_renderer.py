@@ -7,7 +7,7 @@ import os
 logger = logging.getLogger(__name__)
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia-Regular.ttf")
-BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/6D026264-766E-41A7-A94A-ACA744575283.png")
+BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png")
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 
 def generate_profile_card(info, output_path="profile_card.png"):
@@ -70,7 +70,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((330, 800), wars_text, font=font_sub, fill=(60,40,30,255))
     bbox = draw.textbbox((330, 800), wars_text, font=font_sub)
     x_wars = bbox[2] + 6
-    draw.text((x_wars, 800 + 15), f" #{info.get('war_rank_display', 'N/A')}", font=font_mini, fill=(60,40,30,255))
+    draw.text((x_wars, 800 + 18), f" #{info.get('war_rank_display', 'N/A')}", font=font_mini, fill=(60,40,30,255))
 
     draw.text((90, 875), "Quests", font=font_sub, fill=(60,40,30,255))
     draw.text((330, 875), f"{info.get('quests', 0):,}", font=font_sub, fill=(60,40,30,255))
@@ -82,7 +82,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((675, 675), playtime_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((675, 675), playtime_text, font=font_small)
     x_hours = bbox[2] + 3
-    draw.text((x_hours, 675 + 15), "hours", font=font_mini, fill=(60,40,30,255))
+    draw.text((x_hours, 675 + 18), "hours", font=font_mini, fill=(60,40,30,255))
 
     draw.text((675, 750), "PvP", font=font_main, fill=(60,40,30,255))
     pk_text = str(info.get('pvp_kill', 0))
@@ -90,11 +90,11 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((675, 825), pk_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((675, 825), pk_text, font=font_small)
     x_k = bbox[2] + 6
-    draw.text((x_k, 825 + 15), "K", font=font_mini, fill=(60,40,30,255))
-    draw.text((675, 900), pd_text, font=font_small, fill=(60,40,30,255))
-    bbox = draw.textbbox((675, 900), pd_text, font=font_small)
+    draw.text((x_k, 825 + 18), "K", font=font_mini, fill=(60,40,30,255))
+    draw.text((675, 875), pd_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((675, 875), pd_text, font=font_small)
     x_d = bbox[2] + 6
-    draw.text((x_d, 900 + 15), "D", font=font_mini, fill=(60,40,30,255))
+    draw.text((x_d, 875 + 18), "D", font=font_mini, fill=(60,40,30,255))
 
     # Raid/Dungeon
     right_edge_x = 450
@@ -106,7 +106,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         bbox = draw.textbbox((0,0), num_text, font=font_raids)
         text_width = bbox[2] - bbox[0]
         x = right_edge_x - text_width
-        draw.text((x, y + 20), num_text, font=font_mini, fill=(60,40,30,255))
+        draw.text((x, y + 15), num_text, font=font_mini, fill=(60,40,30,255))
 
     # UUID
     uuid = info.get("uuid", "")
@@ -121,8 +121,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
     else:
         line1 = line2 = ""
     draw.text((475, 1150), "UUID", font=font_raids, fill=(90,90,90,255))
-    draw.text((600, 1160), line1, font=font_uuid, fill=(90,90,90,255))
-    draw.text((475, 1210), line2, font=font_uuid, fill=(90,90,90,255))
+    draw.text((600, 1155), line1, font=font_uuid, fill=(90,90,90,255))
+    draw.text((475, 1205), line2, font=font_uuid, fill=(90,90,90,255))
 
     # スキン画像貼り付け
     img.paste(PLAYER_BACKGROUND, (110, 280), mask=PLAYER_BACKGROUND)
