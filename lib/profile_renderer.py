@@ -28,9 +28,10 @@ def generate_profile_card(info, output_path="profile_card.png"):
     try:
         font_title = ImageFont.truetype(FONT_PATH, 50)
         font_main = ImageFont.truetype(FONT_PATH, 45)
-        font_sub = ImageFont.truetype(FONT_PATH, 41)
+        font_sub = ImageFont.truetype(FONT_PATH, 43)
         font_small = ImageFont.truetype(FONT_PATH, 40)
-        font_uuid = ImageFont.truetype(FONT_PATH, 35)
+        font_raids = ImageFont.truetype(FONT_PATH, 35)
+        font_uuid = ImageFont.truetype(FONT_PATH, 30)
         font_mini = ImageFont.truetype(FONT_PATH, 25)
     except Exception as e:
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
@@ -59,48 +60,48 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((330, 475), f"Last Seen: {info.get('last_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
 
     draw.text((90, 600), "Mobs", font=font_sub, fill=(60,40,30,255))
-    draw.text((330, 600), f"{info.get('mobs_killed', 0):,}", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 600), f"{info.get('mobs_killed', 0):,}", font=font_small, fill=(60,40,30,255))
 
     draw.text((90, 675), "Playtime", font=font_sub, fill=(60,40,30,255))
     playtime_text = f"{info.get('playtime', 0):,}"
-    draw.text((330, 675), playtime_text, font=font_sub, fill=(60,40,30,255))
-    bbox = draw.textbbox((330, 675), playtime_text, font=font_sub)
+    draw.text((330, 675), playtime_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((330, 675), playtime_text, font=font_small)
     x_hours = bbox[2] + 6
-    draw.text((x_hours, 675 + 30), "hours", font=font_mini, fill=(60,40,30,255))
+    draw.text((x_hours, 675 + 25), "hours", font=font_mini, fill=(60,40,30,255))
 
     draw.text((90, 800), "Wars", font=font_sub, fill=(60,40,30,255))
     wars_text = f"{info.get('wars', 0):,}"
-    draw.text((330, 800), wars_text, font=font_sub, fill=(60,40,30,255))
-    bbox = draw.textbbox((330, 800), wars_text, font=font_sub)
+    draw.text((330, 800), wars_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((330, 800), wars_text, font=font_small)
     x_wars = bbox[2] + 6
-    draw.text((x_wars, 800 + 30), f" #{info.get('war_rank_display', 'N/A')}", font=font_mini, fill=(60,40,30,255))
+    draw.text((x_wars, 800 + 25), f" #{info.get('war_rank_display', 'N/A')}", font=font_mini, fill=(60,40,30,255))
 
     draw.text((90, 875), "Quests", font=font_sub, fill=(60,40,30,255))
-    draw.text((330, 875), f"{info.get('quests', 0):,}", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 875), f"{info.get('quests', 0):,}", font=font_small, fill=(60,40,30,255))
 
     draw.text((90, 950), f"Total Level {info.get('total_level', 0):,}", font=font_sub, fill=(60,40,30,255))
 
     draw.text((675, 600), "Chests", font=font_main, fill=(60,40,30,255))
-    draw.text((675, 675), f"{info.get('chests', 0):,}", font=font_main, fill=(60,40,30,255))
+    draw.text((675, 675), f"{info.get('chests', 0):,}", font=font_small, fill=(60,40,30,255))
 
     draw.text((675, 750), "PvP", font=font_main, fill=(60,40,30,255))
     pk_text = str(info.get('pvp_kill', 0))
     k_text = "K"
     slash_text = "/"
     pd_text = str(info.get('pvp_death', 0))
-    draw.text((675, 825), pk_text, font=font_main, fill=(60,40,30,255))
-    bbox = draw.textbbox((675, 825), pk_text, font=font_main)
+    draw.text((675, 825), pk_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((675, 825), pk_text, font=font_small)
     x_k = bbox[2] + 6
-    draw.text((x_k, 825 + 30), k_text, font=font_mini, fill=(60,40,30,255))
-    bbox = draw.textbbox((x_k, 825 + 30), k_text, font=font_mini)
+    draw.text((x_k, 825 + 25), k_text, font=font_mini, fill=(60,40,30,255))
+    bbox = draw.textbbox((x_k, 825 + 25), k_text, font=font_mini)
     x_slash = bbox[2] + 6
-    draw.text((x_slash, 825), slash_text, font=font_main, fill=(60,40,30,255))
-    bbox = draw.textbbox((x_slash, 825), slash_text, font=font_main)
+    draw.text((x_slash, 825), slash_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((x_slash, 825), slash_text, font=font_small)
     x_pd = bbox[2] + 6
-    draw.text((x_pd, 825), pd_text, font=font_main, fill=(60,40,30,255))
-    bbox = draw.textbbox((x_pd, 825), pd_text, font=font_main)
+    draw.text((x_pd, 825), pd_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((x_pd, 825), pd_text, font=font_small)
     x_d = bbox[2] + 6
-    draw.text((x_d, 825 + 30), "D", font=font_mini, fill=(60,40,30,255))
+    draw.text((x_d, 825 + 25), "D", font=font_mini, fill=(60,40,30,255))
 
     # Raid/Dungeon
     right_edge_x = 425
@@ -112,7 +113,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         bbox = draw.textbbox((0,0), num_text, font=font_small)
         text_width = bbox[2] - bbox[0]
         x = right_edge_x - text_width
-        draw.text((x, y), num_text, font=font_small, fill=(60,40,30,255))
+        draw.text((x, y), num_text, font=font_raids, fill=(60,40,30,255))
 
     # UUID
     uuid = info.get("uuid", "")
@@ -126,7 +127,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
             line2 = ""
     else:
         line1 = line2 = ""
-    draw.text((475, 1150), f"UUID   {line1}", font=font_uuid, fill=(90,90,90,255))
+    draw.text((475, 1150), "UUID", font=font_small, fill=(90,90,90,255))
+    draw.text((500, 1150), line1, font=font_uuid, fill=(90,90,90,255))
     draw.text((475, 1200), line2, font=font_uuid, fill=(90,90,90,255))
 
     # スキン画像貼り付け
