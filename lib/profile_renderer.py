@@ -100,7 +100,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     banner_size = (71, 140)
     if guild_banner_img:
         guild_banner_img = guild_banner_img.resize(banner_size, Image.LANCZOS)
-        framed_banner_img = add_frame_to_banner_3d(guild_banner_img, final_size=final_size, frame_width=8)
+        framed_banner_img = add_frame_to_banner_3d(guild_banner_img, final_size=(87, 156), frame_width=8)
         img.paste(framed_banner_img, (banner_x, banner_y), mask=framed_banner_img)
     else:
         # バナー画像生成失敗時は透明画像 or ダミー
