@@ -64,7 +64,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     # guildバナー描画座標
     banner_x = 330
     banner_y = 250
-    banner_size = (100, 195)
+    banner_size = (82, 160)
     if guild_banner_img:
         guild_banner_img = guild_banner_img.resize(banner_size, Image.LANCZOS)
         img.paste(guild_banner_img, (banner_x, banner_y), mask=guild_banner_img)
@@ -95,7 +95,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     x_grank = bbox[2] + 10
     y_star = banner_y + 80
     for i in range(star_num):
-        x = x_grank + i * (star_size + 3)
+        x = x_grank + i * (star_size + 2)
         img.paste(rank_star_img, (x, y_star), mask=rank_star_img)
     
     draw.text((330, 400), f"First Join: {info.get('first_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
