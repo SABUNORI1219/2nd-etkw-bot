@@ -100,7 +100,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     # guildバナー描画座標
     banner_x = 330
     banner_y = 250
-    banner_size = (76, 150)
+    banner_size = (71, 140)
     if guild_banner_img:
         guild_banner_img = guild_banner_img.resize(banner_size, Image.LANCZOS)
         guild_banner_img = add_padding_to_banner(guild_banner_img, padding=8, pad_color=(255,255,255,0))
