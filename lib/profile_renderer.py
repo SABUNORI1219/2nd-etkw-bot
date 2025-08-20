@@ -47,9 +47,37 @@ def generate_profile_card(info, output_path="profile_card.png"):
 
     # 描画（profile_infoの内容を全部使う）
     draw.text((90, 140), f"[{info.get('support_rank_display', 'Player')}] {info.get('username', 'NoName')}", font=font_title, fill=(60,40,30,255))
-    
-    draw.text((330, 250), f"[{info.get('guild_prefix', '')}] {info.get('guild_name', '')}", font=font_main, fill=(60,40,30,255))
 
+    # ギルドバナー描画
+    banner_bytes = info.get("banner_bytes")
+    guild_banner_img = None
+    if banner_bytes and isinstance(banner_bytes, BytesIO):
+        try:
+            guild_banner_img = Image.open(banner_bytes).convert("RGBA")
+        except Exception as e:
+            logger.error(f"guild_banner_img読み込み失敗: {e}")
+            guild_banner_img = None
+    elif banner_bytes and isinstance(banner_bytes, str):
+        # discord.Fileを渡している場合は、サムネイル用途なのでここでは無視
+        guild_banner_img = None
+
+    # guildバナー描画座標
+    banner_x = 90
+    banner_y = 250
+    banner_size = (120, 120)
+    if guild_banner_img:
+        guild_banner_img = guild_banner_img.resize(banner_size, Image.LANCZOS)
+        img.paste(guild_banner_img, (banner_x, banner_y), mask=guild_banner_img)
+    else:
+        # バナー画像生成失敗時は透明画像 or ダミー
+        dummy = Image.new("RGBA", banner_size, (0, 0, 0, 0))
+        img.paste(dummy, (banner_x, banner_y), mask=dummy)
+
+    # [guild_prefix] guild_name
+    text_base_x = banner_x + banner_size[0] + 10
+    draw.text((text_base_x, banner_y), f"[{info.get('guild_prefix', '')}] {info.get('guild_name', '')}", font=font_main, fill=(60,40,30,255))
+
+    # guild_rank + rankstars
     guild_rank_text = str(info.get('guild_rank', ''))
     star_num = 0
     if guild_rank_text == "OWNER":
@@ -62,13 +90,13 @@ def generate_profile_card(info, output_path="profile_card.png"):
         star_num = 2
     elif guild_rank_text == "RECRUITER":
         star_num = 1
-    draw.text((330, 325), f"{guild_rank_text}", font=font_main, fill=(60,40,30,255))
-    bbox = draw.textbbox((330, 325), f"{guild_rank_text}", font=font_main)
-    x_grank = bbox[2] + 175
-    y = 330
+    draw.text((text_base_x, banner_y + 75), f"{guild_rank_text}", font=font_main, fill=(60,40,30,255))
+    bbox = draw.textbbox((text_base_x, banner_y + 75), f"{guild_rank_text}", font=font_main)
+    x_grank = bbox[2] + 10
+    y_star = banner_y + 75
     for i in range(star_num):
         x = x_grank + i * (star_size + 3)
-        img.paste(rank_star_img, (x, y), mask=rank_star_img)
+        img.paste(rank_star_img, (x, y_star), mask=rank_star_img)
     
     draw.text((330, 400), f"First Join: {info.get('first_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
     draw.text((330, 475), f"Last Seen: {info.get('last_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
