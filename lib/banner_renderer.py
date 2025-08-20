@@ -1,4 +1,4 @@
-from PIL import Image
+from PIL import Image, ImageFilter
 import os
 import logging
 from io import BytesIO
