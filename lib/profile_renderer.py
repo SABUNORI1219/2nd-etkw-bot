@@ -63,8 +63,9 @@ def generate_profile_card(info, output_path="profile_card.png"):
     elif guild_rank_text == "RECRUITER":
         star_num = 1
     draw.text((330, 325), f"{guild_rank_text}", font=font_main, fill=(60,40,30,255))
-    start_x = 330 + 175  # guild_rank_textの右端座標から200px右（調整推奨）
-    y = 325
+    bbox = draw.textbbox((330, 325), f"{guild_rank_text}", font=font_main)
+    x_grank = bbox[2] + 175
+    y = 330
     for i in range(star_num):
         x = start_x + i * (star_size + 3)
         img.paste(rank_star_img, (x, y), mask=rank_star_img)
@@ -123,12 +124,9 @@ def generate_profile_card(info, output_path="profile_card.png"):
     for label, key, y in raid_keys:
         draw.text((100, y), label, font=font_raids, fill=(60,40,30,255))
         num_text = f"{info.get(key, 0)}"
-        digits = len(num_text)
-        # 例：5桁基準で右に+2pxずつズラす
-        adjust = (5 - digits) * 2
         bbox = draw.textbbox((0,0), num_text, font=font_raids)
         text_width = bbox[2] - bbox[0]
-        x = right_edge_x - text_width + adjust
+        x = right_edge_x - text_width
         draw.text((x, y), num_text, font=font_raids, fill=(60,40,30,255))
 
     # UUID
