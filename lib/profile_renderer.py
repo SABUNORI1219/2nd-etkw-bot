@@ -67,7 +67,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     x_grank = bbox[2] + 175
     y = 330
     for i in range(star_num):
-        x = start_x + i * (star_size + 3)
+        x = x_grank + i * (star_size + 3)
         img.paste(rank_star_img, (x, y), mask=rank_star_img)
     
     draw.text((330, 400), f"First Join: {info.get('first_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
