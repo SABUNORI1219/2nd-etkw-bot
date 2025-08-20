@@ -62,9 +62,9 @@ def generate_profile_card(info, output_path="profile_card.png"):
         guild_banner_img = None
 
     # guildバナー描画座標
-    banner_x = 90
+    banner_x = 330
     banner_y = 250
-    banner_size = (120, 120)
+    banner_size = (100, 195)
     if guild_banner_img:
         guild_banner_img = guild_banner_img.resize(banner_size, Image.LANCZOS)
         img.paste(guild_banner_img, (banner_x, banner_y), mask=guild_banner_img)
@@ -93,7 +93,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((text_base_x, banner_y + 75), f"{guild_rank_text}", font=font_main, fill=(60,40,30,255))
     bbox = draw.textbbox((text_base_x, banner_y + 75), f"{guild_rank_text}", font=font_main)
     x_grank = bbox[2] + 10
-    y_star = banner_y + 75
+    y_star = banner_y + 80
     for i in range(star_num):
         x = x_grank + i * (star_size + 3)
         img.paste(rank_star_img, (x, y_star), mask=rank_star_img)
