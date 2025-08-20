@@ -66,15 +66,15 @@ def generate_profile_card(info, output_path="profile_card.png"):
     playtime_text = f"{info.get('playtime', 0):,}"
     draw.text((330, 675), playtime_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((330, 675), playtime_text, font=font_small)
-    x_hours = bbox[2] + 6
-    draw.text((x_hours, 675 + 25), "hours", font=font_mini, fill=(60,40,30,255))
+    x_hours = bbox[2] + 3
+    draw.text((x_hours, 675 + 20), "hours", font=font_mini, fill=(60,40,30,255))
 
     draw.text((90, 800), "Wars", font=font_sub, fill=(60,40,30,255))
     wars_text = f"{info.get('wars', 0):,}"
     draw.text((330, 800), wars_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((330, 800), wars_text, font=font_small)
     x_wars = bbox[2] + 6
-    draw.text((x_wars, 800 + 25), f" #{info.get('war_rank_display', 'N/A')}", font=font_mini, fill=(60,40,30,255))
+    draw.text((x_wars, 800 + 20), f" #{info.get('war_rank_display', 'N/A')}", font=font_mini, fill=(60,40,30,255))
 
     draw.text((90, 875), "Quests", font=font_sub, fill=(60,40,30,255))
     draw.text((330, 875), f"{info.get('quests', 0):,}", font=font_small, fill=(60,40,30,255))
@@ -93,18 +93,18 @@ def generate_profile_card(info, output_path="profile_card.png"):
     bbox = draw.textbbox((675, 825), pk_text, font=font_small)
     x_k = bbox[2] + 6
     draw.text((x_k, 825 + 25), k_text, font=font_mini, fill=(60,40,30,255))
-    bbox = draw.textbbox((x_k, 825 + 25), k_text, font=font_mini)
-    x_slash = bbox[2] + 6
+    bbox = draw.textbbox((x_k, 825 + 20), k_text, font=font_mini)
+    x_slash = bbox[2] + 10
     draw.text((x_slash, 825), slash_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((x_slash, 825), slash_text, font=font_small)
-    x_pd = bbox[2] + 6
+    x_pd = bbox[2] + 10
     draw.text((x_pd, 825), pd_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((x_pd, 825), pd_text, font=font_small)
     x_d = bbox[2] + 6
-    draw.text((x_d, 825 + 25), "D", font=font_mini, fill=(60,40,30,255))
+    draw.text((x_d, 825 + 20), "D", font=font_mini, fill=(60,40,30,255))
 
     # Raid/Dungeon
-    right_edge_x = 425
+    right_edge_x = 450
     raid_keys = [("NOTG", "notg", 1150), ("NOL", "nol", 1200), ("TCC", "tcc", 1250),
                  ("TNA", "tna", 1300), ("Dungeons", "dungeons", 1350), ("All Raids", "all_raids", 1400)]
     for label, key, y in raid_keys:
@@ -127,8 +127,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
             line2 = ""
     else:
         line1 = line2 = ""
-    draw.text((475, 1150), "UUID", font=font_small, fill=(90,90,90,255))
-    draw.text((500, 1150), line1, font=font_uuid, fill=(90,90,90,255))
+    draw.text((475, 1150), "UUID", font=font_raids, fill=(90,90,90,255))
+    draw.text((600, 1150), line1, font=font_uuid, fill=(90,90,90,255))
     draw.text((475, 1200), line2, font=font_uuid, fill=(90,90,90,255))
 
     # スキン画像貼り付け
