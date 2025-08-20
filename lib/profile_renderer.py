@@ -11,42 +11,6 @@ BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8e
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 RANK_STAR_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/rankStar.png")
 
-def add_padding_to_banner(banner_img, padding=8, pad_color=(255,255,255,0)):
-    w, h = banner_img.size
-    padded = Image.new("RGBA", (w + 2*padding, h + 2*padding), pad_color)
-    padded.paste(banner_img, (padding, padding), mask=banner_img)
-    return padded
-
-def add_frame_to_banner_3d(banner_img, frame_width=8):
-    w, h = banner_img.size
-    # 基本色
-    dark_brown = (60, 40, 30, 255)
-    light_brown = (110, 80, 50, 255)
-    highlight = (180, 130, 80, 255)
-    shadow = (40, 20, 10, 255)
-
-    framed = Image.new("RGBA", (w, h), (0,0,0,0))
-    framed.paste(banner_img, (0,0), mask=banner_img)
-    draw = ImageDraw.Draw(framed)
-
-    # 1. 外枠（こげ茶色）
-    for fw in range(frame_width):
-        draw.rectangle([fw, fw, w-fw-1, h-fw-1], outline=dark_brown)
-
-    # 2. 内枠（明るめ茶色）
-    for fw in range(frame_width-2, frame_width):
-        draw.rectangle([fw, fw, w-fw-1, h-fw-1], outline=light_brown)
-
-    # 3. 左上にハイライト、右下にシャドウ（立体感）
-    # 上辺・左辺のハイライト
-    draw.line([(frame_width, frame_width), (w-frame_width, frame_width)], fill=highlight, width=3)
-    draw.line([(frame_width, frame_width), (frame_width, h-frame_width)], fill=highlight, width=3)
-    # 下辺・右辺のシャドウ
-    draw.line([(frame_width, h-frame_width), (w-frame_width, h-frame_width)], fill=shadow, width=3)
-    draw.line([(w-frame_width, frame_width), (w-frame_width, h-frame_width)], fill=shadow, width=3)
-
-    return framed
-
 def generate_profile_card(info, output_path="profile_card.png"):
     try:
         img = Image.open(BASE_IMG_PATH).convert("RGBA")
@@ -100,11 +64,9 @@ def generate_profile_card(info, output_path="profile_card.png"):
     # guildバナー描画座標
     banner_x = 330
     banner_y = 250
-    banner_size = (71, 140)
+    banner_size = (76, 150)
     if guild_banner_img:
         guild_banner_img = guild_banner_img.resize(banner_size, Image.LANCZOS)
-        guild_banner_img = add_padding_to_banner(guild_banner_img, padding=8, pad_color=(255,255,255,0))
-        guild_banner_img = add_frame_to_banner_3d(guild_banner_img, frame_width=8)
         img.paste(guild_banner_img, (banner_x, banner_y), mask=guild_banner_img)
     else:
         # バナー画像生成失敗時は透明画像 or ダミー
