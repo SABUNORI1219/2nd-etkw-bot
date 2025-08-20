@@ -7,6 +7,7 @@ import os
 from lib.wynncraft_api import WynncraftAPI
 from config import AUTHORIZED_USER_IDS
 from lib.cache_handler import CacheHandler
+from lib.banner_renderer import BannerRenderer
 from lib.profile_renderer import generate_profile_card  # データ→画像生成だけ担当
 
 logger = logging.getLogger(__name__)
@@ -57,11 +58,21 @@ class PlayerCog(commands.Cog):
         except Exception:
             last_join_date = last_join_str.split('T')[0] if 'T' in last_join_str else last_join_str
 
+        guild_prefix = self._safe_get(data, ['guild', 'prefix'], "")
+        guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
+        banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner'))
+
+        if banner_bytes:
+            banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
+        else:
+            banner_file = None
+
         # 必要な情報だけdictでまとめる
         profile_info = {
             "username": data.get("username"),
             "support_rank_display": data.get("supportRank", "Player").capitalize(),
-            "guild_prefix": self._safe_get(data, ['guild', 'prefix'], ""),
+            "guild_prefix": f"{guild_prefix}",
+            "banner_file": f"{banner_file}",
             "guild_name": self._safe_get(data, ['guild', 'name'], ""),
             "guild_rank": self._safe_get(data, ['guild', 'rank'], ""),
             "guild_rank_stars": self._safe_get(data, ['guild', 'rankStars'], ""),
