@@ -37,13 +37,12 @@ def generate_profile_card(info, output_path="profile_card.png"):
         font_title = font_main = font_sub = font_small = font_uuid = font_mini = ImageFont.load_default()
 
     # 描画（profile_infoの内容を全部使う）
-    draw.text((90, 140), f"[{safe_get(info, 'support_rank_display', 'Player')}] {safe_get(info, 'username', 'NoName')}", font=font_title, fill=(60,40,30,255))
+    draw.text((90, 140), f"[{info.get('support_rank_display', 'Player')}] {info.get('username', 'NoName')}", font=font_title, fill=(60,40,30,255))
     
-    draw.text((330, 250), f"[{safe_get(info, 'guild_prefix', '')}] {safe_get(info, 'guild_name', '')}", font=font_main, fill=(60,40,30,255))
+    draw.text((330, 250), f"[{info.get('guild_prefix', '')}] {info.get('guild_name', '')}", font=font_main, fill=(60,40,30,255))
 
-    guild_rank_text = str(safe_get(info, 'guild_rank', ''))
+    guild_rank_text = str(info.get('guild_rank', ''))
     rankStar_text = ""
-    # 「is」ではなく「==」で比較
     if guild_rank_text == "OWNER":
         rankStar_text = "★★★★★"
     elif guild_rank_text == "CHIEF":
@@ -56,39 +55,39 @@ def generate_profile_card(info, output_path="profile_card.png"):
         rankStar_text = "★"
     draw.text((330, 325), f"{guild_rank_text} {rankStar_text}", font=font_main, fill=(60,40,30,255))
     
-    draw.text((330, 400), f"First Join: {safe_get(info, 'first_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
-    draw.text((330, 475), f"Last Seen: {safe_get(info, 'last_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
+    draw.text((330, 400), f"First Join: {info.get('first_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
+    draw.text((330, 475), f"Last Seen: {info.get('last_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
 
     draw.text((90, 600), "Mobs", font=font_sub, fill=(60,40,30,255))
-    draw.text((330, 600), f"{safe_get(info, 'mobs_killed', 0):,}", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 600), f"{info.get('mobs_killed', 0):,}", font=font_sub, fill=(60,40,30,255))
 
     draw.text((90, 675), "Playtime", font=font_sub, fill=(60,40,30,255))
-    playtime_text = f"{safe_get(info, 'playtime', 0):,}"
+    playtime_text = f"{info.get('playtime', 0):,}"
     draw.text((330, 675), playtime_text, font=font_sub, fill=(60,40,30,255))
     bbox = draw.textbbox((330, 675), playtime_text, font=font_sub)
     x_hours = bbox[2] + 6
     draw.text((x_hours, 675 + 30), "hours", font=font_mini, fill=(60,40,30,255))
 
     draw.text((90, 800), "Wars", font=font_sub, fill=(60,40,30,255))
-    wars_text = f"{safe_get(info, 'wars', 0):,}"
+    wars_text = f"{info.get('wars', 0):,}"
     draw.text((330, 800), wars_text, font=font_sub, fill=(60,40,30,255))
     bbox = draw.textbbox((330, 800), wars_text, font=font_sub)
     x_wars = bbox[2] + 6
-    draw.text((x_wars, 800 + 30), f" #{safe_get(info, 'war_rank_display', 'N/A')}", font=font_mini, fill=(60,40,30,255))
+    draw.text((x_wars, 800 + 30), f" #{info.get('war_rank_display', 'N/A')}", font=font_mini, fill=(60,40,30,255))
 
     draw.text((90, 875), "Quests", font=font_sub, fill=(60,40,30,255))
-    draw.text((330, 875), f"{safe_get(info, 'quests', 0):,}", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 875), f"{info.get('quests', 0):,}", font=font_sub, fill=(60,40,30,255))
 
-    draw.text((90, 950), f"Total Level {safe_get(info, 'total_level', 0):,}", font=font_sub, fill=(60,40,30,255))
+    draw.text((90, 950), f"Total Level {info.get('total_level', 0):,}", font=font_sub, fill=(60,40,30,255))
 
     draw.text((675, 600), "Chests", font=font_main, fill=(60,40,30,255))
-    draw.text((675, 675), f"{safe_get(info, 'chests', 0):,}", font=font_main, fill=(60,40,30,255))
+    draw.text((675, 675), f"{info.get('chests', 0):,}", font=font_main, fill=(60,40,30,255))
 
     draw.text((675, 750), "PvP", font=font_main, fill=(60,40,30,255))
-    pk_text = str(safe_get(info, 'pvp_kill', 0))
+    pk_text = str(info.get('pvp_kill', 0))
     k_text = "K"
     slash_text = "/"
-    pd_text = str(safe_get(info, 'pvp_death', 0))
+    pd_text = str(info.get('pvp_death', 0))
     draw.text((675, 825), pk_text, font=font_main, fill=(60,40,30,255))
     bbox = draw.textbbox((675, 825), pk_text, font=font_main)
     x_k = bbox[2] + 6
@@ -109,14 +108,14 @@ def generate_profile_card(info, output_path="profile_card.png"):
                  ("TNA", "tna", 1300), ("Dungeons", "dungeons", 1350), ("All Raids", "all_raids", 1400)]
     for label, key, y in raid_keys:
         draw.text((100, y), label, font=font_small, fill=(60,40,30,255))
-        num_text = f"{safe_get(info, key, 0)}"
+        num_text = f"{info.get(key, 0)}"
         bbox = draw.textbbox((0,0), num_text, font=font_small)
         text_width = bbox[2] - bbox[0]
         x = right_edge_x - text_width
         draw.text((x, y), num_text, font=font_small, fill=(60,40,30,255))
 
     # UUID
-    uuid = safe_get(info, "uuid", "")
+    uuid = info.get("uuid", "")
     if uuid and '-' in uuid:
         parts = uuid.split('-')
         if len(parts) == 5:
@@ -132,7 +131,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
 
     # スキン画像貼り付け
     img.paste(PLAYER_BACKGROUND, (110, 280), mask=PLAYER_BACKGROUND)
-    uuid = safe_get(info, "uuid", "")
+    uuid = info.get("uuid", "")
     if uuid:
         try:
             skin_url = f"https://vzge.me/bust/256/{uuid}"
