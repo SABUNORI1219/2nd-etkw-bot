@@ -57,7 +57,17 @@ class BannerRenderer:
                 
                 if os.path.exists(pattern_path):
                     pattern_image = Image.open(pattern_path).convert("RGBA")
-                    banner_image.paste(pattern_image, (0, 0), pattern_image)
+
+                    # 境界が目立つパターンだけぼかし（例：CROSS, BORDER）
+                    if pattern_abbr in ('cr', 'bo'):
+                        pattern_image = pattern_image.filter(ImageFilter.GaussianBlur(radius=1.2))
+            
+                    # サイズが合ってるならアルファブレンド
+                    if banner_image.size == pattern_image.size:
+                        banner_image = Image.alpha_composite(banner_image, pattern_image)
+                    else:
+                        # サイズ違う場合は従来通り
+                        banner_image.paste(pattern_image, (0, 0), pattern_image)
                 else:
                     logger.warning(f"アセットファイルが見つかりません: {pattern_path}")
 
