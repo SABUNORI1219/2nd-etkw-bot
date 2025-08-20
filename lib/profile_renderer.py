@@ -94,7 +94,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     # guildバナー描画座標
     banner_x = 330
     banner_y = 250
-    banner_size = (60, 134)
+    banner_size = (76, 150)
     if guild_banner_img:
         guild_banner_img = guild_banner_img.resize(banner_size, Image.LANCZOS)
         guild_banner_img = add_frame_to_banner_3d(guild_banner_img, frame_width=8)
