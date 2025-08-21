@@ -117,20 +117,20 @@ class PlayerSelectView(discord.ui.View):
         guild_data = await self.cog_instance.wynn_api.get_guild_by_prefix(guild_prefix)
         banner_bytes = self.cog_instance.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
 
-        is_online = self.safe_get(data, ['online'], False)
-        server = self.safe_get(data, ['server'], "???")
+        is_online = safe_get(data, ['online'], False)
+        server = safe_get(data, ['server'], "???")
         if is_online:
             server_display = f"Online on {server}"
         else:
             server_display = "Offline"
 
-        active_char_uuid = self.safe_get(data, ['activeCharacter'])
+        active_char_uuid = safe_get(data, ['activeCharacter'])
         if active_char_uuid is None:
             active_char_info = "???"
         else:
-            char_obj = self.safe_get(data, ['characters', active_char_uuid], {})
-            char_type = self.safe_get(char_obj, ['type'], "???")
-            reskin = self.safe_get(char_obj, ['reskin'], "N/A")
+            char_obj = safe_get(data, ['characters', active_char_uuid], {})
+            char_type = safe_get(char_obj, ['type'], "???")
+            reskin = safe_get(char_obj, ['reskin'], "N/A")
             if reskin != "N/A":
                 active_char_info = f"{reskin}"
             else:
