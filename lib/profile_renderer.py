@@ -13,9 +13,9 @@ RANK_STAR_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/rank
 # ランクごとのアイコンパス
 RANK_ICON_MAP = {
     "Champion": os.path.join(os.path.dirname(__file__), "../assets/profile/champ_icon.png"),
-    "Heroplus": os.path.join(os.path.dirname(__file__), "../assets/profile/heroplus_icon.png"),
+    "Hero+": os.path.join(os.path.dirname(__file__), "../assets/profile/heroplus_icon.png"),
     "Hero": os.path.join(os.path.dirname(__file__), "../assets/profile/hero_icon.png"),
-    "Vipplus": os.path.join(os.path.dirname(__file__), "../assets/profile/vipplus_icon.png"),
+    "Vip+": os.path.join(os.path.dirname(__file__), "../assets/profile/vipplus_icon.png"),
     "Vip": os.path.join(os.path.dirname(__file__), "../assets/profile/vip_icon.png"),
 }
 
@@ -38,9 +38,9 @@ def gradient_rect(size, color_top, color_bottom, radius):
 
 RANK_COLOR_MAP = {
     "Champion": ((255, 255, 80, 230), (255, 210, 60, 200)),     # 黄色グラデ
-    "Heroplus": ((255, 40, 255, 230), (180, 0, 120, 200)),      # マゼンタ
+    "Hero+": ((255, 40, 255, 230), (180, 0, 120, 200)),      # マゼンタ
     "Hero": ((170, 90, 255, 230), (60, 0, 160, 200)),           # 紫
-    "Vipplus": ((80, 255, 255, 230), (40, 170, 255, 200)),      # 水色
+    "Vip+": ((80, 255, 255, 230), (40, 170, 255, 200)),      # 水色
     "Vip": ((80, 255, 120, 230), (0, 190, 40, 200)),            # 緑
     "None": ((160, 160, 160, 220), (80, 80, 80, 200)),          # 灰色
 }
