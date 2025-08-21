@@ -67,17 +67,26 @@ class PlayerSelectView(discord.ui.View):
                     return default
             return v
 
-        def fallback_stat(data, keys_global, keys_ranking, keys_prev, default="???"):
+        # fallback_statはglobalDataのみ参照
+        def fallback_stat(data, keys_global, default="???"):
             val = safe_get(data, keys_global, None)
             if val is not None:
                 return val
-            val = safe_get(data, keys_ranking, None)
-            if val is not None:
-                return val
-            val = safe_get(data, keys_prev, None)
-            if val is not None:
-                return val
             return default
+
+        # --- レイド数取得専用 ---
+        def get_raid_stat(data, raid_key):
+            global_data = data.get("globalData")
+            if not global_data or not isinstance(global_data, dict):
+                return "???"
+            raids = global_data.get("raids")
+            if not raids or not isinstance(raids, dict):
+                return "???"
+            raid_list = raids.get("list")
+            if not raid_list or not isinstance(raid_list, dict):
+                return "???"
+            # キーが無ければ未プレイ
+            return raid_list.get(raid_key, 0)
 
         raw_support_rank = safe_get(data, ['supportRank'], "Player")
         if raw_support_rank and raw_support_rank.lower() == "vipplus":
@@ -107,22 +116,28 @@ class PlayerSelectView(discord.ui.View):
         guild_data = await self.cog_instance.wynn_api.get_guild_by_prefix(guild_prefix)
         banner_bytes = self.cog_instance.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
 
-        mobs_killed = fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
-        playtime = "???" if data.get("playtime", None) is None else data.get("playtime", 0)
-        wars = fallback_stat(data, ['globalData', 'wars'], ['ranking', 'wars'], ['previousRanking', 'wars'])
+        # globalData系ステータス
+        mobs_killed = fallback_stat(data, ['globalData', 'mobsKilled'])
+        playtime = data.get("playtime", "???") if data.get("playtime", None) is not None else "???"
+        wars = fallback_stat(data, ['globalData', 'wars'])
+        quests = fallback_stat(data, ['globalData', 'completedQuests'])
+        world_events = fallback_stat(data, ['globalData', 'worldEvents'])
+        total_level = fallback_stat(data, ['globalData', 'totalLevel'])
+        chests = fallback_stat(data, ['globalData', 'chestsFound'])
+        pvp_kill = str(safe_get(data, ['globalData', 'pvp', 'kills'], "???"))
+        pvp_death = str(safe_get(data, ['globalData', 'pvp', 'deaths'], "???"))
+        dungeons = fallback_stat(data, ['globalData', 'dungeons', 'total'])
+        all_raids = fallback_stat(data, ['globalData', 'raids', 'total'])
+
+        # war_rank_displayのみranking参照
         war_rank_display = safe_get(data, ['ranking', 'warsCompletion'], "???")
-        quests = fallback_stat(data, ['globalData', 'completedQuests'], ['ranking', 'completedQuests'], ['previousRanking', 'completedQuests'])
-        world_events = safe_get(data, ['globalData', 'worldEvents'], 0)
-        total_level = fallback_stat(data, ['globalData', 'totalLevel'], ['ranking', 'totalLevel'], ['previousRanking', 'totalLevel'])
-        chests = fallback_stat(data, ['globalData', 'chestsFound'], ['ranking', 'chestsFound'], ['previousRanking', 'chestsFound'])
-        pvp_kill = "???" if safe_get(data, ['globalData', 'pvp', 'kills'], None) is None else str(safe_get(data, ['globalData', 'pvp', 'kills'], 0))
-        pvp_death = "???" if safe_get(data, ['globalData', 'pvp', 'deaths'], None) is None else str(safe_get(data, ['globalData', 'pvp', 'deaths'], 0))
-        notg = safe_get(data, ['globalData', 'raids', 'list', 'Nest of the Grootslangs'], 0)
-        nol = safe_get(data, ['globalData', 'raids', 'list', "Orphion's Nexus of Light"], 0)
-        tcc = safe_get(data, ['globalData', 'raids', 'list', 'The Canyon Colossus'], 0)
-        tna = safe_get(data, ['globalData', 'raids', 'list', 'The Nameless Anomaly'], 0)
-        dungeons = safe_get(data, ['globalData', 'dungeons', 'total'], 0)
-        all_raids = safe_get(data, ['globalData', 'raids', 'total'], 0)
+
+        # レイド数系
+        notg = get_raid_stat(data, 'Nest of the Grootslangs')
+        nol = get_raid_stat(data, "Orphion's Nexus of Light")
+        tcc = get_raid_stat(data, 'The Canyon Colossus')
+        tna = get_raid_stat(data, 'The Nameless Anomaly')
+
         uuid = data.get("uuid")
 
         profile_info = {
@@ -182,17 +197,23 @@ class PlayerCog(commands.Cog):
                 return default
         return v if v is not None else default
 
-    def _fallback_stat(self, data: dict, keys_global: list, keys_ranking: list, keys_prev: list, default="???"):
+    def _fallback_stat(self, data: dict, keys_global: list, default="???"):
         val = self._safe_get(data, keys_global, None)
         if val is not None:
             return val
-        val = self._safe_get(data, keys_ranking, None)
-        if val is not None:
-            return val
-        val = self._safe_get(data, keys_prev, None)
-        if val is not None:
-            return val
         return default
+
+    def _get_raid_stat(self, data: dict, raid_key: str):
+        global_data = data.get("globalData")
+        if not global_data or not isinstance(global_data, dict):
+            return "???"
+        raids = global_data.get("raids")
+        if not raids or not isinstance(raids, dict):
+            return "???"
+        raid_list = raids.get("list")
+        if not raid_list or not isinstance(raid_list, dict):
+            return "???"
+        return raid_list.get(raid_key, 0)
 
     @app_commands.command(name="player", description="プレイヤーのステータスを表示")
     @app_commands.describe(player="MCID or UUID")
@@ -266,22 +287,25 @@ class PlayerCog(commands.Cog):
         guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
         banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
 
-        mobs_killed = self._fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
-        playtime = "???" if data.get("playtime", None) is None else data.get("playtime", 0)
-        wars = self._fallback_stat(data, ['globalData', 'wars'], ['ranking', 'wars'], ['previousRanking', 'wars'])
+        mobs_killed = self._fallback_stat(data, ['globalData', 'mobsKilled'])
+        playtime = data.get("playtime", "???") if data.get("playtime", None) is not None else "???"
+        wars = self._fallback_stat(data, ['globalData', 'wars'])
+        quests = self._fallback_stat(data, ['globalData', 'completedQuests'])
+        world_events = self._fallback_stat(data, ['globalData', 'worldEvents'])
+        total_level = self._fallback_stat(data, ['globalData', 'totalLevel'])
+        chests = self._fallback_stat(data, ['globalData', 'chestsFound'])
+        pvp_kill = str(safe_get(data, ['globalData', 'pvp', 'kills'], "???"))
+        pvp_death = str(safe_get(data, ['globalData', 'pvp', 'deaths'], "???"))
+        dungeons = self._fallback_stat(data, ['globalData', 'dungeons', 'total'])
+        all_raids = self._fallback_stat(data, ['globalData', 'raids', 'total'])
+
         war_rank_display = safe_get(data, ['ranking', 'warsCompletion'], "???")
-        quests = self._fallback_stat(data, ['globalData', 'completedQuests'], ['ranking', 'completedQuests'], ['previousRanking', 'completedQuests'])
-        world_events = safe_get(data, ['globalData', 'worldEvents'], 0)
-        total_level = self._fallback_stat(data, ['globalData', 'totalLevel'], ['ranking', 'totalLevel'], ['previousRanking', 'totalLevel'])
-        chests = self._fallback_stat(data, ['globalData', 'chestsFound'], ['ranking', 'chestsFound'], ['previousRanking', 'chestsFound'])
-        pvp_kill = "???" if safe_get(data, ['globalData', 'pvp', 'kills'], None) is None else str(safe_get(data, ['globalData', 'pvp', 'kills'], 0))
-        pvp_death = "???" if safe_get(data, ['globalData', 'pvp', 'deaths'], None) is None else str(safe_get(data, ['globalData', 'pvp', 'deaths'], 0))
-        notg = safe_get(data, ['globalData', 'raids', 'list', 'Nest of the Grootslangs'], 0)
-        nol = safe_get(data, ['globalData', 'raids', 'list', "Orphion's Nexus of Light"], 0)
-        tcc = safe_get(data, ['globalData', 'raids', 'list', 'The Canyon Colossus'], 0)
-        tna = safe_get(data, ['globalData', 'raids', 'list', 'The Nameless Anomaly'], 0)
-        dungeons = safe_get(data, ['globalData', 'dungeons', 'total'], 0)
-        all_raids = safe_get(data, ['globalData', 'raids', 'total'], 0)
+
+        notg = self._get_raid_stat(data, 'Nest of the Grootslangs')
+        nol = self._get_raid_stat(data, "Orphion's Nexus of Light")
+        tcc = self._get_raid_stat(data, 'The Canyon Colossus')
+        tna = self._get_raid_stat(data, 'The Nameless Anomaly')
+
         uuid = data.get("uuid")
 
         profile_info = {
