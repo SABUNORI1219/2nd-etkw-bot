@@ -41,7 +41,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         font_raids = ImageFont.truetype(FONT_PATH, 35)
         font_uuid = ImageFont.truetype(FONT_PATH, 30)
         font_mini = ImageFont.truetype(FONT_PATH, 25)
-        font_prefix = ImageFont.truetype(FONT_PATH, 56)
+        font_prefix = ImageFont.truetype(FONT_PATH, 10)
     except Exception as e:
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = ImageFont.load_default()
@@ -93,7 +93,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         box_y = banner_y + banner_size[1] - int(box_h * 0.4)
         # 薄黒色四角形（透明度180/255くらい）
         box_color = (30, 30, 30, 180)
-        draw.rectangle([box_x, box_y, box_x + box_w, box_y + box_h], fill=box_color)
+        draw.rounded_rectangle([box_x, box_y, box_x + box_w, box_y + box_h], radius=14, fill=box_color)
         # テキスト中央揃え
         text_x = box_x + (box_w - text_w) // 2
         text_y = box_y + (box_h - text_h) // 2
