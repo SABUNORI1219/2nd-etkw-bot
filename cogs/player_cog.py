@@ -65,18 +65,18 @@ class PlayerSelectView(discord.ui.View):
                 v = v.get(k)
                 if v is None:
                     return default
-            return "Hidden" if v == "非公開" else v
+            return v
 
         def fallback_stat(data, keys_global, keys_ranking, keys_prev, default="Hidden"):
             val = safe_get(data, keys_global, None)
             if val is not None:
-                return "Hidden" if val == "非公開" else val
+                return val
             val = safe_get(data, keys_ranking, None)
             if val is not None:
-                return "Hidden" if val == "非公開" else val
+                return val
             val = safe_get(data, keys_prev, None)
             if val is not None:
-                return "Hidden" if val == "非公開" else val
+                return val
             return default
 
         raw_support_rank = safe_get(data, ['supportRank'], "Player")
@@ -185,13 +185,13 @@ class PlayerCog(commands.Cog):
     def _fallback_stat(self, data: dict, keys_global: list, keys_ranking: list, keys_prev: list, default="Hidden"):
         val = self._safe_get(data, keys_global, None)
         if val is not None:
-            return "Hidden" if val == "非公開" else val
+            return val
         val = self._safe_get(data, keys_ranking, None)
         if val is not None:
-            return "Hidden" if val == "非公開" else val
+            return val
         val = self._safe_get(data, keys_prev, None)
         if val is not None:
-            return "Hidden" if val == "非公開" else val
+            return val
         return default
 
     @app_commands.command(name="player", description="プレイヤーのステータスを表示")
@@ -236,7 +236,7 @@ class PlayerCog(commands.Cog):
                 v = v.get(k)
                 if v is None:
                     return default
-            return "Hidden" if v == "非公開" else v
+            return v
 
         raw_support_rank = safe_get(data, ['supportRank'], "Player")
         if raw_support_rank and raw_support_rank.lower() == "vipplus":
