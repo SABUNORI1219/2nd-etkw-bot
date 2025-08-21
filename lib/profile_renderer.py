@@ -82,12 +82,12 @@ def generate_profile_card(info, output_path="profile_card.png"):
         font_uuid = ImageFont.truetype(FONT_PATH, 30)
         font_mini = ImageFont.truetype(FONT_PATH, 25)
         font_prefix = ImageFont.truetype(FONT_PATH, 12)
-        font_rank = ImageFont.truetype(FONT_PATH, 36)
+        font_rank = ImageFont.truetype(FONT_PATH, 20)
     except Exception as e:
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = font_rank = ImageFont.load_default()
 
-    draw.text((90, 140), f"[{info.get('support_rank_display', 'Player')}] {info.get('username', 'NoName')}", font=font_title, fill=(60,40,30,255))
+    draw.text((90, 140), f"{info.get('username', 'NoName')}", font=font_title, fill=(60,40,30,255))
 
     banner_bytes = info.get("banner_bytes")
     guild_banner_img = None
@@ -145,7 +145,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     icon_path = RANK_ICON_MAP.get(rank_text)
     icon_img = None
     icon_w, icon_h = 0, 0
-    target_icon_h = 64
+    target_icon_h = 24
     if icon_path and os.path.exists(icon_path):
         try:
             original_icon = Image.open(icon_path).convert("RGBA")
