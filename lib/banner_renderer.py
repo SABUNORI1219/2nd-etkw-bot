@@ -47,6 +47,19 @@ class BannerRenderer:
         if not banner_data or not isinstance(banner_data, dict) or 'base' not in banner_data:
             # 白色ベース画像パス
             base_image_path = os.path.join(ASSETS_DIR, "white-background.png")
+            try:
+                banner_image = Image.open(base_image_path).convert("RGBA")
+                scale_factor = 5
+                original_width, original_height = banner_image.size
+                new_size = (original_width * scale_factor, original_height * scale_factor)
+                resized_image = banner_image.resize(new_size, resample=Image.Resampling.NEAREST)
+                final_buffer = BytesIO()
+                resized_image.save(final_buffer, format='PNG')
+                final_buffer.seek(0)
+                return final_buffer
+            except Exception as e:
+                logger.error(f"白ベース画像生成失敗: {e}")
+                return None
 
         try:
             base_color = COLOR_MAP.get(banner_data.get('base', 'WHITE').upper(), 'white')
