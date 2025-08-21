@@ -10,6 +10,14 @@ FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia
 BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png")
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 RANK_STAR_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/rankStar.png")
+# ランクごとのアイコンパス
+RANK_ICON_MAP = {
+    "Champion": os.path.join(os.path.dirname(__file__), "../assets/profile/champ_icon.png"),
+    "Heroplus": os.path.join(os.path.dirname(__file__), "../assets/profile/heroplus_icon.png"),
+    "Hero": os.path.join(os.path.dirname(__file__), "../assets/profile/hero_icon.png"),
+    "Vipplus": os.path.join(os.path.dirname(__file__), "../assets/profile/vipplus_icon.png"),
+    "Vip": os.path.join(os.path.dirname(__file__), "../assets/profile/vip_icon.png"),
+}
 
 def gradient_rect(size, color_top, color_bottom, radius):
     w, h = size
@@ -28,7 +36,6 @@ def gradient_rect(size, color_top, color_bottom, radius):
     base.putalpha(mask)
     return base
 
-# ランク色設定
 RANK_COLOR_MAP = {
     "Champion": ((255, 255, 80, 230), (255, 210, 60, 200)),     # 黄色グラデ
     "Heroplus": ((255, 40, 255, 230), (180, 0, 120, 200)),      # マゼンタ
@@ -37,6 +44,12 @@ RANK_COLOR_MAP = {
     "Vip": ((80, 255, 120, 230), (0, 190, 40, 200)),            # 緑
     "None": ((160, 160, 160, 220), (80, 80, 80, 200)),          # 灰色
 }
+
+def resize_icon_keep_ratio(img, target_height):
+    w, h = img.size
+    scale = target_height / h
+    target_w = int(w * scale)
+    return img.resize((target_w, target_height), Image.LANCZOS)
 
 def generate_profile_card(info, output_path="profile_card.png"):
     try:
@@ -74,10 +87,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = font_rank = ImageFont.load_default()
 
-    # 描画（profile_infoの内容を全部使う）
     draw.text((90, 140), f"[{info.get('support_rank_display', 'Player')}] {info.get('username', 'NoName')}", font=font_title, fill=(60,40,30,255))
 
-    # ギルドバナー描画
     banner_bytes = info.get("banner_bytes")
     guild_banner_img = None
     if banner_bytes and isinstance(banner_bytes, BytesIO):
@@ -89,7 +100,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
     elif banner_bytes and isinstance(banner_bytes, str):
         guild_banner_img = None
 
-    # guildバナー描画座標
     banner_x = 330
     banner_y = 250
     banner_size = (76, 150)
@@ -100,7 +110,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
         dummy = Image.new("RGBA", banner_size, (0, 0, 0, 0))
         img.paste(dummy, (banner_x, banner_y), mask=dummy)
 
-    # ギルドプレフィックス用の薄黒色四角＋テキスト（バナーのすぐ下）
     guild_prefix = info.get('guild_prefix', '')
     if guild_prefix:
         prefix_text = guild_prefix
@@ -125,44 +134,60 @@ def generate_profile_card(info, output_path="profile_card.png"):
         text_y = box_y + (box_h - text_h) // 2
         draw.text((text_x, text_y), prefix_text, font=prefix_font, fill=(240,240,240,255))
 
-    # --- プレイヤーランク表示エリア ---
+    # --- プレイヤーランク表示エリア（アイコン付き） ---
     rank_text = info.get('support_rank_display', 'Player')
     rank_colors = RANK_COLOR_MAP.get(rank_text, RANK_COLOR_MAP['None'])
     rank_font = font_rank
     rank_bbox = draw.textbbox((0,0), rank_text, font=rank_font)
     rank_text_w = rank_bbox[2] - rank_bbox[0]
     rank_text_h = rank_bbox[3] - rank_bbox[1]
+    # アイコン準備
+    icon_path = RANK_ICON_MAP.get(rank_text)
+    icon_img = None
+    icon_w, icon_h = 0, 0
+    target_icon_h = 64
+    if icon_path and os.path.exists(icon_path):
+        try:
+            original_icon = Image.open(icon_path).convert("RGBA")
+            icon_img = resize_icon_keep_ratio(original_icon, target_icon_h)
+            icon_w, icon_h = icon_img.size
+        except Exception as e:
+            logger.error(f"Rank icon load failed: {e}")
+    else:
+        icon_w, icon_h = 0, target_icon_h
+
     rank_padding_x = 18
     rank_padding_y = 8
-    rank_box_w = rank_text_w + rank_padding_x * 2 + 40  # アイコン用スペース
-    rank_box_h = rank_text_h + rank_padding_y * 2
-    # スキン画像の下に配置
+    rank_box_w = icon_w + rank_padding_x + rank_text_w + rank_padding_x
+    rank_box_h = max(icon_h, rank_text_h + rank_padding_y*2)
     skin_box_y = 336 + 196
     rank_box_x = 106
     rank_box_y = skin_box_y + 20
-    
+
     # ドロップシャドウ
     shadow = Image.new("RGBA", (rank_box_w+8, rank_box_h+8), (0,0,0,0))
     shadow_draw = ImageDraw.Draw(shadow)
     shadow_draw.rounded_rectangle([4,4,rank_box_w+4,rank_box_h+4], radius=16, fill=(0,0,0,80))
     shadow = shadow.filter(ImageFilter.GaussianBlur(3))
     img.paste(shadow, (rank_box_x-4, rank_box_y-4), mask=shadow)
-    
+
     # グラデ四角
     rect_img = gradient_rect((rank_box_w, rank_box_h), rank_colors[0], rank_colors[1], radius=14)
     img.paste(rect_img, (rank_box_x, rank_box_y), mask=rect_img)
-    
-    # アイコン（後で追加予定）
-    rank_text_x = rank_box_x + 14 + 32  # アイコン用スペース(仮)
+
+    # アイコン貼り付け
+    if icon_img:
+        icon_y = rank_box_y + (rank_box_h - icon_h)//2
+        img.paste(icon_img, (rank_box_x + rank_padding_x//2, icon_y), mask=icon_img)
+        rank_text_x = rank_box_x + icon_w + rank_padding_x
+    else:
+        rank_text_x = rank_box_x + rank_padding_x
     rank_text_y = rank_box_y + (rank_box_h - rank_text_h) // 2
-    
     draw.text((rank_text_x, rank_text_y), rank_text, font=rank_font, fill=(255,255,255,255))
 
-    # guild_name
     text_base_x = banner_x + banner_size[0] + 10
     draw.text((text_base_x, banner_y), f"{info.get('guild_name', '')}", font=font_main, fill=(60,40,30,255))
 
-    # guild_rank + rankstars
     guild_rank_text = str(info.get('guild_rank', ''))
     star_num = 0
     if guild_rank_text == "OWNER":
@@ -230,7 +255,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
     x_lvl = bbox[2] + 3
     draw.text((x_lvl, 1025 + 18), "lv.", font=font_mini, fill=(60,40,30,255))
     
-    # Raid/Dungeon
     right_edge_x = 440
     raid_keys = [("NOTG", "notg", 1150), ("NOL", "nol", 1200), ("TCC", "tcc", 1250),
                  ("TNA", "tna", 1300), ("Dungeons", "dungeons", 1350), ("All Raids", "all_raids", 1400)]
@@ -242,7 +266,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
         x = right_edge_x - text_width
         draw.text((x, y), num_text, font=font_raids, fill=(60,40,30,255))
 
-    # UUID
     uuid = info.get("uuid", "")
     if uuid and '-' in uuid:
         parts = uuid.split('-')
@@ -258,7 +281,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((600, 1155), line1, font=font_uuid, fill=(90,90,90,255))
     draw.text((475, 1205), line2, font=font_uuid, fill=(90,90,90,255))
 
-    # スキン画像貼り付け
     img.paste(PLAYER_BACKGROUND, (110, 280), mask=PLAYER_BACKGROUND)
     uuid = info.get("uuid", "")
     if uuid:
