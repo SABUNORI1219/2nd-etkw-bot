@@ -11,6 +11,23 @@ BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8e
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 RANK_STAR_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/rankStar.png")
 
+def gradient_rect(size, color_top, color_bottom, radius):
+    w, h = size
+    base = Image.new("RGBA", (w, h), (0,0,0,0))
+    for y in range(h):
+        ratio = y / h
+        r = int(color_top[0] * (1-ratio) + color_bottom[0] * ratio)
+        g = int(color_top[1] * (1-ratio) + color_bottom[1] * ratio)
+        b = int(color_top[2] * (1-ratio) + color_bottom[2] * ratio)
+        a = int(color_top[3] * (1-ratio) + color_bottom[3] * ratio)
+        ImageDraw.Draw(base).line([(0, y), (w, y)], fill=(r, g, b, a))
+    # 角丸mask
+    mask = Image.new("L", (w, h), 0)
+    draw_mask = ImageDraw.Draw(mask)
+    draw_mask.rounded_rectangle([0, 0, w, h], radius=radius, fill=255)
+    base.putalpha(mask)
+    return base
+
 def generate_profile_card(info, output_path="profile_card.png"):
     try:
         img = Image.open(BASE_IMG_PATH).convert("RGBA")
@@ -92,8 +109,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
         box_x = banner_x + (banner_size[0] - box_w) // 2
         box_y = banner_y + banner_size[1] - int(box_h * 0.4)
         # 薄黒色四角形（透明度180/255くらい）
-        box_color = (30, 30, 30, 180)
-        draw.rounded_rectangle([box_x, box_y, box_x + box_w, box_y + box_h], radius=14, fill=box_color)
+        rect_img = gradient_rect((box_w, box_h), (30,30,30,220), (60,60,60,160), radius=14)
+        img.paste(rect_img, (box_x, box_y), mask=rect_img)
         # テキスト中央揃え
         text_x = box_x + (box_w - text_w) // 2
         text_y = box_y + (box_h - text_h) // 2
