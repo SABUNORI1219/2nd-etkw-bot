@@ -199,7 +199,7 @@ class PlayerCog(commands.Cog):
     async def player(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
         if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await interaction.followup.send("権限なし")
+            await interaction.followup.send("sbadkita")
             return
 
         cache_key = f"player_{player.lower()}"
