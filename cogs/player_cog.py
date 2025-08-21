@@ -83,10 +83,10 @@ class PlayerSelectView(discord.ui.View):
             if not raids or not isinstance(raids, dict):
                 return "???"
             raid_list = raids.get("list")
-            if not raid_list or not isinstance(raid_list, dict):
-                return "???"
             if raid_list == {}:
                 return 0
+            if not raid_list or not isinstance(raid_list, dict):
+                return "???"
             # キーが無ければ未プレイ
             return raid_list.get(raid_key, 0)
 
@@ -213,10 +213,10 @@ class PlayerCog(commands.Cog):
         if not raids or not isinstance(raids, dict):
             return "???"
         raid_list = raids.get("list")
-        if not raid_list or not isinstance(raid_list, dict):
-            return "???"
         if raid_list == {}:
             return 0
+        if not raid_list or not isinstance(raid_list, dict):
+            return "???"
         return raid_list.get(raid_key, 0)
 
     @app_commands.command(name="player", description="プレイヤーのステータスを表示")
