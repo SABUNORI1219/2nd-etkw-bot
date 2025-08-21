@@ -133,8 +133,29 @@ def generate_profile_card(info, output_path="profile_card.png"):
         text_x = box_x + (box_w - text_w) // 2
         text_y = box_y + (box_h - text_h) // 2
         draw.text((text_x, text_y), prefix_text, font=prefix_font, fill=(240,240,240,255))
+        
+    # プレイヤーのスキンあんど拝啓
+    img.paste(PLAYER_BACKGROUND, (110, 280), mask=PLAYER_BACKGROUND)
+    uuid = info.get("uuid", "")
+    if uuid:
+        try:
+            skin_url = f"https://vzge.me/bust/256/{uuid}"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+                "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+                "Referer": "https://vzge.me/"
+            }
+            skin_res = requests.get(skin_url, headers=headers)
+            if skin_res.status_code != 200:
+                raise Exception(f"skin url response: {skin_res.status_code}")
+            skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
+            skin = skin.resize((196, 196), Image.LANCZOS)
+            img.paste(skin, (106, 336), mask=skin)
+        except Exception as e:
+            logger.error(f"Skin image load failed: {e}")
+            draw.rectangle([60, 120, 180, 240], fill=(160,160,160,255))
 
-    # --- プレイヤーランク表示エリア（アイコン付き） ---
+    # プレイヤーランク表示エリア（アイコン付き）
     rank_text = info.get('support_rank_display', 'Player')
     rank_colors = RANK_COLOR_MAP.get(rank_text, RANK_COLOR_MAP['None'])
     rank_font = font_rank
@@ -284,26 +305,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((475, 1150), "UUID", font=font_raids, fill=(90,90,90,255))
     draw.text((600, 1155), line1, font=font_uuid, fill=(90,90,90,255))
     draw.text((475, 1205), line2, font=font_uuid, fill=(90,90,90,255))
-
-    img.paste(PLAYER_BACKGROUND, (110, 280), mask=PLAYER_BACKGROUND)
-    uuid = info.get("uuid", "")
-    if uuid:
-        try:
-            skin_url = f"https://vzge.me/bust/256/{uuid}"
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-                "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
-                "Referer": "https://vzge.me/"
-            }
-            skin_res = requests.get(skin_url, headers=headers)
-            if skin_res.status_code != 200:
-                raise Exception(f"skin url response: {skin_res.status_code}")
-            skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
-            skin = skin.resize((196, 196), Image.LANCZOS)
-            img.paste(skin, (106, 336), mask=skin)
-        except Exception as e:
-            logger.error(f"Skin image load failed: {e}")
-            draw.rectangle([60, 120, 180, 240], fill=(160,160,160,255))
 
     try:
         img.save(output_path)
