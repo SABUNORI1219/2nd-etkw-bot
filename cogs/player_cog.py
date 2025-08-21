@@ -70,8 +70,8 @@ class PlayerSelectView(discord.ui.View):
         except Exception:
             last_join_date = last_join_str.split('T')[0] if 'T' in last_join_str else last_join_str
         guild_prefix = data.get('guild', {}).get('prefix', "")
-        guild_data = await self.cog_instance.wynn_api.get_guild_by_prefix(guild_prefix)
-        banner_bytes = self.cog_instance.banner_renderer.create_banner_image(guild_data.get('banner'))
+        guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
+        banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data else None)
 
         profile_info = {
             "username": data.get("username"),
@@ -189,7 +189,7 @@ class PlayerCog(commands.Cog):
 
         guild_prefix = self._safe_get(data, ['guild', 'prefix'], "")
         guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
-        banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner'))
+        banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data else None)
 
         profile_info = {
             "username": data.get("username"),
