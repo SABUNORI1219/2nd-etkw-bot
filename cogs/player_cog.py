@@ -74,6 +74,8 @@ class PlayerSelectView(discord.ui.View):
         except Exception:
             last_join_date = last_join_str.split('T')[0] if 'T' in last_join_str else last_join_str
         guild_prefix = self.cog_instance._safe_get(data, ['guild', 'prefix'], "")
+        guild_name = self.cog_instance._safe_get(data, ['guild', 'name'], "")
+        guild_rank = self.cog_instance._safe_get(data, ['guild', 'rank'], "")
         guild_data = await self.cog_instance.wynn_api.get_guild_by_prefix(guild_prefix)
         banner_bytes = self.cog_instance.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data else None)
 
@@ -82,9 +84,8 @@ class PlayerSelectView(discord.ui.View):
             "support_rank_display": support_rank_display,
             "guild_prefix": guild_prefix,
             "banner_bytes": banner_bytes,
-            "guild_name": data.get('guild', {}).get('name', ""),
-            "guild_rank": data.get('guild', {}).get('rank', ""),
-            "guild_rank_stars": data.get('guild', {}).get('rankStars', ""),
+            "guild_name": guild_name,
+            "guild_rank": guild_rank,
             "first_join": first_join_date,
             "last_join": last_join_date,
             "mobs_killed": data.get('globalData', {}).get('mobsKilled', 0),
@@ -204,7 +205,6 @@ class PlayerCog(commands.Cog):
             "banner_bytes": banner_bytes,
             "guild_name": self._safe_get(data, ['guild', 'name'], ""),
             "guild_rank": self._safe_get(data, ['guild', 'rank'], ""),
-            "guild_rank_stars": self._safe_get(data, ['guild', 'rankStars'], ""),
             "first_join": first_join_date,
             "last_join": last_join_date,
             "mobs_killed": self._safe_get(data, ['globalData', 'mobsKilled'], 0),
