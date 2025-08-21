@@ -44,7 +44,7 @@ def remove_border_lines(img, line_colors, tolerance=25, alpha_value=0):
 
 class BannerRenderer:
     def create_banner_image(self, banner_data: dict) -> BytesIO | None:
-        if not banner_data or 'base' not in banner_data:
+        if not banner_data or not isinstance(banner_data, dict) or 'base' not in banner_data:
             # 白色ベース画像パス
             base_image_path = os.path.join(ASSETS_DIR, "white-background.png")
 
