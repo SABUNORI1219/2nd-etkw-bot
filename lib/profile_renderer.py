@@ -84,8 +84,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
         # 余白設定
-        padding_x = 12
-        padding_y = 6
+        padding_x = 10
+        padding_y = 4
         box_w = text_w + padding_x * 2
         box_h = text_h + padding_y * 2
         # バナー中央下に配置（バナーに少し重ねる位置）
@@ -124,8 +124,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
         x = x_grank + i * (star_size)
         img.paste(rank_star_img, (x, y_star), mask=rank_star_img)
     
-    draw.text((330, 400), f"First Join: {info.get('first_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
-    draw.text((330, 475), f"Last Seen: {info.get('last_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
+    draw.text((330, 410), f"First Join: {info.get('first_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
+    draw.text((330, 485), f"Last Seen: {info.get('last_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
 
     draw.text((90, 600), "Mobs", font=font_sub, fill=(60,40,30,255))
     draw.text((330, 600), f"{info.get('mobs_killed', 0):,}", font=font_sub, fill=(60,40,30,255))
