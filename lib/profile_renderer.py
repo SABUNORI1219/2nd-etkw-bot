@@ -28,6 +28,16 @@ def gradient_rect(size, color_top, color_bottom, radius):
     base.putalpha(mask)
     return base
 
+# ランク色設定
+RANK_COLOR_MAP = {
+    "Champion": ((255, 255, 80, 230), (255, 210, 60, 200)),     # 黄色グラデ
+    "Heroplus": ((255, 40, 255, 230), (180, 0, 120, 200)),      # マゼンタ
+    "Hero": ((170, 90, 255, 230), (60, 0, 160, 200)),           # 紫
+    "Vipplus": ((80, 255, 255, 230), (40, 170, 255, 200)),      # 水色
+    "Vip": ((80, 255, 120, 230), (0, 190, 40, 200)),            # 緑
+    "None": ((160, 160, 160, 220), (80, 80, 80, 200)),          # 灰色
+}
+
 def generate_profile_card(info, output_path="profile_card.png"):
     try:
         img = Image.open(BASE_IMG_PATH).convert("RGBA")
@@ -59,9 +69,10 @@ def generate_profile_card(info, output_path="profile_card.png"):
         font_uuid = ImageFont.truetype(FONT_PATH, 30)
         font_mini = ImageFont.truetype(FONT_PATH, 25)
         font_prefix = ImageFont.truetype(FONT_PATH, 12)
+        font_rank = ImageFont.truetype(FONT_PATH, 36)
     except Exception as e:
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
-        font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = ImageFont.load_default()
+        font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = font_rank = ImageFont.load_default()
 
     # 描画（profile_infoの内容を全部使う）
     draw.text((90, 140), f"[{info.get('support_rank_display', 'Player')}] {info.get('username', 'NoName')}", font=font_title, fill=(60,40,30,255))
@@ -92,35 +103,60 @@ def generate_profile_card(info, output_path="profile_card.png"):
     # ギルドプレフィックス用の薄黒色四角＋テキスト（バナーのすぐ下）
     guild_prefix = info.get('guild_prefix', '')
     if guild_prefix:
-        # プレフィックス長さに応じて四角サイズ調整
-        prefix_len = len(guild_prefix)
-        # フォントで実際のサイズを測る
         prefix_text = guild_prefix
         prefix_font = font_prefix
         bbox = draw.textbbox((0,0), prefix_text, font=prefix_font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
-        # 余白設定
         padding_x = 6
         padding_y = 2
         box_w = text_w + padding_x * 2
         box_h = text_h + padding_y * 2
-        # バナー中央下に配置（バナーに少し重ねる位置）
         box_x = banner_x + (banner_size[0] - box_w) // 2
         box_y = banner_y + banner_size[1] - int(box_h * 0.4)
-        # 影用画像
         shadow = Image.new("RGBA", (box_w+8, box_h+8), (0,0,0,0))
         shadow_draw = ImageDraw.Draw(shadow)
         shadow_draw.rounded_rectangle([4,4,box_w+4,box_h+4], radius=16, fill=(0,0,0,80))
         shadow = shadow.filter(ImageFilter.GaussianBlur(3))
         img.paste(shadow, (box_x-4, box_y-4), mask=shadow)
-        # 薄黒色四角形（透明度180/255くらい）
         rect_img = gradient_rect((box_w, box_h), (30,30,30,220), (60,60,60,160), radius=14)
         img.paste(rect_img, (box_x, box_y), mask=rect_img)
-        # テキスト中央揃え
         text_x = box_x + (box_w - text_w) // 2
         text_y = box_y + (box_h - text_h) // 2
         draw.text((text_x, text_y), prefix_text, font=prefix_font, fill=(240,240,240,255))
+
+    # --- プレイヤーランク表示エリア ---
+    rank_text = info.get('support_rank_display', 'Player')
+    rank_colors = RANK_COLOR_MAP.get(rank_text, RANK_COLOR_MAP['None'])
+    rank_font = font_rank
+    rank_bbox = draw.textbbox((0,0), rank_text, font=rank_font)
+    rank_text_w = rank_bbox[2] - rank_bbox[0]
+    rank_text_h = rank_bbox[3] - rank_bbox[1]
+    rank_padding_x = 18
+    rank_padding_y = 8
+    rank_box_w = rank_text_w + rank_padding_x * 2 + 40  # アイコン用スペース
+    rank_box_h = rank_text_h + rank_padding_y * 2
+    # スキン画像の下に配置
+    skin_box_y = 336 + 196
+    rank_box_x = 106
+    rank_box_y = skin_box_y + 20
+    
+    # ドロップシャドウ
+    shadow = Image.new("RGBA", (rank_box_w+8, rank_box_h+8), (0,0,0,0))
+    shadow_draw = ImageDraw.Draw(shadow)
+    shadow_draw.rounded_rectangle([4,4,rank_box_w+4,rank_box_h+4], radius=16, fill=(0,0,0,80))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(3))
+    img.paste(shadow, (rank_box_x-4, rank_box_y-4), mask=shadow)
+    
+    # グラデ四角
+    rect_img = gradient_rect((rank_box_w, rank_box_h), rank_colors[0], rank_colors[1], radius=14)
+    img.paste(rect_img, (rank_box_x, rank_box_y), mask=rect_img)
+    
+    # アイコン（後で追加予定）
+    rank_text_x = rank_box_x + 14 + 32  # アイコン用スペース(仮)
+    rank_text_y = rank_box_y + (rank_box_h - rank_text_h) // 2
+    
+    draw.text((rank_text_x, rank_text_y), rank_text, font=rank_font, fill=(255,255,255,255))
 
     # guild_name
     text_base_x = banner_x + banner_size[0] + 10
