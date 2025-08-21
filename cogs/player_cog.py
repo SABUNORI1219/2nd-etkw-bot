@@ -124,6 +124,7 @@ class PlayerSelectView(discord.ui.View):
         else:
             server_display = "Offline"
 
+        active_char_uuid = self._safe_get(data, ['activeCharacter'])
         char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
         char_type = self._safe_get(char_obj, ['type'])
         nickname = self._safe_get(char_obj, ['nickname'])
@@ -313,6 +314,7 @@ class PlayerCog(commands.Cog):
         else:
             server_display = "Offline"
 
+        active_char_uuid = self._safe_get(data, ['activeCharacter'])
         char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
         char_type = self._safe_get(char_obj, ['type'])
         nickname = self._safe_get(char_obj, ['nickname'])
