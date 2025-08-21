@@ -58,39 +58,26 @@ def draw_status_circle(base_img, left_x, center_y, status="online"):
     circle_img = Image.new("RGBA", (2*circle_radius, 2*circle_radius), (0,0,0,0))
     draw = ImageDraw.Draw(circle_img)
 
-    # ラジアルグラデーション
+    # ラジアルグラデーション（白いハイライトなし）
     for r in range(circle_radius, 0, -1):
         ratio = r / circle_radius
         if status == "online":
             # 緑
-            if ratio > 0.85:
-                col = (255,255,255,255)  # ハイライト
-            else:
-                # 明るい緑→濃い緑
-                col = (
-                    int(60 + 140 * ratio),
-                    int(230 - 60 * ratio),
-                    int(60 + 20 * ratio),
-                    255
-                )
+            col = (
+                int(60 + 140 * ratio),
+                int(230 - 60 * ratio),
+                int(60 + 20 * ratio),
+                255
+            )
         else:
             # 赤
-            if ratio > 0.85:
-                col = (255,255,255,255)  # ハイライト
-            else:
-                col = (
-                    int(220 - 40 * ratio),
-                    int(60 + 40 * ratio),
-                    int(60 + 40 * ratio),
-                    255
-                )
+            col = (
+                int(220 - 40 * ratio),
+                int(60 + 40 * ratio),
+                int(60 + 40 * ratio),
+                255
+            )
         draw.ellipse([circle_radius-r, circle_radius-r, circle_radius+r, circle_radius+r], fill=col)
-
-    # ハイライトの白い点
-    highlight_radius = int(circle_radius * 0.35)
-    highlight_box = [int(circle_radius*1.1)-highlight_radius, int(circle_radius*0.6)-highlight_radius,
-                     int(circle_radius*1.1)+highlight_radius, int(circle_radius*0.6)+highlight_radius]
-    draw.ellipse(highlight_box, fill=(255,255,255,180))
 
     # 影（少しだけ）
     shadow = Image.new("RGBA", base_img.size, (0,0,0,0))
