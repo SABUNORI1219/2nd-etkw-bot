@@ -279,9 +279,9 @@ def generate_profile_card(info, output_path="profile_card.png"):
     status_circle_y = 410 + 35
     text_x = status_circle_x + 50
     text_y = 420
-    if server_display.lower() == "online":
+    if not server_display.lower() == "offline":
         draw_status_circle(img, status_circle_x, status_circle_y, status="online")
-    elif server_display.lower() == "offline":
+    else:
         draw_status_circle(img, status_circle_x, status_circle_y, status="offline")
     draw.text((text_x, text_y), f"{server_display}", font=font_main, fill=(60,40,30,255))
     draw.text((330, text_y+75), f"Class: {active_char_info}", font=font_main, fill=(60,40,30,255))
