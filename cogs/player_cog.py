@@ -69,7 +69,7 @@ class PlayerSelectView(discord.ui.View):
             last_join_date = last_join_dt.strftime('%Y-%m-%d')
         except Exception:
             last_join_date = last_join_str.split('T')[0] if 'T' in last_join_str else last_join_str
-        guild_prefix = data.get('guild', {}).get('prefix', "")
+        guild_prefix = self.cog_instance._safe_get(data, ['guild', 'prefix'], "")
         guild_data = await self.cog_instance.wynn_api.get_guild_by_prefix(guild_prefix)
         banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data else None)
 
