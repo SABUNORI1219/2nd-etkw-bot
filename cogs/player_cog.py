@@ -127,12 +127,11 @@ class PlayerSelectView(discord.ui.View):
         active_char_uuid = self._safe_get(data, ['activeCharacter'])
         char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
         char_type = self._safe_get(char_obj, ['type'])
-        nickname = self._safe_get(char_obj, ['nickname'])
         reskin = self._safe_get(char_obj, ['reskin'])
         if reskin != "N/A":
-            active_char_info = f"{reskin} ({nickname})"
+            active_char_info = f"{reskin}"
         else:
-            active_char_info = f"{char_type} ({nickname})"
+            active_char_info = f"{char_type}"
 
         # globalData系ステータス
         mobs_killed = fallback_stat(data, ['globalData', 'mobsKilled'])
@@ -317,12 +316,11 @@ class PlayerCog(commands.Cog):
         active_char_uuid = self._safe_get(data, ['activeCharacter'])
         char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
         char_type = self._safe_get(char_obj, ['type'])
-        nickname = self._safe_get(char_obj, ['nickname'])
         reskin = self._safe_get(char_obj, ['reskin'])
         if reskin != "N/A":
-            active_char_info = f"{reskin} ({nickname})"
+            active_char_info = f"{reskin}"
         else:
-            active_char_info = f"{char_type} ({nickname})"
+            active_char_info = f"{char_type}"
 
         mobs_killed = self._fallback_stat(data, ['globalData', 'mobsKilled'])
         playtime = data.get("playtime", "???") if data.get("playtime", None) is not None else "???"
