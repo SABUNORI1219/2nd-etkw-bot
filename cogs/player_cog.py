@@ -28,7 +28,7 @@ class PlayerSelectView(discord.ui.View):
                 elif raw_support_rank and raw_support_rank.lower() == "heroplus":
                     rank_display = "Hero+"
                 else:
-                    rank_display = (raw_support_rank or 'Player').capitalize()
+                    rank_display = (raw_support_rank or 'None').capitalize()
 
                 stored_name = player_info.get('username', 'Unknown')
                 label_text = f"{stored_name} [{rank_display}]"
@@ -85,7 +85,7 @@ class PlayerSelectView(discord.ui.View):
         elif raw_support_rank and raw_support_rank.lower() == "heroplus":
             support_rank_display = "Hero+"
         else:
-            support_rank_display = (raw_support_rank or 'Player').capitalize()
+            support_rank_display = (raw_support_rank or 'None').capitalize()
 
         first_join_str = safe_get(data, ['firstJoin'], "???")
         first_join_date = first_join_str.split('T')[0] if first_join_str and 'T' in first_join_str else first_join_str
@@ -244,7 +244,7 @@ class PlayerCog(commands.Cog):
         elif raw_support_rank and raw_support_rank.lower() == "heroplus":
             support_rank_display = "Hero+"
         else:
-            support_rank_display = (raw_support_rank or 'Player').capitalize()
+            support_rank_display = (raw_support_rank or 'None').capitalize()
 
         first_join_str = safe_get(data, ['firstJoin'], "???")
         first_join_date = first_join_str.split('T')[0] if first_join_str and 'T' in first_join_str else first_join_str
