@@ -80,7 +80,9 @@ def generate_profile_card(info, output_path="profile_card.png"):
         # フォントで実際のサイズを測る
         prefix_text = guild_prefix
         prefix_font = font_prefix
-        text_w, text_h = prefix_font.getsize(prefix_text)
+        bbox = draw.textbbox((0,0), prefix_text, font=prefix_font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
         # 余白設定
         padding_x = 24
         padding_y = 12
