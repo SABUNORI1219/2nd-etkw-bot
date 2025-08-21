@@ -25,6 +25,8 @@ class PlayerSelectView(discord.ui.View):
                 raw_support_rank = player_info.get('supportRank')
                 if raw_support_rank and raw_support_rank.lower() == "vipplus":
                     rank_display = "Vip+"
+                elif raw_support_rank and raw_support_rank.lower() == "heroplus":
+                    rank_display = "Hero+"
                 else:
                     rank_display = (raw_support_rank or 'None').capitalize()
                 stored_name = player_info.get('username', 'Unknown')
@@ -59,6 +61,8 @@ class PlayerSelectView(discord.ui.View):
         raw_support_rank = data.get('supportRank', 'Player')
         if raw_support_rank and raw_support_rank.lower() == "vipplus":
             support_rank_display = "Vip+"
+        elif raw_support_rank and raw_support_rank.lower() == "heroplus":
+            support_rank_display = "Hero+"
         else:
             support_rank_display = (raw_support_rank or 'None').capitalize()
         first_join_str = data.get('firstJoin', "N/A")
@@ -170,10 +174,12 @@ class PlayerCog(commands.Cog):
                 await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
                 return
 
-        # サポートランク取得（バグ防止のためEmbed版のロジックを流用）
+        # サポートランク取得
         raw_support_rank = data.get('supportRank', 'Player')
         if raw_support_rank and raw_support_rank.lower() == "vipplus":
             support_rank_display = "Vip+"
+        elif raw_support_rank and raw_support_rank.lower() == "heroplus":
+            support_rank_display = "Hero+"
         else:
             support_rank_display = (raw_support_rank or 'None').capitalize()
 
