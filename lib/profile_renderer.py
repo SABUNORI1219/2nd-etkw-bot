@@ -273,9 +273,9 @@ def generate_profile_card(info, output_path="profile_card.png"):
     server_display = info.get('server_display', 'Unknown')
     active_char_info = info.get('active_char_info', 'Unknown')
     # 左側にステータス丸（オンライン：緑、オフライン：赤）を描画
-    status_circle_x = 360
+    status_circle_x = 330
     status_circle_y = 410 + 35
-    text_x = status_circle_x + 40
+    text_x = status_circle_x + 45
     text_y = 415
     if not server_display.lower() == "offline":
         draw_status_circle(img, status_circle_x, status_circle_y, status="online")
@@ -322,7 +322,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     x_lvl = bbox[2] + 3
     draw.text((x_lvl, 1025 + 18), "lv.", font=font_mini, fill=(60,40,30,255))
 
-    draw.text((90, 1060), "Content Clears", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 1065), "Content Clears", font=font_main, fill=(60,40,30,255))
 
     right_edge_x = 440
     raid_keys = [("NOTG", "notg", 1150), ("NOL", "nol", 1200), ("TCC", "tcc", 1250),
