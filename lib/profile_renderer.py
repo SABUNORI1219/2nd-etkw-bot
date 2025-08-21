@@ -278,7 +278,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     status_circle_x = 330
     status_circle_y = 410 + 35
     text_x = status_circle_x + 50
-    text_y = 410
+    text_y = 420
     if server_display.lower() == "online":
         draw_status_circle(img, status_circle_x, status_circle_y, status="online")
     elif server_display.lower() == "offline":
