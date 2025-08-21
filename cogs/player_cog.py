@@ -9,7 +9,7 @@ from lib.wynncraft_api import WynncraftAPI
 from config import AUTHORIZED_USER_IDS
 from lib.cache_handler import CacheHandler
 from lib.banner_renderer import BannerRenderer
-from lib.profile_renderer import generate_profile_card  # プロファイル画像生成
+from lib.profile_renderer import generate_profile_card
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class PlayerSelectView(discord.ui.View):
                 stored_name = player_info.get('username', 'Unknown')
                 label_text = f"{stored_name} [{rank_display}]"
                 options.append(discord.SelectOption(
-                    label=label_text, 
+                    label=label_text,
                     value=uuid,
                     description=f"UUID: {uuid}"
                 ))
@@ -42,7 +42,7 @@ class PlayerSelectView(discord.ui.View):
             self.select_menu = discord.ui.Select(placeholder="プレイヤーを選択してください...", options=options)
             self.select_menu.callback = self.select_callback
             self.add_item(self.select_menu)
-            
+
     async def select_callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.owner_id:
             await interaction.response.send_message(
@@ -57,7 +57,6 @@ class PlayerSelectView(discord.ui.View):
             await interaction.message.edit(content="選択されたプレイヤーの情報を取得できませんでした。", embed=None, view=None)
             return
 
-        # データ取得・安全化（"非公開"→"Hidden"）
         def safe_get(d, keys, default="Hidden"):
             v = d
             for k in keys:
@@ -104,6 +103,7 @@ class PlayerSelectView(discord.ui.View):
         guild_prefix = safe_get(data, ['guild', 'prefix'], "")
         guild_name = safe_get(data, ['guild', 'name'], "")
         guild_rank = safe_get(data, ['guild', 'rank'], "")
+        guild_rank_stars = safe_get(data, ['guild', 'rankStars'], "")
         guild_data = await self.cog_instance.wynn_api.get_guild_by_prefix(guild_prefix)
         banner_bytes = self.cog_instance.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
 
@@ -132,6 +132,7 @@ class PlayerSelectView(discord.ui.View):
             "banner_bytes": banner_bytes,
             "guild_name": guild_name,
             "guild_rank": guild_rank,
+            "guild_rank_stars": guild_rank_stars,
             "first_join": first_join_date,
             "last_join": last_join_date,
             "mobs_killed": mobs_killed,
@@ -182,7 +183,6 @@ class PlayerCog(commands.Cog):
         return v if v is not None else default
 
     def _fallback_stat(self, data: dict, keys_global: list, keys_ranking: list, keys_prev: list, default="Hidden"):
-        # globalData優先、ranking→previousRanking→default
         val = self._safe_get(data, keys_global, None)
         if val is not None:
             return "Hidden" if val == "非公開" else val
@@ -212,7 +212,6 @@ class PlayerCog(commands.Cog):
                 await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
                 return
 
-            # 複数候補の場合は選択Viewを表示
             if isinstance(data, dict) and data.get("error") == "MultipleObjectsReturned" and "objects" in data:
                 player_collision_dict = data["objects"]
                 view = PlayerSelectView(player_collision_dict=player_collision_dict, cog_instance=self, owner_id=interaction.user.id)
@@ -223,7 +222,6 @@ class PlayerCog(commands.Cog):
                 else:
                     await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
                 return
-            # キャッシュに保存
             if isinstance(data, dict) and 'username' in data:
                 self.cache.set_cache(cache_key, data)
             else:
@@ -264,7 +262,8 @@ class PlayerCog(commands.Cog):
         guild_prefix = safe_get(data, ['guild', 'prefix'], "")
         guild_name = safe_get(data, ['guild', 'name'], "")
         guild_rank = safe_get(data, ['guild', 'rank'], "")
-        guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
+        guild_rank_stars = safe_get(data, ['guild', 'rankStars'], "")
+        guild_data = await self.banner_renderer.wynn_api.get_guild_by_prefix(guild_prefix)
         banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
 
         mobs_killed = self._fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
@@ -292,6 +291,7 @@ class PlayerCog(commands.Cog):
             "banner_bytes": banner_bytes,
             "guild_name": guild_name,
             "guild_rank": guild_rank,
+            "guild_rank_stars": guild_rank_stars,
             "first_join": first_join_date,
             "last_join": last_join_date,
             "mobs_killed": mobs_killed,
