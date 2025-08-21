@@ -156,13 +156,13 @@ def generate_profile_card(info, output_path="profile_card.png"):
     else:
         icon_w, icon_h = 0, target_icon_h
 
-    rank_padding_x = 18
-    rank_padding_y = 8
+    rank_padding_x = 16
+    rank_padding_y = 6
     rank_box_w = icon_w + rank_padding_x + rank_text_w + rank_padding_x
     rank_box_h = max(icon_h, rank_text_h + rank_padding_y*2)
     skin_box_y = 336 + 196
-    rank_box_x = 106
-    rank_box_y = skin_box_y + 20
+    rank_box_x = 130
+    rank_box_y = skin_box_y
 
     # ドロップシャドウ
     shadow = Image.new("RGBA", (rank_box_w+8, rank_box_h+8), (0,0,0,0))
