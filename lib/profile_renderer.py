@@ -10,13 +10,20 @@ FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia
 BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png")
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 RANK_STAR_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/rankStar.png")
-# ランクごとのアイコンパス
 RANK_ICON_MAP = {
     "Champion": os.path.join(os.path.dirname(__file__), "../assets/profile/champ_icon.png"),
     "Hero+": os.path.join(os.path.dirname(__file__), "../assets/profile/heroplus_icon.png"),
     "Hero": os.path.join(os.path.dirname(__file__), "../assets/profile/hero_icon.png"),
     "Vip+": os.path.join(os.path.dirname(__file__), "../assets/profile/vipplus_icon.png"),
     "Vip": os.path.join(os.path.dirname(__file__), "../assets/profile/vip_icon.png"),
+}
+RANK_COLOR_MAP = {
+    "Champion": ((255, 255, 80, 230), (255, 210, 60, 200)),     # 黄色グラデ
+    "Hero+": ((255, 40, 255, 230), (180, 0, 120, 200)),         # マゼンタ
+    "Hero": ((170, 90, 255, 230), (60, 0, 160, 200)),           # 紫
+    "Vip+": ((80, 255, 255, 230), (40, 170, 255, 200)),         # 水色
+    "Vip": ((80, 255, 120, 230), (0, 190, 40, 200)),            # 緑
+    "None": ((160, 160, 160, 220), (80, 80, 80, 200)),          # 灰色
 }
 
 def gradient_rect(size, color_top, color_bottom, radius):
@@ -29,21 +36,11 @@ def gradient_rect(size, color_top, color_bottom, radius):
         b = int(color_top[2] * (1-ratio) + color_bottom[2] * ratio)
         a = int(color_top[3] * (1-ratio) + color_bottom[3] * ratio)
         ImageDraw.Draw(base).line([(0, y), (w, y)], fill=(r, g, b, a))
-    # 角丸mask
     mask = Image.new("L", (w, h), 0)
     draw_mask = ImageDraw.Draw(mask)
     draw_mask.rounded_rectangle([0, 0, w, h], radius=radius, fill=255)
     base.putalpha(mask)
     return base
-
-RANK_COLOR_MAP = {
-    "Champion": ((255, 255, 80, 230), (255, 210, 60, 200)),     # 黄色グラデ
-    "Hero+": ((255, 40, 255, 230), (180, 0, 120, 200)),      # マゼンタ
-    "Hero": ((170, 90, 255, 230), (60, 0, 160, 200)),           # 紫
-    "Vip+": ((80, 255, 255, 230), (40, 170, 255, 200)),      # 水色
-    "Vip": ((80, 255, 120, 230), (0, 190, 40, 200)),            # 緑
-    "None": ((160, 160, 160, 220), (80, 80, 80, 200)),          # 灰色
-}
 
 def resize_icon_keep_ratio(img, target_height):
     w, h = img.size
@@ -51,12 +48,17 @@ def resize_icon_keep_ratio(img, target_height):
     target_w = int(w * scale)
     return img.resize((target_w, target_height), Image.LANCZOS)
 
+def fmt_num(val):
+    if isinstance(val, int) or isinstance(val, float):
+        return f"{val:,}"
+    return str(val)
+
 def generate_profile_card(info, output_path="profile_card.png"):
     try:
         img = Image.open(BASE_IMG_PATH).convert("RGBA")
     except Exception as e:
         logger.error(f"BASE_IMG_PATH 読み込み失敗: {e}")
-        img = Image.new("RGBA", (900, 1600), (255, 255, 255, 255))  # fallback
+        img = Image.new("RGBA", (900, 1600), (255, 255, 255, 255))
     try:
         PLAYER_BACKGROUND = Image.open(PLAYER_BACKGROUND_PATH).convert("RGBA")
     except Exception as e:
@@ -134,7 +136,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
         text_y = box_y + (box_h - text_h) // 2
         draw.text((text_x, text_y), prefix_text, font=prefix_font, fill=(240,240,240,255))
         
-    # プレイヤーのスキンあんど拝啓
     img.paste(PLAYER_BACKGROUND, (110, 280), mask=PLAYER_BACKGROUND)
     uuid = info.get("uuid", "")
     if uuid:
@@ -155,14 +156,12 @@ def generate_profile_card(info, output_path="profile_card.png"):
             logger.error(f"Skin image load failed: {e}")
             draw.rectangle([60, 120, 180, 240], fill=(160,160,160,255))
 
-    # プレイヤーランク表示エリア（アイコン付き）
     rank_text = info.get('support_rank_display', 'Player')
     rank_colors = RANK_COLOR_MAP.get(rank_text, RANK_COLOR_MAP['None'])
     rank_font = font_rank
     rank_bbox = draw.textbbox((0,0), rank_text, font=rank_font)
     rank_text_w = rank_bbox[2] - rank_bbox[0]
     rank_text_h = rank_bbox[3] - rank_bbox[1]
-    # アイコン準備
     icon_path = RANK_ICON_MAP.get(rank_text)
     icon_img = None
     icon_w, icon_h = 0, 0
@@ -189,18 +188,15 @@ def generate_profile_card(info, output_path="profile_card.png"):
     rank_box_x = skin_x + (skin_w // 2) - (rank_box_w // 2)
     rank_box_y = skin_y + skin_h - 6
 
-    # ドロップシャドウ
     shadow = Image.new("RGBA", (rank_box_w+8, rank_box_h+8), (0,0,0,0))
     shadow_draw = ImageDraw.Draw(shadow)
     shadow_draw.rounded_rectangle([4,4,rank_box_w+4,rank_box_h+4], radius=16, fill=(0,0,0,80))
     shadow = shadow.filter(ImageFilter.GaussianBlur(3))
     img.paste(shadow, (rank_box_x-4, rank_box_y-4), mask=shadow)
 
-    # グラデ四角
     rect_img = gradient_rect((rank_box_w, rank_box_h), rank_colors[0], rank_colors[1], radius=14)
     img.paste(rect_img, (rank_box_x, rank_box_y), mask=rect_img)
 
-    # アイコン貼り付け
     if icon_img:
         icon_y = rank_box_y + (rank_box_h - icon_h)//2
         img.paste(icon_img, (rank_box_x + rank_padding_x//2, icon_y), mask=icon_img)
@@ -232,38 +228,38 @@ def generate_profile_card(info, output_path="profile_card.png"):
     for i in range(star_num):
         x = x_grank + i * (star_size)
         img.paste(rank_star_img, (x, y_star), mask=rank_star_img)
-    
+
     draw.text((330, 410), f"First Join: {info.get('first_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
     draw.text((330, 485), f"Last Seen: {info.get('last_join', 'N/A')}", font=font_main, fill=(60,40,30,255))
 
     draw.text((90, 600), "Mobs", font=font_sub, fill=(60,40,30,255))
-    draw.text((330, 600), f"{info.get('mobs_killed', 0):,}", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 600), fmt_num(info.get('mobs_killed', 0)), font=font_sub, fill=(60,40,30,255))
 
     draw.text((90, 675), "Chests", font=font_sub, fill=(60,40,30,255))
-    draw.text((330, 675), f"{info.get('chests', 0):,}", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 675), fmt_num(info.get('chests', 0)), font=font_sub, fill=(60,40,30,255))
 
     draw.text((90, 800), "Wars", font=font_sub, fill=(60,40,30,255))
-    wars_text = f"{info.get('wars', 0):,}"
+    wars_text = fmt_num(info.get('wars', 0))
     draw.text((330, 800), wars_text, font=font_sub, fill=(60,40,30,255))
     bbox = draw.textbbox((330, 800), wars_text, font=font_sub)
     x_wars = bbox[2] + 6
     draw.text((x_wars, 800 + 18), f" #{info.get('war_rank_display', 'N/A')}", font=font_mini, fill=(60,40,30,255))
 
     draw.text((90, 875), "Quests", font=font_sub, fill=(60,40,30,255))
-    draw.text((330, 875), f"{info.get('quests', 0):,}", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 875), fmt_num(info.get('quests', 0)), font=font_sub, fill=(60,40,30,255))
 
-    draw.text((90, 950), f"World Events   {info.get('world_events', 0):,}", font=font_sub, fill=(60,40,30,255))
+    draw.text((90, 950), f"World Events   {fmt_num(info.get('world_events', 0))}", font=font_sub, fill=(60,40,30,255))
 
     draw.text((650, 600), "Playtime", font=font_sub, fill=(60,40,30,255))
-    playtime_text = f"{info.get('playtime', 0):,}"
+    playtime_text = fmt_num(info.get('playtime', 0))
     draw.text((650, 675), playtime_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((650, 675), playtime_text, font=font_small)
     x_hours = bbox[2] + 3
     draw.text((x_hours, 675 + 18), "hours", font=font_mini, fill=(60,40,30,255))
 
     draw.text((650, 750), "PvP", font=font_main, fill=(60,40,30,255))
-    pk_text = str(info.get('pvp_kill', 0))
-    pd_text = str(info.get('pvp_death', 0))
+    pk_text = fmt_num(info.get('pvp_kill', 0))
+    pd_text = fmt_num(info.get('pvp_death', 0))
     draw.text((650, 825), pk_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((650, 825), pk_text, font=font_small)
     x_k = bbox[2] + 3
@@ -274,18 +270,18 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((x_d, 875 + 18), "D", font=font_mini, fill=(60,40,30,255))
 
     draw.text((650, 950), "Total Level", font=font_main, fill=(60,40,30,255))
-    total_text = f"{info.get('total_level', 0):,}"
+    total_text = fmt_num(info.get('total_level', 0))
     draw.text((650, 1025), total_text, font=font_small, fill=(60,40,30,255))
     bbox = draw.textbbox((650, 1025), total_text, font=font_small)
     x_lvl = bbox[2] + 3
     draw.text((x_lvl, 1025 + 18), "lv.", font=font_mini, fill=(60,40,30,255))
-    
+
     right_edge_x = 440
     raid_keys = [("NOTG", "notg", 1150), ("NOL", "nol", 1200), ("TCC", "tcc", 1250),
                  ("TNA", "tna", 1300), ("Dungeons", "dungeons", 1350), ("All Raids", "all_raids", 1400)]
     for label, key, y in raid_keys:
         draw.text((100, y), label, font=font_raids, fill=(60,40,30,255))
-        num_text = f"{info.get(key, 0)}"
+        num_text = fmt_num(info.get(key, 0))
         bbox = draw.textbbox((0,0), num_text, font=font_raids)
         text_width = bbox[2] - bbox[0]
         x = right_edge_x - text_width
