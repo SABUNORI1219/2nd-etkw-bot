@@ -113,6 +113,12 @@ def generate_profile_card(info, output_path="profile_card.png"):
         img.paste(dummy, (banner_x, banner_y), mask=dummy)
 
     guild_prefix = info.get('guild_prefix', '')
+    guild_name = info.get('guild_name', '')
+    if not guild_name or guild_name == "Hidden":
+        guild_name_display = "No Guild"
+    else:
+        guild_name_display = guild_name
+        
     if guild_prefix:
         prefix_text = guild_prefix
         prefix_font = font_prefix
@@ -207,7 +213,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((rank_text_x, rank_text_y), rank_text, font=rank_font, fill=(255,255,255,255))
 
     text_base_x = banner_x + banner_size[0] + 10
-    draw.text((text_base_x, banner_y), f"{info.get('guild_name', '')}", font=font_main, fill=(60,40,30,255))
+    draw.text((text_base_x, banner_y), guild_name_display, font=font_main, fill=(60,40,30,255))
 
     guild_rank_text = str(info.get('guild_rank', ''))
     star_num = 0
