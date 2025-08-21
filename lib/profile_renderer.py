@@ -54,41 +54,53 @@ def fmt_num(val):
     return str(val)
 
 def draw_status_circle(base_img, left_x, center_y, status="online"):
-    """status: 'online' or 'offline'. Draws a circle with gradient and shadow."""
     circle_radius = 15
-    shadow_radius = 22
-    circle_box = [left_x, center_y - circle_radius, left_x + 2*circle_radius, center_y + circle_radius]
-    shadow_box = [left_x - (shadow_radius - circle_radius), center_y - shadow_radius, left_x + shadow_radius + circle_radius, center_y + shadow_radius]
+    circle_img = Image.new("RGBA", (2*circle_radius, 2*circle_radius), (0,0,0,0))
+    draw = ImageDraw.Draw(circle_img)
 
-    # Draw shadow
+    # ラジアルグラデーション
+    for r in range(circle_radius, 0, -1):
+        ratio = r / circle_radius
+        if status == "online":
+            # 緑
+            if ratio > 0.85:
+                col = (255,255,255,255)  # ハイライト
+            else:
+                # 明るい緑→濃い緑
+                col = (
+                    int(60 + 140 * ratio),
+                    int(230 - 60 * ratio),
+                    int(60 + 20 * ratio),
+                    255
+                )
+        else:
+            # 赤
+            if ratio > 0.85:
+                col = (255,255,255,255)  # ハイライト
+            else:
+                col = (
+                    int(220 - 40 * ratio),
+                    int(60 + 40 * ratio),
+                    int(60 + 40 * ratio),
+                    255
+                )
+        draw.ellipse([circle_radius-r, circle_radius-r, circle_radius+r, circle_radius+r], fill=col)
+
+    # ハイライトの白い点
+    highlight_radius = int(circle_radius * 0.35)
+    highlight_box = [int(circle_radius*1.1)-highlight_radius, int(circle_radius*0.6)-highlight_radius,
+                     int(circle_radius*1.1)+highlight_radius, int(circle_radius*0.6)+highlight_radius]
+    draw.ellipse(highlight_box, fill=(255,255,255,180))
+
+    # 影（少しだけ）
     shadow = Image.new("RGBA", base_img.size, (0,0,0,0))
     shadow_draw = ImageDraw.Draw(shadow)
-    shadow_draw.ellipse(shadow_box, fill=(0,0,0,60))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(4))
+    shadow_box = [left_x+3, center_y+circle_radius+1, left_x+2*circle_radius-3, center_y+2*circle_radius]
+    shadow_draw.ellipse(shadow_box, fill=(0,0,0,40))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(3))
     base_img.alpha_composite(shadow)
 
-    # Draw gradient circle
-    circle = Image.new("RGBA", (2*circle_radius, 2*circle_radius), (0,0,0,0))
-    grad_draw = ImageDraw.Draw(circle)
-    for r in range(circle_radius, 0, -1):
-        if status == "online":
-            # green gradient
-            col = (
-                int(40 + 100 * (r / circle_radius)), 
-                int(200 + 40 * (r / circle_radius)), 
-                int(40 + 20 * (r / circle_radius)), 
-                255
-            )
-        else:
-            # red gradient
-            col = (
-                int(180 + 50 * (r / circle_radius)), 
-                int(40 + 30 * (r / circle_radius)), 
-                int(40 + 30 * (r / circle_radius)), 
-                255
-            )
-        grad_draw.ellipse([circle_radius - r, circle_radius - r, circle_radius + r, circle_radius + r], fill=col)
-    base_img.alpha_composite(circle, (left_x, center_y - circle_radius))
+    base_img.alpha_composite(circle_img, (left_x, center_y - circle_radius))
 
 def generate_profile_card(info, output_path="profile_card.png"):
     try:
