@@ -57,7 +57,7 @@ class PlayerSelectView(discord.ui.View):
             await interaction.message.edit(content="選択されたプレイヤーの情報を取得できませんでした。", embed=None, view=None)
             return
 
-        def safe_get(d, keys, default="Hidden"):
+        def safe_get(d, keys, default="???"):
             v = d
             for k in keys:
                 if not isinstance(v, dict):
@@ -67,7 +67,7 @@ class PlayerSelectView(discord.ui.View):
                     return default
             return v
 
-        def fallback_stat(data, keys_global, keys_ranking, keys_prev, default="Hidden"):
+        def fallback_stat(data, keys_global, keys_ranking, keys_prev, default="???"):
             val = safe_get(data, keys_global, None)
             if val is not None:
                 return val
@@ -87,10 +87,10 @@ class PlayerSelectView(discord.ui.View):
         else:
             support_rank_display = (raw_support_rank or 'Player').capitalize()
 
-        first_join_str = safe_get(data, ['firstJoin'], "Hidden")
+        first_join_str = safe_get(data, ['firstJoin'], "???")
         first_join_date = first_join_str.split('T')[0] if first_join_str and 'T' in first_join_str else first_join_str
 
-        last_join_str = safe_get(data, ['lastJoin'], "Hidden")
+        last_join_str = safe_get(data, ['lastJoin'], "???")
         if last_join_str and isinstance(last_join_str, str) and 'T' in last_join_str:
             try:
                 last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
@@ -98,7 +98,7 @@ class PlayerSelectView(discord.ui.View):
             except Exception:
                 last_join_date = last_join_str.split('T')[0]
         else:
-            last_join_date = last_join_str if last_join_str else "Hidden"
+            last_join_date = last_join_str if last_join_str else "???"
 
         guild_prefix = safe_get(data, ['guild', 'prefix'], "")
         guild_name = safe_get(data, ['guild', 'name'], "")
@@ -108,15 +108,15 @@ class PlayerSelectView(discord.ui.View):
         banner_bytes = self.cog_instance.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
 
         mobs_killed = fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
-        playtime = "Hidden" if data.get("playtime", None) == "非公開" else data.get("playtime", 0)
+        playtime = "???" if data.get("playtime", None) is None else data.get("playtime", 0)
         wars = fallback_stat(data, ['globalData', 'wars'], ['ranking', 'wars'], ['previousRanking', 'wars'])
-        war_rank_display = safe_get(data, ['ranking', 'warsCompletion'], "Hidden")
+        war_rank_display = safe_get(data, ['ranking', 'warsCompletion'], "???")
         quests = fallback_stat(data, ['globalData', 'completedQuests'], ['ranking', 'completedQuests'], ['previousRanking', 'completedQuests'])
         world_events = safe_get(data, ['globalData', 'worldEvents'], 0)
         total_level = fallback_stat(data, ['globalData', 'totalLevel'], ['ranking', 'totalLevel'], ['previousRanking', 'totalLevel'])
         chests = fallback_stat(data, ['globalData', 'chestsFound'], ['ranking', 'chestsFound'], ['previousRanking', 'chestsFound'])
-        pvp_kill = "Hidden" if safe_get(data, ['globalData', 'pvp', 'kills'], 0) == "非公開" else str(safe_get(data, ['globalData', 'pvp', 'kills'], 0))
-        pvp_death = "Hidden" if safe_get(data, ['globalData', 'pvp', 'deaths'], 0) == "非公開" else str(safe_get(data, ['globalData', 'pvp', 'deaths'], 0))
+        pvp_kill = "???" if safe_get(data, ['globalData', 'pvp', 'kills'], None) is None else str(safe_get(data, ['globalData', 'pvp', 'kills'], 0))
+        pvp_death = "???" if safe_get(data, ['globalData', 'pvp', 'deaths'], None) is None else str(safe_get(data, ['globalData', 'pvp', 'deaths'], 0))
         notg = safe_get(data, ['globalData', 'raids', 'list', 'Nest of the Grootslangs'], 0)
         nol = safe_get(data, ['globalData', 'raids', 'list', "Orphion's Nexus of Light"], 0)
         tcc = safe_get(data, ['globalData', 'raids', 'list', 'The Canyon Colossus'], 0)
@@ -182,7 +182,7 @@ class PlayerCog(commands.Cog):
                 return default
         return v if v is not None else default
 
-    def _fallback_stat(self, data: dict, keys_global: list, keys_ranking: list, keys_prev: list, default="Hidden"):
+    def _fallback_stat(self, data: dict, keys_global: list, keys_ranking: list, keys_prev: list, default="???"):
         val = self._safe_get(data, keys_global, None)
         if val is not None:
             return val
@@ -228,7 +228,7 @@ class PlayerCog(commands.Cog):
                 await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
                 return
 
-        def safe_get(d, keys, default="Hidden"):
+        def safe_get(d, keys, default="???"):
             v = d
             for k in keys:
                 if not isinstance(v, dict):
@@ -246,10 +246,10 @@ class PlayerCog(commands.Cog):
         else:
             support_rank_display = (raw_support_rank or 'Player').capitalize()
 
-        first_join_str = safe_get(data, ['firstJoin'], "Hidden")
+        first_join_str = safe_get(data, ['firstJoin'], "???")
         first_join_date = first_join_str.split('T')[0] if first_join_str and 'T' in first_join_str else first_join_str
 
-        last_join_str = safe_get(data, ['lastJoin'], "Hidden")
+        last_join_str = safe_get(data, ['lastJoin'], "???")
         if last_join_str and isinstance(last_join_str, str) and 'T' in last_join_str:
             try:
                 last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
@@ -257,7 +257,7 @@ class PlayerCog(commands.Cog):
             except Exception:
                 last_join_date = last_join_str.split('T')[0]
         else:
-            last_join_date = last_join_str if last_join_str else "Hidden"
+            last_join_date = last_join_str if last_join_str else "???"
 
         guild_prefix = safe_get(data, ['guild', 'prefix'], "")
         guild_name = safe_get(data, ['guild', 'name'], "")
@@ -267,15 +267,15 @@ class PlayerCog(commands.Cog):
         banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
 
         mobs_killed = self._fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
-        playtime = "Hidden" if data.get("playtime", None) == "非公開" else data.get("playtime", 0)
+        playtime = "???" if data.get("playtime", None) is None else data.get("playtime", 0)
         wars = self._fallback_stat(data, ['globalData', 'wars'], ['ranking', 'wars'], ['previousRanking', 'wars'])
-        war_rank_display = safe_get(data, ['ranking', 'warsCompletion'], "Hidden")
+        war_rank_display = safe_get(data, ['ranking', 'warsCompletion'], "???")
         quests = self._fallback_stat(data, ['globalData', 'completedQuests'], ['ranking', 'completedQuests'], ['previousRanking', 'completedQuests'])
         world_events = safe_get(data, ['globalData', 'worldEvents'], 0)
         total_level = self._fallback_stat(data, ['globalData', 'totalLevel'], ['ranking', 'totalLevel'], ['previousRanking', 'totalLevel'])
         chests = self._fallback_stat(data, ['globalData', 'chestsFound'], ['ranking', 'chestsFound'], ['previousRanking', 'chestsFound'])
-        pvp_kill = "Hidden" if safe_get(data, ['globalData', 'pvp', 'kills'], 0) == "非公開" else str(safe_get(data, ['globalData', 'pvp', 'kills'], 0))
-        pvp_death = "Hidden" if safe_get(data, ['globalData', 'pvp', 'deaths'], 0) == "非公開" else str(safe_get(data, ['globalData', 'pvp', 'deaths'], 0))
+        pvp_kill = "???" if safe_get(data, ['globalData', 'pvp', 'kills'], None) is None else str(safe_get(data, ['globalData', 'pvp', 'kills'], 0))
+        pvp_death = "???" if safe_get(data, ['globalData', 'pvp', 'deaths'], None) is None else str(safe_get(data, ['globalData', 'pvp', 'deaths'], 0))
         notg = safe_get(data, ['globalData', 'raids', 'list', 'Nest of the Grootslangs'], 0)
         nol = safe_get(data, ['globalData', 'raids', 'list', "Orphion's Nexus of Light"], 0)
         tcc = safe_get(data, ['globalData', 'raids', 'list', 'The Canyon Colossus'], 0)
