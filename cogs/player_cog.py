@@ -150,15 +150,7 @@ class PlayerSelectView(discord.ui.View):
         all_raids = fallback_stat(data, ['globalData', 'raids', 'total'])
 
         # war_rank_displayのみranking参照
-        ranking_obj = safe_get(data, ['ranking'])
-        if ranking_obj is None:
-            war_rank_display = "???"
-        else:
-            war_rank_completion = ranking_obj.get('warsCompletion')
-            if war_rank_completion is None:
-                war_rank_display = "N/A"
-            else:
-                war_rank_display = str(war_rank_completion)
+        war_rank_display = safe_get(data, ['ranking', 'warsCompletion'], "N/A")
 
         # レイド数系
         notg = get_raid_stat(data, 'Nest of the Grootslangs')
@@ -345,15 +337,7 @@ class PlayerCog(commands.Cog):
         dungeons = self._fallback_stat(data, ['globalData', 'dungeons', 'total'])
         all_raids = self._fallback_stat(data, ['globalData', 'raids', 'total'])
 
-        ranking_obj = safe_get(data, ['ranking'])
-        if ranking_obj is None:
-            war_rank_display = "???"
-        else:
-            war_rank_completion = ranking_obj.get('warsCompletion')
-            if war_rank_completion is None:
-                war_rank_display = "N/A"
-            else:
-                war_rank_display = str(war_rank_completion)
+        war_rank_display = safe_get(data, ['ranking', 'warsCompletion'], "N/A")
 
         notg = self._get_raid_stat(data, 'Nest of the Grootslangs')
         nol = self._get_raid_stat(data, "Orphion's Nexus of Light")
