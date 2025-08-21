@@ -84,7 +84,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
         # 余白設定
-        padding_x = 10
+        padding_x = 8
         padding_y = 4
         box_w = text_w + padding_x * 2
         box_h = text_h + padding_y * 2
