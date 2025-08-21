@@ -82,7 +82,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         font_uuid = ImageFont.truetype(FONT_PATH, 30)
         font_mini = ImageFont.truetype(FONT_PATH, 25)
         font_prefix = ImageFont.truetype(FONT_PATH, 12)
-        font_rank = ImageFont.truetype(FONT_PATH, 18)
+        font_rank = ImageFont.truetype(FONT_PATH, 16)
     except Exception as e:
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = font_rank = ImageFont.load_default()
@@ -156,13 +156,17 @@ def generate_profile_card(info, output_path="profile_card.png"):
     else:
         icon_w, icon_h = 0, target_icon_h
 
-    rank_padding_x = 16
-    rank_padding_y = 6
+    rank_padding_x = 12
+    rank_padding_y = 4
     rank_box_w = icon_w + rank_padding_x + rank_text_w + rank_padding_x
     rank_box_h = max(icon_h, rank_text_h + rank_padding_y*2)
-    skin_box_y = 336 + 196
-    rank_box_x = 130
-    rank_box_y = skin_box_y
+    skin_x = 106
+    skin_y = 336
+    skin_w = 196
+    skin_h = 196
+    
+    rank_box_x = skin_x + (skin_w // 2) - (rank_box_w // 2)
+    rank_box_y = skin_y + skin_h - 8
 
     # ドロップシャドウ
     shadow = Image.new("RGBA", (rank_box_w+8, rank_box_h+8), (0,0,0,0))
