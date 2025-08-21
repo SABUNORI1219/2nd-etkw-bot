@@ -350,7 +350,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
 
     bbox_war_rank = draw.textbbox((0,0), war_rank_display_text, font=font_mini)
     war_rank_width = bbox_war_rank[2] - bbox_war_rank[0]
-    draw.text((x_right_align + 12, y_wars + 18), war_rank_display_text, font=font_mini, fill=(60,40,30,255))
+    draw.text((x_right_align + 12, y_wars + 12), war_rank_display_text, font=font_mini, fill=(60,40,30,255))
 
     bbox_we = draw.textbbox((0,0), world_events_text, font=font_raids)
     we_width = bbox_we[2] - bbox_we[0]
