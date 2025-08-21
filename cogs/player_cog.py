@@ -250,9 +250,6 @@ class PlayerCog(commands.Cog):
     @app_commands.describe(player="MCID or UUID")
     async def player(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await interaction.followup.send("sbadkita")
-            return
 
         cache_key = f"player_{player.lower()}"
         cached_data = self.cache.get_cache(cache_key)
