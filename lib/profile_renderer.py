@@ -41,9 +41,10 @@ def generate_profile_card(info, output_path="profile_card.png"):
         font_raids = ImageFont.truetype(FONT_PATH, 35)
         font_uuid = ImageFont.truetype(FONT_PATH, 30)
         font_mini = ImageFont.truetype(FONT_PATH, 25)
+        font_prefix = ImageFont.truetype(FONT_PATH, 56)
     except Exception as e:
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
-        font_title = font_main = font_sub = font_small = font_uuid = font_mini = ImageFont.load_default()
+        font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = ImageFont.load_default()
 
     # 描画（profile_infoの内容を全部使う）
     draw.text((90, 140), f"[{info.get('support_rank_display', 'Player')}] {info.get('username', 'NoName')}", font=font_title, fill=(60,40,30,255))
@@ -58,7 +59,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
             logger.error(f"guild_banner_img読み込み失敗: {e}")
             guild_banner_img = None
     elif banner_bytes and isinstance(banner_bytes, str):
-        # discord.Fileを渡している場合は、サムネイル用途なのでここでは無視
         guild_banner_img = None
 
     # guildバナー描画座標
@@ -69,13 +69,37 @@ def generate_profile_card(info, output_path="profile_card.png"):
         guild_banner_img = guild_banner_img.resize(banner_size, Image.LANCZOS)
         img.paste(guild_banner_img, (banner_x, banner_y), mask=guild_banner_img)
     else:
-        # バナー画像生成失敗時は透明画像 or ダミー
         dummy = Image.new("RGBA", banner_size, (0, 0, 0, 0))
         img.paste(dummy, (banner_x, banner_y), mask=dummy)
 
-    # [guild_prefix] guild_name
+    # ギルドプレフィックス用の薄黒色四角＋テキスト（バナーのすぐ下）
+    guild_prefix = info.get('guild_prefix', '')
+    if guild_prefix:
+        # プレフィックス長さに応じて四角サイズ調整
+        prefix_len = len(guild_prefix)
+        # フォントで実際のサイズを測る
+        prefix_text = guild_prefix
+        prefix_font = font_prefix
+        text_w, text_h = prefix_font.getsize(prefix_text)
+        # 余白設定
+        padding_x = 24
+        padding_y = 12
+        box_w = text_w + padding_x * 2
+        box_h = text_h + padding_y * 2
+        # バナー中央下に配置（バナーに少し重ねる位置）
+        box_x = banner_x + (banner_size[0] - box_w) // 2
+        box_y = banner_y + banner_size[1] - int(box_h * 0.4)
+        # 薄黒色四角形（透明度180/255くらい）
+        box_color = (30, 30, 30, 180)
+        draw.rectangle([box_x, box_y, box_x + box_w, box_y + box_h], fill=box_color)
+        # テキスト中央揃え
+        text_x = box_x + (box_w - text_w) // 2
+        text_y = box_y + (box_h - text_h) // 2
+        draw.text((text_x, text_y), prefix_text, font=prefix_font, fill=(240,240,240,255))
+
+    # guild_name
     text_base_x = banner_x + banner_size[0] + 10
-    draw.text((text_base_x, banner_y), f"[{info.get('guild_prefix', '')}] {info.get('guild_name', '')}", font=font_main, fill=(60,40,30,255))
+    draw.text((text_base_x, banner_y), f"{info.get('guild_name', '')}", font=font_main, fill=(60,40,30,255))
 
     # guild_rank + rankstars
     guild_rank_text = str(info.get('guild_rank', ''))
