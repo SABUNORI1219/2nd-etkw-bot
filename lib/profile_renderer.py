@@ -41,7 +41,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         font_raids = ImageFont.truetype(FONT_PATH, 35)
         font_uuid = ImageFont.truetype(FONT_PATH, 30)
         font_mini = ImageFont.truetype(FONT_PATH, 25)
-        font_prefix = ImageFont.truetype(FONT_PATH, 10)
+        font_prefix = ImageFont.truetype(FONT_PATH, 12)
     except Exception as e:
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = ImageFont.load_default()
@@ -84,8 +84,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
         # 余白設定
-        padding_x = 24
-        padding_y = 12
+        padding_x = 12
+        padding_y = 6
         box_w = text_w + padding_x * 2
         box_h = text_h + padding_y * 2
         # バナー中央下に配置（バナーに少し重ねる位置）
