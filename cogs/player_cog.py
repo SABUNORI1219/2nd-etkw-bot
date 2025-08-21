@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 from lib.wynncraft_api import WynncraftAPI
 from config import AUTHORIZED_USER_IDS
@@ -28,7 +28,8 @@ class PlayerSelectView(discord.ui.View):
                 elif raw_support_rank and raw_support_rank.lower() == "heroplus":
                     rank_display = "Hero+"
                 else:
-                    rank_display = (raw_support_rank or 'None').capitalize()
+                    rank_display = (raw_support_rank or 'Player').capitalize()
+
                 stored_name = player_info.get('username', 'Unknown')
                 label_text = f"{stored_name} [{rank_display}]"
                 options.append(discord.SelectOption(
@@ -51,33 +52,78 @@ class PlayerSelectView(discord.ui.View):
         selected_uuid = self.select_menu.values[0]
         self.select_menu.disabled = True
         await interaction.response.edit_message(content="プレイヤー情報を取得中...", view=self)
-        # 画像送信形式に変更
         data = await self.cog_instance.wynn_api.get_official_player_data(selected_uuid)
         if not data or 'uuid' not in data:
             await interaction.message.edit(content="選択されたプレイヤーの情報を取得できませんでした。", embed=None, view=None)
             return
 
-        # --- 画像送信に必要なprofile_info生成 ---
-        raw_support_rank = data.get('supportRank', 'Player')
+        # データ取得・安全化（"非公開"→"Hidden"）
+        def safe_get(d, keys, default="Hidden"):
+            v = d
+            for k in keys:
+                if not isinstance(v, dict):
+                    return default
+                v = v.get(k)
+                if v is None:
+                    return default
+            return "Hidden" if v == "非公開" else v
+
+        def fallback_stat(data, keys_global, keys_ranking, keys_prev, default="Hidden"):
+            val = safe_get(data, keys_global, None)
+            if val is not None:
+                return "Hidden" if val == "非公開" else val
+            val = safe_get(data, keys_ranking, None)
+            if val is not None:
+                return "Hidden" if val == "非公開" else val
+            val = safe_get(data, keys_prev, None)
+            if val is not None:
+                return "Hidden" if val == "非公開" else val
+            return default
+
+        raw_support_rank = safe_get(data, ['supportRank'], "Player")
         if raw_support_rank and raw_support_rank.lower() == "vipplus":
             support_rank_display = "Vip+"
         elif raw_support_rank and raw_support_rank.lower() == "heroplus":
             support_rank_display = "Hero+"
         else:
-            support_rank_display = (raw_support_rank or 'None').capitalize()
-        first_join_str = data.get('firstJoin', "N/A")
-        first_join_date = first_join_str.split('T')[0] if 'T' in first_join_str else first_join_str
-        last_join_str = data.get('lastJoin', "1970-01-01T00:00:00.000Z")
-        try:
-            last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
-            last_join_date = last_join_dt.strftime('%Y-%m-%d')
-        except Exception:
-            last_join_date = last_join_str.split('T')[0] if 'T' in last_join_str else last_join_str
-        guild_prefix = self.cog_instance._safe_get(data, ['guild', 'prefix'], "")
-        guild_name = self.cog_instance._safe_get(data, ['guild', 'name'], "")
-        guild_rank = self.cog_instance._safe_get(data, ['guild', 'rank'], "")
+            support_rank_display = (raw_support_rank or 'Player').capitalize()
+
+        first_join_str = safe_get(data, ['firstJoin'], "Hidden")
+        first_join_date = first_join_str.split('T')[0] if first_join_str and 'T' in first_join_str else first_join_str
+
+        last_join_str = safe_get(data, ['lastJoin'], "Hidden")
+        if last_join_str and isinstance(last_join_str, str) and 'T' in last_join_str:
+            try:
+                last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
+                last_join_date = last_join_dt.strftime('%Y-%m-%d')
+            except Exception:
+                last_join_date = last_join_str.split('T')[0]
+        else:
+            last_join_date = last_join_str if last_join_str else "Hidden"
+
+        guild_prefix = safe_get(data, ['guild', 'prefix'], "")
+        guild_name = safe_get(data, ['guild', 'name'], "")
+        guild_rank = safe_get(data, ['guild', 'rank'], "")
         guild_data = await self.cog_instance.wynn_api.get_guild_by_prefix(guild_prefix)
-        banner_bytes = self.cog_instance.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data else None)
+        banner_bytes = self.cog_instance.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
+
+        mobs_killed = fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
+        playtime = "Hidden" if data.get("playtime", None) == "非公開" else data.get("playtime", 0)
+        wars = fallback_stat(data, ['globalData', 'wars'], ['ranking', 'wars'], ['previousRanking', 'wars'])
+        war_rank_display = safe_get(data, ['ranking', 'warsCompletion'], "Hidden")
+        quests = fallback_stat(data, ['globalData', 'completedQuests'], ['ranking', 'completedQuests'], ['previousRanking', 'completedQuests'])
+        world_events = safe_get(data, ['globalData', 'worldEvents'], 0)
+        total_level = fallback_stat(data, ['globalData', 'totalLevel'], ['ranking', 'totalLevel'], ['previousRanking', 'totalLevel'])
+        chests = fallback_stat(data, ['globalData', 'chestsFound'], ['ranking', 'chestsFound'], ['previousRanking', 'chestsFound'])
+        pvp_kill = "Hidden" if safe_get(data, ['globalData', 'pvp', 'kills'], 0) == "非公開" else str(safe_get(data, ['globalData', 'pvp', 'kills'], 0))
+        pvp_death = "Hidden" if safe_get(data, ['globalData', 'pvp', 'deaths'], 0) == "非公開" else str(safe_get(data, ['globalData', 'pvp', 'deaths'], 0))
+        notg = safe_get(data, ['globalData', 'raids', 'list', 'Nest of the Grootslangs'], 0)
+        nol = safe_get(data, ['globalData', 'raids', 'list', "Orphion's Nexus of Light"], 0)
+        tcc = safe_get(data, ['globalData', 'raids', 'list', 'The Canyon Colossus'], 0)
+        tna = safe_get(data, ['globalData', 'raids', 'list', 'The Nameless Anomaly'], 0)
+        dungeons = safe_get(data, ['globalData', 'dungeons', 'total'], 0)
+        all_raids = safe_get(data, ['globalData', 'raids', 'total'], 0)
+        uuid = data.get("uuid")
 
         profile_info = {
             "username": data.get("username"),
@@ -88,23 +134,23 @@ class PlayerSelectView(discord.ui.View):
             "guild_rank": guild_rank,
             "first_join": first_join_date,
             "last_join": last_join_date,
-            "mobs_killed": data.get('globalData', {}).get('mobsKilled', 0),
-            "playtime": data.get("playtime", 0),
-            "wars": data.get('globalData', {}).get('wars', 0),
-            "war_rank_display": data.get('ranking', {}).get('warsCompletion', "N/A"),
-            "quests": data.get('globalData', {}).get('completedQuests', 0),
-            "world_events": data.get('globalData', {}).get('worldEvents', 0),
-            "total_level": data.get('globalData', {}).get('totalLevel', 0),
-            "chests": data.get('globalData', {}).get('chestsFound', 0),
-            "pvp_kill": f"{data.get('globalData', {}).get('pvp', {}).get('kills', 0)}",
-            "pvp_death": f"{data.get('globalData', {}).get('pvp', {}).get('deaths', 0)}",
-            "notg": data.get('globalData', {}).get('raids', {}).get('list', {}).get('Nest of the Grootslangs', 0),
-            "nol": data.get('globalData', {}).get('raids', {}).get('list', {}).get("Orphion's Nexus of Light", 0),
-            "tcc": data.get('globalData', {}).get('raids', {}).get('list', {}).get('The Canyon Colossus', 0),
-            "tna": data.get('globalData', {}).get('raids', {}).get('list', {}).get('The Nameless Anomaly', 0),
-            "dungeons": data.get('globalData', {}).get('dungeons', {}).get('total', 0),
-            "all_raids": data.get('globalData', {}).get('raids', {}).get('total', 0),
-            "uuid": data.get("uuid"),
+            "mobs_killed": mobs_killed,
+            "playtime": playtime,
+            "wars": wars,
+            "war_rank_display": war_rank_display,
+            "quests": quests,
+            "world_events": world_events,
+            "total_level": total_level,
+            "chests": chests,
+            "pvp_kill": pvp_kill,
+            "pvp_death": pvp_death,
+            "notg": notg,
+            "nol": nol,
+            "tcc": tcc,
+            "tna": tna,
+            "dungeons": dungeons,
+            "all_raids": all_raids,
+            "uuid": uuid,
         }
 
         output_path = f"profile_card_{profile_info['uuid']}.png" if profile_info['uuid'] else "profile_card.png"
@@ -135,6 +181,19 @@ class PlayerCog(commands.Cog):
                 return default
         return v if v is not None else default
 
+    def _fallback_stat(self, data: dict, keys_global: list, keys_ranking: list, keys_prev: list, default="Hidden"):
+        # globalData優先、ranking→previousRanking→default
+        val = self._safe_get(data, keys_global, None)
+        if val is not None:
+            return "Hidden" if val == "非公開" else val
+        val = self._safe_get(data, keys_ranking, None)
+        if val is not None:
+            return "Hidden" if val == "非公開" else val
+        val = self._safe_get(data, keys_prev, None)
+        if val is not None:
+            return "Hidden" if val == "非公開" else val
+        return default
+
     @app_commands.command(name="player", description="プレイヤーのステータスを表示")
     @app_commands.describe(player="MCID or UUID")
     async def player(self, interaction: discord.Interaction, player: str):
@@ -145,19 +204,17 @@ class PlayerCog(commands.Cog):
 
         cache_key = f"player_{player.lower()}"
         cached_data = self.cache.get_cache(cache_key)
-
         if cached_data:
             data = cached_data
         else:
-            api_data = await self.wynn_api.get_official_player_data(player)
-            # 1. エラー返却なら即「見つかりませんでした」
-            if not api_data or (isinstance(api_data, dict) and "error" in api_data and api_data.get("error") != "MultipleObjectsReturned"):
+            data = await self.wynn_api.get_official_player_data(player)
+            if not data or (isinstance(data, dict) and "error" in data and data.get("error") != "MultipleObjectsReturned"):
                 await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
                 return
 
-            # 2. API更新対応: 複数プレイヤーの場合
-            if isinstance(api_data, dict) and api_data.get("error") == "MultipleObjectsReturned" and "objects" in api_data:
-                player_collision_dict = api_data["objects"]
+            # 複数候補の場合は選択Viewを表示
+            if isinstance(data, dict) and data.get("error") == "MultipleObjectsReturned" and "objects" in data:
+                player_collision_dict = data["objects"]
                 view = PlayerSelectView(player_collision_dict=player_collision_dict, cog_instance=self, owner_id=interaction.user.id)
                 if hasattr(view, "select_menu") and view.select_menu.options:
                     await interaction.followup.send(
@@ -166,64 +223,94 @@ class PlayerCog(commands.Cog):
                 else:
                     await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
                 return
-
-            # 3. 単一プレイヤーデータ（usernameキーあり）ならprofile_info
-            if isinstance(api_data, dict) and 'username' in api_data:
-                data = api_data
-                self.cache.set_cache(cache_key, api_data)
+            # キャッシュに保存
+            if isinstance(data, dict) and 'username' in data:
+                self.cache.set_cache(cache_key, data)
             else:
                 await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
                 return
 
-        # サポートランク取得
-        raw_support_rank = data.get('supportRank', 'Player')
+        def safe_get(d, keys, default="Hidden"):
+            v = d
+            for k in keys:
+                if not isinstance(v, dict):
+                    return default
+                v = v.get(k)
+                if v is None:
+                    return default
+            return "Hidden" if v == "非公開" else v
+
+        raw_support_rank = safe_get(data, ['supportRank'], "Player")
         if raw_support_rank and raw_support_rank.lower() == "vipplus":
             support_rank_display = "Vip+"
         elif raw_support_rank and raw_support_rank.lower() == "heroplus":
             support_rank_display = "Hero+"
         else:
-            support_rank_display = (raw_support_rank or 'None').capitalize()
+            support_rank_display = (raw_support_rank or 'Player').capitalize()
 
-        first_join_str = self._safe_get(data, ['firstJoin'], "N/A")
-        first_join_date = first_join_str.split('T')[0] if 'T' in first_join_str else first_join_str
+        first_join_str = safe_get(data, ['firstJoin'], "Hidden")
+        first_join_date = first_join_str.split('T')[0] if first_join_str and 'T' in first_join_str else first_join_str
 
-        last_join_str = self._safe_get(data, ['lastJoin'], "1970-01-01T00:00:00.000Z")
-        try:
-            last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
-            last_join_date = last_join_dt.strftime('%Y-%m-%d')
-        except Exception:
-            last_join_date = last_join_str.split('T')[0] if 'T' in last_join_str else last_join_str
+        last_join_str = safe_get(data, ['lastJoin'], "Hidden")
+        if last_join_str and isinstance(last_join_str, str) and 'T' in last_join_str:
+            try:
+                last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
+                last_join_date = last_join_dt.strftime('%Y-%m-%d')
+            except Exception:
+                last_join_date = last_join_str.split('T')[0]
+        else:
+            last_join_date = last_join_str if last_join_str else "Hidden"
 
-        guild_prefix = self._safe_get(data, ['guild', 'prefix'], "")
+        guild_prefix = safe_get(data, ['guild', 'prefix'], "")
+        guild_name = safe_get(data, ['guild', 'name'], "")
+        guild_rank = safe_get(data, ['guild', 'rank'], "")
         guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
-        banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data else None)
+        banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
+
+        mobs_killed = self._fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
+        playtime = "Hidden" if data.get("playtime", None) == "非公開" else data.get("playtime", 0)
+        wars = self._fallback_stat(data, ['globalData', 'wars'], ['ranking', 'wars'], ['previousRanking', 'wars'])
+        war_rank_display = safe_get(data, ['ranking', 'warsCompletion'], "Hidden")
+        quests = self._fallback_stat(data, ['globalData', 'completedQuests'], ['ranking', 'completedQuests'], ['previousRanking', 'completedQuests'])
+        world_events = safe_get(data, ['globalData', 'worldEvents'], 0)
+        total_level = self._fallback_stat(data, ['globalData', 'totalLevel'], ['ranking', 'totalLevel'], ['previousRanking', 'totalLevel'])
+        chests = self._fallback_stat(data, ['globalData', 'chestsFound'], ['ranking', 'chestsFound'], ['previousRanking', 'chestsFound'])
+        pvp_kill = "Hidden" if safe_get(data, ['globalData', 'pvp', 'kills'], 0) == "非公開" else str(safe_get(data, ['globalData', 'pvp', 'kills'], 0))
+        pvp_death = "Hidden" if safe_get(data, ['globalData', 'pvp', 'deaths'], 0) == "非公開" else str(safe_get(data, ['globalData', 'pvp', 'deaths'], 0))
+        notg = safe_get(data, ['globalData', 'raids', 'list', 'Nest of the Grootslangs'], 0)
+        nol = safe_get(data, ['globalData', 'raids', 'list', "Orphion's Nexus of Light"], 0)
+        tcc = safe_get(data, ['globalData', 'raids', 'list', 'The Canyon Colossus'], 0)
+        tna = safe_get(data, ['globalData', 'raids', 'list', 'The Nameless Anomaly'], 0)
+        dungeons = safe_get(data, ['globalData', 'dungeons', 'total'], 0)
+        all_raids = safe_get(data, ['globalData', 'raids', 'total'], 0)
+        uuid = data.get("uuid")
 
         profile_info = {
             "username": data.get("username"),
             "support_rank_display": support_rank_display,
             "guild_prefix": guild_prefix,
             "banner_bytes": banner_bytes,
-            "guild_name": self._safe_get(data, ['guild', 'name'], ""),
-            "guild_rank": self._safe_get(data, ['guild', 'rank'], ""),
+            "guild_name": guild_name,
+            "guild_rank": guild_rank,
             "first_join": first_join_date,
             "last_join": last_join_date,
-            "mobs_killed": self._safe_get(data, ['globalData', 'mobsKilled'], 0),
-            "playtime": data.get("playtime", 0),
-            "wars": self._safe_get(data, ['globalData', 'wars'], 0),
-            "war_rank_display": self._safe_get(data, ['ranking', 'warsCompletion'], "N/A"),
-            "quests": self._safe_get(data, ['globalData', 'completedQuests'], 0),
-            "world_events": self._safe_get(data, ['globalData', 'worldEvents'], 0),
-            "total_level": self._safe_get(data, ['globalData', 'totalLevel'], 0),
-            "chests": self._safe_get(data, ['globalData', 'chestsFound'], 0),
-            "pvp_kill": f"{self._safe_get(data, ['globalData', 'pvp', 'kills'], 0)}",
-            "pvp_death": f"{self._safe_get(data, ['globalData', 'pvp', 'deaths'], 0)}",
-            "notg": self._safe_get(data, ['globalData', 'raids', 'list', 'Nest of the Grootslangs'], 0),
-            "nol": self._safe_get(data, ['globalData', 'raids', 'list', "Orphion's Nexus of Light"], 0),
-            "tcc": self._safe_get(data, ['globalData', 'raids', 'list', 'The Canyon Colossus'], 0),
-            "tna": self._safe_get(data, ['globalData', 'raids', 'list', 'The Nameless Anomaly'], 0),
-            "dungeons": self._safe_get(data, ['globalData', 'dungeons', 'total'], 0),
-            "all_raids": self._safe_get(data, ['globalData', 'raids', 'total'], 0),
-            "uuid": data.get("uuid"),
+            "mobs_killed": mobs_killed,
+            "playtime": playtime,
+            "wars": wars,
+            "war_rank_display": war_rank_display,
+            "quests": quests,
+            "world_events": world_events,
+            "total_level": total_level,
+            "chests": chests,
+            "pvp_kill": pvp_kill,
+            "pvp_death": pvp_death,
+            "notg": notg,
+            "nol": nol,
+            "tcc": tcc,
+            "tna": tna,
+            "dungeons": dungeons,
+            "all_raids": all_raids,
+            "uuid": uuid,
         }
 
         output_path = f"profile_card_{profile_info['uuid']}.png" if profile_info['uuid'] else "profile_card.png"
