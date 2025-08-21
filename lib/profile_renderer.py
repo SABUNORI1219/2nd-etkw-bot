@@ -108,6 +108,12 @@ def generate_profile_card(info, output_path="profile_card.png"):
         # バナー中央下に配置（バナーに少し重ねる位置）
         box_x = banner_x + (banner_size[0] - box_w) // 2
         box_y = banner_y + banner_size[1] - int(box_h * 0.4)
+        # 影用画像
+        shadow = Image.new("RGBA", (box_w+8, box_h+8), (0,0,0,0))
+        shadow_draw = ImageDraw.Draw(shadow)
+        shadow_draw.rounded_rectangle([4,4,box_w+4,box_h+4], radius=16, fill=(0,0,0,80))
+        shadow = shadow.filter(ImageFilter.GaussianBlur(3))
+        img.paste(shadow, (box_x-4, box_y-4), mask=shadow)
         # 薄黒色四角形（透明度180/255くらい）
         rect_img = gradient_rect((box_w, box_h), (30,30,30,220), (60,60,60,160), radius=14)
         img.paste(rect_img, (box_x, box_y), mask=rect_img)
