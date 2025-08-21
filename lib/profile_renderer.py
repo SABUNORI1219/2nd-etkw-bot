@@ -53,6 +53,43 @@ def fmt_num(val):
         return f"{val:,}"
     return str(val)
 
+def draw_status_circle(base_img, left_x, center_y, status="online"):
+    """status: 'online' or 'offline'. Draws a circle with gradient and shadow."""
+    circle_radius = 15
+    shadow_radius = 22
+    circle_box = [left_x, center_y - circle_radius, left_x + 2*circle_radius, center_y + circle_radius]
+    shadow_box = [left_x - (shadow_radius - circle_radius), center_y - shadow_radius, left_x + shadow_radius + circle_radius, center_y + shadow_radius]
+
+    # Draw shadow
+    shadow = Image.new("RGBA", base_img.size, (0,0,0,0))
+    shadow_draw = ImageDraw.Draw(shadow)
+    shadow_draw.ellipse(shadow_box, fill=(0,0,0,60))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(4))
+    base_img.alpha_composite(shadow)
+
+    # Draw gradient circle
+    circle = Image.new("RGBA", (2*circle_radius, 2*circle_radius), (0,0,0,0))
+    grad_draw = ImageDraw.Draw(circle)
+    for r in range(circle_radius, 0, -1):
+        if status == "online":
+            # green gradient
+            col = (
+                int(40 + 100 * (r / circle_radius)), 
+                int(200 + 40 * (r / circle_radius)), 
+                int(40 + 20 * (r / circle_radius)), 
+                255
+            )
+        else:
+            # red gradient
+            col = (
+                int(180 + 50 * (r / circle_radius)), 
+                int(40 + 30 * (r / circle_radius)), 
+                int(40 + 30 * (r / circle_radius)), 
+                255
+            )
+        grad_draw.ellipse([circle_radius - r, circle_radius - r, circle_radius + r, circle_radius + r], fill=col)
+    base_img.alpha_composite(circle, (left_x, center_y - circle_radius))
+
 def generate_profile_card(info, output_path="profile_card.png"):
     try:
         img = Image.open(BASE_IMG_PATH).convert("RGBA")
@@ -235,8 +272,19 @@ def generate_profile_card(info, output_path="profile_card.png"):
         x = x_grank + i * (star_size)
         img.paste(rank_star_img, (x, y_star), mask=rank_star_img)
 
-    draw.text((330, 410), f"{info.get('server_display', 'Unknown')}", font=font_main, fill=(60,40,30,255))
-    draw.text((330, 485), f"{info.get('active_char_info', 'Unknown')}", font=font_main, fill=(60,40,30,255))
+    server_display = info.get('server_display', 'Unknown')
+    active_char_info = info.get('active_char_info', 'Unknown')
+    # 左側にステータス丸（オンライン：緑、オフライン：赤）を描画
+    status_circle_x = 90
+    status_circle_y = 410 + 22
+    text_x = status_circle_x + 36
+    text_y = 410
+    if server_display.lower() == "online":
+        draw_status_circle(img, status_circle_x, status_circle_y, status="online")
+    elif server_display.lower() == "offline":
+        draw_status_circle(img, status_circle_x, status_circle_y, status="offline")
+    draw.text((text_x, text_y), f"{server_display}", font=font_main, fill=(60,40,30,255))
+    draw.text((text_x, text_y+45), f"{active_char_info}", font=font_main, fill=(60,40,30,255))
 
     draw.text((90, 600), f"First Join: {info.get('first_join', 'N/A')}", font=font_raids, fill=(60,40,30,255))
     draw.text((90, 675), f"Last Seen: {info.get('last_join', 'N/A')}", font=font_raids, fill=(60,40,30,255))
@@ -290,7 +338,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((475, 1150), "Wars", font=font_raids, fill=(60,40,30,255))
     wars_text = fmt_num(info.get('wars', 0))
     draw.text((800, 1150), wars_text, font=font_raids, fill=(60,40,30,255))
-    bbox = draw.textbbox((800, 1150), wars_text, font=font_sub)
+    bbox = draw.textbbox((800, 1150), wars_text, font=font_raids)
     x_wars = bbox[2] + 6
     draw.text((x_wars, 1150 + 18), f" #{info.get('war_rank_display', 'N/A')}", font=font_mini, fill=(60,40,30,255))
 
