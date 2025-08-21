@@ -187,7 +187,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     skin_h = 196
     
     rank_box_x = skin_x + (skin_w // 2) - (rank_box_w // 2)
-    rank_box_y = skin_y + skin_h - 8
+    rank_box_y = skin_y + skin_h - 6
 
     # ドロップシャドウ
     shadow = Image.new("RGBA", (rank_box_w+8, rank_box_h+8), (0,0,0,0))
