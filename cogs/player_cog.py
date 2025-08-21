@@ -237,8 +237,9 @@ class PlayerCog(commands.Cog):
         if not raid_list or not isinstance(raid_list, dict):
             return "???"
         return raid_list.get(raid_key, 0)
-
-    @app_commands.command(name="player", description="プレイヤーのステータスを表示")
+        
+    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
+    @app_commands.command(name="player", description="プレイヤーのプロファイルカードを表示")
     @app_commands.describe(player="MCID or UUID")
     async def player(self, interaction: discord.Interaction, player: str):
         await interaction.response.defer()
