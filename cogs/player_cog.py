@@ -27,7 +27,7 @@ class PlayerSelectView(discord.ui.View):
                     rank_display = "Vip+"
                 else:
                     rank_display = (raw_support_rank or 'None').capitalize()
-                stored_name = player_info.get('storedName', 'Unknown')
+                stored_name = player_info.get('username', 'Unknown')
                 label_text = f"{stored_name} [{rank_display}]"
                 options.append(discord.SelectOption(
                     label=label_text, 
@@ -70,7 +70,7 @@ class PlayerSelectView(discord.ui.View):
         except Exception:
             last_join_date = last_join_str.split('T')[0] if 'T' in last_join_str else last_join_str
         guild_prefix = data.get('guild', {}).get('prefix', "")
-        guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
+        guild_data = await self.cog_instance.wynn_api.get_guild_by_prefix(guild_prefix)
         banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data else None)
 
         profile_info = {
