@@ -114,9 +114,24 @@ class PlayerSelectView(discord.ui.View):
         guild_prefix = safe_get(data, ['guild', 'prefix'], "")
         guild_name = safe_get(data, ['guild', 'name'], "")
         guild_rank = safe_get(data, ['guild', 'rank'], "")
-        guild_rank_stars = safe_get(data, ['guild', 'rankStars'], "")
         guild_data = await self.cog_instance.wynn_api.get_guild_by_prefix(guild_prefix)
         banner_bytes = self.cog_instance.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
+
+        is_online = self._safe_get(data, ['online'], False)
+        server = self._safe_get(data, ['server'], "???")
+        if is_online:
+            server_display = f"Online on {server}"
+        else:
+            server_display = "Offline"
+
+        char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
+        char_type = self._safe_get(char_obj, ['type'])
+        nickname = self._safe_get(char_obj, ['nickname'])
+        reskin = self._safe_get(char_obj, ['reskin'])
+        if reskin != "N/A":
+            active_char_info = f"{reskin} ({nickname})"
+        else:
+            active_char_info = f"{char_type} ({nickname})"
 
         # globalData系ステータス
         mobs_killed = fallback_stat(data, ['globalData', 'mobsKilled'])
@@ -149,7 +164,8 @@ class PlayerSelectView(discord.ui.View):
             "banner_bytes": banner_bytes,
             "guild_name": guild_name,
             "guild_rank": guild_rank,
-            "guild_rank_stars": guild_rank_stars,
+            "server_display": server_display,
+            "active_char_info": active_char_info,
             "first_join": first_join_date,
             "last_join": last_join_date,
             "mobs_killed": mobs_killed,
@@ -287,9 +303,24 @@ class PlayerCog(commands.Cog):
         guild_prefix = safe_get(data, ['guild', 'prefix'], "")
         guild_name = safe_get(data, ['guild', 'name'], "")
         guild_rank = safe_get(data, ['guild', 'rank'], "")
-        guild_rank_stars = safe_get(data, ['guild', 'rankStars'], "")
         guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
         banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
+
+        is_online = self._safe_get(data, ['online'], False)
+        server = self._safe_get(data, ['server'], "???")
+        if is_online:
+            server_display = f"Online on {server}"
+        else:
+            server_display = "Offline"
+
+        char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
+        char_type = self._safe_get(char_obj, ['type'])
+        nickname = self._safe_get(char_obj, ['nickname'])
+        reskin = self._safe_get(char_obj, ['reskin'])
+        if reskin != "N/A":
+            active_char_info = f"{reskin} ({nickname})"
+        else:
+            active_char_info = f"{char_type} ({nickname})"
 
         mobs_killed = self._fallback_stat(data, ['globalData', 'mobsKilled'])
         playtime = data.get("playtime", "???") if data.get("playtime", None) is not None else "???"
@@ -319,7 +350,8 @@ class PlayerCog(commands.Cog):
             "banner_bytes": banner_bytes,
             "guild_name": guild_name,
             "guild_rank": guild_rank,
-            "guild_rank_stars": guild_rank_stars,
+            "server_display": server_display,
+            "active_char_info": active_char_info,
             "first_join": first_join_date,
             "last_join": last_join_date,
             "mobs_killed": mobs_killed,
