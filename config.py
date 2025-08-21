@@ -4,7 +4,7 @@ import discord
 # Wynncraft API関連
 NORI_GUILD_API_URL = "https://nori.fish/api/guild/{}"
 NORI_PLAYER_API_URL = "https://nori.fish/api/player/{}"
-WYNN_PLAYER_API_URL = "https://api.wynncraft.com/v3/player/{}"
+WYNN_PLAYER_API_URL = "https://api.wynncraft.com/v3/player/{}?fullResult"
 WYNN_GUILD_BY_NAME_API_URL = "https://api.wynncraft.com/v3/guild/{}"
 WYNN_GUILD_BY_PREFIX_API_URL = "https://api.wynncraft.com/v3/guild/prefix/{}"
 GUILD_NAME = "Empire of TKW"
