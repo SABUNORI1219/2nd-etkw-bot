@@ -235,11 +235,11 @@ def generate_profile_card(info, output_path="profile_card.png"):
         x = x_grank + i * (star_size)
         img.paste(rank_star_img, (x, y_star), mask=rank_star_img)
 
-    draw.text((330, 410), f"info.get('server_display', 'Unknown')", font=font_main, fill=(60,40,30,255))
-    draw.text((330, 485), f"info.get('active_char_info', 'Unknown')", font=font_main, fill=(60,40,30,255))
+    draw.text((330, 410), f"{info.get('server_display', 'Unknown')}", font=font_main, fill=(60,40,30,255))
+    draw.text((330, 485), f"{info.get('active_char_info', 'Unknown')}", font=font_main, fill=(60,40,30,255))
 
     draw.text((90, 600), f"First Join: {info.get('first_join', 'N/A')}", font=font_raids, fill=(60,40,30,255))
-    draw.text((90, 675), f"Last Seen: {info.get('last_join', 'N/A')}", font=font_small, fill=(60,40,30,255))
+    draw.text((90, 675), f"Last Seen: {info.get('last_join', 'N/A')}", font=font_raids, fill=(60,40,30,255))
     
     draw.text((90, 800), "Mobs", font=font_sub, fill=(60,40,30,255))
     draw.text((330, 800), fmt_num(info.get('mobs_killed', 0)), font=font_sub, fill=(60,40,30,255))
