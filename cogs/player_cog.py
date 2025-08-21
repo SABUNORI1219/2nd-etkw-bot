@@ -263,7 +263,7 @@ class PlayerCog(commands.Cog):
         guild_name = safe_get(data, ['guild', 'name'], "")
         guild_rank = safe_get(data, ['guild', 'rank'], "")
         guild_rank_stars = safe_get(data, ['guild', 'rankStars'], "")
-        guild_data = await self.banner_renderer.wynn_api.get_guild_by_prefix(guild_prefix)
+        guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
         banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
 
         mobs_killed = self._fallback_stat(data, ['globalData', 'mobsKilled'], ['ranking', 'mobsKilled'], ['previousRanking', 'mobsKilled'])
