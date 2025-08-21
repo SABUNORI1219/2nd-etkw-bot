@@ -7,7 +7,7 @@ import os
 logger = logging.getLogger(__name__)
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia-Regular.ttf")
-BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/5bf8ec18-6901-4825-9125-d8aba4d6a4b8.png")
+BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/profile_card.png")
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 RANK_STAR_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/rankStar.png")
 RANK_ICON_MAP = {
@@ -58,11 +58,10 @@ def draw_status_circle(base_img, left_x, center_y, status="online"):
     circle_img = Image.new("RGBA", (2*circle_radius, 2*circle_radius), (0,0,0,0))
     draw = ImageDraw.Draw(circle_img)
 
-    # ラジアルグラデーション（白いハイライトなし）
+    # ラジアルグラデーション（中央明るめ、外側暗め）
     for r in range(circle_radius, 0, -1):
         ratio = r / circle_radius
         if status == "online":
-            # 緑
             col = (
                 int(60 + 140 * ratio),
                 int(230 - 60 * ratio),
@@ -70,7 +69,6 @@ def draw_status_circle(base_img, left_x, center_y, status="online"):
                 255
             )
         else:
-            # 赤
             col = (
                 int(220 - 40 * ratio),
                 int(60 + 40 * ratio),
@@ -79,14 +77,15 @@ def draw_status_circle(base_img, left_x, center_y, status="online"):
             )
         draw.ellipse([circle_radius-r, circle_radius-r, circle_radius+r, circle_radius+r], fill=col)
 
-    # 影（少しだけ）
-    shadow = Image.new("RGBA", base_img.size, (0,0,0,0))
-    shadow_draw = ImageDraw.Draw(shadow)
-    shadow_box = [left_x+3, center_y+circle_radius+1, left_x+2*circle_radius-3, center_y+2*circle_radius]
-    shadow_draw.ellipse(shadow_box, fill=(0,0,0,40))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(3))
-    base_img.alpha_composite(shadow)
+    # 輪郭（アウトライン）を描画
+    if status == "online":
+        outline_color = (16, 100, 16, 255)
+    else:
+        outline_color = (180, 32, 32, 255)
+    # 1px太さで外周に楕円描画
+    draw.ellipse([0, 0, 2*circle_radius-1, 2*circle_radius-1], outline=outline_color, width=2)
 
+    # 影は描画しない（絵文字風にシャープに仕上げる）
     base_img.alpha_composite(circle_img, (left_x, center_y - circle_radius))
 
 def generate_profile_card(info, output_path="profile_card.png"):
@@ -322,6 +321,8 @@ def generate_profile_card(info, output_path="profile_card.png"):
     bbox = draw.textbbox((650, 1025), total_text, font=font_small)
     x_lvl = bbox[2] + 3
     draw.text((x_lvl, 1025 + 18), "lv.", font=font_mini, fill=(60,40,30,255))
+
+    draw.text((90, 1075), "Content Clears", font=font_main, fill=(60,40,30,255))
 
     right_edge_x = 440
     raid_keys = [("NOTG", "notg", 1150), ("NOL", "nol", 1200), ("TCC", "tcc", 1250),
