@@ -90,7 +90,7 @@ class PlayerSelectView(discord.ui.View):
             # キーが無ければ未プレイ
             return raid_list.get(raid_key, 0)
 
-        raw_support_rank = safe_get(data, ['supportRank'])
+        raw_support_rank = safe_get(data, ['supportRank'], "None")
         if raw_support_rank and raw_support_rank.lower() == "vipplus":
             support_rank_display = "Vip+"
         elif raw_support_rank and raw_support_rank.lower() == "heroplus":
@@ -263,7 +263,7 @@ class PlayerCog(commands.Cog):
                     return default
             return v
 
-        raw_support_rank = safe_get(data, ['supportRank'])
+        raw_support_rank = safe_get(data, ['supportRank'], "None")
         if raw_support_rank and raw_support_rank.lower() == "vipplus":
             support_rank_display = "Vip+"
         elif raw_support_rank and raw_support_rank.lower() == "heroplus":
