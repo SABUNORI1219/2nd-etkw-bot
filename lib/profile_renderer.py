@@ -162,7 +162,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
             logger.error(f"Skin image load failed: {e}")
             draw.rectangle([60, 120, 180, 240], fill=(160,160,160,255))
 
-    rank_text = info.get('support_rank_display', 'None')
+    rank_text = info.get('support_rank_display')
     rank_colors = RANK_COLOR_MAP.get(rank_text, RANK_COLOR_MAP['None'])
     rank_font = font_rank
     rank_bbox = draw.textbbox((0,0), rank_text, font=rank_font)
