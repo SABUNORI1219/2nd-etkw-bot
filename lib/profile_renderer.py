@@ -53,22 +53,25 @@ def fmt_num(val):
         return f"{val:,}"
     return str(val)
 
-def split_guild_name_to_lines(guild_name, font, max_text_width, draw):
+def split_guild_name_by_pixel_and_word(guild_name, font, start_x, threshold_x, draw):
     words = guild_name.split()
-    if not words:
+    # もしx座標がthreshold_xを超えないなら1行
+    if start_x < threshold_x:
         return [guild_name]
-    # 1単語ずつ追加していき、合計幅がmax_text_widthを超えたらそこで分割
-    line = ""
-    for i in range(1, len(words) + 1):
-        candidate = " ".join(words[:i])
-        if draw.textlength(candidate, font=font) > max_text_width:
-            if i == 1:
-                # 1単語で超えた場合は強制分割
-                half = len(candidate) // 2
-                return [candidate[:half], candidate[half:] + " " + " ".join(words[i:])]
-            else:
-                return [" ".join(words[:i-1]), " ".join(words[i-1:])]
-    return [guild_name]
+    # 単語ごとに分割して2行に
+    # できるだけ均等な長さになるように分ける
+    best_split = 1
+    min_diff = float('inf')
+    for i in range(1, len(words)):
+        line1 = " ".join(words[:i])
+        line2 = " ".join(words[i:])
+        l1_len = draw.textlength(line1, font=font)
+        l2_len = draw.textlength(line2, font=font)
+        diff = abs(l1_len - l2_len)
+        if diff < min_diff:
+            min_diff = diff
+            best_split = i
+    return [" ".join(words[:best_split]), " ".join(words[best_split:])]
 
 def draw_status_circle(base_img, left_x, center_y, status="online"):
     circle_radius = 15
@@ -265,7 +268,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((rank_text_x, rank_text_y), rank_text, font=rank_font, fill=(255,255,255,255))
 
     text_base_x = banner_x + banner_size[0] + 10
-    guild_name_lines = split_guild_name_to_lines(guild_name_display, font_main, 1000, draw)
+    guild_name_lines = split_guild_name_by_pixel_and_word(guild_name_display, font_main, text_base_x, 1000, draw)
     if len(guild_name_lines) == 1:
         draw.text((text_base_x, banner_y), guild_name_lines[0], font=font_main, fill=(60,40,30,255))
     else:
