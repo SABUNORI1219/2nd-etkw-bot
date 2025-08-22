@@ -33,7 +33,7 @@ def paste_wynn_icon_bg(base_img, icon_path, pos=(0,0), target_size=(120,120), al
         icon_img = icon_img.resize(target_size, Image.LANCZOS)
         alpha_layer = icon_img.split()[3].point(lambda p: alpha)
         icon_img.putalpha(alpha_layer)
-        base_img.alpha_composite(icon_img, pos)
+        base_img.paste(icon_img, pos, mask=icon_img)
     except Exception as e:
         logger.error(f"Wynncraftアイコン読み込み失敗: {e}")
 
