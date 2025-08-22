@@ -27,21 +27,6 @@ RANK_COLOR_MAP = {
     "None": ((160, 160, 160, 220), (80, 80, 80, 200)),          # 灰色
 }
 
-def paste_wynn_icon_bg_safe(base_img, icon_path, pos=(0,0), target_size=(120,120), alpha=160):
-    try:
-        icon_img = Image.open(icon_path).convert("RGBA")
-        icon_img = icon_img.resize(target_size, Image.LANCZOS)
-        # α値の減衰
-        alpha_layer = icon_img.split()[3].point(lambda p: int(p * (alpha / 255)))
-        icon_img.putalpha(alpha_layer)
-
-        # base_imgと同じサイズの透明画像を生成
-        overlay = Image.new("RGBA", base_img.size, (0,0,0,0))
-        overlay.paste(icon_img, pos, mask=icon_img)
-        base_img.alpha_composite(overlay)
-    except Exception as e:
-        logger.error(f"Wynncraftアイコン読み込み失敗: {e}")
-
 def gradient_rect(size, color_top, color_bottom, radius):
     w, h = size
     base = Image.new("RGBA", (w, h), (0,0,0,0))
@@ -170,8 +155,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
     except Exception as e:
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = font_rank = ImageFont.load_default()
-
-    paste_wynn_icon_bg_safe(img, WYNN_ICON_PATH, pos=(620, 100), target_size=(324,324), alpha=160)
 
     draw.text((90, 140), f"{info.get('username', 'No Name')}", font=font_title, fill=(60,40,30,255))
 
