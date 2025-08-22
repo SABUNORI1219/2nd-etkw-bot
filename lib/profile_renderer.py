@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia-Regular.ttf")
 BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/profile_card.png")
+WYNN_ICON_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/wynn_icon.png")
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 RANK_STAR_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/rankStar.png")
 RANK_ICON_MAP = {
@@ -25,6 +26,16 @@ RANK_COLOR_MAP = {
     "Vip": ((80, 255, 120, 230), (0, 190, 40, 200)),            # 緑
     "None": ((160, 160, 160, 220), (80, 80, 80, 200)),          # 灰色
 }
+
+def paste_wynn_icon_bg(base_img, icon_path, pos=(0,0), target_size=(120,120), alpha=160):
+    try:
+        icon_img = Image.open(icon_path).convert("RGBA")
+        icon_img = icon_img.resize(target_size, Image.LANCZOS)
+        alpha_layer = icon_img.split()[3].point(lambda p: alpha)
+        icon_img.putalpha(alpha_layer)
+        base_img.alpha_composite(icon_img, pos)
+    except Exception as e:
+        logger.error(f"Wynncraftアイコン読み込み失敗: {e}")
 
 def gradient_rect(size, color_top, color_bottom, radius):
     w, h = size
@@ -155,7 +166,9 @@ def generate_profile_card(info, output_path="profile_card.png"):
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = font_rank = ImageFont.load_default()
 
-    draw.text((90, 140), f"{info.get('username', 'NoName')}", font=font_title, fill=(60,40,30,255))
+    paste_wynn_icon_bg(img, WYNN_ICON_PATH, pos=(650, 1320), target_size=(120,120), alpha=160)
+
+    draw.text((90, 140), f"{info.get('username', 'No Name')}", font=font_title, fill=(60,40,30,255))
 
     banner_bytes = info.get("banner_bytes")
     guild_banner_img = None
