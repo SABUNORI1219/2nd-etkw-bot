@@ -56,7 +56,48 @@ class PlayerSelectView(discord.ui.View):
         if not data or 'uuid' not in data:
             await interaction.message.edit(content="選択されたプレイヤーの情報を取得できませんでした。", embed=None, view=None)
             return
+        # 共通処理呼び出し（Viewからはeditのみ）
+        await self.cog_instance.handle_player_data(interaction, data, use_edit=True)
 
+class PlayerCog(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        self.wynn_api = WynncraftAPI()
+        self.banner_renderer = BannerRenderer()
+        self.cache = CacheHandler()
+
+    def _safe_get(self, data: dict, keys: list, default=None):
+        v = data
+        for key in keys:
+            if not isinstance(v, dict):
+                return default
+            v = v.get(key)
+            if v is None:
+                return default
+        return v if v is not None else default
+
+    def _fallback_stat(self, data: dict, keys_global: list, default="???"):
+        val = self._safe_get(data, keys_global, None)
+        if val is not None:
+            return val
+        return default
+
+    def _get_raid_stat(self, data: dict, raid_key: str):
+        global_data = data.get("globalData")
+        if not global_data or not isinstance(global_data, dict):
+            return "???"
+        raids = global_data.get("raids")
+        if not raids or not isinstance(raids, dict):
+            return "???"
+        raid_list = raids.get("list")
+        if raid_list == {}:
+            return 0
+        if not raid_list or not isinstance(raid_list, dict):
+            return "???"
+        return raid_list.get(raid_key, 0)
+
+    async def handle_player_data(self, interaction, data, use_edit=False):
+        # 共通処理化: プレイヤーデータからプロフィールカードを生成して送信
         def safe_get(d, keys, default="???"):
             v = d
             for k in keys:
@@ -67,14 +108,12 @@ class PlayerSelectView(discord.ui.View):
                     return default
             return v
 
-        # fallback_statはglobalDataのみ参照
         def fallback_stat(data, keys_global, default="???"):
             val = safe_get(data, keys_global, None)
             if val is not None:
                 return val
             return default
 
-        # --- レイド数取得専用 ---
         def get_raid_stat(data, raid_key):
             global_data = data.get("globalData")
             if not global_data or not isinstance(global_data, dict):
@@ -87,7 +126,6 @@ class PlayerSelectView(discord.ui.View):
                 return 0
             if not raid_list or not isinstance(raid_list, dict):
                 return "???"
-            # キーが無ければ未プレイ
             return raid_list.get(raid_key, 0)
 
         raw_support_rank = safe_get(data, ['supportRank'], "None")
@@ -114,8 +152,8 @@ class PlayerSelectView(discord.ui.View):
         guild_prefix = safe_get(data, ['guild', 'prefix'], "")
         guild_name = safe_get(data, ['guild', 'name'], "")
         guild_rank = safe_get(data, ['guild', 'rank'], "")
-        guild_data = await self.cog_instance.wynn_api.get_guild_by_prefix(guild_prefix)
-        banner_bytes = self.cog_instance.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
+        guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
+        banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
 
         is_online = safe_get(data, ['online'], False)
         server = safe_get(data, ['server'], "???")
@@ -136,7 +174,6 @@ class PlayerSelectView(discord.ui.View):
             else:
                 active_char_info = f"{char_type}"
 
-        # globalData系ステータス
         mobs_killed = fallback_stat(data, ['globalData', 'mobsKilled'])
         playtime = data.get("playtime", "???") if data.get("playtime", None) is not None else "???"
         wars = fallback_stat(data, ['globalData', 'wars'])
@@ -149,10 +186,17 @@ class PlayerSelectView(discord.ui.View):
         dungeons = fallback_stat(data, ['globalData', 'dungeons', 'total'])
         all_raids = fallback_stat(data, ['globalData', 'raids', 'total'])
 
-        # war_rank_displayのみranking参照
-        war_rank_display = safe_get(data, ['ranking', 'warsCompletion'], "N/A")
+        # war_rank_display分岐
+        ranking_obj = safe_get(data, ['ranking'], None)
+        if ranking_obj is None:
+            war_rank_display = "非公開"
+        else:
+            war_rank_completion = ranking_obj.get('warsCompletion')
+            if war_rank_completion is None:
+                war_rank_display = "N/A"
+            else:
+                war_rank_display = str(war_rank_completion)
 
-        # レイド数系
         notg = get_raid_stat(data, 'Nest of the Grootslangs')
         nol = get_raid_stat(data, "Orphion's Nexus of Light")
         tcc = get_raid_stat(data, 'The Canyon Colossus')
@@ -194,50 +238,20 @@ class PlayerSelectView(discord.ui.View):
         try:
             generate_profile_card(profile_info, output_path)
             file = discord.File(output_path, filename=os.path.basename(output_path))
-            await interaction.message.edit(content=None, attachments=[file], embed=None, view=None)
+            # 選択Viewからの呼び出し（edit）か、コマンド直（send）かで分岐
+            if use_edit:
+                await interaction.message.edit(content=None, attachments=[file], embed=None, view=None)
+            else:
+                await interaction.followup.send(file=file)
             if os.path.exists(output_path):
                 os.remove(output_path)
         except Exception as e:
             logger.error(f"画像生成または送信失敗: {e}")
-            await interaction.message.edit(content="プロフィール画像生成に失敗しました。", embed=None, view=None)
+            if use_edit:
+                await interaction.message.edit(content="プロフィール画像生成に失敗しました。", embed=None, view=None)
+            else:
+                await interaction.followup.send("プロフィール画像生成に失敗しました。")
 
-class PlayerCog(commands.Cog):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self.wynn_api = WynncraftAPI()
-        self.banner_renderer = BannerRenderer()
-        self.cache = CacheHandler()
-
-    def _safe_get(self, data: dict, keys: list, default=None):
-        v = data
-        for key in keys:
-            if not isinstance(v, dict):
-                return default
-            v = v.get(key)
-            if v is None:
-                return default
-        return v if v is not None else default
-
-    def _fallback_stat(self, data: dict, keys_global: list, default="???"):
-        val = self._safe_get(data, keys_global, None)
-        if val is not None:
-            return val
-        return default
-
-    def _get_raid_stat(self, data: dict, raid_key: str):
-        global_data = data.get("globalData")
-        if not global_data or not isinstance(global_data, dict):
-            return "???"
-        raids = global_data.get("raids")
-        if not raids or not isinstance(raids, dict):
-            return "???"
-        raid_list = raids.get("list")
-        if raid_list == {}:
-            return 0
-        if not raid_list or not isinstance(raid_list, dict):
-            return "???"
-        return raid_list.get(raid_key, 0)
-        
     @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
     @app_commands.command(name="player", description="プレイヤーのプロファイルカードを表示")
     @app_commands.describe(player="MCID or UUID")
@@ -270,123 +284,8 @@ class PlayerCog(commands.Cog):
                 await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
                 return
 
-        def safe_get(d, keys, default="???"):
-            v = d
-            for k in keys:
-                if not isinstance(v, dict):
-                    return default
-                v = v.get(k)
-                if v is None:
-                    return default
-            return v
-
-        raw_support_rank = safe_get(data, ['supportRank'], "None")
-        if raw_support_rank and raw_support_rank.lower() == "vipplus":
-            support_rank_display = "Vip+"
-        elif raw_support_rank and raw_support_rank.lower() == "heroplus":
-            support_rank_display = "Hero+"
-        else:
-            support_rank_display = (raw_support_rank or 'None').capitalize()
-
-        first_join_str = safe_get(data, ['firstJoin'], "???")
-        first_join_date = first_join_str.split('T')[0] if first_join_str and 'T' in first_join_str else first_join_str
-
-        last_join_str = safe_get(data, ['lastJoin'], "???")
-        if last_join_str and isinstance(last_join_str, str) and 'T' in last_join_str:
-            try:
-                last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
-                last_join_date = last_join_dt.strftime('%Y-%m-%d')
-            except Exception:
-                last_join_date = last_join_str.split('T')[0]
-        else:
-            last_join_date = last_join_str if last_join_str else "???"
-
-        guild_prefix = safe_get(data, ['guild', 'prefix'], "")
-        guild_name = safe_get(data, ['guild', 'name'], "")
-        guild_rank = safe_get(data, ['guild', 'rank'], "")
-        guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
-        banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
-
-        is_online = self._safe_get(data, ['online'], False)
-        server = self._safe_get(data, ['server'], "???")
-        if is_online:
-            server_display = f"Online on {server}"
-        else:
-            server_display = "Offline"
-
-        active_char_uuid = self._safe_get(data, ['activeCharacter'])
-        if active_char_uuid is None:
-            active_char_info = "???"
-        else:
-            char_obj = self._safe_get(data, ['characters', active_char_uuid], {})
-            char_type = self._safe_get(char_obj, ['type'], "???")
-            reskin = self._safe_get(char_obj, ['reskin'], "N/A")
-            if reskin != "N/A":
-                active_char_info = f"{reskin}"
-            else:
-                active_char_info = f"{char_type}"
-
-        mobs_killed = self._fallback_stat(data, ['globalData', 'mobsKilled'])
-        playtime = data.get("playtime", "???") if data.get("playtime", None) is not None else "???"
-        wars = self._fallback_stat(data, ['globalData', 'wars'])
-        quests = self._fallback_stat(data, ['globalData', 'completedQuests'])
-        world_events = self._fallback_stat(data, ['globalData', 'worldEvents'])
-        total_level = self._fallback_stat(data, ['globalData', 'totalLevel'])
-        chests = self._fallback_stat(data, ['globalData', 'chestsFound'])
-        pvp_kill = str(safe_get(data, ['globalData', 'pvp', 'kills'], "???"))
-        pvp_death = str(safe_get(data, ['globalData', 'pvp', 'deaths'], "???"))
-        dungeons = self._fallback_stat(data, ['globalData', 'dungeons', 'total'])
-        all_raids = self._fallback_stat(data, ['globalData', 'raids', 'total'])
-
-        war_rank_display = safe_get(data, ['ranking', 'warsCompletion'], "N/A")
-
-        notg = self._get_raid_stat(data, 'Nest of the Grootslangs')
-        nol = self._get_raid_stat(data, "Orphion's Nexus of Light")
-        tcc = self._get_raid_stat(data, 'The Canyon Colossus')
-        tna = self._get_raid_stat(data, 'The Nameless Anomaly')
-
-        uuid = data.get("uuid")
-
-        profile_info = {
-            "username": data.get("username"),
-            "support_rank_display": support_rank_display,
-            "guild_prefix": guild_prefix,
-            "banner_bytes": banner_bytes,
-            "guild_name": guild_name,
-            "guild_rank": guild_rank,
-            "server_display": server_display,
-            "active_char_info": active_char_info,
-            "first_join": first_join_date,
-            "last_join": last_join_date,
-            "mobs_killed": mobs_killed,
-            "playtime": playtime,
-            "wars": wars,
-            "war_rank_display": war_rank_display,
-            "quests": quests,
-            "world_events": world_events,
-            "total_level": total_level,
-            "chests": chests,
-            "pvp_kill": pvp_kill,
-            "pvp_death": pvp_death,
-            "notg": notg,
-            "nol": nol,
-            "tcc": tcc,
-            "tna": tna,
-            "dungeons": dungeons,
-            "all_raids": all_raids,
-            "uuid": uuid,
-        }
-
-        output_path = f"profile_card_{profile_info['uuid']}.png" if profile_info['uuid'] else "profile_card.png"
-        try:
-            generate_profile_card(profile_info, output_path)
-            file = discord.File(output_path, filename=os.path.basename(output_path))
-            await interaction.followup.send(file=file)
-            if os.path.exists(output_path):
-                os.remove(output_path)
-        except Exception as e:
-            logger.error(f"画像生成または送信失敗: {e}")
-            await interaction.followup.send("プロフィール画像生成に失敗しました。")
+        # 共通処理呼び出し
+        await self.handle_player_data(interaction, data, use_edit=False)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(PlayerCog(bot))
