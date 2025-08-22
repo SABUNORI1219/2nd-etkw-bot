@@ -342,7 +342,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((475, 1200), "WEs", font=font_raids, fill=(60,40,30,255))
     y_wars = 1150
     y_world_events = 1200
-    x_right_align = 800
+    x_right_align = 775
 
     bbox_wars = draw.textbbox((0,0), wars_text, font=font_raids)
     wars_width = bbox_wars[2] - bbox_wars[0]
