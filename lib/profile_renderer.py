@@ -277,6 +277,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
             font_guild_small = ImageFont.load_default()
         draw.text((text_base_x, banner_y), guild_name_lines[0], font=font_guild_small, fill=(60,40,30,255))
         draw.text((text_base_x, banner_y + 33 + 5), guild_name_lines[1], font=font_guild_small, fill=(60,40,30,255))
+        banner_y += 10
 
     guild_rank_text = str(info.get('guild_rank', ''))
     star_num = 0
