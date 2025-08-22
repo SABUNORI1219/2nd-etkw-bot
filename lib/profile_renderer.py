@@ -53,13 +53,12 @@ def fmt_num(val):
         return f"{val:,}"
     return str(val)
 
-def split_guild_name_by_pixel_and_word(guild_name, font, start_x, threshold_x, draw):
+def split_guild_name_by_pixel_and_word(guild_name, font, text_base_x, threshold_x, draw):
     words = guild_name.split()
-    # もしx座標がthreshold_xを超えないなら1行
-    if start_x < threshold_x:
+    # 判定は開始位置+テキスト幅
+    if text_base_x + draw.textlength(guild_name, font=font) <= threshold_x:
         return [guild_name]
-    # 単語ごとに分割して2行に
-    # できるだけ均等な長さになるように分ける
+    # 分割：単語単位でできるだけ均等に
     best_split = 1
     min_diff = float('inf')
     for i in range(1, len(words)):
