@@ -58,19 +58,31 @@ def split_guild_name_by_pixel_and_word(guild_name, font, text_base_x, threshold_
     # 判定は開始位置+テキスト幅
     if text_base_x + draw.textlength(guild_name, font=font) <= threshold_x:
         return [guild_name]
-    # 分割：単語単位でできるだけ均等に
-    best_split = 1
-    min_diff = float('inf')
-    for i in range(1, len(words)):
-        line1 = " ".join(words[:i])
-        line2 = " ".join(words[i:])
-        l1_len = draw.textlength(line1, font=font)
-        l2_len = draw.textlength(line2, font=font)
-        diff = abs(l1_len - l2_len)
-        if diff < min_diff:
-            min_diff = diff
-            best_split = i
-    return [" ".join(words[:best_split]), " ".join(words[best_split:])]
+    # 2単語以上なら均等分割
+    if len(words) > 1:
+        best_split = 1
+        min_diff = float('inf')
+        for i in range(1, len(words)):
+            line1 = " ".join(words[:i])
+            line2 = " ".join(words[i:])
+            l1_len = draw.textlength(line1, font=font)
+            l2_len = draw.textlength(line2, font=font)
+            diff = abs(l1_len - l2_len)
+            if diff < min_diff:
+                min_diff = diff
+                best_split = i
+        return [" ".join(words[:best_split]), " ".join(words[best_split:])]
+    else:
+        # 1単語しかない場合は強制分割
+        # 文字数の半分で分割する例（実際はピクセル長で分割した方がよい）
+        text = words[0]
+        for i in range(1, len(text)):
+            part1 = text[:i]
+            part2 = text[i:]
+            if text_base_x + draw.textlength(part1, font=font) > threshold_x:
+                return [part1, part2]
+        # 最後まで行っても分割しないなら（すごく小さい単語）、そのまま
+        return [text]
 
 def draw_status_circle(base_img, left_x, center_y, status="online"):
     circle_radius = 15
