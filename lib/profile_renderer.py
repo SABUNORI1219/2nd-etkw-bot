@@ -272,7 +272,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         draw.text((text_base_x, banner_y), guild_name_lines[0], font=font_main, fill=(60,40,30,255))
     else:
         try:
-            font_guild_small = ImageFont.truetype(FONT_PATH, 28)
+            font_guild_small = ImageFont.truetype(FONT_PATH, 33)
         except Exception:
             font_guild_small = ImageFont.load_default()
         draw.text((text_base_x, banner_y), guild_name_lines[0], font=font_guild_small, fill=(60,40,30,255))
