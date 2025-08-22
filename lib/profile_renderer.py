@@ -53,14 +53,17 @@ def fmt_num(val):
         return f"{val:,}"
     return str(val)
 
-def split_guild_name_to_lines(guild_name, font, max_width, draw):
+def split_guild_name_to_lines(guild_name, font, max_text_width, draw):
     words = guild_name.split()
     if not words:
         return [guild_name]
+    # 1単語ずつ追加していき、合計幅がmax_text_widthを超えたらそこで分割
+    line = ""
     for i in range(1, len(words) + 1):
         candidate = " ".join(words[:i])
-        if draw.textlength(candidate, font=font) > max_width:
+        if draw.textlength(candidate, font=font) > max_text_width:
             if i == 1:
+                # 1単語で超えた場合は強制分割
                 half = len(candidate) // 2
                 return [candidate[:half], candidate[half:] + " " + " ".join(words[i:])]
             else:
