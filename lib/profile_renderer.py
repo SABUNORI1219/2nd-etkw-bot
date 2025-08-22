@@ -27,13 +27,18 @@ RANK_COLOR_MAP = {
     "None": ((160, 160, 160, 220), (80, 80, 80, 200)),          # 灰色
 }
 
-def paste_wynn_icon_bg(base_img, icon_path, pos=(0,0), target_size=(120,120), alpha=160):
+def paste_wynn_icon_bg_safe(base_img, icon_path, pos=(0,0), target_size=(120,120), alpha=160):
     try:
         icon_img = Image.open(icon_path).convert("RGBA")
         icon_img = icon_img.resize(target_size, Image.LANCZOS)
-        alpha_layer = icon_img.split()[3].point(lambda p: alpha)
+        # α値の減衰
+        alpha_layer = icon_img.split()[3].point(lambda p: int(p * (alpha / 255)))
         icon_img.putalpha(alpha_layer)
-        base_img.paste(icon_img, pos, mask=icon_img)
+
+        # base_imgと同じサイズの透明画像を生成
+        overlay = Image.new("RGBA", base_img.size, (0,0,0,0))
+        overlay.paste(icon_img, pos, mask=icon_img)
+        base_img.alpha_composite(overlay)
     except Exception as e:
         logger.error(f"Wynncraftアイコン読み込み失敗: {e}")
 
@@ -166,7 +171,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = font_rank = ImageFont.load_default()
 
-    paste_wynn_icon_bg(img, WYNN_ICON_PATH, pos=(620, 100), target_size=(180,180), alpha=160)
+    paste_wynn_icon_bg(img, WYNN_ICON_PATH, pos=(620, 100), target_size=(220,220), alpha=160)
 
     draw.text((90, 140), f"{info.get('username', 'No Name')}", font=font_title, fill=(60,40,30,255))
 
