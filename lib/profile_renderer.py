@@ -53,6 +53,20 @@ def fmt_num(val):
         return f"{val:,}"
     return str(val)
 
+def split_guild_name_to_lines(guild_name, font, max_width, draw):
+    words = guild_name.split()
+    if not words:
+        return [guild_name]
+    for i in range(1, len(words) + 1):
+        candidate = " ".join(words[:i])
+        if draw.textlength(candidate, font=font) > max_width:
+            if i == 1:
+                half = len(candidate) // 2
+                return [candidate[:half], candidate[half:] + " " + " ".join(words[i:])]
+            else:
+                return [" ".join(words[:i-1]), " ".join(words[i-1:])]
+    return [guild_name]
+
 def draw_status_circle(base_img, left_x, center_y, status="online"):
     circle_radius = 15
     circle_img = Image.new("RGBA", (2*circle_radius, 2*circle_radius), (0,0,0,0))
@@ -248,7 +262,16 @@ def generate_profile_card(info, output_path="profile_card.png"):
     draw.text((rank_text_x, rank_text_y), rank_text, font=rank_font, fill=(255,255,255,255))
 
     text_base_x = banner_x + banner_size[0] + 10
-    draw.text((text_base_x, banner_y), guild_name_display, font=font_main, fill=(60,40,30,255))
+    guild_name_lines = split_guild_name_to_lines(guild_name_display, font_main, 1000, draw)
+    if len(guild_name_lines) == 1:
+        draw.text((text_base_x, banner_y), guild_name_lines[0], font=font_main, fill=(60,40,30,255))
+    else:
+        try:
+            font_guild_small = ImageFont.truetype(FONT_PATH, int(45 // 2))
+        except Exception:
+            font_guild_small = ImageFont.load_default()
+        draw.text((text_base_x, banner_y), guild_name_lines[0], font=font_guild_small, fill=(60,40,30,255))
+        draw.text((text_base_x, banner_y + int(45 // 2) + 5), guild_name_lines[1], font=font_guild_small, fill=(60,40,30,255))
 
     guild_rank_text = str(info.get('guild_rank', ''))
     star_num = 0
