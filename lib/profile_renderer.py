@@ -31,6 +31,7 @@ def paste_wynn_icon_bg(base_img, icon_path, pos=(0,0), target_size=(120,120), al
     try:
         icon_img = Image.open(icon_path).convert("RGBA")
         icon_img = icon_img.resize(target_size, Image.LANCZOS)
+        icon_img = icon_img.convert("L").convert("RGBA")
         # α値の減衰
         alpha_layer = icon_img.split()[3].point(lambda p: int(p * (alpha / 255)))
         icon_img.putalpha(alpha_layer)
@@ -171,7 +172,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = font_rank = ImageFont.load_default()
 
-    paste_wynn_icon_bg(img, WYNN_ICON_PATH, pos=(90, 140), target_size=(930,930), alpha=160)
+    paste_wynn_icon_bg(img, WYNN_ICON_PATH, pos=(50, 140), target_size=(930,930), alpha=160)
 
     draw.text((90, 140), f"{info.get('username', 'No Name')}", font=font_title, fill=(60,40,30,255))
 
