@@ -172,7 +172,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title = font_main = font_sub = font_small = font_uuid = font_mini = font_prefix = font_rank = ImageFont.load_default()
 
-    paste_wynn_icon_bg(img, WYNN_ICON_PATH, pos=(50, 140), target_size=(930,930), alpha=160)
+    paste_wynn_icon_bg(img, WYNN_ICON_PATH, pos=(40, 140), target_size=(950,950), alpha=160)
 
     draw.text((90, 140), f"{info.get('username', 'No Name')}", font=font_title, fill=(60,40,30,255))
 
