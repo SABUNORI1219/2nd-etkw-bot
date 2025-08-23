@@ -1,4 +1,4 @@
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 import requests
 from io import BytesIO
 import logging
@@ -32,18 +32,14 @@ def paste_wynn_icon_bg(base_img, icon_path, pos=(0,0), target_size=(120,120), al
         icon_img = Image.open(icon_path).convert("RGBA")
         icon_img = icon_img.resize(target_size, Image.LANCZOS)
         
-        # αチャンネル（Image型）→ alpha_img
-        alpha_img = icon_img.getchannel('A')
-        # グレースケール化（Image型）
-        gray = icon_img.convert('L')
-        # RGBA合成
-        icon_img = Image.merge('RGBA', (gray, gray, gray, alpha_img))
-        
-        # α値減衰
-        # ここで使うalphaは引数の160など、int型
-        alpha_layer = alpha_img.point(lambda p: int(p * (alpha / 255)))
+        enhancer = ImageEnhance.Color(icon_img)
+        icon_img = enhancer.enhance(0.4)
+
+        # --- α値減衰 ---
+        alpha_layer = icon_img.split()[3].point(lambda p: int(p * (alpha / 255)))
         icon_img.putalpha(alpha_layer)
-        
+
+        # --- 貼り付け ---
         overlay = Image.new("RGBA", base_img.size, (0,0,0,0))
         overlay.paste(icon_img, pos, mask=icon_img)
         base_img.alpha_composite(overlay)
