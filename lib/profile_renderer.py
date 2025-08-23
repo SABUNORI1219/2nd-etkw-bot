@@ -31,13 +31,18 @@ def paste_wynn_icon_bg(base_img, icon_path, pos=(0,0), target_size=(120,120), al
     try:
         icon_img = Image.open(icon_path).convert("RGBA")
         icon_img = icon_img.resize(target_size, Image.LANCZOS)
-        # グレースケール＋α維持
+        
+        # αチャンネルを抜き出しておく
         alpha = icon_img.getchannel('A')
-        gray_rgb = icon_img.convert('RGB').convert('L')
-        icon_img = Image.merge('RGBA', (gray_rgb, gray_rgb, gray_rgb, alpha))
+        # グレースケール化
+        gray = icon_img.convert('L')
+        # RGBA合成（RGBはgray, Aは元のalpha）
+        icon_img = Image.merge('RGBA', (gray, gray, gray, alpha))
+        
         # α値減衰
         alpha_layer = icon_img.split()[3].point(lambda p: int(p * (alpha / 255)))
         icon_img.putalpha(alpha_layer)
+        
         overlay = Image.new("RGBA", base_img.size, (0,0,0,0))
         overlay.paste(icon_img, pos, mask=icon_img)
         base_img.alpha_composite(overlay)
