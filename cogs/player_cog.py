@@ -4,9 +4,11 @@ from discord.ext import commands
 import logging
 import os
 from datetime import datetime, timezone, timedelta
+import requests
+from io import BytesIO 
 
 from lib.wynncraft_api import WynncraftAPI
-from config import AUTHORIZED_USER_IDS
+from config import AUTHORIZED_USER_IDS, SKIN_EMOJI_SERVER_ID
 from lib.cache_handler import CacheHandler
 from lib.banner_renderer import BannerRenderer
 from lib.profile_renderer import generate_profile_card
@@ -19,8 +21,20 @@ class PlayerSelectView(discord.ui.View):
         self.cog_instance = cog_instance
         self.owner_id = owner_id
 
+        # サーバーIDからGuildオブジェクト取得予定
+        self.skin_emojis = {}  # {uuid: emoji}
+        self.player_collision_dict = player_collision_dict  # 保存してcallbackで参照
+        self.options = []      # 保存してcallbackで参照
+
+    async def prepare_options(self, bot):
+        guild = bot.get_guild(SKIN_EMOJI_SERVER_ID)
+        if guild is None:
+            # Guildオブジェクト取得失敗
+            logger.error(f"SKIN_EMOJI_SERVER_ID {SKIN_EMOJI_SERVER_ID} のGuild取得失敗")
+            return
+
         options = []
-        for uuid, player_info in player_collision_dict.items():
+        for uuid, player_info in self.player_collision_dict.items():
             if isinstance(player_info, dict):
                 raw_support_rank = player_info.get('supportRank')
                 if raw_support_rank and raw_support_rank.lower() == "vipplus":
@@ -32,16 +46,47 @@ class PlayerSelectView(discord.ui.View):
 
                 stored_name = player_info.get('username', 'Unknown')
                 label_text = f"{stored_name} [{rank_display}]"
-                options.append(discord.SelectOption(
-                    label=label_text,
-                    value=uuid,
-                    description=f"UUID: {uuid}"
-                ))
 
+                # --- スキン頭画像を取得して絵文字追加 ---
+                try:
+                    skin_url = f"https://crafatar.com/avatars/{uuid}?size=32&overlay"
+                    response = requests.get(skin_url)
+                    image_bytes = BytesIO(response.content)
+                    emoji_name = f"skin_{stored_name}_{uuid[:6]}"
+                    emoji = await guild.create_custom_emoji(name=emoji_name, image=image_bytes)
+                    self.skin_emojis[uuid] = emoji
+                    option = discord.SelectOption(
+                        label=label_text,
+                        value=uuid,
+                        description=f"UUID: {uuid}",
+                        emoji=discord.PartialEmoji(name=emoji.name, id=emoji.id)
+                    )
+                except Exception as e:
+                    logger.error(f"絵文字追加失敗: {e}")
+                    # 絵文字失敗時は通常ラベルのみ
+                    option = discord.SelectOption(
+                        label=label_text,
+                        value=uuid,
+                        description=f"UUID: {uuid}"
+                    )
+                options.append(option)
+        self.options = options
         if options:
             self.select_menu = discord.ui.Select(placeholder="プレイヤーを選択してください...", options=options)
             self.select_menu.callback = self.select_callback
             self.add_item(self.select_menu)
+
+    async def on_timeout(self):
+        # タイムアウト時に追加した絵文字を削除
+        await self.cleanup_emojis()
+
+    async def cleanup_emojis(self):
+        # 追加した絵文字を全部削除
+        for emoji in self.skin_emojis.values():
+            try:
+                await emoji.delete()
+            except Exception as e:
+                logger.error(f"絵文字削除失敗: {e}")
 
     async def select_callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.owner_id:
@@ -55,9 +100,11 @@ class PlayerSelectView(discord.ui.View):
         data = await self.cog_instance.wynn_api.get_official_player_data(selected_uuid)
         if not data or 'uuid' not in data:
             await interaction.message.edit(content="選択されたプレイヤーの情報を取得できませんでした。", embed=None, view=None)
+            await self.cleanup_emojis()
             return
         # 共通処理呼び出し（Viewからはeditのみ）
         await self.cog_instance.handle_player_data(interaction, data, use_edit=True)
+        await self.cleanup_emojis()  # 選択後に絵文字削除
 
 class PlayerCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -271,9 +318,10 @@ class PlayerCog(commands.Cog):
             if isinstance(data, dict) and data.get("error") == "MultipleObjectsReturned" and "objects" in data:
                 player_collision_dict = data["objects"]
                 view = PlayerSelectView(player_collision_dict=player_collision_dict, cog_instance=self, owner_id=interaction.user.id)
+                await view.prepare_options(self.bot)
                 if hasattr(view, "select_menu") and view.select_menu.options:
                     await interaction.followup.send(
-                        "複数のプレイヤーが見つかりました。どちらの情報を表示しますか？", view=view
+                        "複数のプレイヤーが見つかりました。どちらの情報を表示しますか? (*Multiple Object Returned*)", view=view
                     )
                 else:
                     await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
