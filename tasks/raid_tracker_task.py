@@ -95,7 +95,7 @@ async def get_all_players_lastjoin(api, mcid_uuid_list, batch_size=5, batch_slee
     # Noneを除外
     return [r for r in results if r is not None]
 
-async def track_guild_raids(bot=None, loop_interval=120):
+async def track_guild_raids(bot=None, loop_interval=600):
     api = WynncraftAPI()
     while True:
         logger.info("ETKWメンバー情報取得開始...")
@@ -105,82 +105,6 @@ async def track_guild_raids(bot=None, loop_interval=120):
             logger.warning("guild_data取得失敗。10秒後に再試行します。")
             await asyncio.sleep(10)
             continue
-
-        # online_members抽出（uuid・name・serverセット）
-        online_members = extract_online_members(guild_data)
-
-        if not online_members:
-            logger.info("オンラインメンバーがいません。")
-            await asyncio.sleep(loop_interval)
-            continue
-
-        player_tasks = [get_player_data(api, member["uuid"]) for member in online_members]
-        player_results = await asyncio.gather(*player_tasks)
-
-        clear_events = []
-        now = datetime.utcnow()
-
-        for member, pdata in zip(online_members, player_results):
-            uuid = member["uuid"]
-            name = member["name"]
-            server = pdata.get("server") or member.get("server")
-            raids = pdata.get("globalData", {}).get("raids", {}).get("list", {})
-            if not raids or len(raids) == 0:
-                continue
-            previous = previous_player_data.get(uuid)
-            await asyncio.to_thread(insert_server_log, name, now, server)
-            for raid in [
-                "The Canyon Colossus",
-                "Orphion's Nexus of Light",
-                "The Nameless Anomaly",
-                "Nest of the Grootslangs"
-            ]:
-                current_count = raids.get(raid, 0)
-                prev_count = previous["raids"].get(raid, 0) if previous else 0
-                delta = current_count - prev_count
-                if previous and delta == 1:
-                    event = {
-                        "player": name,
-                        "raid_name": raid,
-                        "clear_time": now,
-                        "server": previous.get("server", server)
-                    }
-                    if not is_duplicate_event(event, clear_events_window) and not is_duplicate_event(event, clear_events):
-                        clear_events.append(event)
-                        logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{previous.get('server', server)}")
-            previous_player_data[uuid] = {
-                "raids": dict(raids),
-                "server": server,
-                "timestamp": now,
-                "name": name
-            }
-        logger.info("ETKWメンバー情報取得完了！")
-
-        for event in clear_events:
-            if not is_duplicate_event(event, clear_events_window):
-                clear_events_window.append(event)
-
-        cleanup_old_events(clear_events_window, max_age_sec=500)
-
-        parties = estimate_and_save_parties(list(clear_events_window), window=clear_events_window)
-        for party in parties:
-            for member in party["members"]:
-                logger.info(f"insert_history呼び出し: {party['raid_name']} {party['clear_time']} {member}")
-                await asyncio.to_thread(
-                    insert_history,
-                    party["raid_name"],
-                    party["clear_time"],
-                    member
-                )
-            logger.info(f"send_guild_raid_embed呼び出し: {party}")
-            if bot is not None:
-                try:
-                    await send_guild_raid_embed(bot, party)
-                except Exception as e:
-                    logger.error(f"通知Embed送信失敗: {e}")
-
-            remove_party_events_from_window(clear_events_window, party, time_threshold=2)
-        await asyncio.to_thread(cleanup_old_server_logs, 5)
 
         # --- 全メンバーのlastJoinを個別APIで取得しキャッシュDBへ ---
         mcid_uuid_list = await get_all_mcid_and_uuid_from_guild(guild_data)
@@ -193,5 +117,5 @@ async def track_guild_raids(bot=None, loop_interval=120):
         logger.info(f"次回まで{sleep_time:.1f}秒待機（処理時間: {elapsed:.1f}秒）")
         await asyncio.sleep(sleep_time)
 
-# async def setup(bot):
-  # bot.loop.create_task(track_guild_raids(bot, loop_interval=120))
+async def setup(bot):
+    bot.loop.create_task(track_guild_raids(bot, loop_interval=600))
