@@ -7,6 +7,12 @@ from config.py import ETKW_SERVER
 
 logger = logging.getLogger(__name__)
 
+# バックアップ通知チャンネルID
+backup_channel_id = 1271174069433274399
+
+# チャンネルリンク
+channel_link = f"https://discord.com/channels/{ETKW_SERVER}/{backup_channel_id}"
+
 # レイド名ごとに対応する絵文字を登録
 RAID_EMOJIS = {
     "The Nameless Anomaly": "<:wynn_tna:1400385557795835958>",
