@@ -139,7 +139,7 @@ Online Players: {online_count}/{total_members}
         await interaction.response.defer()
         
         # キャッシュだと分かるようにキーを設定
-        cache_key = f"guild_{guild.upper()}"
+        cache_key = f"guild_{guild}"
         data_to_use = None
         from_cache = False
         is_stale = False
