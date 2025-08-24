@@ -138,8 +138,8 @@ Online Players: {online_count}/{total_members}
     async def guild(self, interaction: discord.Interaction, guild: str):
         await interaction.response.defer()
         
-        # 公式APIのキャッシュだと分かるようにキーを設定
-        cache_key = f"wynn_guild_{guild.upper()}"
+        # キャッシュだと分かるようにキーを設定
+        cache_key = f"guild_{guild.upper()}"
         data_to_use = None
         from_cache = False
         is_stale = False
