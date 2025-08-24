@@ -5,6 +5,7 @@ import logging
 import os
 from datetime import datetime, timezone, timedelta
 import requests
+import time
 
 from lib.wynncraft_api import WynncraftAPI
 from config import AUTHORIZED_USER_IDS, SKIN_EMOJI_SERVER_ID
@@ -28,7 +29,6 @@ class PlayerSelectView(discord.ui.View):
     async def prepare_options(self, bot):
         guild = bot.get_guild(SKIN_EMOJI_SERVER_ID)
         if guild is None:
-            # Guildオブジェクト取得失敗
             logger.error(f"SKIN_EMOJI_SERVER_ID {SKIN_EMOJI_SERVER_ID} のGuild取得失敗")
             return
 
@@ -47,8 +47,12 @@ class PlayerSelectView(discord.ui.View):
                 label_text = f"{stored_name} [{rank_display}]"
 
                 try:
-                    skin_url = f"https://crafatar.com/avatars/{uuid}?size=32&overlay"
-                    response = requests.get(skin_url)
+                    skin_url = f"https://crafatar.com/avatars/{uuid}?size=32&overlay&ts={int(time.time())}"
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+                        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"
+                    }
+                    response = requests.get(skin_url, headers=headers)
                     image_bytes = response.content
                     emoji_name = f"skin_{stored_name}_{uuid[:6]}"
                     emoji = await guild.create_custom_emoji(name=emoji_name, image=image_bytes)
@@ -61,7 +65,6 @@ class PlayerSelectView(discord.ui.View):
                     )
                 except Exception as e:
                     logger.error(f"絵文字追加失敗: {e}")
-                    # 絵文字失敗時は通常ラベルのみ
                     option = discord.SelectOption(
                         label=label_text,
                         value=uuid,
@@ -75,16 +78,15 @@ class PlayerSelectView(discord.ui.View):
             self.add_item(self.select_menu)
 
     async def on_timeout(self):
-        # タイムアウト時に追加した絵文字を削除
         await self.cleanup_emojis()
 
     async def cleanup_emojis(self):
-        # 追加した絵文字を全部削除
-        for emoji in self.skin_emojis.values():
+        for uuid, emoji in list(self.skin_emojis.items()):
             try:
                 await emoji.delete()
             except Exception as e:
                 logger.error(f"絵文字削除失敗: {e}")
+            self.skin_emojis.pop(uuid, None)
 
     async def select_callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.owner_id:
@@ -319,7 +321,7 @@ class PlayerCog(commands.Cog):
                 await view.prepare_options(self.bot)
                 if hasattr(view, "select_menu") and view.select_menu.options:
                     await interaction.followup.send(
-                        "複数のプレイヤーが見つかりました。どちらの情報を表示しますか? (*Multiple Object Returned*)", view=view
+                        "複数のプレイヤーが見つかりました。どちらの情報を表示しますか?\n(Multiple Object Returned)", view=view
                     )
                 else:
                     await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
