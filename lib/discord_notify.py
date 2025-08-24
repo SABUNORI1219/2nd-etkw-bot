@@ -15,8 +15,52 @@ RAID_EMOJIS = {
 }
 DEFAULT_EMOJI = "🎲"  # 未登録レイド用
 
+JAPANESE_MESSAGE = (
+    "* ご自身でギルドから抜けた場合には、このメッセージは無視してください。\n\n"
+    "最近、Wynncraft内での活動が盛んではないかつ、新しいメンバーが加入するためにキックいたしました。\n"
+    "再度加入したい場合は、ここでその旨伝えてください。\n"
+    "またWynncraftにログインできなくなる理由がある場合は、ここで伝えてもらえれば枠をキープすることもできます。"
+)
+
+ENGLISH_MESSAGE = (
+    "* If you left the guild yourself, please ignore this message.\n\n"
+    "You were kicked because there hasn't been much activity in Wynncraft recently and to make way for new members.\n"
+    "If you would like to rejoin, please let us know here.\n"
+    "Also, if there is a reason why you can no longer log in to Wynncraft, you can let us know here and we will be able to keep your spot."
+)
+
 def get_emoji_for_raid(raid_name):
     return RAID_EMOJIS.get(raid_name, DEFAULT_EMOJI)
+
+class LanguageSwitchView(discord.ui.View):
+    def __init__(self, target_user_id):
+        super().__init__(timeout=180)
+        self.target_user_id = target_user_id
+        self.language = "ja"  # デフォルト日本語
+
+    @discord.ui.button(label="日本語で表示", style=discord.ButtonStyle.primary)
+    async def show_japanese(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.target_user_id:
+            await interaction.response.send_message("この操作はご本人のみ利用できます。", ephemeral=True)
+            return
+        embed = discord.Embed(
+            title="ギルド脱退のお知らせ",
+            description=JAPANESE_MESSAGE,
+            color=discord.Color.red()
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="Show in English", style=discord.ButtonStyle.secondary)
+    async def show_english(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.target_user_id:
+            await interaction.response.send_message("This action is only available to the person concerned.", ephemeral=True)
+            return
+        embed = discord.Embed(
+            title="Guild Departure Notice",
+            description=ENGLISH_MESSAGE,
+            color=discord.Color.red()
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
 
 async def send_guild_raid_embed(bot, party):
     NOTIFY_CHANNEL_ID = int(get_config("NOTIFY_CHANNEL_ID") or "0")
@@ -71,6 +115,7 @@ async def notify_member_removed(bot, member_data):
     ギルドから脱退したメンバーを通知する
     member_data: dict {mcid, discord_id, rank}
     """
+    # 通知Embed（管理用チャンネルに送信）
     NOTIFY_CHANNEL_ID = int(get_config("MEMBER_NOTIFY_CHANNEL_ID") or "0")
     channel = bot.get_channel(NOTIFY_CHANNEL_ID)
     if not channel:
@@ -86,6 +131,38 @@ async def notify_member_removed(bot, member_data):
     embed.set_footer(text="脱退通知 | Minister Chikuwa")
     await channel.send(embed=embed)
     logger.info(f"Guild脱退通知: {member_data}")
+
+    # --- DM送信 ---
+    discord_id = member_data.get('discord_id')
+    if discord_id:
+        user = bot.get_user(int(discord_id))
+        # Viewで日本語/英語切り替えボタンを送信
+        view = LanguageSwitchView(target_user_id=int(discord_id))
+        embed_dm = discord.Embed(
+            title="ギルド脱退のお知らせ",
+            description=JAPANESE_MESSAGE,
+            color=discord.Color.red()
+        )
+        dm_failed = False
+        try:
+            await user.send(embed=embed_dm, view=view)
+        except Exception as e:
+            logger.warning(f"DM送信失敗: {e}")
+            dm_failed = True
+
+        # DM送信失敗時、指定チャンネル（ID: 1271174069433274399）でメンション＋Embed送信
+        if dm_failed:
+            backup_channel_id = 1271174069433274399
+            backup_channel = bot.get_channel(backup_channel_id)
+            if backup_channel:
+                # メンション＋Embed＋View
+                await backup_channel.send(
+                    content=f"<@{discord_id}>",
+                    embed=embed_dm,
+                    view=view
+                )
+            else:
+                logger.warning(f"バックアップ通知チャンネル({backup_channel_id})が見つかりません")
 
 async def notify_member_left_discord(bot, member_data):
     """
