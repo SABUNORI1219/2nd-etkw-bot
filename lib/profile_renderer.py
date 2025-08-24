@@ -146,7 +146,6 @@ def generate_profile_card(info, output_path="profile_card.png"):
         font_main = ImageFont.truetype(FONT_PATH, 45)
         font_sub = ImageFont.truetype(FONT_PATH, 43)
         font_small = ImageFont.truetype(FONT_PATH, 40)
-        font_content = ImageFont.truetype(FONT_PATH, 39)
         font_raids = ImageFont.truetype(FONT_PATH, 35)
         font_uuid = ImageFont.truetype(FONT_PATH, 30)
         font_mini = ImageFont.truetype(FONT_PATH, 25)
@@ -224,7 +223,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
                 raise Exception(f"skin url response: {skin_res.status_code}")
             skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
             skin = skin.resize((196, 196), Image.LANCZOS)
-            img.paste(skin, (106, 341), mask=skin)
+            img.paste(skin, (106, 340), mask=skin)
         except Exception as e:
             logger.error(f"Skin image load failed: {e}")
             draw.rectangle([60, 120, 180, 240], fill=(160,160,160,255))
@@ -364,7 +363,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     x_lvl = bbox[2] + 3
     draw.text((x_lvl, 1025 + 18), "lv.", font=font_mini, fill=(60,40,30,255))
 
-    draw.text((90, 1075), "Content Clears", font=font_content, fill=(90,60,30,255))
+    draw.text((90, 1070), "Content Clears", font=font_small, fill=(90,60,30,255))
 
     right_edge_x = 440
     raid_keys = [("NOTG", "notg", 1150), ("NOL", "nol", 1200), ("TCC", "tcc", 1250),
