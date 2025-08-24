@@ -363,7 +363,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     x_lvl = bbox[2] + 3
     draw.text((x_lvl, 1025 + 18), "lv.", font=font_mini, fill=(60,40,30,255))
 
-    draw.text((90, 1065), "Content Clears", font=font_sub, fill=(122,82,42,255))
+    draw.text((90, 1065), "Content Clears", font=font_small, fill=(80,50,30,255))
 
     right_edge_x = 440
     raid_keys = [("NOTG", "notg", 1150), ("NOL", "nol", 1200), ("TCC", "tcc", 1250),
