@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 backup_channel_id = 1271174069433274399
 
 # チャンネルリンク
-channel_link = f"https://discord.com/channels/{ETKW_SERVER}/{backup_channel_id}"
+channel_link = f"https://discord.com/channels/{str(ETKW_SERVER)}/{backup_channel_id}"
 
 # レイド名ごとに対応する絵文字を登録
 RAID_EMOJIS = {
