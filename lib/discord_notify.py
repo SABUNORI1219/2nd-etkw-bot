@@ -3,6 +3,7 @@ import logging
 from lib.db import get_config
 import os
 from datetime import timezone, timedelta
+from config.py import ETKW_SERVER
 
 logger = logging.getLogger(__name__)
 
@@ -133,16 +134,14 @@ async def notify_member_removed(bot, member_data):
     logger.info(f"Guild脱退通知: {member_data}")
 
     # --- ロール追加処理 ---
-    ROLE_IDS_TO_ADD = [1271173606478708811, 1151511274165895228]
+    DEPARTURE_IDS = [1271173606478708811, 1151511274165895228] # Inactive, Chikuwaed
     discord_id = member_data.get('discord_id')
     if discord_id:
-        # サーバーIDを明示的に指定
-        GUILD_ID = 1119277416431501394
-        guild = bot.get_guild(GUILD_ID)
+        guild = bot.get_guild(ETKW_SERVER)
         if guild:
             member = guild.get_member(int(discord_id))
             if member:
-                roles_to_add = [guild.get_role(role_id) for role_id in ROLE_IDS_TO_ADD if guild.get_role(role_id)]
+                roles_to_add = [guild.get_role(role_id) for role_id in DEPARTURE_IDS if guild.get_role(role_id)]
                 if roles_to_add:
                     try:
                         await member.add_roles(*roles_to_add, reason="Guild removal auto role")
