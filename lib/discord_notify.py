@@ -25,15 +25,15 @@ DEFAULT_EMOJI = "🎲"  # 未登録レイド用
 JAPANESE_MESSAGE = (
     "* ご自身でギルドから抜けた場合には、このメッセージは無視してください。\n\n"
     "最近、Wynncraft内での活動が盛んではないかつ、新しいメンバーが加入するためにキックいたしました。\n"
-    "再度加入したい場合は、ここでその旨伝えてください。\n"
+    "再度加入したい場合は、[こちらのチャンネル]({channel_link})でその旨伝えてください。\n"
     "またWynncraftにログインできなくなる理由がある場合は、ここで伝えてもらえれば枠をキープすることもできます。"
 )
 
 ENGLISH_MESSAGE = (
     "* If you left the guild yourself, please ignore this message.\n\n"
     "You were kicked because there hasn't been much activity in Wynncraft recently and to make way for new members.\n"
-    "If you would like to rejoin, please let us know here.\n"
-    "Also, if there is a reason why you can no longer log in to Wynncraft, you can let us know here and we will be able to keep your spot."
+    "If you would like to rejoin, please let us know [here]({channel_link}).\n"
+    "Also, if there is a reason why you can no longer log in to Wynncraft, you can let us know there and we will be able to keep your spot."
 )
 
 def get_emoji_for_raid(raid_name):
