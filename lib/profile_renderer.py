@@ -223,7 +223,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
                 raise Exception(f"skin url response: {skin_res.status_code}")
             skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
             skin = skin.resize((196, 196), Image.LANCZOS)
-            img.paste(skin, (106, 336), mask=skin)
+            img.paste(skin, (106, 341), mask=skin)
         except Exception as e:
             logger.error(f"Skin image load failed: {e}")
             draw.rectangle([60, 120, 180, 240], fill=(160,160,160,255))
@@ -363,7 +363,7 @@ def generate_profile_card(info, output_path="profile_card.png"):
     x_lvl = bbox[2] + 3
     draw.text((x_lvl, 1025 + 18), "lv.", font=font_mini, fill=(60,40,30,255))
 
-    draw.text((90, 1065), "Content Clears", font=font_main, fill=(60,40,30,255))
+    draw.text((90, 1065), "Content Clears", font=font_sub, fill=(122,82,42,255))
 
     right_edge_x = 440
     raid_keys = [("NOTG", "notg", 1150), ("NOL", "nol", 1200), ("TCC", "tcc", 1250),
