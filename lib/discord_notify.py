@@ -122,7 +122,7 @@ async def notify_member_removed(bot, member_data):
         logger.warning("メンバー通知チャンネルが見つかりません")
         return
     embed = discord.Embed(
-        title="ゲーム内Guildのメンバーが退出しました",
+        title="Guild Departure Notice",
         color=discord.Color.red()
     )
     embed.add_field(name="MCID", value=f"`{member_data.get('mcid', 'N/A')}`", inline=True)
@@ -132,14 +132,28 @@ async def notify_member_removed(bot, member_data):
     await channel.send(embed=embed)
     logger.info(f"Guild脱退通知: {member_data}")
 
-    # --- DM送信 ---
+    # --- ロール追加処理 ---
+    ROLE_IDS_TO_ADD = [1271173606478708811, 1151511274165895228]
     discord_id = member_data.get('discord_id')
     if discord_id:
+        # サーバーIDを明示的に指定
+        GUILD_ID = 1119277416431501394
+        guild = bot.get_guild(GUILD_ID)
+        if guild:
+            member = guild.get_member(int(discord_id))
+            if member:
+                roles_to_add = [guild.get_role(role_id) for role_id in ROLE_IDS_TO_ADD if guild.get_role(role_id)]
+                if roles_to_add:
+                    try:
+                        await member.add_roles(*roles_to_add, reason="Guild removal auto role")
+                    except Exception as e:
+                        logger.warning(f"ロール追加失敗: {e}")
+
+        # --- DM送信 ---
         user = bot.get_user(int(discord_id))
-        # Viewで日本語/英語切り替えボタンを送信
         view = LanguageSwitchView(target_user_id=int(discord_id))
         embed_dm = discord.Embed(
-            title="ギルド脱退のお知らせ",
+            title="Guild Departure Notice",
             description=JAPANESE_MESSAGE,
             color=discord.Color.red()
         )
@@ -155,7 +169,6 @@ async def notify_member_removed(bot, member_data):
             backup_channel_id = 1271174069433274399
             backup_channel = bot.get_channel(backup_channel_id)
             if backup_channel:
-                # メンション＋Embed＋View
                 await backup_channel.send(
                     content=f"<@{discord_id}>",
                     embed=embed_dm,
