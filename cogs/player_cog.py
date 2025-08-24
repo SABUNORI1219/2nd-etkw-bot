@@ -44,7 +44,7 @@ class PlayerSelectView(discord.ui.View):
                     rank_display = (raw_support_rank or 'None').capitalize()
 
                 stored_name = player_info.get('username', 'Unknown')
-                label_text = f"{stored_name} [{rank_display}]"
+                label_text = f"[{rank_display}] {stored_name}"
 
                 try:
                     skin_url = f"https://crafatar.com/avatars/{uuid}?size=32&overlay&ts={int(time.time())}"
