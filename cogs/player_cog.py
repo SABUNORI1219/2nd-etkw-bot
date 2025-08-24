@@ -5,7 +5,6 @@ import logging
 import os
 from datetime import datetime, timezone, timedelta
 import requests
-from io import BytesIO 
 
 from lib.wynncraft_api import WynncraftAPI
 from config import AUTHORIZED_USER_IDS, SKIN_EMOJI_SERVER_ID
@@ -47,11 +46,10 @@ class PlayerSelectView(discord.ui.View):
                 stored_name = player_info.get('username', 'Unknown')
                 label_text = f"{stored_name} [{rank_display}]"
 
-                # --- スキン頭画像を取得して絵文字追加 ---
                 try:
                     skin_url = f"https://crafatar.com/avatars/{uuid}?size=32&overlay"
                     response = requests.get(skin_url)
-                    image_bytes = BytesIO(response.content)
+                    image_bytes = response.content
                     emoji_name = f"skin_{stored_name}_{uuid[:6]}"
                     emoji = await guild.create_custom_emoji(name=emoji_name, image=image_bytes)
                     self.skin_emojis[uuid] = emoji
