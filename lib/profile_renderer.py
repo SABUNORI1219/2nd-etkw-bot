@@ -10,6 +10,7 @@ FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia
 BASE_IMG_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/profile_card.png")
 PLAYER_BACKGROUND_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/IMG_1493.png")
 RANK_STAR_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/rankStar.png")
+UNKNOWN_SKIN_PATH = os.path.join(os.path.dirname(__file__), "../assets/profile/unknown_skin.png")
 RANK_ICON_MAP = {
     "Champion": os.path.join(os.path.dirname(__file__), "../assets/profile/champ_icon.png"),
     "Hero+": os.path.join(os.path.dirname(__file__), "../assets/profile/heroplus_icon.png"),
@@ -226,7 +227,12 @@ def generate_profile_card(info, output_path="profile_card.png"):
             img.paste(skin, (106, 340), mask=skin)
         except Exception as e:
             logger.error(f"Skin image load failed: {e}")
-            draw.rectangle([60, 120, 180, 240], fill=(160,160,160,255))
+            try:
+                unknown_skin = Image.open(UNKNOWN_SKIN_PATH).convert("RGBA")
+                unknown_skin = unknown_skin.resize((196, 196), Image.LANCZOS)
+                img.paste(unknown_skin, (106, 340), mask=unknown_skin)
+            except Exception as ee:
+                logger.error(f"Unknown skin image load failed: {ee}")
 
     rank_text = info.get('support_rank_display')
     rank_colors = RANK_COLOR_MAP.get(rank_text, RANK_COLOR_MAP['None'])
