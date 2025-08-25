@@ -427,3 +427,26 @@ def get_last_join_cache(top_n=10):
         if conn:
             conn.close()
 
+def get_last_join_cache_for_members(mcid_list):
+    """
+    指定したmcidリストについてlast_join_cacheからデータを取得
+    戻り値: {mcid: last_join}
+    """
+    if not mcid_list:
+        return {}
+    conn = get_conn()
+    result = {}
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT mcid, last_join FROM last_join_cache
+                WHERE last_join IS NOT NULL AND mcid = ANY(%s)
+            """, (mcid_list,))
+            for mcid, last_join in cur.fetchall():
+                result[mcid] = last_join
+    except Exception as e:
+        logger.error(f"[DB Handler] get_last_join_cache_for_members failed: {e}")
+    finally:
+        if conn: conn.close()
+    return result
+
