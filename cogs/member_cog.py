@@ -13,7 +13,8 @@ from lib.db import (
     get_linked_members_page,
     set_config,
     get_all_linked_members,
-    get_last_join_cache
+    get_last_join_cache,
+    get_last_join_cache_for_members,
 )
 from lib.discord_notify import notify_member_left_discord
 from config import (
@@ -86,15 +87,17 @@ def get_linked_members_page_ranked(page=1, rank_filter=None, per_page=10):
     return members_sorted[start:end], total_pages
 
 async def get_last_seen_dict_db(limit=10):
-    last_join_rows = get_last_join_cache(top_n=limit)
-    mcids = [row[0] for row in last_join_rows]
     all_members = get_all_linked_members()
     member_dict = {m['mcid']: m for m in all_members}
-    results = []
-    for mcid, last_join in last_join_rows:
-        m = member_dict.get(mcid)
-        if not m:
-            continue
+    mcid_list = list(member_dict.keys())
+
+    last_join_map = get_last_join_cache_for_members(mcid_list)
+
+    results_raw = []
+    for mcid in mcid_list:
+        m = member_dict[mcid]
+        last_join = last_join_map.get(mcid)
+        last_join_dt = None
         if last_join:
             try:
                 last_join_dt = datetime.strptime(last_join, "%Y-%m-%dT%H:%M:%S.%fZ")
@@ -103,10 +106,9 @@ async def get_last_seen_dict_db(limit=10):
                     last_join_dt = datetime.strptime(last_join, "%Y-%m-%dT%H:%M:%SZ")
                 except Exception:
                     last_join_dt = None
-        else:
-            last_join_dt = None
-        results.append((m, last_join_dt))
-    return results
+        results_raw.append((m, last_join_dt))
+    results_raw.sort(key=lambda x: x[1] or datetime.max)
+    return results_raw[:limit]
 
 def extract_role_display_name(role_name: str) -> str:
     """
