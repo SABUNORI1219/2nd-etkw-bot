@@ -5,7 +5,7 @@ import re
 from lib.wynncraft_api import WynncraftAPI
 from lib.db import get_linked_members_page, add_member, remove_member, get_member
 from lib.discord_notify import notify_member_removed
-from config import GUILD_NAME, RANK_ROLE_ID_MAP, ETKW, ROLE_ID_TO_RANK
+from config.py import GUILD_NAME, RANK_ROLE_ID_MAP, ETKW, ROLE_ID_TO_RANK
 
 logger = logging.getLogger(__name__)
 
