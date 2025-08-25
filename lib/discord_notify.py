@@ -3,7 +3,7 @@ import logging
 from lib.db import get_config
 import os
 from datetime import timezone, timedelta
-from config.py import ETKW_SERVER
+from config import ETKW_SERVER
 
 logger = logging.getLogger(__name__)
 
