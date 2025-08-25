@@ -13,7 +13,6 @@ from lib.db import (
     get_linked_members_page,
     set_config,
     get_all_linked_members,
-    get_last_join_cache,
     get_last_join_cache_for_members,
 )
 from lib.discord_notify import notify_member_left_discord
