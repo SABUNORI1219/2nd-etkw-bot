@@ -16,7 +16,7 @@ from lib.db import (
     get_last_join_cache
 )
 from lib.discord_notify import notify_member_left_discord
-from config.py import (
+from config import (
     GUILD_NAME,
     EMBED_COLOR_BLUE,
     AUTHORIZED_USER_IDS,
