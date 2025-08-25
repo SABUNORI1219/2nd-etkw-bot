@@ -409,24 +409,6 @@ def upsert_last_join_cache(last_join_list):
         if conn:
             conn.close()
 
-def get_last_join_cache(top_n=10):
-    conn = get_conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT mcid, last_join FROM last_join_cache
-                WHERE last_join IS NOT NULL
-                ORDER BY last_join ASC
-                LIMIT %s
-            """, (top_n,))
-            return cur.fetchall()
-    except Exception as e:
-        logger.error(f"[DB Handler] get_last_join_cache failed: {e}")
-        return []
-    finally:
-        if conn:
-            conn.close()
-
 def get_last_join_cache_for_members(mcid_list):
     """
     指定したmcidリストについてlast_join_cacheからデータを取得
