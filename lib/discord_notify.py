@@ -41,7 +41,7 @@ def get_emoji_for_raid(raid_name):
 
 class LanguageSwitchView(discord.ui.View):
     def __init__(self, target_user_id):
-        super().__init__(timeout=180)
+        super().__init__(timeout=None)
         self.target_user_id = target_user_id
         self.language = "ja"  # デフォルト日本語
 
