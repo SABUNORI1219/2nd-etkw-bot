@@ -129,7 +129,7 @@ async def notify_member_removed(bot, member_data):
         logger.warning("メンバー通知チャンネルが見つかりません")
         return
     embed = discord.Embed(
-        title="Guild Departure Notice",
+        title="ゲーム内Guildのメンバーが退出しました",
         color=discord.Color.red()
     )
     embed.add_field(name="MCID", value=f"`{member_data.get('mcid', 'N/A')}`", inline=True)
