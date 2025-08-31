@@ -6,8 +6,10 @@ import os
 from datetime import datetime, timezone, timedelta
 import requests
 import time
+from io import BytesIO
+from PIL import Image
 
-from lib.api_stocker import WynncraftAPI
+from lib.api_stocker import WynncraftAPI, OtherAPI
 from config import AUTHORIZED_USER_IDS, SKIN_EMOJI_SERVER_ID
 from lib.cache_handler import CacheHandler
 from lib.banner_renderer import BannerRenderer
@@ -110,6 +112,7 @@ class PlayerCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
+        self.other_api = OtherAPI()
         self.banner_renderer = BannerRenderer()
         self.cache = CacheHandler()
 
@@ -251,6 +254,16 @@ class PlayerCog(commands.Cog):
 
         uuid = data.get("uuid")
 
+        skin_image = None
+        if uuid:
+        try:
+            skin_bytes = await self.other_api.get_vzge_skin(uuid)
+            if skin_bytes:
+                skin_image = Image.open(BytesIO(skin_bytes)).convert("RGBA")
+        except Exception as e:
+            logger.error(f"Skin image load failed: {e}")
+            skin_image = None
+
         profile_info = {
             "username": data.get("username"),
             "support_rank_display": support_rank_display,
@@ -283,7 +296,7 @@ class PlayerCog(commands.Cog):
 
         output_path = f"profile_card_{profile_info['uuid']}.png" if profile_info['uuid'] else "profile_card.png"
         try:
-            generate_profile_card(profile_info, output_path)
+            generate_profile_card(profile_info, output_path, skin_image=skin_image)
             file = discord.File(output_path, filename=os.path.basename(output_path))
             # 選択Viewからの呼び出し（edit）か、コマンド直（send）かで分岐
             if use_edit:
