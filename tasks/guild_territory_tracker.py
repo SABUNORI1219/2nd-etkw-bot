@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
-from lib.wynncraft_api import WynncraftAPI
+from lib.api_stocker import WynncraftAPI
 from lib.db import upsert_guild_territory_state, get_guild_territory_state
 
 logger = logging.getLogger(__name__)
