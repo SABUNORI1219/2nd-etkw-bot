@@ -3,7 +3,6 @@ import requests
 from io import BytesIO
 import logging
 import os
-import asyncio
 from lib.api_stocker import OtherAPI
 
 logger = logging.getLogger(__name__)
@@ -269,3 +268,168 @@ def generate_profile_card(info, output_path="profile_card.png"):
     skin_y = 336
     skin_w = 196
     skin_h = 196
+    
+    rank_box_x = skin_x + (skin_w // 2) - (rank_box_w // 2)
+    rank_box_y = skin_y + skin_h - 6
+
+    shadow = Image.new("RGBA", (rank_box_w+8, rank_box_h+8), (0,0,0,0))
+    shadow_draw = ImageDraw.Draw(shadow)
+    shadow_draw.rounded_rectangle([4,4,rank_box_w+4,rank_box_h+4], radius=16, fill=(0,0,0,80))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(3))
+    img.paste(shadow, (rank_box_x-4, rank_box_y-4), mask=shadow)
+
+    rect_img = gradient_rect((rank_box_w, rank_box_h), rank_colors[0], rank_colors[1], radius=14)
+    img.paste(rect_img, (rank_box_x, rank_box_y), mask=rect_img)
+
+    if icon_img:
+        icon_y = rank_box_y + (rank_box_h - icon_h)//2
+        img.paste(icon_img, (rank_box_x + rank_padding_x//2, icon_y), mask=icon_img)
+        rank_text_x = rank_box_x + icon_w + rank_padding_x
+    else:
+        rank_text_x = rank_box_x + rank_padding_x
+    rank_text_y = rank_box_y + (rank_box_h - rank_text_h) // 2
+    draw.text((rank_text_x, rank_text_y), rank_text, font=rank_font, fill=(255,255,255,255))
+
+    text_base_x = banner_x + banner_size[0] + 10
+    guild_name_lines = split_guild_name_by_pixel_and_word(guild_name_display, font_main, text_base_x, 1000, draw)
+    if len(guild_name_lines) == 1:
+        draw.text((text_base_x, banner_y), guild_name_lines[0], font=font_main, fill=(60,40,30,255))
+    else:
+        try:
+            font_guild_small = ImageFont.truetype(FONT_PATH, 33)
+        except Exception:
+            font_guild_small = ImageFont.load_default()
+        draw.text((text_base_x, banner_y), guild_name_lines[0], font=font_guild_small, fill=(60,40,30,255))
+        draw.text((text_base_x, banner_y + 33 + 5), guild_name_lines[1], font=font_guild_small, fill=(60,40,30,255))
+        banner_y += 10
+
+    guild_rank_text = str(info.get('guild_rank', ''))
+    star_num = 0
+    if guild_rank_text == "OWNER":
+        star_num = 5
+    elif guild_rank_text == "CHIEF":
+        star_num = 4
+    elif guild_rank_text == "STRATEGIST":
+        star_num = 3
+    elif guild_rank_text == "CAPTAIN":
+        star_num = 2
+    elif guild_rank_text == "RECRUITER":
+        star_num = 1
+    draw.text((text_base_x, banner_y + 75), f"{guild_rank_text}", font=font_main, fill=(60,40,30,255))
+    bbox = draw.textbbox((text_base_x, banner_y + 75), f"{guild_rank_text}", font=font_main)
+    x_grank = bbox[2] + 10
+    y_star = banner_y + 80
+    for i in range(star_num):
+        x = x_grank + i * (star_size)
+        img.paste(rank_star_img, (x, y_star), mask=rank_star_img)
+
+    server_display = info.get('server_display', 'Unknown')
+    active_char_info = info.get('active_char_info', 'Unknown')
+    # 左側にステータス丸（オンライン：緑、オフライン：赤）を描画
+    status_circle_x = 330
+    status_circle_y = 410 + 35
+    text_x = status_circle_x + 45
+    text_y = 413
+    if not server_display.lower() == "offline":
+        draw_status_circle(img, status_circle_x, status_circle_y, status="online")
+    else:
+        draw_status_circle(img, status_circle_x, status_circle_y, status="offline")
+    draw.text((text_x, text_y), f"{server_display}", font=font_main, fill=(60,40,30,255))
+    draw.text((330, text_y+75), f"Class: {active_char_info}", font=font_main, fill=(60,40,30,255))
+
+    draw.text((90, 610), f"First Join: {info.get('first_join', 'N/A')}", font=font_raids, fill=(60,40,30,255))
+    draw.text((90, 685), f"Last Seen: {info.get('last_join', 'N/A')}", font=font_raids, fill=(60,40,30,255))
+    
+    draw.text((90, 800), "Mobs", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 800), fmt_num(info.get('mobs_killed', 0)), font=font_sub, fill=(60,40,30,255))
+
+    draw.text((90, 875), "Chests", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 875), fmt_num(info.get('chests', 0)), font=font_sub, fill=(60,40,30,255))
+
+    draw.text((90, 950), "Quests", font=font_sub, fill=(60,40,30,255))
+    draw.text((330, 950), fmt_num(info.get('quests', 0)), font=font_sub, fill=(60,40,30,255))
+
+    draw.text((650, 600), "Playtime", font=font_sub, fill=(60,40,30,255))
+    playtime_text = fmt_num(info.get('playtime', 0))
+    draw.text((650, 675), playtime_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((650, 675), playtime_text, font=font_small)
+    x_hours = bbox[2] + 3
+    draw.text((x_hours, 675 + 18), "hours", font=font_mini, fill=(60,40,30,255))
+
+    draw.text((650, 750), "PvP", font=font_main, fill=(60,40,30,255))
+    pk_text = fmt_num(info.get('pvp_kill', 0))
+    pd_text = fmt_num(info.get('pvp_death', 0))
+    draw.text((650, 825), pk_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((650, 825), pk_text, font=font_small)
+    x_k = bbox[2] + 3
+    draw.text((x_k, 825 + 18), "K", font=font_mini, fill=(60,40,30,255))
+    draw.text((650, 875), pd_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((650, 875), pd_text, font=font_small)
+    x_d = bbox[2] + 3
+    draw.text((x_d, 875 + 18), "D", font=font_mini, fill=(60,40,30,255))
+
+    draw.text((650, 950), "Total Level", font=font_main, fill=(60,40,30,255))
+    total_text = fmt_num(info.get('total_level', 0))
+    draw.text((650, 1025), total_text, font=font_small, fill=(60,40,30,255))
+    bbox = draw.textbbox((650, 1025), total_text, font=font_small)
+    x_lvl = bbox[2] + 3
+    draw.text((x_lvl, 1025 + 18), "lv.", font=font_mini, fill=(60,40,30,255))
+
+    draw.text((90, 1070), "Content Clears", font=font_small, fill=(90,60,30,255))
+
+    right_edge_x = 440
+    raid_keys = [("NOTG", "notg", 1150), ("NOL", "nol", 1200), ("TCC", "tcc", 1250),
+                 ("TNA", "tna", 1300), ("Dungeons", "dungeons", 1350), ("All Raids", "all_raids", 1400)]
+    for label, key, y in raid_keys:
+        draw.text((100, y), label, font=font_raids, fill=(60,40,30,255))
+        num_text = fmt_num(info.get(key, 0))
+        bbox = draw.textbbox((0,0), num_text, font=font_raids)
+        text_width = bbox[2] - bbox[0]
+        x = right_edge_x - text_width
+        draw.text((x, y), num_text, font=font_raids, fill=(60,40,30,255))
+
+    wars_text = fmt_num(info.get('wars', 0))
+    war_rank_display_text = f"#{info.get('war_rank_display', 'N/A')}"
+    world_events_text = fmt_num(info.get('world_events', 0))
+    draw.text((475, 1150), "Wars", font=font_raids, fill=(60,40,30,255))
+    draw.text((475, 1200), "WEs", font=font_raids, fill=(60,40,30,255))
+    y_wars = 1150
+    y_world_events = 1200
+    x_right_align = 775
+
+    bbox_wars = draw.textbbox((0,0), wars_text, font=font_raids)
+    wars_width = bbox_wars[2] - bbox_wars[0]
+    draw.text((x_right_align - wars_width, y_wars), wars_text, font=font_raids, fill=(60,40,30,255))
+
+    bbox_war_rank = draw.textbbox((0,0), war_rank_display_text, font=font_mini)
+    war_rank_width = bbox_war_rank[2] - bbox_war_rank[0]
+    draw.text((x_right_align + 12, y_wars + 12), war_rank_display_text, font=font_mini, fill=(60,40,30,255))
+
+    bbox_we = draw.textbbox((0,0), world_events_text, font=font_raids)
+    we_width = bbox_we[2] - bbox_we[0]
+    draw.text((x_right_align - we_width, y_world_events), world_events_text, font=font_raids, fill=(60,40,30,255))
+
+    uuid = info.get("uuid", "")
+    if uuid and '-' in uuid:
+        parts = uuid.split('-')
+        if len(parts) == 5:
+            line1 = f"{parts[0]}-{parts[1]}"
+            line2 = f"{parts[2]}-{parts[3]}-{parts[4]}"
+        else:
+            line1 = uuid
+            line2 = ""
+    else:
+        line1 = line2 = ""
+    draw.text((475, 1275), "UUID", font=font_raids, fill=(90,90,90,255))
+    draw.text((600, 1280), line1 + "-", font=font_uuid, fill=(90,90,90,255))
+    draw.text((475, 1320), line2, font=font_uuid, fill=(90,90,90,255))
+
+    draw.text((585, 1400), "Generated by", font=font_mini, fill=(60,40,30,255))
+    draw.text((635, 1435), "Minister Chikuwa#5740", font=font_mini, fill=(60,40,30,255))
+
+    try:
+        img.save(output_path)
+    except Exception as e:
+        logger.error(f"画像保存失敗: {e}")
+    return output_path
+
