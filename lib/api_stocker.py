@@ -2,10 +2,11 @@ import aiohttp
 import asyncio
 from urllib.parse import quote
 import logging
+from PIL import Image
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
-# 共通リクエスト関数
 async def _make_request(url: str, *, headers: dict = None, return_bytes: bool = False, max_retries: int = 5, timeout: int = 10):
     for i in range(max_retries):
         try:
@@ -13,23 +14,22 @@ async def _make_request(url: str, *, headers: dict = None, return_bytes: bool = 
                 async with session.get(url, timeout=timeout) as response:
                     if 200 <= response.status < 301:
                         if return_bytes:
-                            return await response.read()
+                            data = await response.read()
+                            if not data:
+                                return None
+                            return data
                         if response.content_length != 0:
-                            # JSON以外はNone返却（OtherAPIでreturn_bytes指定時のみ画像バイト返す）
                             return await response.json()
                         return None
-
                     non_retryable_codes = [400, 404, 429]
                     if response.status in non_retryable_codes:
                         logger.warning(f"APIが{response.status}エラーを返しました。対象が見つかりません。URL: {url}")
                         return None
-
                     retryable_codes = [408, 500, 502, 503, 504]
                     if response.status in retryable_codes:
                         logger.warning(f"APIがステータス{response.status}を返しました。再試行します... ({i+1}/{max_retries})")
                         await asyncio.sleep(5)
                         continue
-
                     logger.error(f"APIから予期せぬエラー: Status {response.status}, URL: {url}")
                     return None
         except Exception as e:
@@ -83,7 +83,6 @@ class OtherAPI:
 
     async def get_guild_color_map(self):
         url = "https://athena.wynntils.com/cache/get/guildList"
-        # このAPIはJSON、headerはWynncraftAPIのものでもOK
         data = await _make_request(url, headers=self.guild_color_headers)
         if isinstance(data, list):
             return {g["prefix"]: g.get("color", "#FFFFFF") for g in data if g.get("prefix")}
@@ -96,3 +95,27 @@ class OtherAPI:
     async def get_mc_heads_avatar(self, mcid: str):
         url = f"https://mc-heads.net/avatar/{quote(mcid)}/256.png"
         return await _make_request(url, headers=self.mc_heads_headers, return_bytes=True)
+
+    async def get_vzge_skin_image(self, uuid: str, size: int = 196):
+        data = await self.get_vzge_skin(uuid)
+        if not data:
+            return None
+        try:
+            skin = Image.open(BytesIO(data)).convert("RGBA")
+            skin = skin.resize((size, size), Image.LANCZOS)
+            return skin
+        except Exception as e:
+            logger.error(f"vzge skin image decode failed: {e}")
+            return None
+
+    async def get_mc_heads_avatar_image(self, mcid: str, size: int = 196):
+        data = await self.get_mc_heads_avatar(mcid)
+        if not data:
+            return None
+        try:
+            img = Image.open(BytesIO(data)).convert("RGBA")
+            img = img.resize((size, size), Image.LANCZOS)
+            return img
+        except Exception as e:
+            logger.error(f"mc-heads image decode failed: {e}")
+            return None
