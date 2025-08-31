@@ -3,6 +3,7 @@ import requests
 from io import BytesIO
 import logging
 import os
+from lib.api_stocker import OtherAPI
 
 logger = logging.getLogger(__name__)
 
@@ -213,20 +214,18 @@ def generate_profile_card(info, output_path="profile_card.png"):
     uuid = info.get("uuid", "")
     if uuid:
         try:
-            skin_url = f"https://vzge.me/bust/256/{uuid}"
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-                "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
-                "Referer": "https://vzge.me/"
-            }
-            skin_res = requests.get(skin_url, headers=headers)
-            if skin_res.status_code != 200:
-                raise Exception(f"skin url response: {skin_res.status_code}")
-            skin = Image.open(BytesIO(skin_res.content)).convert("RGBA")
-            skin = skin.resize((196, 196), Image.LANCZOS)
-            img.paste(skin, (106, 340), mask=skin)
+            other_api = OtherAPI()
+            skin = await other_api.get_vzge_skin_image(uuid, size=196)
+            if skin:
+                img.paste(skin, (106, 340), mask=skin)
+            else:
+                # fallback: unknown_skin
+                unknown_skin = Image.open(UNKNOWN_SKIN_PATH).convert("RGBA")
+                unknown_skin = unknown_skin.resize((196, 196), Image.LANCZOS)
+                img.paste(unknown_skin, (106, 340), mask=unknown_skin)
         except Exception as e:
             logger.error(f"Skin image load failed: {e}")
+            # fallback: unknown_skin
             try:
                 unknown_skin = Image.open(UNKNOWN_SKIN_PATH).convert("RGBA")
                 unknown_skin = unknown_skin.resize((196, 196), Image.LANCZOS)
