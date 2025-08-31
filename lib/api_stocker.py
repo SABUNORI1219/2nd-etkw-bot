@@ -45,7 +45,7 @@ class WynncraftAPI:
     def __init__(self, token):
         self.headers = {
             'User-Agent': 'DiscordBot/1.0',
-            'Authorization': f'Bearer {token}',
+            'Authorization': f'Bearer {WYNNCRAFT_API_TOKEN}',
         }
 
     async def get_guild_by_name(self, guild_name: str):
@@ -75,11 +75,6 @@ class OtherAPI:
             'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
             'Referer': 'https://vzge.me/'
         }
-        self.mc_heads_headers = {
-            'User-Agent': 'Mozilla/5.0 ...',
-            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-            'Referer': 'https://mc-heads.net/'
-        }
 
     async def get_guild_color_map(self):
         url = "https://athena.wynntils.com/cache/get/guildList"
@@ -92,10 +87,6 @@ class OtherAPI:
         url = f"https://vzge.me/bust/256/{quote(uuid)}"
         return await _make_request(url, headers=self.vzge_headers, return_bytes=True)
 
-    async def get_mc_heads_avatar(self, mcid: str):
-        url = f"https://mc-heads.net/avatar/{quote(mcid)}/256.png"
-        return await _make_request(url, headers=self.mc_heads_headers, return_bytes=True)
-
     async def get_vzge_skin_image(self, uuid: str, size: int = 196):
         data = await self.get_vzge_skin(uuid)
         if not data:
@@ -106,16 +97,4 @@ class OtherAPI:
             return skin
         except Exception as e:
             logger.error(f"vzge skin image decode failed: {e}")
-            return None
-
-    async def get_mc_heads_avatar_image(self, mcid: str, size: int = 196):
-        data = await self.get_mc_heads_avatar(mcid)
-        if not data:
-            return None
-        try:
-            img = Image.open(BytesIO(data)).convert("RGBA")
-            img = img.resize((size, size), Image.LANCZOS)
-            return img
-        except Exception as e:
-            logger.error(f"mc-heads image decode failed: {e}")
             return None
