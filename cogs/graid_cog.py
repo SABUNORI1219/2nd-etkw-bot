@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
 from lib.db import fetch_history, set_config, reset_player_raid_count
-from lib.wynncraft_api import WynncraftAPI
+from lib.api_stocker import WynncraftAPI
 from config import AUTHORIZED_USER_IDS, send_authorized_only_message, RESTRICTION
 import os
 import logging
