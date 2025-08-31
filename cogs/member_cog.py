@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone
 import re
 
-from lib.api_stocker import WynncraftAPI
+from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.db import (
     add_member,
     remove_member,
@@ -122,6 +122,7 @@ class MemberListView(discord.ui.View):
         super().__init__(timeout=180.0)
         self.cog = cog_instance
         self.api = WynncraftAPI()
+        self.other_api = OtherAPI()
         self.current_page = initial_page
         self.total_pages = total_pages
         self.rank_filter = rank_filter
