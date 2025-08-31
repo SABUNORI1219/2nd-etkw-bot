@@ -164,6 +164,7 @@ async def notify_member_removed(bot, member_data):
         )
         dm_failed = False
         try:
+            logger.info("脱退通知Embedを該当メンバーに送信しました。")
             await user.send(embed=embed_dm, view=view)
         except Exception as e:
             logger.warning(f"DM送信失敗: {e}")
@@ -174,6 +175,7 @@ async def notify_member_removed(bot, member_data):
             backup_channel_id = 1271174069433274399
             backup_channel = bot.get_channel(backup_channel_id)
             if backup_channel:
+                logger.info("inactiveチャンネルに脱退通知Embedを該当メンバーに送信しました。")
                 await backup_channel.send(
                     content=f"<@{discord_id}>",
                     embed=embed_dm,
