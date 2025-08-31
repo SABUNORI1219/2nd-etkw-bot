@@ -122,7 +122,7 @@ def draw_status_circle(base_img, left_x, center_y, status="online"):
     # 影は描画しない（絵文字風にシャープに仕上げる）
     base_img.alpha_composite(circle_img, (left_x, center_y - circle_radius))
 
-def generate_profile_card(info, output_path="profile_card.png"):
+def generate_profile_card(info, output_path="profile_card.png", skin_image=None):
     try:
         img = Image.open(BASE_IMG_PATH).convert("RGBA")
     except Exception as e:
@@ -212,22 +212,12 @@ def generate_profile_card(info, output_path="profile_card.png"):
         draw.text((text_x, text_y), prefix_text, font=prefix_font, fill=(240,240,240,255))
         
     img.paste(PLAYER_BACKGROUND, (110, 280), mask=PLAYER_BACKGROUND)
-    uuid = info.get("uuid", "")
-    if uuid:
+    if skin_image:
         try:
-            other_api = OtherAPI()
-            skin_bytes = await other_api.get_vzge_skin(uuid)
-            if skin_bytes:
-                skin = Image.open(BytesIO(skin_bytes)).convert("RGBA")
-                skin = skin.resize((196, 196), Image.LANCZOS)
-                img.paste(skin, (106, 340), mask=skin)
-            else:
-                # fallback
-                unknown_skin = Image.open(UNKNOWN_SKIN_PATH).convert("RGBA")
-                unknown_skin = unknown_skin.resize((196, 196), Image.LANCZOS)
-                img.paste(unknown_skin, (106, 340), mask=unknown_skin)
+            skin = skin_image.resize((196, 196), Image.LANCZOS)
+            img.paste(skin, (106, 340), mask=skin)
         except Exception as e:
-            logger.error(f"Skin image load failed: {e}")
+            logger.error(f"Skin image process failed: {e}")
             # fallback
             try:
                 unknown_skin = Image.open(UNKNOWN_SKIN_PATH).convert("RGBA")
@@ -235,6 +225,15 @@ def generate_profile_card(info, output_path="profile_card.png"):
                 img.paste(unknown_skin, (106, 340), mask=unknown_skin)
             except Exception as ee:
                 logger.error(f"Unknown skin image load failed: {ee}")
+    else:
+        logger.error(f"Skin image load failed: {e}")
+        # fallback
+        try:
+            unknown_skin = Image.open(UNKNOWN_SKIN_PATH).convert("RGBA")
+            unknown_skin = unknown_skin.resize((196, 196), Image.LANCZOS)
+            img.paste(unknown_skin, (106, 340), mask=unknown_skin)
+        except Exception as ee:
+            logger.error(f"Unknown skin image load failed: {ee}")
 
     rank_text = info.get('support_rank_display')
     rank_colors = RANK_COLOR_MAP.get(rank_text, RANK_COLOR_MAP['None'])
