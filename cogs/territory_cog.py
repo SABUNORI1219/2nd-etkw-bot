@@ -8,8 +8,7 @@ import os
 import re
 from datetime import datetime, timezone
 
-# libフォルダから専門家たちをインポート
-from lib.wynncraft_api import WynncraftAPI
+from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.map_renderer import MapRenderer
 from lib.cache_handler import CacheHandler
 from lib.db import get_guild_territory_state
@@ -41,6 +40,7 @@ class Territory(commands.GroupCog, name="territory"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.wynn_api = WynncraftAPI()
+        self.other_api = OtherAPI()
         self.map_renderer = MapRenderer()
         self.cache = CacheHandler()
         self.territory_guilds_cache = [] # ギルド名のリスト
@@ -135,7 +135,7 @@ class Territory(commands.GroupCog, name="territory"):
 
         # WynncraftAPIで領地データ・ギルドカラー取得
         territory_data = await self.wynn_api.get_territory_list()
-        guild_color_map = await self.wynn_api.get_guild_color_map()
+        guild_color_map = await self.other_api.get_guild_color_map()
 
         if not territory_data or not guild_color_map:
             await interaction.followup.send("テリトリーまたはギルドカラー情報の取得に失敗しました。コマンドをもう一度お試しください。")
@@ -181,7 +181,7 @@ class Territory(commands.GroupCog, name="territory"):
         await interaction.response.defer()
 
         static_data = self.map_renderer.local_territories.get(territory)
-        guild_color_map = await self.wynn_api.get_guild_color_map()
+        guild_color_map = await self.other_api.get_guild_color_map()
 
         cache_key = "wynn_territory_list"
         territory_data = self.cache.get_cache(cache_key)
