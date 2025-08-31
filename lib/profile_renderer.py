@@ -216,24 +216,19 @@ def generate_profile_card(info, output_path="profile_card.png"):
     if uuid:
         try:
             other_api = OtherAPI()
-            skin_bytes = None
-            try:
-                skin_bytes = asyncio.run(other_api.get_vzge_skin(uuid))
-            except Exception as e:
-                logger.error(f"Skin image async get failed: {e}")
-                skin_bytes = None
-
+            skin_bytes = await other_api.get_vzge_skin(uuid)
             if skin_bytes:
                 skin = Image.open(BytesIO(skin_bytes)).convert("RGBA")
                 skin = skin.resize((196, 196), Image.LANCZOS)
                 img.paste(skin, (106, 340), mask=skin)
             else:
-                # fallback: unknown_skin
+                # fallback
                 unknown_skin = Image.open(UNKNOWN_SKIN_PATH).convert("RGBA")
                 unknown_skin = unknown_skin.resize((196, 196), Image.LANCZOS)
                 img.paste(unknown_skin, (106, 340), mask=unknown_skin)
         except Exception as e:
             logger.error(f"Skin image load failed: {e}")
+            # fallback
             try:
                 unknown_skin = Image.open(UNKNOWN_SKIN_PATH).convert("RGBA")
                 unknown_skin = unknown_skin.resize((196, 196), Image.LANCZOS)
