@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timezone
 import re
 
-from lib.wynncraft_api import WynncraftAPI
+from lib.api_stocker import WynncraftAPI
 from lib.db import (
     add_member,
     remove_member,
