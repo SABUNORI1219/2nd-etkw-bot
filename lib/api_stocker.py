@@ -5,6 +5,8 @@ import logging
 from PIL import Image
 from io import BytesIO
 
+from config import WYNNCRAFT_API_TOKEN
+
 logger = logging.getLogger(__name__)
 
 async def _make_request(url: str, *, headers: dict = None, return_bytes: bool = False, max_retries: int = 5, timeout: int = 10):
@@ -42,7 +44,7 @@ class WynncraftAPI:
     """
     api.wynncraft.com関連APIのみ。認証トークン必須。
     """
-    def __init__(self, token):
+    def __init__(self):
         self.headers = {
             'User-Agent': 'DiscordBot/1.0',
             'Authorization': f'Bearer {WYNNCRAFT_API_TOKEN}',
