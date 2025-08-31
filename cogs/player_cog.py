@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 import requests
 import time
 
-from lib.wynncraft_api import WynncraftAPI
+from lib.api_stocker import WynncraftAPI
 from config import AUTHORIZED_USER_IDS, SKIN_EMOJI_SERVER_ID
 from lib.cache_handler import CacheHandler
 from lib.banner_renderer import BannerRenderer
