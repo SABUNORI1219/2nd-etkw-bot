@@ -3,6 +3,7 @@ import requests
 from io import BytesIO
 import logging
 import os
+import asyncio
 from lib.api_stocker import OtherAPI
 
 logger = logging.getLogger(__name__)
