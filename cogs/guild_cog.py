@@ -8,7 +8,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from lib.wynncraft_api import WynncraftAPI
+from lib.api_stocker import WynncraftAPI
 from lib.cache_handler import CacheHandler
 from lib.banner_renderer import BannerRenderer
 from config import EMBED_COLOR_BLUE
