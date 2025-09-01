@@ -4,6 +4,8 @@ from lib.db import get_config
 import os
 from datetime import timezone, timedelta
 from config import ETKW_SERVER
+import asyncio
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -39,35 +41,184 @@ ENGLISH_MESSAGE = (
 def get_emoji_for_raid(raid_name):
     return RAID_EMOJIS.get(raid_name, DEFAULT_EMOJI)
 
-class LanguageSwitchView(discord.ui.View):
-    def __init__(self, target_user_id):
-        super().__init__(timeout=None)
-        self.target_user_id = target_user_id
-        self.language = "ja"  # デフォルト日本語
+# Reaction-based language switching system
+class ReactionLanguageManager:
+    def __init__(self):
+        # Store message states: {message_id: {'user_id': int, 'language': str, 'last_switch': float}}
+        self.message_states = {}
+        self.cooldown_seconds = 2.0
+        
+    def add_message(self, message_id: int, target_user_id: int, initial_language: str = "ja"):
+        """Register a message for reaction-based language switching"""
+        self.message_states[message_id] = {
+            'user_id': target_user_id,
+            'language': initial_language,
+            'last_switch': 0.0
+        }
+        
+    def remove_message(self, message_id: int):
+        """Remove a message from tracking"""
+        self.message_states.pop(message_id, None)
+        
+    def can_switch_language(self, message_id: int, user_id: int) -> bool:
+        """Check if user can switch language (permission + cooldown)"""
+        state = self.message_states.get(message_id)
+        if not state:
+            return False
+            
+        # Check if user is authorized
+        if state['user_id'] != user_id:
+            return False
+            
+        # Check cooldown
+        current_time = time.time()
+        if current_time - state['last_switch'] < self.cooldown_seconds:
+            return False
+            
+        return True
+        
+    def switch_language(self, message_id: int, new_language: str):
+        """Switch language and update timestamp"""
+        if message_id in self.message_states:
+            self.message_states[message_id]['language'] = new_language
+            self.message_states[message_id]['last_switch'] = time.time()
+            
+    def get_language(self, message_id: int) -> str:
+        """Get current language for message"""
+        state = self.message_states.get(message_id)
+        return state['language'] if state else "ja"
 
-    @discord.ui.button(label="日本語で表示", style=discord.ButtonStyle.primary)
-    async def show_japanese(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.target_user_id:
-            await interaction.response.send_message("この操作はご本人のみ利用できます。", ephemeral=True)
-            return
-        embed = discord.Embed(
-            title="ギルド脱退のお知らせ",
-            description=JAPANESE_MESSAGE,
-            color=discord.Color.red()
-        )
-        await interaction.response.edit_message(embed=embed, view=self)
+# Global instance
+reaction_manager = ReactionLanguageManager()
 
-    @discord.ui.button(label="Show in English", style=discord.ButtonStyle.secondary)
-    async def show_english(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.target_user_id:
-            await interaction.response.send_message("This action is only available to the person concerned.", ephemeral=True)
-            return
-        embed = discord.Embed(
+def create_departure_embed(language: str = "ja") -> discord.Embed:
+    """Create departure notification embed in specified language"""
+    if language == "en":
+        return discord.Embed(
             title="Guild Departure Notice",
-            description=ENGLISH_MESSAGE,
+            description=ENGLISH_MESSAGE.format(channel_link=channel_link),
             color=discord.Color.red()
         )
-        await interaction.response.edit_message(embed=embed, view=self)
+    else:
+        return discord.Embed(
+            title="ギルド脱退のお知らせ",
+            description=JAPANESE_MESSAGE.format(channel_link=channel_link),
+            color=discord.Color.red()
+        )
+
+async def setup_reaction_language_switching(bot, message: discord.Message, target_user_id: int):
+    """Setup reaction-based language switching for a message"""
+    # Register the message
+    reaction_manager.add_message(message.id, target_user_id)
+    
+    # Add reaction emojis
+    try:
+        await message.add_reaction("🇯🇵")
+        await message.add_reaction("🇬🇧")
+        await message.add_reaction("🗑️")  # Delete emoji
+    except Exception as e:
+        logger.error(f"Failed to add reactions: {e}")
+
+async def handle_reaction_add(bot, payload: discord.RawReactionActionEvent):
+    """Handle reaction additions for language switching"""
+    # Ignore bot reactions
+    if payload.user_id == bot.user.id:
+        return
+        
+    message_id = payload.message_id
+    user_id = payload.user_id
+    emoji = str(payload.emoji)
+    
+    # Check if this message is managed by our system
+    if message_id not in reaction_manager.message_states:
+        return
+        
+    # Get the message
+    try:
+        channel = bot.get_channel(payload.channel_id)
+        if not channel:
+            # Try to get channel from guild if it's a guild channel
+            guild = bot.get_guild(payload.guild_id) if payload.guild_id else None
+            if guild:
+                channel = guild.get_channel(payload.channel_id)
+            if not channel:
+                return
+                
+        message = await channel.fetch_message(message_id)
+    except Exception as e:
+        logger.error(f"Failed to fetch message for reaction handling: {e}")
+        return
+    
+    # Handle delete reaction
+    if emoji == "🗑️":
+        # Only the target user can delete
+        state = reaction_manager.message_states.get(message_id)
+        if state and state['user_id'] == user_id:
+            try:
+                reaction_manager.remove_message(message_id)
+                await message.delete()
+                return
+            except Exception as e:
+                logger.error(f"Failed to delete message: {e}")
+                
+    # Handle language switching
+    new_language = None
+    if emoji == "🇯🇵":
+        new_language = "ja"
+    elif emoji == "🇬🇧":
+        new_language = "en"
+        
+    if new_language:
+        # Check if user can switch
+        if not reaction_manager.can_switch_language(message_id, user_id):
+            # Remove the reaction
+            try:
+                await message.remove_reaction(emoji, bot.get_user(user_id))
+            except Exception:
+                pass
+            return
+            
+        # Get current language
+        current_language = reaction_manager.get_language(message_id)
+        
+        # Don't switch if already in the requested language
+        if current_language == new_language:
+            try:
+                await message.remove_reaction(emoji, bot.get_user(user_id))
+            except Exception:
+                pass
+            return
+            
+        # Update language and edit message
+        reaction_manager.switch_language(message_id, new_language)
+        new_embed = create_departure_embed(new_language)
+        
+        try:
+            await message.edit(embed=new_embed)
+            # Remove the user's reaction
+            await message.remove_reaction(emoji, bot.get_user(user_id))
+        except Exception as e:
+            logger.error(f"Failed to edit message or remove reaction: {e}")
+
+async def send_test_departure_embed(bot, channel_or_user, target_user_id: int):
+    """
+    Utility function for sending a test departure embed that can be deleted anytime.
+    
+    Args:
+        bot: Discord bot instance
+        channel_or_user: Channel or User object to send to
+        target_user_id: ID of the user who can control the embed
+    """
+    embed = create_departure_embed("ja")  # Start with Japanese
+    
+    try:
+        message = await channel_or_user.send(embed=embed)
+        await setup_reaction_language_switching(bot, message, target_user_id)
+        logger.info(f"Test departure embed sent to {channel_or_user} for user {target_user_id}")
+        return message
+    except Exception as e:
+        logger.error(f"Failed to send test departure embed: {e}")
+        return None
 
 async def send_guild_raid_embed(bot, party):
     NOTIFY_CHANNEL_ID = int(get_config("NOTIFY_CHANNEL_ID") or "0")
@@ -154,18 +305,15 @@ async def notify_member_removed(bot, member_data):
                     except Exception as e:
                         logger.warning(f"ロール追加失敗: {e}")
 
-        # --- DM送信 ---
+        # --- DM送信 (新しいリアクション方式) ---
         user = bot.get_user(int(discord_id))
-        view = LanguageSwitchView(target_user_id=int(discord_id))
-        embed_dm = discord.Embed(
-            title="Guild Departure Notice",
-            description=JAPANESE_MESSAGE,
-            color=discord.Color.red()
-        )
+        embed_dm = create_departure_embed("ja")  # Start with Japanese
+        
         dm_failed = False
         try:
             logger.info("脱退通知Embedを該当メンバーに送信しました。")
-            await user.send(embed=embed_dm, view=view)
+            message = await user.send(embed=embed_dm)
+            await setup_reaction_language_switching(bot, message, int(discord_id))
         except Exception as e:
             logger.warning(f"DM送信失敗: {e}")
             dm_failed = True
@@ -176,11 +324,11 @@ async def notify_member_removed(bot, member_data):
             backup_channel = bot.get_channel(backup_channel_id)
             if backup_channel:
                 logger.info("inactiveチャンネルに脱退通知Embedを該当メンバーに送信しました。")
-                await backup_channel.send(
+                message = await backup_channel.send(
                     content=f"<@{discord_id}>",
-                    embed=embed_dm,
-                    view=view
+                    embed=embed_dm
                 )
+                await setup_reaction_language_switching(bot, message, int(discord_id))
             else:
                 logger.warning(f"バックアップ通知チャンネル({backup_channel_id})が見つかりません")
 
