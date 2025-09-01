@@ -12,6 +12,7 @@ import logging
 from keep_alive import keep_alive
 from logger_setup import setup_logger
 from lib.db import create_table
+from lib.discord_notify import handle_reaction_add
 
 # ロガーを最初にセットアップ
 setup_logger()
@@ -81,6 +82,10 @@ class MyBot(commands.Bot):
         logger.info(f"ステータス設定完了: {self.activity.type.name} {self.activity.name}")
         logger.info("Botは正常に起動し、命令待機状態に入りました。")
         logger.info("==================================================")
+
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
+        """リアクション追加時のイベントハンドラー"""
+        await handle_reaction_add(self, payload)
 
 # Botのインスタンスを作成
 bot = MyBot()
