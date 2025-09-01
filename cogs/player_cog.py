@@ -256,13 +256,13 @@ class PlayerCog(commands.Cog):
 
         skin_image = None
         if uuid:
-        try:
-            skin_bytes = await self.other_api.get_vzge_skin(uuid)
-            if skin_bytes:
-                skin_image = Image.open(BytesIO(skin_bytes)).convert("RGBA")
-        except Exception as e:
-            logger.error(f"Skin image load failed: {e}")
-            skin_image = None
+            try:
+                skin_bytes = await self.other_api.get_vzge_skin(uuid)
+                if skin_bytes:
+                    skin_image = Image.open(BytesIO(skin_bytes)).convert("RGBA")
+            except Exception as e:
+                logger.error(f"Skin image load failed: {e}")
+                skin_image = None
 
         profile_info = {
             "username": data.get("username"),
