@@ -13,7 +13,7 @@ class TestCog(commands.Cog):
 
     @app_commands.command(name="test_departure", description="Send a test departure notification embed")
     @app_commands.describe(
-        user="Target user who can control the embed",
+        user="Target user who can control the embed(現在テスト用)",
         channel="Channel to send to (optional, defaults to current channel)"
     )
     async def test_departure(
@@ -52,7 +52,7 @@ class TestCog(commands.Cog):
             )
 
     @app_commands.command(name="test_departure_dm", description="Send a test departure notification embed via DM")
-    @app_commands.describe(user="Target user who can control the embed")
+    @app_commands.describe(user="Target user who can control the embed(現在テスト用)")
     async def test_departure_dm(self, interaction: discord.Interaction, user: discord.User):
         # Check authorization
         if interaction.user.id not in AUTHORIZED_USER_IDS:
