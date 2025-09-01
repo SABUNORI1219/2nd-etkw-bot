@@ -1,8 +1,6 @@
 import os
 import discord
 
-GUILD_NAME = "Empire of TKW"
-
 WYNNCRAFT_API_TOKEN = os.getenv('WYNN_API_TOKEN')
 
 # Discord関連 (環境変数から読み込み)
