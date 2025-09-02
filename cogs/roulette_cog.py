@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class RouletteCog(commands.Cog):
     """
-    ルーレット機能：軽量化・ランダム性強化・静止画対応
+    ルーレット機能：軽量化・ゆっくり回転・ランダム性強化・静止画対応・候補数/文字数制約緩和
     """
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -22,7 +22,7 @@ class RouletteCog(commands.Cog):
     @app_commands.command(name="roulette", description="ルーレットを回してランダムに一つを当選")
     @app_commands.describe(
         title="ルーレットのタイトル",
-        options="候補をスペースで区切って入力(候補は10文字以内、6個以内で入力)"
+        options="候補をスペース区切りで入力（各候補15文字以内、最大10個まで）"
     )
     async def roulette(self, interaction: discord.Interaction, title: str, options: str):
         await interaction.response.defer()
@@ -31,23 +31,22 @@ class RouletteCog(commands.Cog):
         if len(candidate_list) < 2:
             await interaction.followup.send("候補は2つ以上指定してください。")
             return
-        if len(candidate_list) > 6:
-            await interaction.followup.send("候補は6個以下にしてください。")
+        if len(candidate_list) > 10:
+            await interaction.followup.send("候補は最大10個までにしてください。")
             return
         for candidate in candidate_list:
-            if len(candidate) > 10:
-                await interaction.followup.send(f"候補「{candidate}」が長すぎます。各候補は10文字以内にしてください。")
+            if len(candidate) > 15:
+                await interaction.followup.send(f"候補「{candidate}」が長すぎます。各候補は15文字以内にしてください。")
                 return
 
         # --- ランダム性強化 ---
-        # サーバー時刻, ユーザーID, 乱数などをseedに
         seed = int(interaction.user.id) ^ int(asyncio.get_event_loop().time() * 1000) ^ random.randint(0, 999999)
         random.seed(seed)
         winner = random.choice(candidate_list)
         winner_index = candidate_list.index(winner)
         logger.info(f"ルーレット実行: {title}, 候補: {candidate_list}, 当選: {winner}")
 
-        # GIF生成（軽量化・乱数強化）
+        # GIF生成（軽量化・乱数強化・ゆっくり回転）
         gif_buffer, animation_duration = self.renderer.create_roulette_gif(candidate_list, winner_index)
         if gif_buffer:
             gif_file = discord.File(fp=gif_buffer, filename="roulette.gif")
