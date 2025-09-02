@@ -139,7 +139,7 @@ async def notify_member_removed(bot, member_data):
                     except Exception as e:
                         logger.warning(f"ロール追加失敗: {e}")
 
-        # --- DM送信 (日英両方入りEmbed) ---
+        # DM送信
         user = bot.get_user(int(discord_id))
         embed_dm = create_departure_embed_dual()
         dm_failed = False
