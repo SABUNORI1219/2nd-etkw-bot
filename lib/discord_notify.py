@@ -106,6 +106,24 @@ def create_departure_embed(language: str = "ja") -> discord.Embed:
             color=discord.Color.red()
         )
 
+async def get_user_for_reaction_removal(bot, user_id: int):
+    """
+    Reliably get a user object for reaction removal.
+    Tries bot.get_user first (cached), then bot.fetch_user (API call) as fallback.
+    """
+    # Try to get from cache first
+    user = bot.get_user(user_id)
+    if user:
+        return user
+    
+    # If not in cache, fetch from API
+    try:
+        user = await bot.fetch_user(user_id)
+        return user
+    except Exception as e:
+        logger.error(f"Failed to fetch user {user_id} for reaction removal: {e}")
+        return None
+
 async def setup_reaction_language_switching(bot, message: discord.Message, target_user_id: int):
     """Setup reaction-based language switching for a message"""
     # Register the message
@@ -173,7 +191,9 @@ async def handle_reaction_add(bot, payload: discord.RawReactionActionEvent):
         if not reaction_manager.can_switch_language(message_id, user_id):
             # Remove the reaction
             try:
-                await message.remove_reaction(emoji, bot.get_user(user_id))
+                user = await get_user_for_reaction_removal(bot, user_id)
+                if user:
+                    await message.remove_reaction(emoji, user)
             except Exception:
                 pass
             return
@@ -184,7 +204,9 @@ async def handle_reaction_add(bot, payload: discord.RawReactionActionEvent):
         # Don't switch if already in the requested language
         if current_language == new_language:
             try:
-                await message.remove_reaction(emoji, bot.get_user(user_id))
+                user = await get_user_for_reaction_removal(bot, user_id)
+                if user:
+                    await message.remove_reaction(emoji, user)
             except Exception:
                 pass
             return
@@ -196,7 +218,9 @@ async def handle_reaction_add(bot, payload: discord.RawReactionActionEvent):
         try:
             await message.edit(embed=new_embed)
             # Remove the user's reaction
-            await message.remove_reaction(emoji, bot.get_user(user_id))
+            user = await get_user_for_reaction_removal(bot, user_id)
+            if user:
+                await message.remove_reaction(emoji, user)
         except Exception as e:
             logger.error(f"Failed to edit message or remove reaction: {e}")
 
