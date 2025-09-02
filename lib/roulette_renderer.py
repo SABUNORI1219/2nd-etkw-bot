@@ -37,17 +37,17 @@ class RouletteRenderer:
             [
                 (self.center - 14, 8),
                 (self.center + 14, 8),
-                (self.center, 36),
+                (self.center, 30),
             ],
             fill=(255, 0, 0),
         )
         # 中心円
         draw.ellipse(
             (
-                self.center - 16,
-                self.center - 16,
-                self.center + 16,
-                self.center + 16,
+                self.center - 14,
+                self.center - 14,
+                self.center + 14,
+                self.center + 14,
             ),
             fill=(0, 0, 0),
         )
@@ -95,7 +95,7 @@ class RouletteRenderer:
 
     def create_roulette_gif(self, candidates: list, winner_index: int) -> tuple[BytesIO, float]:
         """
-        ゆっくり回転・軽量GIF生成
+        ゆっくり止まるGIF生成（フレーム数は60～80）
         """
         logger.info(f"ルーレットGIF生成開始。候補: {candidates}, 当選者: {candidates[winner_index]}")
         num_candidates = len(candidates)
@@ -110,20 +110,21 @@ class RouletteRenderer:
         # ランダム性強化
         seed = int(time.time() * 1000) ^ os.getpid() ^ random.randint(0, 999999)
         random.seed(seed)
-        spin_count = random.randint(5, 8)
-        spin_offset = random.uniform(-0.4, 0.4)
+        spin_count = random.randint(4, 6)
+        spin_offset = random.uniform(-0.35, 0.35)
 
         angle_per_candidate = 360 / num_candidates
         stop_angle = 270 - (angle_per_candidate * winner_index) - (angle_per_candidate / 2) + spin_offset * angle_per_candidate
         total_rotation_degrees = 360 * spin_count + stop_angle
 
-        num_frames = random.randint(140, 180)  # ゆっくり＆なめらか
-        duration_ms = random.randint(18, 28)  # 1フレームあたりの時間
+        num_frames = random.randint(60, 80)  # 60～80フレーム
+        duration_ms = random.randint(22, 32)
 
         frames = []
         for i in range(num_frames):
             progress = i / (num_frames - 1)
-            ease_out_progress = 1 - (1 - progress) ** 3.5
+            # 強めのease-outで最後ゆっくり止まる
+            ease_out_progress = 1 - (1 - progress) ** 6
             current_rotation = total_rotation_degrees * ease_out_progress
 
             frame = Image.new("RGBA", (self.size, self.size), (0, 0, 0, 0))
@@ -136,6 +137,7 @@ class RouletteRenderer:
             self._draw_static_elements(draw)
             frames.append(frame)
 
+        # 最終静止フレームを多めに追加（余韻）
         last_frame = frames[-1]
         for _ in range(18):
             frames.append(last_frame)
