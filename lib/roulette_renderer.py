@@ -35,8 +35,8 @@ class RouletteRenderer:
         # ポインタ（三角形）
         draw.polygon(
             [
-                (self.center - 14, 8),
-                (self.center + 14, 8),
+                (self.center - 12, 6),
+                (self.center + 12, 6),
                 (self.center, 30),
             ],
             fill=(255, 0, 0),
@@ -117,7 +117,7 @@ class RouletteRenderer:
         stop_angle = 270 - (angle_per_candidate * winner_index) - (angle_per_candidate / 2) + spin_offset * angle_per_candidate
         total_rotation_degrees = 360 * spin_count + stop_angle
 
-        num_frames = random.randint(60, 80)  # 60～80フレーム
+        num_frames = random.randint(120, 180)
         duration_ms = random.randint(22, 32)
 
         frames = []
