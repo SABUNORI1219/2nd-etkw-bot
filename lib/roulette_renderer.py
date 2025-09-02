@@ -117,14 +117,14 @@ class RouletteRenderer:
         stop_angle = 270 - (angle_per_candidate * winner_index) - (angle_per_candidate / 2) + spin_offset * angle_per_candidate
         total_rotation_degrees = 360 * spin_count + stop_angle
 
-        num_frames = random.randint(120, 180)
-        duration_ms = random.randint(22, 32)
+        num_frames = random.randint(100, 160)
+        duration_ms = random.randint(32, 42)
 
         frames = []
         for i in range(num_frames):
             progress = i / (num_frames - 1)
             # 強めのease-outで最後ゆっくり止まる
-            ease_out_progress = 1 - (1 - progress) ** 10
+            ease_out_progress = 1 - (1 - progress) ** 15
             current_rotation = total_rotation_degrees * ease_out_progress
 
             frame = Image.new("RGBA", (self.size, self.size), (0, 0, 0, 0))
