@@ -62,24 +62,6 @@ def create_departure_embed_dual() -> discord.Embed:
     embed.set_footer(text="Inactive通知 | Minister Chikuwa")
     return embed
 
-async def send_test_departure_embed(bot, channel_or_user, target_user_id: int):
-    """
-    Utility function for sending a test departure embed (日本語・英語両方入り).
-    Args:
-        bot: Discord bot instance
-        channel_or_user: Channel or User object to send to
-        target_user_id: ID of the user who can control the embed
-    """
-    embed = create_departure_embed_dual()  # 日英両方入りEmbed
-
-    try:
-        message = await channel_or_user.send(embed=embed)
-        logger.info(f"Test departure embed (dual) sent to {channel_or_user} for user {target_user_id}")
-        return message
-    except Exception as e:
-        logger.error(f"Failed to send test departure embed (dual): {e}")
-        return None
-
 async def send_guild_raid_embed(bot, party):
     NOTIFY_CHANNEL_ID = int(get_config("NOTIFY_CHANNEL_ID") or "0")
     channel = bot.get_channel(NOTIFY_CHANNEL_ID)
