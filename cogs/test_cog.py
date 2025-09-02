@@ -36,7 +36,7 @@ class TestCog(commands.Cog):
             if message:
                 await interaction.followup.send(
                     f"✅ Test departure embed sent to {target_channel.mention} for {user.mention}\n"
-                    f"User can react with 🇯🇵 (Japanese), 🇬🇧 (English), or 🗑️ (Delete)",
+                    f"User can use buttons 🇯🇵 (Japanese), 🇬🇧 (English), or 🗑️ (Delete) for 15 minutes",
                     ephemeral=True
                 )
             else:
@@ -66,7 +66,7 @@ class TestCog(commands.Cog):
             if message:
                 await interaction.followup.send(
                     f"✅ Test departure embed sent via DM to {user.mention}\n"
-                    f"User can react with 🇯🇵 (Japanese), 🇬🇧 (English), or 🗑️ (Delete)",
+                    f"User can use buttons 🇯🇵 (Japanese), 🇬🇧 (English), or 🗑️ (Delete) for 15 minutes",
                     ephemeral=True
                 )
             else:
