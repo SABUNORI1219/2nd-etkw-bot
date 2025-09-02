@@ -124,7 +124,7 @@ class RouletteRenderer:
         for i in range(num_frames):
             progress = i / (num_frames - 1)
             # 強めのease-outで最後ゆっくり止まる
-            ease_out_progress = 1 - (1 - progress) ** 6
+            ease_out_progress = 1 - (1 - progress) ** 10
             current_rotation = total_rotation_degrees * ease_out_progress
 
             frame = Image.new("RGBA", (self.size, self.size), (0, 0, 0, 0))
