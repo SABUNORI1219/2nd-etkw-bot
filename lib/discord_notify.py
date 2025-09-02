@@ -25,16 +25,16 @@ RAID_EMOJIS = {
 DEFAULT_EMOJI = "🎲"  # 未登録レイド用
 
 JAPANESE_MESSAGE = (
-    "**ご自身でギルドから抜けた場合には、このメッセージは無視してください**。\n\n"
+    "ご自身でギルドから抜けた場合には、このメッセージは無視してください。\n\n"
     "最近、Wynncraft内での活動が盛んではないかつ、新しいメンバーが加入するためにキックいたしました。\n"
-    "__再度加入したい場合は、[こちらのチャンネル]({channel_link})でその旨伝えてください__。\n"
+    "再度加入したい場合は、[こちらのチャンネル]({channel_link})でその旨伝えてください。\n"
     "またWynncraftにログインできなくなる理由がある場合は、ここで伝えてもらえれば枠をキープすることもできます。"
 )
 
 ENGLISH_MESSAGE = (
-    "**If you left the guild yourself, please ignore this message**.\n\n"
+    "If you left the guild yourself, please ignore this message.\n\n"
     "You were kicked because there hasn't been much activity in Wynncraft recently and to make way for new members.\n"
-    "__If you would like to rejoin, please let us know [here]({channel_link})__.\n"
+    "If you would like to rejoin, please let us know [here]({channel_link}).\n"
     "Also, if there is a reason why you can no longer log in to Wynncraft, you can let us know there and we will be able to keep your spot."
 )
 
@@ -143,7 +143,6 @@ async def notify_member_removed(bot, member_data):
     await channel.send(embed=embed)
     logger.info(f"Guild脱退通知: {member_data}")
 
-    # --- ロール追加処理 ---
     DEPARTURE_IDS = [1271173606478708811, 1151511274165895228]
     discord_id = member_data.get('discord_id')
     if discord_id:
