@@ -73,6 +73,8 @@ class MyBot(commands.Bot):
         except Exception as e:
             logger.error(f"--- [司令塔] ❌ コマンドの同期に失敗しました: {e}")
 
+        self.add_view(LanguageSwitchView())
+
     async def on_ready(self):
         """Botの準備が完了したときに呼ばれるイベント"""
         logger.info("==================================================")
@@ -83,16 +85,8 @@ class MyBot(commands.Bot):
         logger.info("Botは正常に起動し、命令待機状態に入りました。")
         logger.info("==================================================")
 
-    # Note: Removed reaction handler as we now use button interactions
-    # Button interactions are handled within the LanguageSwitchView class
-
 # Botのインスタンスを作成
 bot = MyBot()
-
-async def my_on_raw_reaction_add(payload):
-    await on_raw_reaction_add(bot, payload)
-
-bot.add_listener(my_on_raw_reaction_add, "on_raw_reaction_add")
 
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
