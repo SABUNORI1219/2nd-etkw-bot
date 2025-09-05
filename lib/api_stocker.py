@@ -29,6 +29,18 @@ async def _make_request(session, url: str, *, return_bytes: bool = False, max_re
                     return None
                 retryable_codes = [408, 500, 502, 503, 504]
                 if response.status in retryable_codes:
+                    if response.status == 500:
+                        try:
+                            body = await response.json()
+                            if (
+                                isinstance(body, dict)
+                                and body.get("error") == "InternalError"
+                                and body.get("detail") == "Unable to render this guild"
+                            ):
+                                logger.warning(f"APIがステータス500かつギルド未存在エラー: {body} URL: {url}")
+                                return None  # リトライせず即None-なんで404で返ってこない年
+                        except Exception as e:
+                            logger.warning(f"500エラーのレスポンスパース失敗: {e}")
                     logger.warning(f"APIがステータス{response.status}を返しました。再試行します... ({i+1}/{max_retries})")
                     await asyncio.sleep(2)
                     continue
