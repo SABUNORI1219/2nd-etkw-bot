@@ -12,7 +12,7 @@ import logging
 from keep_alive import keep_alive
 from logger_setup import setup_logger
 from lib.db import create_table
-from lib.discord_notify import on_raw_reaction_add
+from lib.discord_notify import LanguageSwitchView
 
 # ロガーを最初にセットアップ
 setup_logger()
