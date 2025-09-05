@@ -7,7 +7,7 @@ from config import ETKW_SERVER
 
 logger = logging.getLogger(__name__)
 
-backup_channel_id = 1271174069433274399
+backup_channel_id = 1395900231157157948
 channel_link = f"https://discord.com/channels/{str(ETKW_SERVER)}/{backup_channel_id}"
 
 RAID_EMOJIS = {
@@ -43,7 +43,7 @@ def make_japanese_embed() -> discord.Embed:
         description=JAPANESE_MESSAGE.format(channel_link=channel_link),
         color=discord.Color.red()
     )
-    embed.set_footer(text="Inactive通知 | Minister Chikuwa")
+    embed.set_footer(text="Inactive通知 | Minister Chikuwa | lang:ja")
     return embed
 
 def make_english_embed() -> discord.Embed:
@@ -52,14 +52,12 @@ def make_english_embed() -> discord.Embed:
         description=ENGLISH_MESSAGE.format(channel_link=channel_link),
         color=discord.Color.red()
     )
-    embed.set_footer(text="Inactive Notification | Minister Chikuwa")
+    embed.set_footer(text="Inactive Notification | Minister Chikuwa | lang:en")
     return embed
 
 async def send_language_select_embed(user_or_channel, is_dm=False):
     """
-    日本語・英語切り替えリアクション付きEmbedを送信
-    is_dm=TrueならDM用
-    返値: 送信したメッセージ
+    日本語Embedを送信し、リアクションを付与
     """
     embed = make_japanese_embed()
     message = await user_or_channel.send(embed=embed)
@@ -70,12 +68,20 @@ async def send_language_select_embed(user_or_channel, is_dm=False):
         logger.warning(f"リアクション付与失敗: {e}")
     return message
 
+def get_embed_language(embed: discord.Embed):
+    """フッターから言語を判定(lang:ja/lang:en)"""
+    if embed.footer and embed.footer.text:
+        if "lang:ja" in embed.footer.text:
+            return "ja"
+        if "lang:en" in embed.footer.text:
+            return "en"
+    # 旧仕様や手動の場合は本文などから判定もあり
+    return None
+
 async def on_raw_reaction_add(bot, payload):
-    # Bot自身のリアクションは無視
     if payload.user_id == bot.user.id:
         return
 
-    # 日本語・英語以外は無視
     if payload.emoji.name not in ["🇯🇵", "🇺🇸"]:
         return
 
@@ -90,21 +96,40 @@ async def on_raw_reaction_add(bot, payload):
         logger.warning("メッセージ取得失敗")
         return
 
-    # DMかどうか判定
     is_dm = isinstance(channel, discord.DMChannel) or (hasattr(channel, "type") and channel.type == discord.ChannelType.private)
-    # 言語Embed生成
+
+    # 現在のEmbedの言語判定
+    if not message.embeds:
+        logger.warning("メッセージにEmbedがありません")
+        return
+    current_embed = message.embeds[0]
+    current_lang = get_embed_language(current_embed)
+
+    # 押されたリアクションが現状と同じ言語なら何もしない
+    if (payload.emoji.name == "🇯🇵" and current_lang == "ja") or (payload.emoji.name == "🇺🇸" and current_lang == "en"):
+        return
+
+    # 切替先Embed生成
     if payload.emoji.name == "🇯🇵":
         new_embed = make_japanese_embed()
     else:
         new_embed = make_english_embed()
 
     if is_dm:
+        # DMの場合: 前のEmbedメッセージを削除→新メッセージ送信＋リアクション付与
+        try:
+            await message.delete()
+        except Exception as e:
+            logger.warning(f"前のEmbed削除失敗: {e}")
         user = await bot.fetch_user(payload.user_id)
         try:
-            await user.send(embed=new_embed)
+            new_msg = await user.send(embed=new_embed)
+            await new_msg.add_reaction("🇯🇵")
+            await new_msg.add_reaction("🇺🇸")
         except Exception as e:
-            logger.warning(f"DMでのEmbed送信失敗: {e}")
+            logger.warning(f"DMでのEmbed送信またはリアクション失敗: {e}")
     else:
+        # チャンネルはEmbed編集＋リアクション削除
         try:
             await message.edit(embed=new_embed)
             await message.clear_reactions()
@@ -122,11 +147,8 @@ async def send_guild_raid_embed(bot, party):
         title="Guild Raid Clear",
         color=discord.Color.blue()
     )
-    
     members_str = ', '.join([discord.utils.escape_markdown(m) for m in party['members']])
     emoji = get_emoji_for_raid(party['raid_name'])
-
-    # clear_time整形
     clear_time = party['clear_time']
     if isinstance(clear_time, str):
         from dateutil import parser
@@ -138,14 +160,12 @@ async def send_guild_raid_embed(bot, party):
     clear_time_jst = clear_time_dt.astimezone(JST)
     unix_ts = int(clear_time_dt.replace(tzinfo=timezone.utc).timestamp())
     timestamp_str = f"<t:{unix_ts}:F>"
-
     embed.add_field(
         name=f"{emoji} **{party['raid_name']}** - {timestamp_str}",
         value=f"> **Members**: {members_str}\n"
               f"> **Server**: {party['server']}",
         inline=False
     )
-
     embed.set_footer(text="Guild Raid Tracker | Minister Chikuwa")
     await channel.send(embed=embed)
     logger.info(f"Embed通知: {party}")
