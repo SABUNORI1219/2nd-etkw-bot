@@ -12,6 +12,7 @@ import logging
 from keep_alive import keep_alive
 from logger_setup import setup_logger
 from lib.db import create_table
+from lib.discord_notify import on_raw_reaction_add
 
 # ロガーを最初にセットアップ
 setup_logger()
@@ -87,6 +88,8 @@ class MyBot(commands.Bot):
 
 # Botのインスタンスを作成
 bot = MyBot()
+
+bot.add_listener(lambda payload: on_raw_reaction_add(bot, payload), "on_raw_reaction_add")
 
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
