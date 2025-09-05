@@ -22,16 +22,14 @@ JAPANESE_MESSAGE = (
     "ご自身でギルドから抜けた場合には、このメッセージは無視してください。\n\n"
     "最近、Wynncraft内での活動が盛んではないかつ、新しいメンバーが加入するためにキックいたしました。\n"
     "再度加入したい場合は、[こちらのチャンネル]({channel_link})でその旨伝えてください。\n"
-    "またWynncraftにログインできなくなる理由がある場合は、ここで伝えてもらえれば枠をキープすることもできます。\n\n"
-    "By reacting with 🇺🇸 on this Embed, all messeages will be translated."
+    "またWynncraftにログインできなくなる理由がある場合は、ここで伝えてもらえれば枠をキープすることもできます。"
 )
 
 ENGLISH_MESSAGE = (
     "If you left the guild yourself, please ignore this message.\n\n"
     "You were kicked because there hasn't been much activity in Wynncraft recently and to make way for new members.\n"
     "If you would like to rejoin, please let us know [here]({channel_link}).\n"
-    "Also, if there is a reason why you can no longer log in to Wynncraft, you can let us know there and we will be able to keep your spot.\n\n"
-    "🇯🇵でこのEmbedにリアクションすると、日本語に翻訳されます。"
+    "Also, if there is a reason why you can no longer log in to Wynncraft, you can let us know there and we will be able to keep your spot."
 )
 
 def get_emoji_for_raid(raid_name):
@@ -55,88 +53,26 @@ def make_english_embed() -> discord.Embed:
     embed.set_footer(text="Inactive Notification | Minister Chikuwa")
     return embed
 
+class LanguageSwitchView(discord.ui.View):
+    def __init__(self, initial_lang="ja"):
+        super().__init__(timeout=None)
+        self.initial_lang = initial_lang
+
+    @discord.ui.button(label="🇯🇵 日本語", style=discord.ButtonStyle.secondary, custom_id="lang_ja")
+    async def ja_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = make_japanese_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="🇬🇧 English", style=discord.ButtonStyle.secondary, custom_id="lang_en")
+    async def en_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = make_english_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+
 async def send_language_select_embed(user_or_channel, is_dm=False):
-    """
-    日本語Embedを送信し、リアクションを付与
-    """
+    """日本語Embedと切替ボタンを送信"""
     embed = make_japanese_embed()
-    message = await user_or_channel.send(embed=embed)
-    try:
-        await message.add_reaction("🇯🇵")
-        await message.add_reaction("🇺🇸")
-    except Exception as e:
-        logger.warning(f"リアクション付与失敗: {e}")
-    return message
-
-def get_embed_language(embed: discord.Embed):
-    """フッターから言語を判定(lang:ja/lang:en)"""
-    if embed.footer and embed.footer.text:
-        if "lang:ja" in embed.footer.text:
-            return "ja"
-        if "lang:en" in embed.footer.text:
-            return "en"
-    # 旧仕様や手動の場合は本文などから判定もあり
-    return None
-
-async def on_raw_reaction_add(bot, payload):
-    if payload.user_id == bot.user.id:
-        return
-
-    if payload.emoji.name not in ["🇯🇵", "🇺🇸"]:
-        return
-
-    channel = bot.get_channel(payload.channel_id)
-    if channel is None:
-        logger.warning("チャンネル取得失敗")
-        return
-
-    try:
-        message = await channel.fetch_message(payload.message_id)
-    except Exception:
-        logger.warning("メッセージ取得失敗")
-        return
-
-    is_dm = isinstance(channel, discord.DMChannel) or (hasattr(channel, "type") and channel.type == discord.ChannelType.private)
-
-    # 現在のEmbedの言語判定
-    if not message.embeds:
-        logger.warning("メッセージにEmbedがありません")
-        return
-    current_embed = message.embeds[0]
-    current_lang = get_embed_language(current_embed)
-
-    # 押されたリアクションが現状と同じ言語なら何もしない
-    if (payload.emoji.name == "🇯🇵" and current_lang == "ja") or (payload.emoji.name == "🇺🇸" and current_lang == "en"):
-        return
-
-    # 切替先Embed生成
-    if payload.emoji.name == "🇯🇵":
-        new_embed = make_japanese_embed()
-    else:
-        new_embed = make_english_embed()
-
-    if is_dm:
-        # DMの場合: 前のEmbedメッセージを削除→新メッセージ送信＋リアクション付与
-        try:
-            await message.delete()
-        except Exception as e:
-            logger.warning(f"前のEmbed削除失敗: {e}")
-        user = await bot.fetch_user(payload.user_id)
-        try:
-            new_msg = await user.send(embed=new_embed)
-            await new_msg.add_reaction("🇯🇵")
-            await new_msg.add_reaction("🇺🇸")
-        except Exception as e:
-            logger.warning(f"DMでのEmbed送信またはリアクション失敗: {e}")
-    else:
-        # チャンネルはEmbed編集＋リアクション削除
-        try:
-            await message.edit(embed=new_embed)
-            guild = message.guild
-            user = guild.get_member(payload.user_id)
-            await message.remove_reaction(payload.emoji, user)
-        except Exception as e:
-            logger.warning(f"Embed編集またはリアクション削除失敗: {e}")
+    view = LanguageSwitchView(initial_lang="ja")
+    return await user_or_channel.send(embed=embed, view=view)
 
 async def send_guild_raid_embed(bot, party):
     NOTIFY_CHANNEL_ID = int(get_config("NOTIFY_CHANNEL_ID") or "0")
@@ -208,7 +144,7 @@ async def notify_member_removed(bot, member_data):
         dm_failed = False
         try:
             logger.info("脱退通知Embedを該当メンバーに送信しました。")
-            await user.send(embed=embed_dm)
+            await user.send(embed=embed_dm, view=LanguageSwitchView())
         except Exception as e:
             logger.warning(f"DM送信失敗: {e}")
             dm_failed = True
@@ -220,7 +156,8 @@ async def notify_member_removed(bot, member_data):
                 logger.info("inactiveチャンネルに脱退通知Embedを該当メンバーに送信しました。")
                 await backup_channel.send(
                     content=f"<@{discord_id}>",
-                    embed=embed_dm
+                    embed=embed_dm,
+                    view=LanguageSwitchView()
                 )
             else:
                 logger.warning(f"バックアップ通知チャンネル({backup_channel_id})が見つかりません")
