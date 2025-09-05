@@ -75,7 +75,7 @@ class BannerRenderer:
                 # (255, 255, 255) # white ← 除外
             ]
             # 枠線消去処理を適用するパターン
-            border_remove_patterns = {'cr', 'bo', 'sc', 'ld', 'rd', 'rud', 'lud'} # 十字・縁など
+            border_remove_patterns = {'cr', 'bo', 'ld', 'rd', 'rud', 'lud'} # 十字・縁など
 
             for layer in banner_data.get('layers', []):
                 pattern_abbr = PATTERN_MAP.get(layer.get('pattern'))
