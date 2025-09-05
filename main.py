@@ -89,7 +89,10 @@ class MyBot(commands.Bot):
 # Botのインスタンスを作成
 bot = MyBot()
 
-bot.add_listener(lambda payload: on_raw_reaction_add(bot, payload), "on_raw_reaction_add")
+async def my_on_raw_reaction_add(payload):
+    await on_raw_reaction_add(bot, payload)
+
+bot.add_listener(my_on_raw_reaction_add, "on_raw_reaction_add")
 
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
