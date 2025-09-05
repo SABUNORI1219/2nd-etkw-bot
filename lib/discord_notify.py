@@ -7,7 +7,7 @@ from config import ETKW_SERVER
 
 logger = logging.getLogger(__name__)
 
-backup_channel_id = 1395900231157157948
+backup_channel_id = 1271174069433274399
 channel_link = f"https://discord.com/channels/{str(ETKW_SERVER)}/{backup_channel_id}"
 
 RAID_EMOJIS = {
@@ -133,6 +133,8 @@ async def on_raw_reaction_add(bot, payload):
         try:
             await message.edit(embed=new_embed)
             await message.clear_reactions()
+            await message.add_reaction("🇯🇵")
+            await message.add_reaction("🇺🇸")
         except Exception as e:
             logger.warning(f"Embed編集またはリアクション削除失敗: {e}")
 
