@@ -124,6 +124,8 @@ async def guild_raid_tracker(api, bot=None, guild_prefix="ETKW", loop_interval=1
             for member, pdata in zip(online_members, player_results):
                 uuid = member["uuid"]
                 name = member["name"]
+                if pdata is None:
+                    continue
                 server = pdata.get("server") or member.get("server")
                 raids = pdata.get("globalData", {}).get("raids", {}).get("list", {})
                 if not raids or len(raids) == 0:
