@@ -30,7 +30,7 @@ async def _make_request(session, url: str, *, return_bytes: bool = False, max_re
                 retryable_codes = [408, 500, 502, 503, 504]
                 if response.status in retryable_codes:
                     logger.warning(f"APIがステータス{response.status}を返しました。再試行します... ({i+1}/{max_retries})")
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(2)
                     continue
                 logger.error(f"APIから予期せぬエラー: Status {response.status}, URL: {url}")
                 return None
