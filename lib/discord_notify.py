@@ -43,7 +43,7 @@ def make_japanese_embed() -> discord.Embed:
         description=JAPANESE_MESSAGE.format(channel_link=channel_link),
         color=discord.Color.red()
     )
-    embed.set_footer(text="Inactive通知 | Minister Chikuwa | lang:ja")
+    embed.set_footer(text="Inactive通知 | Minister Chikuwa")
     return embed
 
 def make_english_embed() -> discord.Embed:
@@ -52,7 +52,7 @@ def make_english_embed() -> discord.Embed:
         description=ENGLISH_MESSAGE.format(channel_link=channel_link),
         color=discord.Color.red()
     )
-    embed.set_footer(text="Inactive Notification | Minister Chikuwa | lang:en")
+    embed.set_footer(text="Inactive Notification | Minister Chikuwa")
     return embed
 
 async def send_language_select_embed(user_or_channel, is_dm=False):
@@ -132,9 +132,9 @@ async def on_raw_reaction_add(bot, payload):
         # チャンネルはEmbed編集＋リアクション削除
         try:
             await message.edit(embed=new_embed)
-            await message.clear_reactions()
-            await message.add_reaction("🇯🇵")
-            await message.add_reaction("🇺🇸")
+            guild = message.guild
+            user = guild.get_member(payload.user_id)
+            await message.remove_reaction(payload.emoji, user)
         except Exception as e:
             logger.warning(f"Embed編集またはリアクション削除失敗: {e}")
 
