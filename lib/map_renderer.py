@@ -319,38 +319,42 @@ class MapRenderer:
         del overlay, overlay_draw, draw, upscaled_lines, draw_lines
         return map_to_draw_on
 
-    def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False, map_to_draw_on=None, owned_territories_map=None):
+    def draw_guild_hq_on_map(
+        self, 
+        territory_data, 
+        guild_color_map, 
+        territory_api_data, 
+        box=None, 
+        is_zoomed=False, 
+        map_to_draw_on=None, 
+        owned_territories_map=None
+    ):
         if map_to_draw_on is None:
             map_img = self.resized_map.copy()
         else:
             map_img = map_to_draw_on
-
-        # ここでprefix_to_territoriesはAPIからでなくowned_territories_mapから構成する
+    
+        # HQ候補は「APIで今所有している領地」だけ
         prefix_to_territories = {}
-        if owned_territories_map:
-            for prefix, terrset in owned_territories_map.items():
-                prefix_to_territories[prefix] = set(terrset)
-        else:
-            # fallback: APIの直所有
-            for name, info in territory_data.items():
-                prefix = info.get("guild", {}).get("prefix", "")
-                if not prefix:
-                    continue
-                prefix_to_territories.setdefault(prefix, set()).add(name)
-
+        for name, info in territory_data.items():
+            prefix = info.get("guild", {}).get("prefix", "")
+            if not prefix:
+                continue
+            prefix_to_territories.setdefault(prefix, set()).add(name)
+    
+        # DB履歴（1h以内失領含む）はConn/Ext/資源計算用
         db_state = get_guild_territory_state()
         hq_names = set()
-        for prefix, owned in prefix_to_territories.items():
-            # 全領地（現所有＋1時間以内失領）
-            all_owned = set(get_effective_owned_territories(prefix))
-            # 直近1時間以内に奪われた領地
+        for prefix, api_owned in prefix_to_territories.items():
+            # Conn/Ext計算用セット
+            all_owned = owned_territories_map.get(prefix, set()) if owned_territories_map else set(api_owned)
             lost_only = set()
             for t in db_state.get(prefix, {}):
                 lost_time = db_state[prefix][t].get("lost")
                 if lost_time is not None:
                     lost_only.add(t)
-            # HQ候補地（現所有のみ）
-            candidate_territories = owned - lost_only
+            # HQ候補はAPIの現所有のみ
+            candidate_territories = set(api_owned)
             hq_name, _, _, _ = self._pick_hq_candidate(
                 candidate_territories,
                 territory_api_data,
@@ -360,18 +364,18 @@ class MapRenderer:
             )
             if hq_name:
                 hq_names.add(hq_name)
+    
+        # 領地描画
         self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map, hq_territories=hq_names)
         draw = ImageDraw.Draw(map_img)
-        for prefix, owned in prefix_to_territories.items():
-            # 全領地（現所有＋1時間以内失領）
-            all_owned = set(get_effective_owned_territories(prefix))
-            # 直近1時間以内に奪われた領地
+        for prefix, api_owned in prefix_to_territories.items():
+            all_owned = owned_territories_map.get(prefix, set()) if owned_territories_map else set(api_owned)
             lost_only = set()
             for t in db_state.get(prefix, {}):
                 lost_time = db_state[prefix][t].get("lost")
                 if lost_time is not None:
                     lost_only.add(t)
-            candidate_territories = owned - lost_only
+            candidate_territories = set(api_owned)
             hq_name, _, _, _ = self._pick_hq_candidate(
                 candidate_territories,
                 territory_api_data,
