@@ -3,6 +3,7 @@ from discord.ext import tasks
 from discord.utils import get
 import asyncio
 import re
+import logging
 
 from lib.ticket_embeds import (
     send_ticket_user_embed, send_ticket_staff_embed,
@@ -15,6 +16,8 @@ TICKET_TOOL_BOT_ID = 557628352828014614
 
 from lib.profile_renderer import generate_profile_card
 from lib.api_stocker import WynncraftAPI
+
+logger = logging.getLogger(__name__)
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -55,6 +58,11 @@ async def on_guild_channel_create(channel: discord.TextChannel):
         if len(members) == 1:
             user_id = members[0].id
 
+    for idx, embed in enumerate(ticket_bot_msg.embeds):
+        logger.info(f"[Embed DEBUG] embed[{idx}].title: {repr(getattr(embed, 'title', None))}")
+        logger.info(f"[Embed DEBUG] embed[{idx}].description: {repr(embed.description)}")
+        logger.info(f"[Embed DEBUG] embed[{idx}].fields: {[{'name': f.name, 'value': f.value} for f in embed.fields]}")
+    
     embed = ticket_bot_msg.embeds[0]
     mcid = None
 
@@ -74,6 +82,7 @@ async def on_guild_channel_create(channel: discord.TextChannel):
                         break
 
     if not mcid:
+        logger.warning(f"[MCID抽出失敗] embed.description={repr(embed.description)}")
         return
 
     applicant_name = mcid
