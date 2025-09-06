@@ -2,6 +2,7 @@ import discord
 from discord.ext import tasks
 from discord.utils import get
 import asyncio
+import re
 
 from lib.ticket_embeds import (
     send_ticket_user_embed, send_ticket_staff_embed,
@@ -20,6 +21,13 @@ intents.guilds = True
 intents.messages = True
 intents.message_content = True
 
+def extract_mcid_from_description(description: str) -> str | None:
+    # MCID/IGNの質問文の直後に```で囲まれた回答が来る形式
+    m = re.search(r"(MCID|IGN)[^\n]*\n```([^\n`]+)```", description, re.IGNORECASE)
+    if m:
+        return m.group(2).strip()
+    return None
+
 async def on_guild_channel_create(channel: discord.TextChannel):
     if channel.category_id != TICKET_CATEGORY_ID:
         return
@@ -31,10 +39,8 @@ async def on_guild_channel_create(channel: discord.TextChannel):
     user_id = None
 
     for msg in reversed(history):
-        # Embedが2つあるTicket Toolメッセージだけを対象
         if msg.author.id == TICKET_TOOL_BOT_ID and len(msg.embeds) == 2:
             ticket_bot_msg = msg
-            # contentからuser_idを抽出
             if msg.content.startswith("<@"):
                 extracted = extract_applicant_user_id_from_content(msg.content)
                 if extracted:
@@ -42,39 +48,35 @@ async def on_guild_channel_create(channel: discord.TextChannel):
             break
 
     if not ticket_bot_msg:
-        return  # 条件に当てはまらなければ何もしない
+        return
 
-    # Fallback: Bot以外のメンバーが1人だけならその人
     if user_id is None:
         members = [m for m in channel.members if not m.bot]
         if len(members) == 1:
             user_id = members[0].id
 
-    # 申請内容Embed(通常1つ目)からMCID（IGN）を適当にパース
     embed = ticket_bot_msg.embeds[0]
     mcid = None
 
-    # descriptionをすべて文字列として検索
+    # --- 新方式: descriptionから正規表現でMCID抽出 ---
     if embed.description:
-        text = embed.description
-        # 「MCID」「IGN」などが含まれる行を探す
-        for line in text.splitlines():
+        mcid = extract_mcid_from_description(embed.description)
+
+    # --- fallback: splitlines方式 ---
+    if not mcid and embed.description:
+        lines = embed.description.splitlines()
+        for i, line in enumerate(lines):
             if "MCID" in line or "IGN" in line:
-                # 次の行が ```xxx``` の場合それを使う
-                idx = text.splitlines().index(line)
-                if idx+1 < len(text.splitlines()):
-                    next_line = text.splitlines()[idx+1].strip()
+                if i+1 < len(lines):
+                    next_line = lines[i+1].strip()
                     if next_line.startswith("```") and next_line.endswith("```"):
                         mcid = next_line.strip("` \n")
                         break
 
-    # ここでmcidが抽出できなければ何もしない
     if not mcid:
         return
 
     applicant_name = mcid
-
-    # --- プロファイル画像生成 ---
     profile_path = None
     try:
         api = WynncraftAPI()
