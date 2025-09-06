@@ -25,12 +25,22 @@ intents.messages = True
 intents.message_content = True
 
 def extract_mcid_from_description(description: str) -> str | None:
-    # MCID/IGNの質問文の直後に```で囲まれた回答が来る形式
-    m = re.search(r"(MCID|IGN)[^\n]*\n```([^\n`]+)```", description, re.IGNORECASE)
+    # MCID/IGN/in game nameの質問文の直後に```で囲まれた回答が来る形式
+    pattern = (
+        r"("
+        r"MCID|IGN|in[\s-]?game[\s-]?name"
+        r")[^\n`]*\n```([^\n`]+)```"
+    )
+    m = re.search(pattern, description, re.IGNORECASE)
     if m:
         return m.group(2).strip()
     # fallback: "**MCID** ```\nxxxx```" のようなパターン（改行や**対応）
-    m2 = re.search(r"(MCID|IGN)[^`]*```[ \n]*([^\n`]+)[ \n]*```", description, re.IGNORECASE)
+    pattern2 = (
+        r"("
+        r"MCID|IGN|in[\s-]?game[\s-]?name"
+        r")[^`]*```[ \n]*([^\n`]+)[ \n]*```"
+    )
+    m2 = re.search(pattern2, description, re.IGNORECASE)
     if m2:
         return m2.group(2).strip()
     return None
