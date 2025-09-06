@@ -2,7 +2,7 @@ import discord
 import asyncio
 from typing import Optional
 
-TICKET_STAFF_ROLE_ID = 1387259707743277177
+TICKET_STAFF_ROLE_ID = 1404665259112792095
 TICKET_CATEGORY_ID = 1134345613585170542
 
 class TicketState:
