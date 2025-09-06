@@ -74,3 +74,8 @@ async def on_guild_channel_create(channel: discord.TextChannel):
     await send_ticket_user_embed(channel, user_id, TICKET_STAFF_ROLE_ID)
     await asyncio.sleep(1)
     await send_ticket_staff_embed(channel, profile_path, applicant_name, user_id, TICKET_STAFF_ROLE_ID)
+
+async def setup(bot):
+    async def _on_guild_channel_create(channel):
+        await on_guild_channel_create(channel)
+    bot.add_listener(_on_guild_channel_create, "on_guild_channel_create")
