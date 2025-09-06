@@ -29,6 +29,10 @@ def extract_mcid_from_description(description: str) -> str | None:
     m = re.search(r"(MCID|IGN)[^\n]*\n```([^\n`]+)```", description, re.IGNORECASE)
     if m:
         return m.group(2).strip()
+    # fallback: "**MCID** ```\nxxxx```" のようなパターン（改行や**対応）
+    m2 = re.search(r"(MCID|IGN)[^`]*```[ \n]*([^\n`]+)[ \n]*```", description, re.IGNORECASE)
+    if m2:
+        return m2.group(2).strip()
     return None
 
 async def on_guild_channel_create(channel: discord.TextChannel):
@@ -58,31 +62,30 @@ async def on_guild_channel_create(channel: discord.TextChannel):
         if len(members) == 1:
             user_id = members[0].id
 
-    for idx, embed in enumerate(ticket_bot_msg.embeds):
-        logger.info(f"[Embed DEBUG] embed[{idx}].title: {repr(getattr(embed, 'title', None))}")
-        logger.info(f"[Embed DEBUG] embed[{idx}].description: {repr(embed.description)}")
-        logger.info(f"[Embed DEBUG] embed[{idx}].fields: {[{'name': f.name, 'value': f.value} for f in embed.fields]}")
-    
-    embed = ticket_bot_msg.embeds[0]
+    # --- embeds全体からMCIDを探す ---
     mcid = None
-
-    # --- 新方式: descriptionから正規表現でMCID抽出 ---
-    if embed.description:
-        mcid = extract_mcid_from_description(embed.description)
-
-    # --- fallback: splitlines方式 ---
-    if not mcid and embed.description:
-        lines = embed.description.splitlines()
-        for i, line in enumerate(lines):
-            if "MCID" in line or "IGN" in line:
-                if i+1 < len(lines):
-                    next_line = lines[i+1].strip()
-                    if next_line.startswith("```") and next_line.endswith("```"):
-                        mcid = next_line.strip("` \n")
-                        break
+    applicant_embed = None
+    for embed in ticket_bot_msg.embeds:
+        if embed.description:
+            mcid_candidate = extract_mcid_from_description(embed.description)
+            if not mcid_candidate:
+                # fallback: splitlines方式
+                lines = embed.description.splitlines()
+                for i, line in enumerate(lines):
+                    if "MCID" in line or "IGN" in line:
+                        # コードブロック含む次行を抽出
+                        if i+1 < len(lines):
+                            next_line = lines[i+1].strip("` \n")
+                            if next_line:
+                                mcid_candidate = next_line
+                                break
+            if mcid_candidate:
+                mcid = mcid_candidate
+                applicant_embed = embed
+                break
 
     if not mcid:
-        logger.warning(f"[MCID抽出失敗] embed.description={repr(embed.description)}")
+        logger.warning(f"[MCID抽出失敗] 全Embed description: {[repr(e.description) for e in ticket_bot_msg.embeds]}")
         return
 
     applicant_name = mcid
