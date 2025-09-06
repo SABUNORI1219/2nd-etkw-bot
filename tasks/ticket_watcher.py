@@ -2,6 +2,7 @@ import discord
 from discord.ext import tasks
 from discord.utils import get
 import asyncio
+import re
 
 from lib.ticket_embeds import (
     send_ticket_user_embed, send_ticket_staff_embed,
@@ -21,14 +22,34 @@ intents.messages = True
 intents.message_content = True
 
 def extract_ticket_form_data(embed: discord.Embed) -> dict:
-    """Embed(fields形式)からform内容を抽出"""
+    """Embedのfieldsまたはdescriptionからform内容を抽出"""
     data = {}
-    for field in embed.fields:
-        key = field.name.strip()
-        val = field.value.strip()
-        if val.startswith("```") and val.endswith("```"):
-            val = val[3:-3].strip()
-        data[key] = val
+
+    # 1. fields優先
+    if embed.fields:
+        for field in embed.fields:
+            key = field.name.strip()
+            val = field.value.strip()
+            if val.startswith("```") and val.endswith("```"):
+                val = val[3:-3].strip()
+            data[key] = val
+
+    # 2. descriptionがあればパース
+    if embed.description:
+        # 質問→回答のペアでsplit
+        # パターン: 質問文\n```回答```
+        lines = embed.description.splitlines()
+        i = 0
+        while i < len(lines):
+            question = lines[i].strip()
+            value = ""
+            if i+1 < len(lines) and lines[i+1].startswith("```"):
+                value = lines[i+1].strip("` \n")
+                i += 2
+            else:
+                i += 1
+            if question and value:
+                data[question] = value
     return data
 
 async def on_guild_channel_create(channel: discord.TextChannel):
@@ -59,9 +80,11 @@ async def on_guild_channel_create(channel: discord.TextChannel):
         if len(members) == 1:
             user_id = members[0].id
 
-    # Embed(fields)からユーザー入力情報を抽出
+    # Embed(description or fields)からユーザー入力情報を抽出
     embed = ticket_bot_msg.embeds[0]
     form_data = extract_ticket_form_data(embed)
+
+    # MCID取得: "MCID" または "IGN" を含むキーを優先
     mcid = None
     for key in form_data:
         if "MCID" in key or "IGN" in key:
@@ -71,8 +94,8 @@ async def on_guild_channel_create(channel: discord.TextChannel):
     # ここでmcidが抽出できなければ何もしない
     if not mcid:
         return
-    
-    applicant_name = mcid if mcid else "Applicant"
+
+    applicant_name = mcid
 
     # --- プロファイル画像生成 ---
     profile_path = None
