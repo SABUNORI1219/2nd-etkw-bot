@@ -1,12 +1,9 @@
 import discord
 import asyncio
-from discord.utils import escape_markdown
 from typing import Optional
 
-TICKET_STAFF_ROLE_ID = 1387259707743277177  # スタッフロールID
-TICKET_CATEGORY_ID = 1134345613585170542    # チケットカテゴリID
-
-# --- ボタン押下フラグをViewで管理（各チャンネルごと） ---
+TICKET_STAFF_ROLE_ID = 1387259707743277177
+TICKET_CATEGORY_ID = 1134345613585170542
 
 class TicketState:
     """1つのチケット用の状態管理"""
@@ -16,7 +13,6 @@ class TicketState:
         self.user_id = None
         self.staff_id = None
 
-# --- グローバル: チャンネルID→TicketState ---
 _channel_ticket_state = {}
 
 def get_ticket_state(channel_id):
@@ -24,67 +20,50 @@ def get_ticket_state(channel_id):
         _channel_ticket_state[channel_id] = TicketState()
     return _channel_ticket_state[channel_id]
 
-# --- 新規ユーザー案内Embed/ボタン ---
+# --- Persistent View (init引数なし) ---
 
 class TicketUserView(discord.ui.View):
-    def __init__(self, user_id: int, staff_role_id: int, ticket_channel_id: int):
+    def __init__(self):
         super().__init__(timeout=None)
-        self.user_id = user_id
-        self.staff_role_id = staff_role_id
-        self.ticket_channel_id = ticket_channel_id
 
     @discord.ui.button(label="🇯🇵 日本語", style=discord.ButtonStyle.secondary, custom_id="user_lang_ja")
     async def lang_ja(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("This button is for the applicant.", ephemeral=True)
-            return
-        embed = make_user_guide_embed(self.user_id, lang="ja")
+        embed = make_user_guide_embed(lang="ja")
         await interaction.response.edit_message(embed=embed, view=self)
 
     @discord.ui.button(label="🇺🇸 English", style=discord.ButtonStyle.secondary, custom_id="user_lang_en")
     async def lang_en(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("This button is for the applicant.", ephemeral=True)
-            return
-        embed = make_user_guide_embed(self.user_id, lang="en")
+        embed = make_user_guide_embed(lang="en")
         await interaction.response.edit_message(embed=embed, view=self)
 
     @discord.ui.button(label="❓ 質問 / Question", style=discord.ButtonStyle.primary, custom_id="user_question")
     async def question(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("質問ボタンは申請者のみ利用できます。", ephemeral=True)
-            return
-        # Modalで質問内容を入力
-        modal = TicketQuestionModal(self.staff_role_id)
+        modal = TicketQuestionModal(TICKET_STAFF_ROLE_ID)
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="✅ 確認済み / Confirmed", style=discord.ButtonStyle.success, custom_id="user_confirmed")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("このボタンは申請者のみ利用できます。", ephemeral=True)
-            return
         state = get_ticket_state(interaction.channel.id)
+        if state.user_id is not None:
+            if interaction.user.id != state.user_id:
+                await interaction.response.send_message("このボタンは申請者のみ利用できます。", ephemeral=True)
+                return
+        else:
+            state.user_id = interaction.user.id
         if state.user_confirmed:
             await interaction.response.send_message("すでに確認済みです。", ephemeral=True)
             return
         state.user_confirmed = True
-        state.user_id = interaction.user.id
         await interaction.response.send_message("確認済みとして受け付けました。スタッフの対応をお待ちください。", ephemeral=True)
         await check_ticket_completion(interaction.channel, state)
 
-# --- スタッフ用Embed/ボタン ---
-
 class TicketStaffView(discord.ui.View):
-    def __init__(self, user_id: int, staff_role_id: int, ticket_channel_id: int):
+    def __init__(self):
         super().__init__(timeout=None)
-        self.user_id = user_id
-        self.staff_role_id = staff_role_id
-        self.ticket_channel_id = ticket_channel_id
 
     @discord.ui.button(label="✅ 加入済み / Invited", style=discord.ButtonStyle.success, custom_id="staff_confirmed")
     async def staff_confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # スタッフロールを持っていることを確認
-        if not any(r.id == self.staff_role_id for r in interaction.user.roles):
+        if not any(r.id == TICKET_STAFF_ROLE_ID for r in getattr(interaction.user, "roles", [])):
             await interaction.response.send_message("このボタンはスタッフのみ利用できます。", ephemeral=True)
             return
         state = get_ticket_state(interaction.channel.id)
@@ -96,13 +75,10 @@ class TicketStaffView(discord.ui.View):
         await interaction.response.send_message("加入完了を受け付けました。", ephemeral=True)
         await check_ticket_completion(interaction.channel, state)
 
-# --- 「質問」モーダル ---
-
 class TicketQuestionModal(discord.ui.Modal, title="質問 / Question"):
     def __init__(self, staff_role_id: int):
         super().__init__()
         self.staff_role_id = staff_role_id
-
         self.question = discord.ui.TextInput(
             label="質問内容 / Your Question",
             style=discord.TextStyle.paragraph,
@@ -124,13 +100,9 @@ class TicketQuestionModal(discord.ui.Modal, title="質問 / Question"):
         await interaction.channel.send(content=staff_mention, embed=embed)
         await interaction.response.send_message("質問を送信しました。スタッフの回答をお待ちください。", ephemeral=True)
 
-# --- Embed生成 ---
-
-def make_user_guide_embed(user_id: int, lang: str = "ja") -> discord.Embed:
-    user_mention = f"<@{user_id}>"
+def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
     if lang == "ja":
         desc = (
-            f"{user_mention}\n"
             "こんにちは！\n"
             "スタッフがチケットを確認し、ゲーム内で招待するまでお待ちください。\n"
             "時間帯によっては、確認および招待までに時間がかかる場合があります。\n"
@@ -141,7 +113,7 @@ def make_user_guide_embed(user_id: int, lang: str = "ja") -> discord.Embed:
             "ギルド内でのアナウンスが行われます。\n\n"
             "> <#1333036649075970058> \n"
             "ギルドに関する情報が掲載されています。\n\n"
-            "> <#1134309996339925113> n"
+            "> <#1134309996339925113> \n"
             "ギルド内専用のチャットです。お気軽に質問等どうぞ。\n\n"
             "> <#1285559379890012282> \n"
             "自己紹介用のチャンネルです。任意です。\n\n"
@@ -156,7 +128,6 @@ def make_user_guide_embed(user_id: int, lang: str = "ja") -> discord.Embed:
         )
     else:
         desc = (
-            f"{user_mention}\n"
             "Hello!\n"
             "Please wait while staff review your ticket and invite you in-game.\n"
             "Depending on the time of day, confirmation/invite may take some time.\n"
@@ -202,13 +173,9 @@ def make_staff_embed(profile_image_path: Optional[str], applicant_name: str) -> 
         embed.set_image(url=f"attachment://{profile_image_path}")
     return embed
 
-# --- チケット完了判定 ---
-
 async def check_ticket_completion(channel, state: TicketState):
-    """両方のボタンが押されたらtranscript/closeを自動実行"""
     if state.user_confirmed and state.staff_confirmed:
         await channel.send("両者の確認が取れたため、チケットのトランスクリプトおよびクローズを自動実行します。")
-        # Ticket Toolのコマンド（slash command）を送信
         try:
             await asyncio.sleep(2)
             await channel.send("/transcript")
@@ -217,18 +184,30 @@ async def check_ticket_completion(channel, state: TicketState):
         except Exception:
             pass
 
-# --- 外部から呼び出す: Embed+View送信ヘルパ ---
-
 async def send_ticket_user_embed(channel, user_id: int, staff_role_id: int):
-    embed = make_user_guide_embed(user_id, lang="ja")
-    view = TicketUserView(user_id, staff_role_id, channel.id)
-    await channel.send(embed=embed, view=view)
+    embed = make_user_guide_embed(lang="ja")
+    view = TicketUserView()
+    content = f"<@{user_id}>" if user_id else None
+    await channel.send(content=content, embed=embed, view=view)
 
 async def send_ticket_staff_embed(channel, profile_image_path: Optional[str], applicant_name: str, user_id: int, staff_role_id: int):
     embed = make_staff_embed(profile_image_path, applicant_name)
-    view = TicketStaffView(user_id, staff_role_id, channel.id)
-    # プロファイル画像ありなら添付
+    view = TicketStaffView()
     files = []
     if profile_image_path:
         files = [discord.File(profile_image_path)]
     await channel.send(embed=embed, view=view, files=files)
+
+def register_persistent_views(bot: discord.Client):
+    bot.add_view(TicketUserView())
+    bot.add_view(TicketStaffView())
+
+def extract_applicant_user_id_from_content(content: str) -> Optional[int]:
+    # 例: <@123456789012345678> こんにちは！
+    if content.startswith("<@"):
+        end = content.find(">")
+        if end != -1:
+            user_id_str = content[2:end]
+            if user_id_str.isdigit():
+                return int(user_id_str)
+    return None
