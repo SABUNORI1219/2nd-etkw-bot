@@ -3,7 +3,11 @@ from discord.ext import tasks
 from discord.utils import get
 import asyncio
 
-from lib.ticket_embeds import send_ticket_user_embed, send_ticket_staff_embed, TICKET_CATEGORY_ID, TICKET_STAFF_ROLE_ID
+from lib.ticket_embeds import (
+    send_ticket_user_embed, send_ticket_staff_embed,
+    TICKET_CATEGORY_ID, TICKET_STAFF_ROLE_ID,
+    extract_applicant_user_id_from_content
+)
 
 # チケットBotのuser_id
 TICKET_TOOL_BOT_ID = 557628352828014614
@@ -28,26 +32,36 @@ def extract_ticket_form_data(embed: discord.Embed) -> dict:
     return data
 
 async def on_guild_channel_create(channel: discord.TextChannel):
-    # カテゴリがチケットカテゴリか確認
     if channel.category_id != TICKET_CATEGORY_ID:
         return
 
-    await asyncio.sleep(2)  # Ticket Tool Botが初期メッセージを投稿するまで待つ
+    await asyncio.sleep(2)
 
     history = [m async for m in channel.history(limit=5)]
     ticket_bot_msg = None
+    user_id = None
+
     for msg in reversed(history):
         if msg.author.id == TICKET_TOOL_BOT_ID and msg.embeds:
             ticket_bot_msg = msg
-            break
+        if msg.author.id == TICKET_TOOL_BOT_ID and msg.content.startswith("<@"):
+            extracted = extract_applicant_user_id_from_content(msg.content)
+            if extracted:
+                user_id = extracted
+                break
 
     if not ticket_bot_msg:
         return  # 見つからない時は無視
 
+    # Fallback: Bot以外のメンバーが1人だけならその人
+    if user_id is None:
+        members = [m for m in channel.members if not m.bot]
+        if len(members) == 1:
+            user_id = members[0].id
+
     # Embed(fields)からユーザー入力情報を抽出
     embed = ticket_bot_msg.embeds[0]
     form_data = extract_ticket_form_data(embed)
-    # ここで「あなたのMCID」などの項目名に合わせて値を取得
     mcid = None
     for key in form_data:
         if "MCID" in key or "IGN" in key:
@@ -66,11 +80,6 @@ async def on_guild_channel_create(channel: discord.TextChannel):
     except Exception:
         profile_path = None
 
-    # --- 新規メンバー案内Embed送信 ---
-    # 申請者のuser_idは抽出できなければNoneでOK
-    user_id = None
-    # Ticket ToolのEmbedにユーザーIDが含まれる場合は抽出してもよい（なくてもOK）
-    # staff_role_idは定数（TICKET_STAFF_ROLE_ID）
     await send_ticket_user_embed(channel, user_id, TICKET_STAFF_ROLE_ID)
     await asyncio.sleep(1)
     await send_ticket_staff_embed(channel, profile_path, applicant_name, user_id, TICKET_STAFF_ROLE_ID)
