@@ -137,17 +137,17 @@ def make_user_guide_embed(user_id: int, lang: str = "ja") -> discord.Embed:
             "また何か質問があれば、下記ボタンから送信できます。担当スタッフが対応します。\n"
             "\n"
             "**ギルドカテゴリ内チャンネル紹介:**\n"
-            "> #📢｜guild-announcements\n"
+            "> <#1310992907527786538> \n"
             "ギルド内でのアナウンスが行われます。\n\n"
-            "> #❗｜guild-info\n"
+            "> <#1333036649075970058> \n"
             "ギルドに関する情報が掲載されています。\n\n"
-            "> #💬｜guild-chat\n"
+            "> <#1134309996339925113> n"
             "ギルド内専用のチャットです。お気軽に質問等どうぞ。\n\n"
-            "> #📝｜self-introduction\n"
+            "> <#1285559379890012282> \n"
             "自己紹介用のチャンネルです。任意です。\n\n"
-            "> #📙｜info-share-情報共有\n"
+            "> <#1343603819610898545> \n"
             "ギルド内での情報が共有されています。ぜひご一読ください。\n\n"
-            "情報の確認が終わったら「確認済み」ボタンを押してください。"
+            "- 情報の確認が終わりましたら「確認済み」ボタンを押してください。"
         )
         embed = discord.Embed(
             title="ご案内",
@@ -163,17 +163,17 @@ def make_user_guide_embed(user_id: int, lang: str = "ja") -> discord.Embed:
             "If you have any questions, use the button below. A staff member will assist you.\n"
             "\n"
             "**Guild Channels:**\n"
-            "> #📢｜guild-announcements\n"
+            "> <#1310992907527786538> \n"
             "Announcements for the guild.\n\n"
-            "> #❗｜guild-info\n"
+            "> <#1333036649075970058> \n"
             "Information about the guild.\n\n"
-            "> #💬｜guild-chat\n"
+            "> <#1134309996339925113> \n"
             "Guild chat channel. Feel free to ask questions, etc.\n\n"
-            "> #📝｜self-introduction\n"
+            "> <#1285559379890012282> \n"
             "Self-introduction channel (optional).\n\n"
-            "> #📙｜info-share-情報共有\n"
+            "> <#1343603819610898545> \n"
             "Information sharing channel. Please take a look!\n\n"
-            "When you've read the info, please click the Confirmed button."
+            "- When you've read the info, please click the Confirmed button."
         )
         embed = discord.Embed(
             title="Welcome & Info",
@@ -185,11 +185,11 @@ def make_user_guide_embed(user_id: int, lang: str = "ja") -> discord.Embed:
 
 def make_staff_embed(profile_image_path: Optional[str], applicant_name: str) -> discord.Embed:
     desc = (
-        f"プレイヤー情報を確認してください。\n"
-        "確認が終わったのちに、ゲーム内で該当プレイヤーを招待してください。\n"
+        f"- プレイヤー情報を確認してください。\n"
+        "- 確認が終わったのちに、ゲーム内で該当プレイヤーを招待してください。\n"
         "「加入済み」ボタンをクリックすることで、該当ユーザーにロールを付与します。\n"
-        "**必ずゲーム内での招待およびプレイヤーの加入が終わったのちに実行してください**。\n"
-        "またAPIの更新の影響で、**加入後から最大10分後**に実行することが推奨されます。\n\n"
+        "- **必ずゲーム内での招待およびプレイヤーの加入が終わったのちに実行してください**。\n"
+        "- またAPIの更新の影響で、**加入後から最大10分後**に実行することが推奨されます。\n\n"
         "プレイヤーの招待およびユーザーからの確認が終わり次第、当チケットのトランスクリプト/クローズをBotが自動実行します。"
     )
     embed = discord.Embed(
