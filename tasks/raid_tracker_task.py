@@ -201,7 +201,7 @@ async def last_seen_tracker(api, guild_prefix="ETKW", loop_interval=120):
             continue
 
         mcid_uuid_list = await get_all_mcid_and_uuid_from_guild(guild_data)
-        results = await get_all_players_lastjoin(api, mcid_uuid_list, batch_size=10, batch_sleep=2.0)
+        results = await get_all_players_lastjoin(api, mcid_uuid_list, batch_size=1, batch_sleep=1.2)
         await asyncio.to_thread(upsert_last_join_cache, results)
 
         elapsed = time.time() - start_time
