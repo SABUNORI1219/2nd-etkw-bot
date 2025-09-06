@@ -36,28 +36,22 @@ async def on_guild_channel_create(channel: discord.TextChannel):
         return
 
     await asyncio.sleep(2)
-    history = [m async for m in channel.history(limit=10)]  # 多めに見る
 
+    history = [m async for m in channel.history(limit=5)]
     ticket_bot_msg = None
     user_id = None
 
     for msg in reversed(history):
         if msg.author.id == TICKET_TOOL_BOT_ID and msg.embeds:
-            # "ユーザー入力" Embedか判定（fieldsに「MCID」や「IGN」などが含まれるか）
-            for embed in msg.embeds:
-                if any("MCID" in field.name or "IGN" in field.name for field in embed.fields):
-                    ticket_bot_msg = msg
-                    break
-        if ticket_bot_msg is not None:
-            # contentからuser_id抽出
-            if msg.content.startswith("<@"):
-                extracted = extract_applicant_user_id_from_content(msg.content)
-                if extracted:
-                    user_id = extracted
-            break
+            ticket_bot_msg = msg
+        if msg.author.id == TICKET_TOOL_BOT_ID and msg.content.startswith("<@"):
+            extracted = extract_applicant_user_id_from_content(msg.content)
+            if extracted:
+                user_id = extracted
+                break
 
     if not ticket_bot_msg:
-        return  # ユーザー申請内容のEmbedがなければ何もしない
+        return  # 見つからない時は無視
 
     # Fallback: Bot以外のメンバーが1人だけならその人
     if user_id is None:
@@ -65,8 +59,8 @@ async def on_guild_channel_create(channel: discord.TextChannel):
         if len(members) == 1:
             user_id = members[0].id
 
-    # ↓以降はいつも通り
-    embed = [e for e in ticket_bot_msg.embeds if any("MCID" in f.name or "IGN" in f.name for f in e.fields)][0]
+    # Embed(fields)からユーザー入力情報を抽出
+    embed = ticket_bot_msg.embeds[0]
     form_data = extract_ticket_form_data(embed)
     mcid = None
     for key in form_data:
