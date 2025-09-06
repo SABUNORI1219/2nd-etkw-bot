@@ -20,6 +20,8 @@ from lib.banner_renderer import BannerRenderer
 from PIL import Image
 from io import BytesIO
 
+from cogs.player_cog import build_profile_info
+
 logger = logging.getLogger(__name__)
 
 intents = discord.Intents.default()
@@ -109,142 +111,8 @@ async def on_guild_channel_create(channel: discord.TextChannel):
         banner_renderer = BannerRenderer()
         player_data = await api.get_official_player_data(mcid)
         if player_data:
-            # ここからprofile_info整形（player_cog.pyのhandle_player_dataの該当部分をコピペ・再現）
-            def safe_get(d, keys, default="???"):
-                v = d
-                for k in keys:
-                    if not isinstance(v, dict):
-                        return default
-                    v = v.get(k)
-                    if v is None:
-                        return default
-                return v
-
-            def fallback_stat(data, keys_global, default="???"):
-                val = safe_get(data, keys_global, None)
-                if val is not None:
-                    return val
-                return default
-
-            def get_raid_stat(data, raid_key):
-                global_data = data.get("globalData")
-                if not global_data or not isinstance(global_data, dict):
-                    return "???"
-                raids = global_data.get("raids")
-                if not raids or not isinstance(raids, dict):
-                    return "???"
-                raid_list = raids.get("list")
-                if raid_list == {}:
-                    return 0
-                if not raid_list or not isinstance(raid_list, dict):
-                    return "???"
-                return raid_list.get(raid_key, 0)
-
-            raw_support_rank = safe_get(player_data, ['supportRank'], "None")
-            if raw_support_rank and raw_support_rank.lower() == "vipplus":
-                support_rank_display = "Vip+"
-            elif raw_support_rank and raw_support_rank.lower() == "heroplus":
-                support_rank_display = "Hero+"
-            else:
-                support_rank_display = (raw_support_rank or 'None').capitalize()
-
-            first_join_str = safe_get(player_data, ['firstJoin'], "???")
-            first_join_date = first_join_str.split('T')[0] if first_join_str and 'T' in first_join_str else first_join_str
-
-            last_join_str = safe_get(player_data, ['lastJoin'], "???")
-            if last_join_str and isinstance(last_join_str, str) and 'T' in last_join_str:
-                try:
-                    last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
-                    last_join_date = last_join_dt.strftime('%Y-%m-%d')
-                except Exception:
-                    last_join_date = last_join_str.split('T')[0]
-            else:
-                last_join_date = last_join_str if last_join_str else "???"
-
-            guild_prefix = safe_get(player_data, ['guild', 'prefix'], "")
-            guild_name = safe_get(player_data, ['guild', 'name'], "")
-            guild_rank = safe_get(player_data, ['guild', 'rank'], "")
-            guild_data = await api.get_guild_by_prefix(guild_prefix)
-            banner_bytes = banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
-
-            is_online = safe_get(player_data, ['online'], False)
-            server = safe_get(player_data, ['server'], "???")
-            if is_online:
-                server_display = f"Online on {server}"
-            else:
-                server_display = "Offline"
-
-            active_char_uuid = safe_get(player_data, ['activeCharacter'])
-            if active_char_uuid is None:
-                active_char_info = "???"
-            else:
-                char_obj = safe_get(player_data, ['characters', active_char_uuid], {})
-                char_type = safe_get(char_obj, ['type'], "???")
-                reskin = safe_get(char_obj, ['reskin'], "N/A")
-                if reskin != "N/A":
-                    active_char_info = f"{reskin}"
-                else:
-                    active_char_info = f"{char_type}"
-
-            mobs_killed = fallback_stat(player_data, ['globalData', 'mobsKilled'])
-            playtime = player_data.get("playtime", "???") if player_data.get("playtime", None) is not None else "???"
-            wars = fallback_stat(player_data, ['globalData', 'wars'])
-            quests = fallback_stat(player_data, ['globalData', 'completedQuests'])
-            world_events = fallback_stat(player_data, ['globalData', 'worldEvents'])
-            total_level = fallback_stat(player_data, ['globalData', 'totalLevel'])
-            chests = fallback_stat(player_data, ['globalData', 'chestsFound'])
-            pvp_kill = str(safe_get(player_data, ['globalData', 'pvp', 'kills'], "???"))
-            pvp_death = str(safe_get(player_data, ['globalData', 'pvp', 'deaths'], "???"))
-            dungeons = fallback_stat(player_data, ['globalData', 'dungeons', 'total'])
-            all_raids = fallback_stat(player_data, ['globalData', 'raids', 'total'])
-
-            ranking_obj = safe_get(player_data, ['ranking'], None)
-            if ranking_obj is None:
-                war_rank_display = "非公開"
-            else:
-                war_rank_completion = ranking_obj.get('warsCompletion')
-                if war_rank_completion is None:
-                    war_rank_display = "N/A"
-                else:
-                    war_rank_display = str(war_rank_completion)
-
-            notg = get_raid_stat(player_data, 'Nest of the Grootslangs')
-            nol = get_raid_stat(player_data, "Orphion's Nexus of Light")
-            tcc = get_raid_stat(player_data, 'The Canyon Colossus')
-            tna = get_raid_stat(player_data, 'The Nameless Anomaly')
-
-            uuid = player_data.get("uuid")
-
-            profile_info = {
-                "username": player_data.get("username"),
-                "support_rank_display": support_rank_display,
-                "guild_prefix": guild_prefix,
-                "banner_bytes": banner_bytes,
-                "guild_name": guild_name,
-                "guild_rank": guild_rank,
-                "server_display": server_display,
-                "active_char_info": active_char_info,
-                "first_join": first_join_date,
-                "last_join": last_join_date,
-                "mobs_killed": mobs_killed,
-                "playtime": playtime,
-                "wars": wars,
-                "war_rank_display": war_rank_display,
-                "quests": quests,
-                "world_events": world_events,
-                "total_level": total_level,
-                "chests": chests,
-                "pvp_kill": pvp_kill,
-                "pvp_death": pvp_death,
-                "notg": notg,
-                "nol": nol,
-                "tcc": tcc,
-                "tna": tna,
-                "dungeons": dungeons,
-                "all_raids": all_raids,
-                "uuid": uuid,
-            }
-
+            profile_info = await build_profile_info(player_data, api, banner_renderer)
+            uuid = profile_info.get("uuid")
             skin_image = None
             if uuid:
                 try:
@@ -253,7 +121,6 @@ async def on_guild_channel_create(channel: discord.TextChannel):
                         skin_image = Image.open(BytesIO(skin_bytes)).convert("RGBA")
                 except Exception as e:
                     logger.error(f"Skin image load failed: {e}")
-
             output_path = f"profile_card_{uuid}.png" if uuid else "profile_card.png"
             generate_profile_card(profile_info, output_path, skin_image=skin_image)
             profile_path = output_path
