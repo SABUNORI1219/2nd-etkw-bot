@@ -67,6 +67,11 @@ async def on_guild_channel_create(channel: discord.TextChannel):
         if "MCID" in key or "IGN" in key:
             mcid = form_data[key]
             break
+
+    # ここでmcidが抽出できなければ何もしない
+    if not mcid:
+        return
+    
     applicant_name = mcid if mcid else "Applicant"
 
     # --- プロファイル画像生成 ---
