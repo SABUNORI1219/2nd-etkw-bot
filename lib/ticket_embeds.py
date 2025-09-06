@@ -1,6 +1,7 @@
 import discord
 import asyncio
 from typing import Optional
+import time
 
 TICKET_STAFF_ROLE_ID = 1404665259112792095
 TICKET_CATEGORY_ID = 1134345613585170542
@@ -20,9 +21,11 @@ def get_ticket_state(channel_id):
         _channel_ticket_state[channel_id] = TicketState()
     return _channel_ticket_state[channel_id]
 
-# --- Persistent View (init引数なし) ---
-
 class TicketUserView(discord.ui.View):
+    _question_cooldowns = {}
+
+    QUESTION_COOLDOWN_SEC = 600  # 10分
+
     def __init__(self):
         super().__init__(timeout=None)
 
@@ -38,6 +41,19 @@ class TicketUserView(discord.ui.View):
 
     @discord.ui.button(label="❓ 質問 / Question", style=discord.ButtonStyle.primary, custom_id="user_question")
     async def question(self, interaction: discord.Interaction, button: discord.ui.Button):
+        now = int(time.time())
+        key = (interaction.channel.id, interaction.user.id)
+        last = self._question_cooldowns.get(key, 0)
+        cooldown = self.QUESTION_COOLDOWN_SEC
+        if now - last < cooldown:
+            wait_sec = cooldown - (now - last)
+            minutes = wait_sec // 60
+            seconds = wait_sec % 60
+            msg = f"質問ボタンはクールダウン中です。あと{minutes}分{seconds}秒お待ちください。"
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+        # クールダウンを更新
+        self._question_cooldowns[key] = now
         modal = TicketQuestionModal(TICKET_STAFF_ROLE_ID)
         await interaction.response.send_modal(modal)
 
