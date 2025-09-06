@@ -17,6 +17,144 @@ from lib.profile_renderer import generate_profile_card
 
 logger = logging.getLogger(__name__)
 
+async def build_profile_info(data, wynn_api, banner_renderer):
+    """WynncraftAPIから得たplayer_dataからprofile_info辞書を生成"""
+    def safe_get(d, keys, default="???"):
+        v = d
+        for k in keys:
+            if not isinstance(v, dict):
+                return default
+            v = v.get(k)
+            if v is None:
+                return default
+        return v
+
+    def fallback_stat(data, keys_global, default="???"):
+        val = safe_get(data, keys_global, None)
+        if val is not None:
+            return val
+        return default
+
+    def get_raid_stat(data, raid_key):
+        global_data = data.get("globalData")
+        if not global_data or not isinstance(global_data, dict):
+            return "???"
+        raids = global_data.get("raids")
+        if not raids or not isinstance(raids, dict):
+            return "???"
+        raid_list = raids.get("list")
+        if raid_list == {}:
+            return 0
+        if not raid_list or not isinstance(raid_list, dict):
+            return "???"
+        return raid_list.get(raid_key, 0)
+
+    raw_support_rank = safe_get(data, ['supportRank'], "None")
+    if raw_support_rank and raw_support_rank.lower() == "vipplus":
+        support_rank_display = "Vip+"
+    elif raw_support_rank and raw_support_rank.lower() == "heroplus":
+        support_rank_display = "Hero+"
+    else:
+        support_rank_display = (raw_support_rank or 'None').capitalize()
+
+    first_join_str = safe_get(data, ['firstJoin'], "???")
+    first_join_date = first_join_str.split('T')[0] if first_join_str and 'T' in first_join_str else first_join_str
+
+    last_join_str = safe_get(data, ['lastJoin'], "???")
+    if last_join_str and isinstance(last_join_str, str) and 'T' in last_join_str:
+        try:
+            last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
+            last_join_date = last_join_dt.strftime('%Y-%m-%d')
+        except Exception:
+            last_join_date = last_join_str.split('T')[0]
+    else:
+        last_join_date = last_join_str if last_join_str else "???"
+
+    guild_prefix = safe_get(data, ['guild', 'prefix'], "")
+    guild_name = safe_get(data, ['guild', 'name'], "")
+    guild_rank = safe_get(data, ['guild', 'rank'], "")
+    guild_data = await wynn_api.get_guild_by_prefix(guild_prefix)
+    banner_bytes = banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
+
+    is_online = safe_get(data, ['online'], False)
+    server = safe_get(data, ['server'], "???")
+    if is_online:
+        server_display = f"Online on {server}"
+    else:
+        server_display = "Offline"
+
+    active_char_uuid = safe_get(data, ['activeCharacter'])
+    if active_char_uuid is None:
+        active_char_info = "???"
+    else:
+        char_obj = safe_get(data, ['characters', active_char_uuid], {})
+        char_type = safe_get(char_obj, ['type'], "???")
+        reskin = safe_get(char_obj, ['reskin'], "N/A")
+        if reskin != "N/A":
+            active_char_info = f"{reskin}"
+        else:
+            active_char_info = f"{char_type}"
+
+    mobs_killed = fallback_stat(data, ['globalData', 'mobsKilled'])
+    playtime = data.get("playtime", "???") if data.get("playtime", None) is not None else "???"
+    wars = fallback_stat(data, ['globalData', 'wars'])
+    quests = fallback_stat(data, ['globalData', 'completedQuests'])
+    world_events = fallback_stat(data, ['globalData', 'worldEvents'])
+    total_level = fallback_stat(data, ['globalData', 'totalLevel'])
+    chests = fallback_stat(data, ['globalData', 'chestsFound'])
+    pvp_kill = str(safe_get(data, ['globalData', 'pvp', 'kills'], "???"))
+    pvp_death = str(safe_get(data, ['globalData', 'pvp', 'deaths'], "???"))
+    dungeons = fallback_stat(data, ['globalData', 'dungeons', 'total'])
+    all_raids = fallback_stat(data, ['globalData', 'raids', 'total'])
+
+    ranking_obj = safe_get(data, ['ranking'], None)
+    if ranking_obj is None:
+        war_rank_display = "非公開"
+    else:
+        war_rank_completion = ranking_obj.get('warsCompletion')
+        if war_rank_completion is None:
+            war_rank_display = "N/A"
+        else:
+            war_rank_display = str(war_rank_completion)
+
+    notg = get_raid_stat(data, 'Nest of the Grootslangs')
+    nol = get_raid_stat(data, "Orphion's Nexus of Light")
+    tcc = get_raid_stat(data, 'The Canyon Colossus')
+    tna = get_raid_stat(data, 'The Nameless Anomaly')
+
+    uuid = data.get("uuid")
+
+    profile_info = {
+        "username": data.get("username"),
+        "support_rank_display": support_rank_display,
+        "guild_prefix": guild_prefix,
+        "banner_bytes": banner_bytes,
+        "guild_name": guild_name,
+        "guild_rank": guild_rank,
+        "server_display": server_display,
+        "active_char_info": active_char_info,
+        "first_join": first_join_date,
+        "last_join": last_join_date,
+        "mobs_killed": mobs_killed,
+        "playtime": playtime,
+        "wars": wars,
+        "war_rank_display": war_rank_display,
+        "quests": quests,
+        "world_events": world_events,
+        "total_level": total_level,
+        "chests": chests,
+        "pvp_kill": pvp_kill,
+        "pvp_death": pvp_death,
+        "notg": notg,
+        "nol": nol,
+        "tcc": tcc,
+        "tna": tna,
+        "dungeons": dungeons,
+        "all_raids": all_raids,
+        "uuid": uuid,
+    }
+    return profile_info
+
 class PlayerSelectView(discord.ui.View):
     def __init__(self, player_collision_dict: dict, cog_instance, owner_id):
         super().__init__(timeout=60.0)
@@ -147,113 +285,10 @@ class PlayerCog(commands.Cog):
         return raid_list.get(raid_key, 0)
 
     async def handle_player_data(self, interaction, data, use_edit=False):
-        # 共通処理化: プレイヤーデータからプロフィールカードを生成して送信
-        def safe_get(d, keys, default="???"):
-            v = d
-            for k in keys:
-                if not isinstance(v, dict):
-                    return default
-                v = v.get(k)
-                if v is None:
-                    return default
-            return v
+        from cogs.player_cog import build_profile_info  # 循環import回避用
+        profile_info = await build_profile_info(data, self.wynn_api, self.banner_renderer)
 
-        def fallback_stat(data, keys_global, default="???"):
-            val = safe_get(data, keys_global, None)
-            if val is not None:
-                return val
-            return default
-
-        def get_raid_stat(data, raid_key):
-            global_data = data.get("globalData")
-            if not global_data or not isinstance(global_data, dict):
-                return "???"
-            raids = global_data.get("raids")
-            if not raids or not isinstance(raids, dict):
-                return "???"
-            raid_list = raids.get("list")
-            if raid_list == {}:
-                return 0
-            if not raid_list or not isinstance(raid_list, dict):
-                return "???"
-            return raid_list.get(raid_key, 0)
-
-        raw_support_rank = safe_get(data, ['supportRank'], "None")
-        if raw_support_rank and raw_support_rank.lower() == "vipplus":
-            support_rank_display = "Vip+"
-        elif raw_support_rank and raw_support_rank.lower() == "heroplus":
-            support_rank_display = "Hero+"
-        else:
-            support_rank_display = (raw_support_rank or 'None').capitalize()
-
-        first_join_str = safe_get(data, ['firstJoin'], "???")
-        first_join_date = first_join_str.split('T')[0] if first_join_str and 'T' in first_join_str else first_join_str
-
-        last_join_str = safe_get(data, ['lastJoin'], "???")
-        if last_join_str and isinstance(last_join_str, str) and 'T' in last_join_str:
-            try:
-                last_join_dt = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
-                last_join_date = last_join_dt.strftime('%Y-%m-%d')
-            except Exception:
-                last_join_date = last_join_str.split('T')[0]
-        else:
-            last_join_date = last_join_str if last_join_str else "???"
-
-        guild_prefix = safe_get(data, ['guild', 'prefix'], "")
-        guild_name = safe_get(data, ['guild', 'name'], "")
-        guild_rank = safe_get(data, ['guild', 'rank'], "")
-        guild_data = await self.wynn_api.get_guild_by_prefix(guild_prefix)
-        banner_bytes = self.banner_renderer.create_banner_image(guild_data.get('banner') if guild_data and isinstance(guild_data, dict) else None)
-
-        is_online = safe_get(data, ['online'], False)
-        server = safe_get(data, ['server'], "???")
-        if is_online:
-            server_display = f"Online on {server}"
-        else:
-            server_display = "Offline"
-
-        active_char_uuid = safe_get(data, ['activeCharacter'])
-        if active_char_uuid is None:
-            active_char_info = "???"
-        else:
-            char_obj = safe_get(data, ['characters', active_char_uuid], {})
-            char_type = safe_get(char_obj, ['type'], "???")
-            reskin = safe_get(char_obj, ['reskin'], "N/A")
-            if reskin != "N/A":
-                active_char_info = f"{reskin}"
-            else:
-                active_char_info = f"{char_type}"
-
-        mobs_killed = fallback_stat(data, ['globalData', 'mobsKilled'])
-        playtime = data.get("playtime", "???") if data.get("playtime", None) is not None else "???"
-        wars = fallback_stat(data, ['globalData', 'wars'])
-        quests = fallback_stat(data, ['globalData', 'completedQuests'])
-        world_events = fallback_stat(data, ['globalData', 'worldEvents'])
-        total_level = fallback_stat(data, ['globalData', 'totalLevel'])
-        chests = fallback_stat(data, ['globalData', 'chestsFound'])
-        pvp_kill = str(safe_get(data, ['globalData', 'pvp', 'kills'], "???"))
-        pvp_death = str(safe_get(data, ['globalData', 'pvp', 'deaths'], "???"))
-        dungeons = fallback_stat(data, ['globalData', 'dungeons', 'total'])
-        all_raids = fallback_stat(data, ['globalData', 'raids', 'total'])
-
-        # war_rank_display分岐
-        ranking_obj = safe_get(data, ['ranking'], None)
-        if ranking_obj is None:
-            war_rank_display = "非公開"
-        else:
-            war_rank_completion = ranking_obj.get('warsCompletion')
-            if war_rank_completion is None:
-                war_rank_display = "N/A"
-            else:
-                war_rank_display = str(war_rank_completion)
-
-        notg = get_raid_stat(data, 'Nest of the Grootslangs')
-        nol = get_raid_stat(data, "Orphion's Nexus of Light")
-        tcc = get_raid_stat(data, 'The Canyon Colossus')
-        tna = get_raid_stat(data, 'The Nameless Anomaly')
-
-        uuid = data.get("uuid")
-
+        uuid = profile_info.get("uuid")
         skin_image = None
         if uuid:
             try:
@@ -264,41 +299,10 @@ class PlayerCog(commands.Cog):
                 logger.error(f"Skin image load failed: {e}")
                 skin_image = None
 
-        profile_info = {
-            "username": data.get("username"),
-            "support_rank_display": support_rank_display,
-            "guild_prefix": guild_prefix,
-            "banner_bytes": banner_bytes,
-            "guild_name": guild_name,
-            "guild_rank": guild_rank,
-            "server_display": server_display,
-            "active_char_info": active_char_info,
-            "first_join": first_join_date,
-            "last_join": last_join_date,
-            "mobs_killed": mobs_killed,
-            "playtime": playtime,
-            "wars": wars,
-            "war_rank_display": war_rank_display,
-            "quests": quests,
-            "world_events": world_events,
-            "total_level": total_level,
-            "chests": chests,
-            "pvp_kill": pvp_kill,
-            "pvp_death": pvp_death,
-            "notg": notg,
-            "nol": nol,
-            "tcc": tcc,
-            "tna": tna,
-            "dungeons": dungeons,
-            "all_raids": all_raids,
-            "uuid": uuid,
-        }
-
-        output_path = f"profile_card_{profile_info['uuid']}.png" if profile_info['uuid'] else "profile_card.png"
+        output_path = f"profile_card_{uuid}.png" if uuid else "profile_card.png"
         try:
             generate_profile_card(profile_info, output_path, skin_image=skin_image)
             file = discord.File(output_path, filename=os.path.basename(output_path))
-            # 選択Viewからの呼び出し（edit）か、コマンド直（send）かで分岐
             if use_edit:
                 await interaction.message.edit(content=None, attachments=[file], embed=None, view=None)
             else:
