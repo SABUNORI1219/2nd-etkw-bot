@@ -3,6 +3,8 @@ import asyncio
 from typing import Optional
 import time
 
+from cogs.member_cog import add_member_logic
+
 TICKET_STAFF_ROLE_ID = 1404665259112792095
 TICKET_CATEGORY_ID = 1134345613585170542
 
@@ -56,8 +58,10 @@ class TicketUserView(discord.ui.View):
         await interaction.response.send_modal(modal)
 
 class TicketStaffView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, mcid_correct: str, applicant_discord_id: int):
         super().__init__(timeout=None)
+        self.mcid_correct = mcid_correct
+        self.applicant_discord_id = applicant_discord_id
 
     @discord.ui.button(label="✅ 加入済み / Invited", style=discord.ButtonStyle.success, custom_id="staff_confirmed")
     async def staff_confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -70,8 +74,13 @@ class TicketStaffView(discord.ui.View):
             return
         state.staff_confirmed = True
         state.staff_id = interaction.user.id
-        await interaction.response.send_message("加入完了を受け付けました。", ephemeral=True)
-        # ここで自動で何かを閉じたりはしない
+        # Discord User取得
+        applicant_member = interaction.guild.get_member(self.applicant_discord_id)
+        if not applicant_member:
+            applicant_member = await interaction.guild.fetch_member(self.applicant_discord_id)
+
+        # add_member_logic呼び出し
+        await add_member_logic(self.mcid_correct, applicant_member, interaction, ephemeral=True)
 
 class TicketQuestionModal(discord.ui.Modal, title="質問 / Question"):
     def __init__(self, staff_role_id: int):
