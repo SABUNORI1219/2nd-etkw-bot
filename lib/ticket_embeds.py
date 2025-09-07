@@ -60,41 +60,28 @@ class TicketStaffView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    # カスタムID: staff_confirmed_{mcid}_{discordid}
     @discord.ui.button(label="✅ 加入済み / Invited", style=discord.ButtonStyle.success, custom_id="staff_confirmed")
     async def staff_confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # カスタムIDから値取得
-        # discord.pyでは interaction.data["custom_id"] で実際のIDが取れる
-        # ただしView定義時はcustom_id固定なので、ボタンのcustom_idを動的にする場合は
-        # ボタン自体を「手動で」追加する必要がある
-        # よって、View生成時にボタンをadd_itemで追加
-
-        # ここがpersistent view用のダミー（使われない）
+        # Persistent用ダミー
         await interaction.response.send_message("このボタンは機能しません。", ephemeral=True)
 
 def make_dynamic_ticket_staff_view(mcid: str, discord_id: int) -> discord.ui.View:
     """
     カスタムIDにmcidとdiscord_idを埋め込んだ「加入済み」ボタンを持つViewを生成
+    区切り文字には|||を使うのでMCIDにどんな文字が入っても安全
     """
     view = discord.ui.View(timeout=None)
-    custom_id = f"staff_confirmed_{mcid}_{discord_id}"
+    SEP = "|||"
+    custom_id = f"staff_confirmed{SEP}{mcid}{SEP}{discord_id}"
 
     async def dynamic_staff_confirm_callback(interaction: discord.Interaction):
         if not any(r.id == TICKET_STAFF_ROLE_ID for r in getattr(interaction.user, "roles", [])):
             await interaction.response.send_message("このボタンはスタッフのみ利用できます。", ephemeral=True)
             return
-        state = get_ticket_state(interaction.channel.id)
-        if state.staff_confirmed:
-            await interaction.response.send_message("すでに加入済みが報告されています。", ephemeral=True)
-            return
-        state.staff_confirmed = True
-        state.staff_id = interaction.user.id
-
         # custom_idから値を分解
-        # "staff_confirmed_{mcid}_{discordid}"
-        data = interaction.data["custom_id"]
+        data = interaction.data.get("custom_id", "")
         try:
-            _, mcid, discord_id_str = data.split("_", 2)
+            _, mcid_parsed, discord_id_str = data.split(SEP)
         except Exception:
             await interaction.response.send_message("カスタムID解析エラー", ephemeral=True)
             return
@@ -103,6 +90,7 @@ def make_dynamic_ticket_staff_view(mcid: str, discord_id: int) -> discord.ui.Vie
         except Exception:
             await interaction.response.send_message("Discord ID解析エラー", ephemeral=True)
             return
+
         # Discord User取得
         applicant_member = interaction.guild.get_member(discord_id_val)
         if not applicant_member:
@@ -111,12 +99,20 @@ def make_dynamic_ticket_staff_view(mcid: str, discord_id: int) -> discord.ui.Vie
             except Exception:
                 applicant_member = None
 
-        await add_member_logic(
+        state = get_ticket_state(interaction.channel.id)
+        if state.staff_confirmed:
+            await interaction.response.send_message("すでに加入済みが報告されています。", ephemeral=True)
+            return
+
+        result = await add_member_logic(
             interaction=interaction,
-            mcid=mcid,
+            mcid=mcid_parsed,
             discord_user=applicant_member,
             ephemeral=True
         )
+        if result:
+            state.staff_confirmed = True
+            state.staff_id = interaction.user.id
 
     button = discord.ui.Button(
         label="✅ 加入済み / Invited",
