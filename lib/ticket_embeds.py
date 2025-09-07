@@ -2,7 +2,6 @@ import discord
 import asyncio
 from typing import Optional
 import time
-
 from cogs.member_cog import add_member_logic
 
 TICKET_STAFF_ROLE_ID = 1404665259112792095
@@ -58,13 +57,29 @@ class TicketUserView(discord.ui.View):
         await interaction.response.send_modal(modal)
 
 class TicketStaffView(discord.ui.View):
-    def __init__(self, mcid_correct: str, applicant_discord_id: int):
+    def __init__(self):
         super().__init__(timeout=None)
-        self.mcid_correct = mcid_correct
-        self.applicant_discord_id = applicant_discord_id
 
+    # カスタムID: staff_confirmed_{mcid}_{discordid}
     @discord.ui.button(label="✅ 加入済み / Invited", style=discord.ButtonStyle.success, custom_id="staff_confirmed")
     async def staff_confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # カスタムIDから値取得
+        # discord.pyでは interaction.data["custom_id"] で実際のIDが取れる
+        # ただしView定義時はcustom_id固定なので、ボタンのcustom_idを動的にする場合は
+        # ボタン自体を「手動で」追加する必要がある
+        # よって、View生成時にボタンをadd_itemで追加
+
+        # ここがpersistent view用のダミー（使われない）
+        await interaction.response.send_message("このボタンは機能しません。", ephemeral=True)
+
+def make_dynamic_ticket_staff_view(mcid: str, discord_id: int) -> discord.ui.View:
+    """
+    カスタムIDにmcidとdiscord_idを埋め込んだ「加入済み」ボタンを持つViewを生成
+    """
+    view = discord.ui.View(timeout=None)
+    custom_id = f"staff_confirmed_{mcid}_{discord_id}"
+
+    async def dynamic_staff_confirm_callback(interaction: discord.Interaction):
         if not any(r.id == TICKET_STAFF_ROLE_ID for r in getattr(interaction.user, "roles", [])):
             await interaction.response.send_message("このボタンはスタッフのみ利用できます。", ephemeral=True)
             return
@@ -74,13 +89,43 @@ class TicketStaffView(discord.ui.View):
             return
         state.staff_confirmed = True
         state.staff_id = interaction.user.id
-        # Discord User取得
-        applicant_member = interaction.guild.get_member(self.applicant_discord_id)
-        if not applicant_member:
-            applicant_member = await interaction.guild.fetch_member(self.applicant_discord_id)
 
-        # add_member_logic呼び出し
-        await add_member_logic(self.mcid_correct, applicant_member, interaction, ephemeral=True)
+        # custom_idから値を分解
+        # "staff_confirmed_{mcid}_{discordid}"
+        data = interaction.data["custom_id"]
+        try:
+            _, mcid, discord_id_str = data.split("_", 2)
+        except Exception:
+            await interaction.response.send_message("カスタムID解析エラー", ephemeral=True)
+            return
+        try:
+            discord_id_val = int(discord_id_str)
+        except Exception:
+            await interaction.response.send_message("Discord ID解析エラー", ephemeral=True)
+            return
+        # Discord User取得
+        applicant_member = interaction.guild.get_member(discord_id_val)
+        if not applicant_member:
+            try:
+                applicant_member = await interaction.guild.fetch_member(discord_id_val)
+            except Exception:
+                applicant_member = None
+
+        await add_member_logic(
+            interaction=interaction,
+            mcid=mcid,
+            discord_user=applicant_member,
+            ephemeral=True
+        )
+
+    button = discord.ui.Button(
+        label="✅ 加入済み / Invited",
+        style=discord.ButtonStyle.success,
+        custom_id=custom_id
+    )
+    button.callback = dynamic_staff_confirm_callback
+    view.add_item(button)
+    return view
 
 class TicketQuestionModal(discord.ui.Modal, title="質問 / Question"):
     def __init__(self, staff_role_id: int):
@@ -189,7 +234,7 @@ async def send_ticket_user_embed(channel, user_id: int, staff_role_id: int):
     
 async def send_ticket_staff_embed(channel, profile_image_path, mcid_correct, applicant_discord_id, staff_role_id):
     embed = make_staff_embed(profile_image_path, mcid_correct)
-    view = TicketStaffView(mcid_correct, applicant_discord_id)
+    view = make_dynamic_ticket_staff_view(mcid_correct, applicant_discord_id)
     files = []
     if profile_image_path:
         files = [discord.File(profile_image_path)]
@@ -197,7 +242,7 @@ async def send_ticket_staff_embed(channel, profile_image_path, mcid_correct, app
 
 def register_persistent_views(bot: discord.Client):
     bot.add_view(TicketUserView())
-    bot.add_view(TicketStaffView())
+    bot.add_view(TicketStaffView())  # ダミーViewとして登録（Dynamic Viewは都度生成）
 
 def extract_applicant_user_id_from_content(content: str) -> Optional[int]:
     # 例: <@123456789012345678> こんにちは！
