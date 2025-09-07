@@ -34,7 +34,7 @@ class TicketUserView(discord.ui.View):
         embed = make_user_guide_embed(lang="ja")
         await interaction.response.edit_message(embed=embed, view=self)
 
-    @discord.ui.button(label="🇺🇸 English", style=discord.ButtonStyle.secondary, custom_id="user_lang_en")
+    @discord.ui.button(label="🇬🇧 English", style=discord.ButtonStyle.secondary, custom_id="user_lang_en")
     async def lang_en(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = make_user_guide_embed(lang="en")
         await interaction.response.edit_message(embed=embed, view=self)
@@ -124,6 +124,7 @@ def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
             "時間帯によっては、確認および招待までに時間がかかる場合があります。\n"
             "また何か質問があれば、下記ボタンから送信できます。担当スタッフが対応します。\n"
             "\n"
+            "(以下ロール付与後に確認してください)\n"
             "**ギルドカテゴリ内チャンネル紹介:**\n"
             "> <#1310992907527786538> \n"
             "ギルド内でのアナウンスが行われます。\n\n"
@@ -134,7 +135,7 @@ def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
             "> <#1285559379890012282> \n"
             "自己紹介用のチャンネルです。任意です。\n\n"
             "> <#1343603819610898545> \n"
-            "ギルド内での情報が共有されています。ぜひご一読ください。\n\n"
+            "ギルド内でのゲームに関する情報が共有されています。ぜひご一読ください。\n\n"
             "- 情報の確認が終わりましたら「確認済み」ボタンを押してください。"
         )
         embed = discord.Embed(
@@ -149,12 +150,13 @@ def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
             "Depending on the time of day, confirmation/invite may take some time.\n"
             "If you have any questions, use the button below. A staff member will assist you.\n"
             "\n"
+            "(Please check the contents below after you got member role.)\n"
             "**Guild Channels:**\n"
             "> <#1310992907527786538> \n"
             "Announcements for the guild.\n\n"
             "> <#1333036649075970058> \n"
             "Information about the guild.\n\n"
-            "> <#1134309996339925113> \n"
+            "> <#1195401593101766727> \n"
             "Guild chat channel. Feel free to ask questions, etc.\n\n"
             "> <#1285559379890012282> \n"
             "Self-introduction channel (optional).\n\n"
@@ -177,7 +179,7 @@ def make_staff_embed(profile_image_path: Optional[str], applicant_name: str) -> 
         "「加入済み」ボタンをクリックすることで、該当ユーザーにロールを付与します。\n"
         "- **必ずゲーム内での招待およびプレイヤーの加入が終わったのちに実行してください**。\n"
         "- またAPIの更新の影響で、**加入後から最大10分後**に実行することが推奨されます。\n\n"
-        "プレイヤーの招待およびユーザーからの確認が終わり次第、当チケットのトランスクリプト/クローズをBotが自動実行します。"
+        "プレイヤーの招待およびユーザーからの確認が終わり次第、当チケットの保存および閉鎖をBotが自動実行します。"
     )
     embed = discord.Embed(
         title="プレイヤー情報",
