@@ -5,41 +5,9 @@ import logging
 from PIL import Image
 from io import BytesIO
 
-from config import WYNNCRAFT_API_TOKEN, BOT_TOKEN, TICKET_TOOL_BOT_ID
+from config import WYNNCRAFT_API_TOKEN
 
 logger = logging.getLogger(__name__)
-
-async def send_discord_interaction(
-    guild_id: int,
-    channel_id: int,
-    command_name: str,
-    BOT_TOKEN: str,
-    application_id: str = None,
-):
-    application_id = application_id or TICKET_TOOL_BOT_ID
-    
-    payload = {
-        "type": 2,
-        "application_id": str(application_id),
-        "guild_id": str(guild_id),
-        "channel_id": str(channel_id),
-        "data": {
-            "name": command_name,
-            "type": 1
-        }
-    }
-    headers = {
-        "Authorization": f"Bot {BOT_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    url = "https://discord.com/api/v10/interactions"
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=payload, headers=headers) as response:
-            text = await response.text()
-            if response.status in (200, 204):
-                logger.info(f"[send_discord_interaction] '{command_name}' sent successfully.")
-            else:
-                logger.error(f"[send_discord_interaction] Error: {response.status}, {text}")
 
 # 共通リクエスト関数
 async def _make_request(session, url: str, *, return_bytes: bool = False, max_retries: int = 5, timeout: int = 10):
