@@ -168,8 +168,7 @@ def make_staff_embed(profile_image_path: Optional[str], applicant_name: str) -> 
         f"- プレイヤー情報を確認してください。\n"
         "- 確認が終わったのちに、ゲーム内で該当プレイヤーを招待してください。\n"
         "「加入済み」ボタンをクリックすることで、該当ユーザーにロールを付与します。\n"
-        "- **必ずゲーム内での招待およびプレイヤーの加入が終わったのちに、Ticket Toolの `/transcript` と `/close` を手動で実行してください。**\n"
-        "（Botによる自動実行はDiscord仕様によりできません。ご協力お願いします。）\n\n"
+        "- **必ずゲーム内での招待およびプレイヤーの加入が終わったのちに、Ticket Toolの `/transcript` と `/close` を手動で実行してください。**\n\n"
         "プレイヤーの招待およびユーザーからの確認が終わり次第、当チケットの保存および閉鎖をスタッフが手動で行ってください。"
     )
     embed = discord.Embed(
@@ -177,7 +176,7 @@ def make_staff_embed(profile_image_path: Optional[str], applicant_name: str) -> 
         description=desc,
         color=discord.Color.blue()
     )
-    embed.set_footer(text=f"申請者: {correct_mcid}")
+    embed.set_footer(text=f"申請者: {applicant_name}")
     if profile_image_path:
         embed.set_image(url=f"attachment://{profile_image_path}")
     return embed
@@ -187,10 +186,10 @@ async def send_ticket_user_embed(channel, user_id: int, staff_role_id: int):
     view = TicketUserView()
     content = f"<@{user_id}>" if user_id else None
     await channel.send(content=content, embed=embed, view=view)
-
-async def send_ticket_staff_embed(channel, profile_image_path: Optional[str], applicant_name: str, user_id: int, staff_role_id: int):
-    embed = make_staff_embed(profile_image_path, applicant_name)
-    view = TicketStaffView()
+    
+async def send_ticket_staff_embed(channel, profile_image_path, mcid_correct, applicant_discord_id, staff_role_id):
+    embed = make_staff_embed(profile_image_path, mcid_correct)
+    view = TicketStaffView(mcid_correct, applicant_discord_id)
     files = []
     if profile_image_path:
         files = [discord.File(profile_image_path)]
