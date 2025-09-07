@@ -5,7 +5,7 @@ import logging
 from PIL import Image
 from io import BytesIO
 
-from config import WYNNCRAFT_API_TOKEN, TICKET_TOOL_BOT_ID
+from config import WYNNCRAFT_API_TOKEN, BOT_TOKEN, TICKET_TOOL_BOT_ID
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ async def send_discord_interaction(
     guild_id: int,
     channel_id: int,
     command_name: str,
-    bot_token: str,
+    BOT_TOKEN: str,
     application_id: str = None,
 ):
     application_id = application_id or TICKET_TOOL_BOT_ID
@@ -29,7 +29,7 @@ async def send_discord_interaction(
         }
     }
     headers = {
-        "Authorization": f"Bot {bot_token}",
+        "Authorization": f"Bot {BOT_TOKEN}",
         "Content-Type": "application/json"
     }
     url = "https://discord.com/api/v10/interactions"
