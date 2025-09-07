@@ -116,6 +116,112 @@ def extract_role_display_name(role_name: str) -> str:
     s = re.sub(r"\s*\[.*?]\s*", " ", role_name)
     return s.strip()
 
+async def add_member_logic(
+    interaction: discord.Interaction,
+    mcid: str,
+    discord_user: discord.User = None,
+    *,
+    ephemeral: bool = True
+):
+    """
+    /member add の本体ロジックを共通関数化
+    - mcid: 正規化済みMCID（APIのusername）
+    - discord_user: DiscordユーザーオブジェクトまたはNone
+    - interaction: コマンド実行時のinteraction
+    - ephemeral: 応答をephemeralにするか
+    """
+    # ギルドデータ取得
+    api = WynncraftAPI()
+    guild_data = await api.get_guild_by_prefix("ETKW")
+    if not guild_data:
+        embed = discord.Embed(
+            title="エラー",
+            description="ギルドデータの取得に失敗しました。",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+        return False
+
+    # ギルド内ランク特定
+    ingame_rank = None
+    members_dict = guild_data.get('members', {})
+    found = False
+    for rank, rank_members in members_dict.items():
+        if rank == "total":
+            continue
+        if mcid in rank_members:
+            ingame_rank = rank.capitalize()
+            found = True
+            break
+    if not found:
+        embed = discord.Embed(
+            title="エラー",
+            description="❌ そのプレイヤーはギルドに所属していません。綴りを再確認してください。",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+        return False
+
+    # Discordユーザー取得
+    discord_id = discord_user.id if discord_user is not None else None
+    guild = interaction.guild
+    discord_member = None
+    if discord_id:
+        discord_member = guild.get_member(discord_id)
+        if discord_member is None:
+            try:
+                discord_member = await guild.fetch_member(discord_id)
+            except Exception:
+                discord_member = None
+
+    # データベース登録
+    success = add_member(mcid, discord_id, ingame_rank)
+    if not success:
+        embed = discord.Embed(
+            title="登録失敗",
+            description="❌ メンバーの登録に失敗しました。",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+        return False
+
+    # 役職付与 & ニックネーム変更
+    role_obj = None
+    if discord_member:
+        role_id = RANK_ROLE_ID_MAP.get(ingame_rank)
+        if role_id:
+            role_obj = guild.get_role(role_id)
+            if role_obj:
+                try:
+                    await discord_member.add_roles(role_obj, reason="ギルドランク連携")
+                except Exception as e:
+                    logger.error(f"ロール付与エラー: {e}")
+        if ETKW:
+            etkw_role = guild.get_role(ETKW)
+            if etkw_role:
+                try:
+                    await discord_member.add_roles(etkw_role, reason="ちくわロール")
+                except Exception as e:
+                    logger.error(f"ちくわロール付与エラー: {e}")
+        # ニックネーム変更
+        role_name = role_obj.name if role_obj else ingame_rank
+        new_nick = f"{role_name} {mcid}"
+        try:
+            if not discord_member.guild_permissions.administrator:
+                await discord_member.edit(nick=new_nick, reason="ギルドメンバー登録時の自動ニックネーム設定")
+        except Exception as e:
+            logger.error(f"ニックネーム編集エラー: {e}")
+
+    # 成功Embed
+    user_str = discord_member.display_name if discord_member else "Discordなし"
+    embed = discord.Embed(
+        title="メンバー登録成功",
+        description=f"✅ メンバー `{mcid}` を `{user_str}` としてランク `{ingame_rank}` で登録しました。",
+        color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+    return True
+
 class MemberListView(discord.ui.View):
     def __init__(self, cog_instance, initial_page: int, total_pages: int, rank_filter: str, sort_by: str, last_seen_members=None):
         super().__init__(timeout=180.0)
@@ -220,92 +326,44 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
     @app_commands.command(name="add", description="メンバーを登録")
     @app_commands.describe(discord_user="登録したいDiscordユーザー（いない場合は入力不要、またはNone）")
     async def add(self, interaction: discord.Interaction, mcid: str, discord_user: discord.User = None):
-        await interaction.response.defer()
+        """
+        /member addコマンド本体
+        - mcid: ユーザー入力またはAPIの正規化済みusername
+        - discord_user: ユーザー指定（省略可）
+        """
+        await interaction.response.defer(ephemeral=True)
 
-        guild: discord.Guild | None = interaction.guild
+        # サーバー内で実行しているかチェック
+        guild = interaction.guild
         if guild is None:
-            await interaction.followup.send("サーバー内でのみ使用できます。")
+            embed = discord.Embed(
+                title="エラー",
+                description="サーバー内でのみ使用できます。",
+                color=discord.Color.red()
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
             return
 
-        member: discord.Member = interaction.user
-
-        # 権限判定-Ticket Chikuwa
+        # 必要なら権限チェック（Ticketロールなど）
+        member = interaction.user
         if Ticket:
             etkw_role = guild.get_role(Ticket)
             if etkw_role and etkw_role.id not in [r.id for r in member.roles]:
-                await interaction.followup.send("このコマンドを使う権限がありません。")
+                embed = discord.Embed(
+                    title="権限エラー",
+                    description="このコマンドを使う権限がありません。",
+                    color=discord.Color.red()
+                )
+                await interaction.followup.send(embed=embed, ephemeral=True)
                 return
 
-        guild_data = await self.api.get_guild_by_prefix("ETKW")
-        if not guild_data:
-            await interaction.followup.send("ギルドデータの取得に失敗しました。")
-            return
-
-        ingame_rank = None
-        members_dict = guild_data.get('members', {})
-        found = False
-        for rank, rank_members in members_dict.items():
-            if rank == "total":
-                continue
-            if mcid in rank_members:
-                ingame_rank = rank.capitalize()
-                found = True
-                break
-        if not found:
-            await interaction.followup.send("❌ そのプレイヤーはギルドに所属していません。綴りを再確認してください。")
-            return
-
-        discord_id = discord_user.id if discord_user is not None else None
-
-        success = add_member(mcid, discord_id, ingame_rank)
-        if success:
-            user_str = discord_user.display_name if discord_user else "Discordなし"
-            await interaction.followup.send(f"✅ メンバー `{mcid}` を `{user_str}` としてランク `{ingame_rank}` で登録しました。")
-        else:
-            await interaction.followup.send("❌ メンバーの登録に失敗しました。")
-            return
-
-        if discord_user is not None:
-            guild: discord.Guild = interaction.guild
-            if guild is not None:
-                try:
-                    member: discord.Member = guild.get_member(discord_user.id)
-                    if member is None:
-                        member = await guild.fetch_member(discord_user.id)
-                except Exception:
-                    member = None
-
-                if member is not None:
-                    role_id = RANK_ROLE_ID_MAP.get(ingame_rank)
-                    role_obj = None
-                    if role_id:
-                        role_obj = guild.get_role(role_id)
-                    if ETKW:  # ETKWはint型のロールIDの場合
-                        etkw_role = guild.get_role(ETKW)
-                        if role_obj:
-                            try:
-                                await member.add_roles(role_obj, reason="ギルドランク連携")
-                            except Exception as e:
-                                logger.error(f"ロール付与エラー: {e}")
-                        if etkw_role:
-                            try:
-                                await member.add_roles(etkw_role, reason="ちくわロール")
-                            except Exception as e:
-                                logger.error(f"ロール付与エラー: {e}")
-
-                    # ロール名から[★★]や[ ]内の文字を除外
-                    if role_obj:
-                        role_name = extract_role_display_name(role_obj.name)
-                    else:
-                        role_name = ingame_rank
-                    new_nick = f"{role_name} {mcid}"
-                    try:
-                        if not member.guild_permissions.administrator:
-                            await member.edit(nick=new_nick, reason="ギルドメンバー登録時の自動ニックネーム設定")
-                        else:
-                            logger.warning(f"管理者権限ユーザー({member})のニックネームは編集できません")
-                    except Exception as e:
-                        logger.error(f"ニックネーム編集エラー: {e}")
+        # 共通関数呼び出し
+        await add_member_logic(
+            interaction=interaction,
+            mcid=mcid,
+            discord_user=discord_user,
+            ephemeral=True
+        )
 
     @app_commands.command(name="remove", description="メンバーの登録を解除")
     async def remove(self, interaction: discord.Interaction, mcid: str = None, discord_user: discord.User = None):
