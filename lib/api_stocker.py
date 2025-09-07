@@ -5,10 +5,7 @@ import logging
 from PIL import Image
 from io import BytesIO
 
-from config import WYNNCRAFT_API_TOKEN
-from tasks.ticket_watcher import TICKET_TOOL_BOT_ID
-
-application_id = application_id or TICKET_TOOL_BOT_ID
+from config import WYNNCRAFT_API_TOKEN, TICKET_TOOL_BOT_ID
 
 logger = logging.getLogger(__name__)
 
