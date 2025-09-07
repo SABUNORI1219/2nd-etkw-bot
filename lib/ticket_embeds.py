@@ -4,6 +4,7 @@ from typing import Optional
 import time
 
 from lib.api_stocker import send_discord_interaction
+from config import BOT_TOKEN  # ここから直接取得
 
 TICKET_STAFF_ROLE_ID = 1404665259112792095
 TICKET_CATEGORY_ID = 1134345613585170542
@@ -54,7 +55,6 @@ class TicketUserView(discord.ui.View):
             msg = f"質問ボタンはクールダウン中です。あと{minutes}分{seconds}秒お待ちください。"
             await interaction.response.send_message(msg, ephemeral=True)
             return
-        # クールダウンを更新
         self._question_cooldowns[key] = now
         modal = TicketQuestionModal(TICKET_STAFF_ROLE_ID)
         await interaction.response.send_modal(modal)
@@ -193,7 +193,7 @@ def make_staff_embed(profile_image_path: Optional[str], applicant_name: str) -> 
         embed.set_image(url=f"attachment://{profile_image_path}")
     return embed
 
-async def check_ticket_completion(channel, state: TicketState, bot_token: str):
+async def check_ticket_completion(channel, state: TicketState):
     if state.user_confirmed and state.staff_confirmed:
         await channel.send("両者の確認が取れたため、チケットのトランスクリプトおよびクローズを自動実行します。")
         try:
@@ -202,14 +202,14 @@ async def check_ticket_completion(channel, state: TicketState, bot_token: str):
                 guild_id=channel.guild.id,
                 channel_id=channel.id,
                 command_name="transcript",
-                bot_token=bot_token
+                BOT_TOKEN=BOT_TOKEN
             )
             await asyncio.sleep(2)
             await send_discord_interaction(
                 guild_id=channel.guild.id,
                 channel_id=channel.id,
                 command_name="close",
-                bot_token=bot_token
+                BOT_TOKEN=BOT_TOKEN
             )
         except Exception as e:
             print(f"エラーが発生しました: {e}")
@@ -241,3 +241,4 @@ def extract_applicant_user_id_from_content(content: str) -> Optional[int]:
             if user_id_str.isdigit():
                 return int(user_id_str)
     return None
+
