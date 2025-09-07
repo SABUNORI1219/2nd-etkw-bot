@@ -11,7 +11,6 @@ from lib.ticket_embeds import (
     extract_applicant_user_id_from_content
 )
 
-from config import TICKET_TOOL_BOT_ID
 from lib.profile_renderer import generate_profile_card
 from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.banner_renderer import BannerRenderer
@@ -21,6 +20,8 @@ from io import BytesIO
 from cogs.player_cog import build_profile_info
 
 logger = logging.getLogger(__name__)
+
+TICKET_TOOL_BOT_ID = 557628352828014614
 
 intents = discord.Intents.default()
 intents.guilds = True
