@@ -177,7 +177,7 @@ def make_staff_embed(profile_image_path: Optional[str], applicant_name: str) -> 
         description=desc,
         color=discord.Color.blue()
     )
-    embed.set_footer(text=f"申請者: {applicant_name}")
+    embed.set_footer(text=f"申請者: {correct_mcid}")
     if profile_image_path:
         embed.set_image(url=f"attachment://{profile_image_path}")
     return embed
