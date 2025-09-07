@@ -205,7 +205,8 @@ async def add_member_logic(
                     logger.error(f"ちくわロール付与エラー: {e}")
         # ニックネーム変更
         role_name = role_obj.name if role_obj else ingame_rank
-        new_nick = f"{role_name} {mcid}"
+        prefix = extract_role_display_name(role_name)
+        new_nick = f"{prefix} {mcid}"
         try:
             if not discord_member.guild_permissions.administrator:
                 await discord_member.edit(nick=new_nick, reason="ギルドメンバー登録時の自動ニックネーム設定")
