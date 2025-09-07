@@ -109,6 +109,7 @@ async def on_guild_channel_create(channel: discord.TextChannel):
         other_api = OtherAPI()
         banner_renderer = BannerRenderer()
         player_data = await api.get_official_player_data(mcid)
+        corrected_mcid = player_data.get("username", mcid)
         if player_data:
             profile_info = await build_profile_info(player_data, api, banner_renderer)
             uuid = profile_info.get("uuid")
@@ -129,7 +130,7 @@ async def on_guild_channel_create(channel: discord.TextChannel):
 
     await send_ticket_user_embed(channel, user_id, TICKET_STAFF_ROLE_ID)
     await asyncio.sleep(1)
-    await send_ticket_staff_embed(channel, profile_path, applicant_name, user_id, TICKET_STAFF_ROLE_ID)
+    await send_ticket_staff_embed(channel, profile_path, corrected_mcid, user_id, TICKET_STAFF_ROLE_ID)
 
 async def setup(bot):
     async def _on_guild_channel_create(channel):
