@@ -191,16 +191,26 @@ def make_staff_embed(profile_image_path: Optional[str], applicant_name: str) -> 
         embed.set_image(url=f"attachment://{profile_image_path}")
     return embed
 
-async def check_ticket_completion(channel, state: TicketState):
+async def check_ticket_completion(channel, state: TicketState, bot_token: str):
     if state.user_confirmed and state.staff_confirmed:
         await channel.send("両者の確認が取れたため、チケットのトランスクリプトおよびクローズを自動実行します。")
         try:
             await asyncio.sleep(2)
-            await channel.send("/transcript")
+            await send_discord_interaction(
+                guild_id=channel.guild.id,
+                channel_id=channel.id,
+                command_name="transcript",
+                bot_token=bot_token
+            )
             await asyncio.sleep(2)
-            await channel.send("/close")
-        except Exception:
-            pass
+            await send_discord_interaction(
+                guild_id=channel.guild.id,
+                channel_id=channel.id,
+                command_name="close",
+                bot_token=bot_token
+            )
+        except Exception as e:
+            print(f"エラーが発生しました: {e}")
 
 async def send_ticket_user_embed(channel, user_id: int, staff_role_id: int):
     embed = make_user_guide_embed(lang="ja")
