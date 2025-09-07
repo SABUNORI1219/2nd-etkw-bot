@@ -139,7 +139,7 @@ async def add_member_logic(
             description="ギルドデータの取得に失敗しました。",
             color=discord.Color.red()
         )
-        await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+        await interaction.followup.send(embed=embed, ephemeral=ephemeral)
         return False
 
     # ギルド内ランク特定
@@ -159,7 +159,7 @@ async def add_member_logic(
             description="❌ そのプレイヤーはギルドに所属していません。綴りを再確認してください。",
             color=discord.Color.red()
         )
-        await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+        await interaction.followup.send(embed=embed, ephemeral=ephemeral)
         return False
 
     # Discordユーザー取得
@@ -182,7 +182,7 @@ async def add_member_logic(
             description="❌ メンバーの登録に失敗しました。",
             color=discord.Color.red()
         )
-        await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+        await interaction.followup.send(embed=embed, ephemeral=ephemeral)
         return False
 
     # 役職付与 & ニックネーム変更
@@ -219,7 +219,7 @@ async def add_member_logic(
         description=f"✅ メンバー `{mcid}` を `{user_str}` としてランク `{ingame_rank}` で登録しました。",
         color=discord.Color.green()
     )
-    await interaction.response.send_message(embed=embed, ephemeral=ephemeral)
+    await interaction.followup.send(embed=embed, ephemeral=ephemeral)
     return True
 
 class MemberListView(discord.ui.View):
