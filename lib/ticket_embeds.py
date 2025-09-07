@@ -3,11 +3,9 @@ import asyncio
 from typing import Optional
 import time
 
-from lib.api_stocker import send_discord_interaction
-from config import BOT_TOKEN  # ここから直接取得
-
 TICKET_STAFF_ROLE_ID = 1404665259112792095
 TICKET_CATEGORY_ID = 1134345613585170542
+TICKET_TOOL_BOT_ID = 557628352828014614
 
 class TicketState:
     """1つのチケット用の状態管理"""
@@ -26,7 +24,6 @@ def get_ticket_state(channel_id):
 
 class TicketUserView(discord.ui.View):
     _question_cooldowns = {}
-
     QUESTION_COOLDOWN_SEC = 600  # 10分
 
     def __init__(self):
@@ -59,22 +56,6 @@ class TicketUserView(discord.ui.View):
         modal = TicketQuestionModal(TICKET_STAFF_ROLE_ID)
         await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label="✅ 確認済み / Confirmed", style=discord.ButtonStyle.success, custom_id="user_confirmed")
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        state = get_ticket_state(interaction.channel.id)
-        if state.user_id is not None:
-            if interaction.user.id != state.user_id:
-                await interaction.response.send_message("このボタンは申請者のみ利用できます。", ephemeral=True)
-                return
-        else:
-            state.user_id = interaction.user.id
-        if state.user_confirmed:
-            await interaction.response.send_message("すでに確認済みです。", ephemeral=True)
-            return
-        state.user_confirmed = True
-        await interaction.response.send_message("確認済みとして受け付けました。スタッフの対応をお待ちください。", ephemeral=True)
-        await check_ticket_completion(interaction.channel, state)
-
 class TicketStaffView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -91,7 +72,7 @@ class TicketStaffView(discord.ui.View):
         state.staff_confirmed = True
         state.staff_id = interaction.user.id
         await interaction.response.send_message("加入完了を受け付けました。", ephemeral=True)
-        await check_ticket_completion(interaction.channel, state)
+        # ここで自動で何かを閉じたりはしない
 
 class TicketQuestionModal(discord.ui.Modal, title="質問 / Question"):
     def __init__(self, staff_role_id: int):
@@ -138,7 +119,7 @@ def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
             "自己紹介用のチャンネルです。任意です。\n\n"
             "> <#1343603819610898545> \n"
             "ギルド内でのゲームに関する情報が共有されています。ぜひご一読ください。\n\n"
-            "- 情報の確認が終わりましたら「確認済み」ボタンを押してください。"
+            "- 情報の確認が終わりましたらスタッフの案内に従ってください。"
         )
         embed = discord.Embed(
             title="ご案内",
@@ -164,7 +145,7 @@ def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
             "Self-introduction channel (optional).\n\n"
             "> <#1343603819610898545> \n"
             "Information sharing channel. Please take a look!\n\n"
-            "- When you've read the info, please click the Confirmed button."
+            "- When you've read the info, please follow the staff's instructions."
         )
         embed = discord.Embed(
             title="Welcome & Info",
@@ -179,9 +160,9 @@ def make_staff_embed(profile_image_path: Optional[str], applicant_name: str) -> 
         f"- プレイヤー情報を確認してください。\n"
         "- 確認が終わったのちに、ゲーム内で該当プレイヤーを招待してください。\n"
         "「加入済み」ボタンをクリックすることで、該当ユーザーにロールを付与します。\n"
-        "- **必ずゲーム内での招待およびプレイヤーの加入が終わったのちに実行してください**。\n"
-        "- またAPIの更新の影響で、**加入後から最大10分後**に実行することが推奨されます。\n\n"
-        "プレイヤーの招待およびユーザーからの確認が終わり次第、当チケットの保存および閉鎖をBotが自動実行します。"
+        "- **必ずゲーム内での招待およびプレイヤーの加入が終わったのちに、Ticket Toolの `/transcript` と `/close` を手動で実行してください。**\n"
+        "（Botによる自動実行はDiscord仕様によりできません。ご協力お願いします。）\n\n"
+        "プレイヤーの招待およびユーザーからの確認が終わり次第、当チケットの保存および閉鎖をスタッフが手動で行ってください。"
     )
     embed = discord.Embed(
         title="プレイヤー情報",
@@ -192,27 +173,6 @@ def make_staff_embed(profile_image_path: Optional[str], applicant_name: str) -> 
     if profile_image_path:
         embed.set_image(url=f"attachment://{profile_image_path}")
     return embed
-
-async def check_ticket_completion(channel, state: TicketState):
-    if state.user_confirmed and state.staff_confirmed:
-        await channel.send("両者の確認が取れたため、チケットのトランスクリプトおよびクローズを自動実行します。")
-        try:
-            await asyncio.sleep(2)
-            await send_discord_interaction(
-                guild_id=channel.guild.id,
-                channel_id=channel.id,
-                command_name="transcript",
-                BOT_TOKEN=BOT_TOKEN
-            )
-            await asyncio.sleep(2)
-            await send_discord_interaction(
-                guild_id=channel.guild.id,
-                channel_id=channel.id,
-                command_name="close",
-                BOT_TOKEN=BOT_TOKEN
-            )
-        except Exception as e:
-            print(f"エラーが発生しました: {e}")
 
 async def send_ticket_user_embed(channel, user_id: int, staff_role_id: int):
     embed = make_user_guide_embed(lang="ja")
@@ -241,4 +201,3 @@ def extract_applicant_user_id_from_content(content: str) -> Optional[int]:
             if user_id_str.isdigit():
                 return int(user_id_str)
     return None
-
