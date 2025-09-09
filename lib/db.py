@@ -50,7 +50,7 @@ def create_table():
                 last_join TEXT
             );
         ''')
-        cur.execute("""
+        cur.execute('''
             CREATE TABLE IF NOT EXISTS guild_territory_state (
                 guild_prefix TEXT,
                 territory_name TEXT,
@@ -60,15 +60,15 @@ def create_table():
                 to_guild TEXT,
                 PRIMARY KEY (guild_prefix, territory_name)
             );
-        """)
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS applications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mcid TEXT NOT NULL,
-            discord_id INTEGER NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        """)
+        ''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS applications (
+                id SERIAL PRIMARY KEY,
+                mcid TEXT NOT NULL,
+                discord_id BIGINT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        ''')
         conn.commit()
     conn.close()
     logger.info("全テーブルを作成/確認しました")
@@ -440,24 +440,23 @@ def get_last_join_cache_for_members(mcid_list):
         if conn: conn.close()
 
 def save_application(mcid: str, discord_id: int):
-    """申請内容を保存（MCID・Discord IDのみ）"""
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("INSERT INTO applications (mcid, discord_id) VALUES (?, ?)", (mcid, discord_id))
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO applications (mcid, discord_id) VALUES (%s, %s)", (mcid, discord_id))
         conn.commit()
+    conn.close()
 
 def get_pending_applications():
-    """未処理申請の一覧取得"""
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("SELECT mcid, discord_id FROM applications")
-        return c.fetchall()
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT mcid, discord_id FROM applications")
+        return cur.fetchall()
+    conn.close()
 
 def delete_application_by_discord_id(discord_id: int):
-    """処理済み申請を削除"""
-    with sqlite3.connect(DB_PATH) as conn:
-        c = conn.cursor()
-        c.execute("DELETE FROM applications WHERE discord_id = ?", (discord_id,))
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM applications WHERE discord_id = %s", (discord_id,))
         conn.commit()
-    return result
+    conn.close()
 
