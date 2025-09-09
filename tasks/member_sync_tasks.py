@@ -150,19 +150,19 @@ async def member_remove_sync_task(bot, api: WynncraftAPI):
         await asyncio.sleep(120)
 
 @tasks.loop(minutes=10)
-    async def member_sync_task():
-        guild = bot.get_guild(GUILD_ID)
-        log_channel = bot.get_channel(LOG_CHANNEL_ID)
-        for mcid, discord_id in get_pending_applications():
-            member = guild.get_member(discord_id)
-            if member is not None:
-                # 加入判定
-                role = guild.get_role(ROLE_ID)
-                await member.add_roles(role, reason="ギルド加入申請承認")
-                await member.edit(nick=mcid)
-                # トランスクリプト送信
-                await log_channel.send(f"{member.mention} さんがギルドに加入しました。MCID: {mcid}")
-                delete_application_by_discord_id(discord_id)
+async def member_sync_task():
+    guild = bot.get_guild(GUILD_ID)
+    log_channel = bot.get_channel(LOG_CHANNEL_ID)
+    for mcid, discord_id in get_pending_applications():
+        member = guild.get_member(discord_id)
+        if member is not None:
+            # 加入判定
+            role = guild.get_role(ROLE_ID)
+            await member.add_roles(role, reason="ギルド加入申請承認")
+            await member.edit(nick=mcid)
+            # トランスクリプト送信
+            await log_channel.send(f"{member.mention} さんがギルドに加入しました。MCID: {mcid}")
+            delete_application_by_discord_id(discord_id)
 
 async def setup(bot):
     api = WynncraftAPI()
