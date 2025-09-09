@@ -249,3 +249,18 @@ def extract_applicant_user_id_from_content(content: str) -> Optional[int]:
             if user_id_str.isdigit():
                 return int(user_id_str)
     return None
+
+def make_application_transcript_embed(mcid: str, discord_id: int, reason: str, past_guild: Optional[str] = None) -> discord.Embed:
+    """申請完了時のトランスクリプト用Embed"""
+    embed = discord.Embed(
+        title="✅ ギルド加入申請完了",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="MCID", value=f"`{mcid}`", inline=True)
+    embed.add_field(name="Discord", value=f"<@{discord_id}>", inline=True)
+    embed.add_field(name="申請理由", value=reason, inline=False)
+    if past_guild:
+        embed.add_field(name="過去のギルド", value=past_guild, inline=False)
+    
+    embed.set_footer(text="申請者がギルドに加入したため、申請チャンネルを自動削除しました")
+    return embed

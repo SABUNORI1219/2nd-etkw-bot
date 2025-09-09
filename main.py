@@ -14,6 +14,7 @@ from logger_setup import setup_logger
 from lib.db import create_table
 from lib.discord_notify import LanguageSwitchView
 from lib.ticket_embeds import register_persistent_views
+from lib.application_views import register_application_views
 
 # ロガーを最初にセットアップ
 setup_logger()
@@ -68,6 +69,10 @@ class MyBot(commands.Bot):
                     logger.error(f"--- [司令塔] ❌ 受付係 '{filename}' の配属に失敗しました: {e}")
         
         register_persistent_views(self)
+        register_application_views(self)
+        
+        # 申請Embed定期復旧タスクを開始
+        self.loop.create_task(self.ensure_application_embed_task())
         
         try:
             logger.info("--- [司令塔] -> スラッシュコマンドをグローバルに同期します... ---")
@@ -77,6 +82,28 @@ class MyBot(commands.Bot):
             logger.error(f"--- [司令塔] ❌ コマンドの同期に失敗しました: {e}")
 
         self.add_view(LanguageSwitchView())
+
+    async def ensure_application_embed_task(self):
+        """申請Embedの定期チェック・復旧タスク"""
+        await self.wait_until_ready()
+        
+        # 申請チャンネルIDを設定（環境変数から取得可能にする）
+        application_channel_id = int(os.getenv('APPLICATION_CHANNEL_ID', 0))
+        
+        if not application_channel_id:
+            logger.warning("APPLICATION_CHANNEL_IDが設定されていません。申請Embed復旧タスクをスキップします。")
+            return
+        
+        from lib.application_views import ensure_application_embed
+        
+        while not self.is_closed():
+            try:
+                await ensure_application_embed(self, application_channel_id)
+            except Exception as e:
+                logger.error(f"申請Embed復旧タスクでエラー: {e}", exc_info=True)
+            
+            # 30分ごとにチェック
+            await asyncio.sleep(1800)
 
     async def on_ready(self):
         """Botの準備が完了したときに呼ばれるイベント"""

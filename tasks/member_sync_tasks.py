@@ -1,10 +1,12 @@
 import asyncio
 import logging
 import re
+import os
 
 from lib.api_stocker import WynncraftAPI
-from lib.db import get_linked_members_page, add_member, remove_member, get_member
+from lib.db import get_linked_members_page, add_member, remove_member, get_member, get_all_applications, remove_application
 from lib.discord_notify import notify_member_removed
+from lib.ticket_embeds import make_application_transcript_embed
 from config import RANK_ROLE_ID_MAP, ETKW, ROLE_ID_TO_RANK
 
 logger = logging.getLogger(__name__)
@@ -90,6 +92,125 @@ async def member_rank_sync_task(api: WynncraftAPI, bot=None):
             logger.error(f"[MemberSync] ランク同期で例外: {e}", exc_info=True)
         await asyncio.sleep(120)
 
+async def application_join_detection_task(api: WynncraftAPI, bot=None):
+    """ギルド加入検知・申請完了処理タスク"""
+    while True:
+        try:
+            logger.info("[ApplicationSync] ギルド加入検知タスク開始")
+            
+            # 現在のギルドメンバーを取得
+            guild_members = await fetch_guild_members(api)
+            if not guild_members:
+                logger.warning("[ApplicationSync] APIからのギルドデータ取得失敗、処理をスキップ")
+                await asyncio.sleep(180)
+                continue
+            
+            # 申請中のメンバーをチェック
+            applications = get_all_applications()
+            
+            for app in applications:
+                mcid = app['mcid']
+                discord_id = app['discord_id']
+                
+                # ギルドに加入しているかチェック
+                if mcid in guild_members:
+                    rank = guild_members[mcid]
+                    logger.info(f"[ApplicationSync] {mcid} のギルド加入を検知")
+                    
+                    # DBにメンバーとして追加
+                    add_member(mcid, discord_id, rank)
+                    
+                    # Discordでロール付与・ニックネーム設定
+                    if bot:
+                        await assign_member_roles_and_nickname(bot, discord_id, mcid, rank)
+                    
+                    # 申請チャンネルを削除・トランスクリプト送信
+                    await complete_application(bot, app)
+                    
+                    # DBから申請情報を削除
+                    remove_application(discord_id)
+                    
+        except Exception as e:
+            logger.error(f"[ApplicationSync] ギルド加入検知で例外: {e}", exc_info=True)
+        
+        await asyncio.sleep(180)  # 3分ごとにチェック
+
+async def assign_member_roles_and_nickname(bot, discord_id: int, mcid: str, rank: str):
+    """新規メンバーにロール付与・ニックネーム設定"""
+    try:
+        for guild in bot.guilds:
+            member = guild.get_member(discord_id)
+            if member:
+                # 1. ランクロール付与
+                role_id = RANK_ROLE_ID_MAP.get(rank)
+                if role_id:
+                    role = guild.get_role(role_id)
+                    if role:
+                        try:
+                            await member.add_roles(role, reason="ギルド加入による自動ロール付与")
+                            logger.info(f"[ApplicationSync] {mcid} に {role.name} ロールを付与")
+                        except Exception as e:
+                            logger.error(f"[ApplicationSync] ロール付与失敗: {e}")
+                
+                # 2. ETKWロール付与
+                if ETKW:
+                    etkw_role = guild.get_role(ETKW)
+                    if etkw_role:
+                        try:
+                            await member.add_roles(etkw_role, reason="ギルド加入によるETKWロール付与")
+                            logger.info(f"[ApplicationSync] {mcid} に ETKWロールを付与")
+                        except Exception as e:
+                            logger.error(f"[ApplicationSync] ETKWロール付与失敗: {e}")
+                
+                # 3. ニックネーム設定
+                role_name = role.name if 'role' in locals() and role else rank
+                prefix = re.sub(r"\s*\[.*?]\s*", " ", role_name).strip()
+                new_nick = f"{prefix} {mcid}"
+                if len(new_nick) > 32:
+                    new_nick = new_nick[:32]
+                
+                try:
+                    if not member.guild_permissions.administrator:
+                        await member.edit(nick=new_nick, reason="ギルド加入による自動ニックネーム設定")
+                        logger.info(f"[ApplicationSync] {mcid} のニックネームを '{new_nick}' に設定")
+                except Exception as e:
+                    logger.error(f"[ApplicationSync] ニックネーム設定失敗: {e}")
+                
+                break  # 該当guildで見つかったら終わり
+                
+    except Exception as e:
+        logger.error(f"[ApplicationSync] ロール・ニックネーム設定で例外: {e}", exc_info=True)
+
+async def complete_application(bot, application: dict):
+    """申請完了処理：チャンネル削除・トランスクリプト送信"""
+    try:
+        channel_id = application['channel_id']
+        mcid = application['mcid']
+        discord_id = application['discord_id']
+        reason = application['reason']
+        past_guild = application.get('past_guild')
+        
+        # 申請チャンネルを取得
+        channel = bot.get_channel(channel_id)
+        if channel:
+            # トランスクリプトEmbedを作成
+            transcript_embed = make_application_transcript_embed(mcid, discord_id, reason, past_guild)
+            
+            # ログチャンネルに送信（ログチャンネルIDは環境変数から取得）
+            log_channel_id = int(os.getenv('APPLICATION_LOG_CHANNEL_ID', 0))
+            if log_channel_id:
+                log_channel = bot.get_channel(log_channel_id)
+                if log_channel:
+                    await log_channel.send(embed=transcript_embed)
+                    logger.info(f"[ApplicationSync] {mcid} の申請トランスクリプトをログチャンネルに送信")
+            
+            # 申請チャンネルを削除
+            await channel.delete(reason=f"ギルド加入完了 - {mcid}")
+            logger.info(f"[ApplicationSync] {mcid} の申請チャンネルを削除")
+        
+    except Exception as e:
+        logger.error(f"[ApplicationSync] 申請完了処理で例外: {e}", exc_info=True)
+
 async def member_remove_sync_task(bot, api: WynncraftAPI):
     while True:
         try:
@@ -149,3 +270,4 @@ async def setup(bot):
     api = WynncraftAPI()
     bot.loop.create_task(member_rank_sync_task(api, bot))
     bot.loop.create_task(member_remove_sync_task(bot, api))
+    bot.loop.create_task(application_join_detection_task(api, bot))
