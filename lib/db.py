@@ -61,7 +61,7 @@ def create_table():
                 PRIMARY KEY (guild_prefix, territory_name)
             );
         """)
-        c.execute("""
+        cur.execute("""
         CREATE TABLE IF NOT EXISTS applications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             mcid TEXT NOT NULL,
