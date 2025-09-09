@@ -61,6 +61,14 @@ def create_table():
                 PRIMARY KEY (guild_prefix, territory_name)
             );
         """)
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS applications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mcid TEXT NOT NULL,
+            discord_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
         conn.commit()
     conn.close()
     logger.info("全テーブルを作成/確認しました")
@@ -430,5 +438,26 @@ def get_last_join_cache_for_members(mcid_list):
         logger.error(f"[DB Handler] get_last_join_cache_for_members failed: {e}")
     finally:
         if conn: conn.close()
+
+def save_application(mcid: str, discord_id: int):
+    """申請内容を保存（MCID・Discord IDのみ）"""
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("INSERT INTO applications (mcid, discord_id) VALUES (?, ?)", (mcid, discord_id))
+        conn.commit()
+
+def get_pending_applications():
+    """未処理申請の一覧取得"""
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("SELECT mcid, discord_id FROM applications")
+        return c.fetchall()
+
+def delete_application_by_discord_id(discord_id: int):
+    """処理済み申請を削除"""
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM applications WHERE discord_id = ?", (discord_id,))
+        conn.commit()
     return result
 
