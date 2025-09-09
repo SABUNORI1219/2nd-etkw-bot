@@ -73,12 +73,12 @@ class MyBot(commands.Bot):
         register_persistent_views(self)
 
         async def ensure_application_embed():
-        """申請ボタン付きEmbedがチャンネルに常駐しているか確認し、なければ送信"""
-        channel = bot.get_channel(APPLICATION_CHANNEL_ID)
-        async for msg in channel.history(limit=10):
-            if msg.author == bot.user and hasattr(msg, "components") and msg.components:
-                # 既にボタン付きEmbedが存在
-                return
+            """申請ボタン付きEmbedがチャンネルに常駐しているか確認し、なければ送信"""
+            channel = bot.get_channel(APPLICATION_CHANNEL_ID)
+            async for msg in channel.history(limit=10):
+                if msg.author == bot.user and hasattr(msg, "components") and msg.components:
+                    # 既にボタン付きEmbedが存在
+                    return
         # なければ送信
         embed = ApplicationButtonView.make_application_guide_embed()
         view = ApplicationButtonView()
