@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import discord
 from datetime import datetime
 
 from lib.api_stocker import WynncraftAPI
