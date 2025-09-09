@@ -61,6 +61,17 @@ def create_table():
                 PRIMARY KEY (guild_prefix, territory_name)
             );
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS application_requests (
+                id SERIAL PRIMARY KEY,
+                mcid TEXT NOT NULL,
+                discord_id BIGINT NOT NULL,
+                reason TEXT NOT NULL,
+                past_guild TEXT,
+                channel_id BIGINT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
         conn.commit()
     conn.close()
     logger.info("全テーブルを作成/確認しました")
@@ -249,6 +260,136 @@ def cleanup_old_server_logs(minutes=5):
         conn.commit()
     conn.close()
     logger.info(f"{minutes}分より前のplayer_server_logを削除しました")
+
+# 申請システム関連のDB関数
+def save_application_request(mcid: str, discord_id: int, reason: str, past_guild: str, channel_id: int) -> bool:
+    """申請情報をDBに保存"""
+    conn = get_conn()
+    if conn is None: 
+        return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO application_requests (mcid, discord_id, reason, past_guild, channel_id)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (mcid, discord_id, reason, past_guild, channel_id))
+            conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"[DB Handler] 申請情報の保存に失敗: {e}")
+        return False
+    finally:
+        if conn: 
+            conn.close()
+
+def get_application_by_discord_id(discord_id: int) -> dict | None:
+    """Discord IDから申請情報を取得"""
+    conn = get_conn()
+    if conn is None: 
+        return None
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, mcid, discord_id, reason, past_guild, channel_id, created_at
+                FROM application_requests WHERE discord_id = %s
+                ORDER BY created_at DESC LIMIT 1
+            """, (discord_id,))
+            record = cur.fetchone()
+            if record:
+                return {
+                    "id": record[0],
+                    "mcid": record[1], 
+                    "discord_id": record[2],
+                    "reason": record[3],
+                    "past_guild": record[4],
+                    "channel_id": record[5],
+                    "created_at": record[6]
+                }
+            return None
+    except Exception as e:
+        logger.error(f"[DB Handler] 申請情報の取得に失敗: {e}")
+        return None
+    finally:
+        if conn: 
+            conn.close()
+
+def get_application_by_channel_id(channel_id: int) -> dict | None:
+    """チャンネルIDから申請情報を取得"""
+    conn = get_conn()
+    if conn is None: 
+        return None
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, mcid, discord_id, reason, past_guild, channel_id, created_at
+                FROM application_requests WHERE channel_id = %s
+            """, (channel_id,))
+            record = cur.fetchone()
+            if record:
+                return {
+                    "id": record[0],
+                    "mcid": record[1], 
+                    "discord_id": record[2],
+                    "reason": record[3],
+                    "past_guild": record[4],
+                    "channel_id": record[5],
+                    "created_at": record[6]
+                }
+            return None
+    except Exception as e:
+        logger.error(f"[DB Handler] 申請情報の取得に失敗: {e}")
+        return None
+    finally:
+        if conn: 
+            conn.close()
+
+def delete_application_request(discord_id: int) -> bool:
+    """申請情報をDBから削除"""
+    conn = get_conn()
+    if conn is None: 
+        return False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM application_requests WHERE discord_id = %s", (discord_id,))
+            conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"[DB Handler] 申請情報の削除に失敗: {e}")
+        return False
+    finally:
+        if conn: 
+            conn.close()
+
+def get_all_pending_applications():
+    """すべての申請中の情報を取得"""
+    conn = get_conn()
+    if conn is None: 
+        return []
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, mcid, discord_id, reason, past_guild, channel_id, created_at
+                FROM application_requests ORDER BY created_at DESC
+            """)
+            records = cur.fetchall()
+            applications = []
+            for record in records:
+                applications.append({
+                    "id": record[0],
+                    "mcid": record[1], 
+                    "discord_id": record[2],
+                    "reason": record[3],
+                    "past_guild": record[4],
+                    "channel_id": record[5],
+                    "created_at": record[6]
+                })
+            return applications
+    except Exception as e:
+        logger.error(f"[DB Handler] 申請情報の一覧取得に失敗: {e}")
+        return []
+    finally:
+        if conn: 
+            conn.close()
 
 def add_member(mcid: str, discord_id: int, rank: str) -> bool:
     sql = "INSERT INTO linked_members (mcid, discord_id, ingame_rank) VALUES (%s, %s, %s) ON CONFLICT(mcid) DO UPDATE SET discord_id = EXCLUDED.discord_id, ingame_rank = EXCLUDED.ingame_rank"

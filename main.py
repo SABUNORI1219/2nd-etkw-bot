@@ -14,6 +14,7 @@ from logger_setup import setup_logger
 from lib.db import create_table
 from lib.discord_notify import LanguageSwitchView
 from lib.ticket_embeds import register_persistent_views
+from lib.application_views import register_application_views
 
 # ロガーを最初にセットアップ
 setup_logger()
@@ -68,6 +69,7 @@ class MyBot(commands.Bot):
                     logger.error(f"--- [司令塔] ❌ 受付係 '{filename}' の配属に失敗しました: {e}")
         
         register_persistent_views(self)
+        register_application_views(self)
         
         try:
             logger.info("--- [司令塔] -> スラッシュコマンドをグローバルに同期します... ---")
