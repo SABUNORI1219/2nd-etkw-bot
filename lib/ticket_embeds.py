@@ -249,3 +249,17 @@ def extract_applicant_user_id_from_content(content: str) -> Optional[int]:
             if user_id_str.isdigit():
                 return int(user_id_str)
     return None
+
+def make_application_guide_embed():
+    # 日本語案内Embed（カスタマイズ可）
+    desc = (
+        "ギルド加入希望の方はこちらのボタンから申請してください。\n"
+        "申請後、スタッフが順次ご案内します。"
+    )
+    embed = discord.Embed(
+        title="[ギルド加入申請] ご案内",
+        description=desc,
+        color=discord.Color.green()
+    )
+    embed.set_footer(text="Minister Chikuwa | 加入申請システム")
+    return embed
