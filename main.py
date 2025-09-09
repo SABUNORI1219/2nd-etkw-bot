@@ -72,12 +72,16 @@ class MyBot(commands.Bot):
         
         register_persistent_views(self)
 
-        # なければ送信
-        embed = ApplicationButtonView.make_application_guide_embed()
-        view = ApplicationButtonView()
-        await channel.send(embed=embed, view=view)
-        # 必要ならメッセージIDをDBやファイルで管理
-        
+        # 申請ボタン付きEmbedがなければ送信
+        channel = self.get_channel(APPLICATION_CHANNEL_ID)
+        if channel is not None:
+            embed = ApplicationButtonView.make_application_guide_embed()
+            view = ApplicationButtonView()
+            await channel.send(embed=embed, view=view)
+            # 必要ならメッセージIDをDBやファイルで管理
+        else:
+            logger.error(f"APPLICATION_CHANNEL_ID {APPLICATION_CHANNEL_ID} のチャンネルが見つかりません。")
+
         try:
             logger.info("--- [司令塔] -> スラッシュコマンドをグローバルに同期します... ---")
             synced = await self.tree.sync()
@@ -117,14 +121,6 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         logger.error(f"--- [司令塔] 予期せぬエラーが発生: {error}", exc_info=True)
         # 必要であれば、ユーザーにエラーが発生したことを伝えるメッセージを送信
         # await interaction.response.send_message("コマンドの実行中にエラーが発生しました。", ephemeral=True)
-
-async def ensure_application_embed():
-            """申請ボタン付きEmbedがチャンネルに常駐しているか確認し、なければ送信"""
-            channel = bot.get_channel(APPLICATION_CHANNEL_ID)
-            async for msg in channel.history(limit=10):
-                if msg.author == bot.user and hasattr(msg, "components") and msg.components:
-                    # 既にボタン付きEmbedが存在
-                    return
 
 async def ensure_application_embed():
     """申請ボタン付きEmbedがチャンネルに常駐しているか確認し、なければ送信"""
