@@ -14,6 +14,9 @@ from logger_setup import setup_logger
 from lib.db import create_table
 from lib.discord_notify import LanguageSwitchView
 from lib.ticket_embeds import register_persistent_views
+from lib.application_views import ApplicationButtonView, register_persistent_views
+
+APPLICATION_CHANNEL_ID = 1415107620108501082
 
 # ロガーを最初にセットアップ
 setup_logger()
@@ -68,6 +71,19 @@ class MyBot(commands.Bot):
                     logger.error(f"--- [司令塔] ❌ 受付係 '{filename}' の配属に失敗しました: {e}")
         
         register_persistent_views(self)
+
+        async def ensure_application_embed():
+        """申請ボタン付きEmbedがチャンネルに常駐しているか確認し、なければ送信"""
+        channel = bot.get_channel(APPLICATION_CHANNEL_ID)
+        async for msg in channel.history(limit=10):
+            if msg.author == bot.user and hasattr(msg, "components") and msg.components:
+                # 既にボタン付きEmbedが存在
+                return
+        # なければ送信
+        embed = ApplicationButtonView.make_application_guide_embed()
+        view = ApplicationButtonView()
+        await channel.send(embed=embed, view=view)
+        # 必要ならメッセージIDをDBやファイルで管理
         
         try:
             logger.info("--- [司令塔] -> スラッシュコマンドをグローバルに同期します... ---")
@@ -108,6 +124,11 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         logger.error(f"--- [司令塔] 予期せぬエラーが発生: {error}", exc_info=True)
         # 必要であれば、ユーザーにエラーが発生したことを伝えるメッセージを送信
         # await interaction.response.send_message("コマンドの実行中にエラーが発生しました。", ephemeral=True)
+
+@tasks.loop(hours=1)
+async def start_embed_check():
+    """1時間おきに申請ボタン付きEmbedが存在するか再確認＆復旧"""
+    await ensure_application_embed()
 
 # メインの実行ブロック
 if __name__ == '__main__':
