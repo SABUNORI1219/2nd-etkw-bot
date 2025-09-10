@@ -73,14 +73,20 @@ class MyBot(commands.Bot):
         register_persistent_views(self)
 
         # 申請ボタン付きEmbedがなければ送信
-        channel = self.get_channel(APPLICATION_CHANNEL_ID)
-        if channel is not None:
-            embed = ApplicationButtonView.make_application_guide_embed()
-            view = ApplicationButtonView()
-            await channel.send(embed=embed, view=view)
-            # 必要ならメッセージIDをDBやファイルで管理
-        else:
-            logger.error(f"APPLICATION_CHANNEL_ID {APPLICATION_CHANNEL_ID} のチャンネルが見つかりません。")
+        try:
+            channel = self.get_channel(APPLICATION_CHANNEL_ID)
+            if channel is None:
+                channel = await self.fetch_channel(APPLICATION_CHANNEL_ID)
+                logger.info(f"APIからチャンネルID {APPLICATION_CHANNEL_ID} を取得しました: {channel} ({type(channel)})")
+            if channel is not None:
+                # 通常処理
+                embed = ApplicationButtonView.make_application_guide_embed()
+                view = ApplicationButtonView()
+                await channel.send(embed=embed, view=view)
+            else:
+                logger.error(f"APPLICATION_CHANNEL_ID {APPLICATION_CHANNEL_ID} のチャンネルが見つかりません（APIでも取得不可）。")
+        except Exception as e:
+            logger.error(f"APPLICATION_CHANNEL_ID {APPLICATION_CHANNEL_ID} のチャンネル取得時に例外: {e}")
 
         try:
             logger.info("--- [司令塔] -> スラッシュコマンドをグローバルに同期します... ---")
