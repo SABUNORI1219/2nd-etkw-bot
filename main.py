@@ -71,22 +71,8 @@ class MyBot(commands.Bot):
                     logger.error(f"--- [司令塔] ❌ 受付係 '{filename}' の配属に失敗しました: {e}")
         
         register_persistent_views(self)
-
-        # 申請ボタン付きEmbedがなければ送信
-        try:
-            channel = self.get_channel(APPLICATION_CHANNEL_ID)
-            if channel is None:
-                channel = await self.fetch_channel(APPLICATION_CHANNEL_ID)
-                logger.info(f"APIからチャンネルID {APPLICATION_CHANNEL_ID} を取得しました: {channel} ({type(channel)})")
-            if channel is not None:
-                # 通常処理
-                embed = ApplicationButtonView.make_application_guide_embed()
-                view = ApplicationButtonView()
-                await channel.send(embed=embed, view=view)
-            else:
-                logger.error(f"APPLICATION_CHANNEL_ID {APPLICATION_CHANNEL_ID} のチャンネルが見つかりません（APIでも取得不可）。")
-        except Exception as e:
-            logger.error(f"APPLICATION_CHANNEL_ID {APPLICATION_CHANNEL_ID} のチャンネル取得時に例外: {e}")
+        # HElper Function Kidou
+        await ensure_application_embed()
 
         try:
             logger.info("--- [司令塔] -> スラッシュコマンドをグローバルに同期します... ---")
@@ -130,6 +116,7 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         # 必要であれば、ユーザーにエラーが発生したことを伝えるメッセージを送信
         # await interaction.response.send_message("コマンドの実行中にエラーが発生しました。", ephemeral=True)
 
+# HElper Function Desu
 async def ensure_application_embed():
     """申請ボタン付きEmbedがチャンネルに常駐しているか確認し、なければ送信"""
     channel = bot.get_channel(APPLICATION_CHANNEL_ID)
@@ -137,13 +124,15 @@ async def ensure_application_embed():
         channel = await bot.fetch_channel(APPLICATION_CHANNEL_ID)
     # 直近100件程度を調べる
     async for msg in channel.history(limit=100):
-        # ボタン付きメッセージのみ判定
-        if msg.author == bot.user and msg.components:
-            # すべてのアクション行（ActionRow）を調べる
+        if msg.author != bot.user:
+            continue
+        # --- Embedタイトルで判定する（カスタマイズしてOK） ---
+        if msg.embeds and msg.embeds[0].title and "加入申請" in msg.embeds[0].title:
+            # --- ボタン(custom_id)も判定 ---
             for action_row in msg.components:
                 for component in getattr(action_row, "children", []):
                     if getattr(component, "custom_id", None) == "application_start":
-                        # 既に申請ボタンつきメッセージがある
+                        # 既に申請ボタン付きEmbedがある
                         return
     # なければ新規投稿
     embed = ApplicationButtonView.make_application_guide_embed()
