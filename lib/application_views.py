@@ -1,7 +1,8 @@
 import discord
 from discord.ui import View, Modal, TextInput, button
 from lib.db import save_application
-from lib.ticket_embeds import make_application_guide_embed
+from lib.ticket_embeds import make_application_guide_embed, make_profile_embed, make_reason_embed, make_prev_guild_embed
+from lib.api_stocker import WynncraftAPI
 
 # --- 申請ボタンView ---
 class ApplicationButtonView(View):
@@ -34,21 +35,71 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
-            # 必要に応じてスタッフロールにも閲覧権限
+            # 必要に応じてスタッフロールにも閲覧権限を追加
         }
-        # 新規チャンネル作成
-        category = discord.utils.get(guild.categories, name="加入申請")  # カテゴリ名は実際のサーバーに合わせて修正
+
+        # --- カテゴリ取得・指定 ---
+        category = discord.utils.get(guild.categories, name="加入申請")  # カテゴリ名はサーバー設定に合わせて修正
+        if category is None:
+            # カテゴリが見つからない場合は一番下に作成
+            category = None
+
+        # --- 新規チャンネル作成 ---
         channel = await guild.create_text_channel(
             name=f"申請-{self.mcid.value}",
             overwrites=overwrites,
             category=category
         )
+
         # ①ご案内Embed
         await channel.send(embed=make_application_guide_embed())
-        # ②MCIDからの情報Embed（ここでAPI呼び出し等）
+
+        # ②MCIDからの情報Embed（API呼び出し等）
+        profile_embed = None
+        try:
+            api = WynncraftAPI()
+            profile_data = await api.get_player_profile(self.mcid.value)
+            profile_embed = make_profile_embed(self.mcid.value, profile_data)
+        except Exception as e:
+            profile_embed = discord.Embed(
+                title="プレイヤープロフィール取得失敗",
+                description=f"MCID: {self.mcid.value}\n情報取得中にエラーが発生しました。",
+                color=discord.Color.red()
+            )
+        await channel.send(embed=profile_embed)
+
         # ③理由Embed
+        reason_embed = make_reason_embed(self.reason.value)
+        await channel.send(embed=reason_embed)
+
         # ④過去ギルドEmbed（APIアクセス＋予備処理）
-        # ...（ここは順次拡張）
+        prev_guild_embed = None
+        prev_guild_name = self.prev_guild.value.strip() if self.prev_guild.value else ""
+        if prev_guild_name:
+            try:
+                api = WynncraftAPI()
+                # 入力値そのまま
+                guild_info = await api.get_guild_by_name(prev_guild_name)
+                # 最初だけ大文字
+                if not guild_info:
+                    guild_info = await api.get_guild_by_name(prev_guild_name.capitalize())
+                # 全部大文字
+                if not guild_info:
+                    guild_info = await api.get_guild_by_name(prev_guild_name.upper())
+                # 全部小文字
+                if not guild_info:
+                    guild_info = await api.get_guild_by_name(prev_guild_name.lower())
+                prev_guild_embed = make_prev_guild_embed(guild_info, prev_guild_name)
+            except Exception as e:
+                prev_guild_embed = discord.Embed(
+                    title="過去ギルド情報取得失敗",
+                    description=f"入力: {prev_guild_name}\n情報取得中にエラーが発生しました。",
+                    color=discord.Color.red()
+                )
+        else:
+            prev_guild_embed = make_prev_guild_embed(None, "")
+
+        await channel.send(embed=prev_guild_embed)
 
         # 必要な情報をDBに保存
         save_application(self.mcid.value, interaction.user.id, channel.id)
