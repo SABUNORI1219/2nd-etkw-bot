@@ -264,7 +264,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         await channel.send(embed=prev_guild_embed)
 
         # DB登録
-        save_application(self.mcid.value, interaction.user.id, channel.id)
+        save_application(self.mcid.value, interaction.user.id)
         await interaction.response.send_message(
             f"{channel.mention} に申請内容を送信しました。スタッフが確認するまでお待ちください。",
             ephemeral=True
