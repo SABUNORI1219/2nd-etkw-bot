@@ -5,6 +5,7 @@ from lib.api_stocker import WynncraftAPI
 
 # CATEGORY ID DESU
 APPLICATION_CATEGORY_ID = 1415492214087483484
+STAFF_ROLE_ID = 1158540148783448134
 
 def make_reason_embed(reason):
     return discord.Embed(
@@ -191,7 +192,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         )
 
         # ①ご案内Embed
-        await channel.send(embed=send_ticket_user_embed())
+        await channel.send(embed=send_ticket_user_embed(channel=channel.id, user_id=interaction.user.id, staff_role_id=STAFF_ROLE_ID))
 
         # ②MCIDからの情報Embed（API呼び出し等）
         profile_embed = None
