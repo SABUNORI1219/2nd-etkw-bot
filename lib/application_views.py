@@ -245,13 +245,13 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         if prev_guild_name:
             try:
                 api = WynncraftAPI()
-                guild_info = await api.get_guild_by_name(prev_guild_name)
+                guild_info = await api.get_guild_by_prefix(prev_guild_name)
                 if not guild_info:
-                    guild_info = await api.get_guild_by_name(prev_guild_name.capitalize())
+                    guild_info = await api.get_guild_by_prefix(prev_guild_name.capitalize())
                 if not guild_info:
-                    guild_info = await api.get_guild_by_name(prev_guild_name.upper())
+                    guild_info = await api.get_guild_by_prefix(prev_guild_name.upper())
                 if not guild_info:
-                    guild_info = await api.get_guild_by_name(prev_guild_name.lower())
+                    guild_info = await api.get_guild_by_prefix(prev_guild_name.lower())
                 prev_guild_embed = make_prev_guild_embed(guild_info, prev_guild_name)
             except Exception:
                 prev_guild_embed = discord.Embed(
