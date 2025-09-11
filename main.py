@@ -133,10 +133,22 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 async def ensure_application_embed():
     """申請ボタン付きEmbedがチャンネルに常駐しているか確認し、なければ送信"""
     channel = bot.get_channel(APPLICATION_CHANNEL_ID)
-    async for msg in channel.history(limit=10):
-        if msg.author == bot.user and hasattr(msg, "components") and msg.components:
-            # 既にボタン付きEmbedが存在
-            return
+    if channel is None:
+        channel = await bot.fetch_channel(APPLICATION_CHANNEL_ID)
+    # 直近100件程度を調べる
+    async for msg in channel.history(limit=100):
+        # ボタン付きメッセージのみ判定
+        if msg.author == bot.user and msg.components:
+            # すべてのアクション行（ActionRow）を調べる
+            for action_row in msg.components:
+                for component in getattr(action_row, "children", []):
+                    if getattr(component, "custom_id", None) == "application_start":
+                        # 既に申請ボタンつきメッセージがある
+                        return
+    # なければ新規投稿
+    embed = ApplicationButtonView.make_application_guide_embed()
+    view = ApplicationButtonView()
+    await channel.send(embed=embed, view=view)
 
 @tasks.loop(hours=1)
 async def start_embed_check():
