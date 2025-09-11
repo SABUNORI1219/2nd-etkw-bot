@@ -4,6 +4,9 @@ from lib.db import save_application
 from lib.ticket_embeds import make_application_guide_embed, make_profile_embed, make_reason_embed, make_prev_guild_embed
 from lib.api_stocker import WynncraftAPI
 
+# CATEGORY ID DESU
+APPLICATION_CATEGORY_ID = 1415492214087483484
+
 # --- 申請ボタンView ---
 class ApplicationButtonView(View):
     def __init__(self):
@@ -38,10 +41,9 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
             # 必要に応じてスタッフロールにも閲覧権限を追加
         }
 
-        # --- カテゴリ取得・指定 ---
-        category = discord.utils.get(guild.categories, name="加入申請")  # カテゴリ名はサーバー設定に合わせて修正
-        if category is None:
-            # カテゴリが見つからない場合は一番下に作成
+        # --- カテゴリ取得・指定（ID優先、なければNone） ---
+        category = guild.get_channel(APPLICATION_CATEGORY_ID)
+        if not isinstance(category, discord.CategoryChannel):
             category = None
 
         # --- 新規チャンネル作成 ---
