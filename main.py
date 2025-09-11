@@ -82,6 +82,7 @@ class MyBot(commands.Bot):
             logger.error(f"--- [司令塔] ❌ コマンドの同期に失敗しました: {e}")
 
         self.add_view(LanguageSwitchView())
+        self.add_view(ApplicationButtonView())
 
     async def on_ready(self):
         """Botの準備が完了したときに呼ばれるイベント"""
