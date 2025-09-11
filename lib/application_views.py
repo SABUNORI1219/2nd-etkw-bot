@@ -1,7 +1,7 @@
 import discord
 from discord.ui import View, Modal, TextInput, button
 from lib.db import save_application
-from lib.ticket_embeds import make_application_guide_embed, make_profile_embed, make_reason_embed, make_prev_guild_embed
+from lib.ticket_embeds import make_application_guide_embed
 from lib.api_stocker import WynncraftAPI
 
 # CATEGORY ID DESU
