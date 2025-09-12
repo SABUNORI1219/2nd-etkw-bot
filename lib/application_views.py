@@ -41,14 +41,14 @@ def make_prev_guild_embed(guild_info, input_name):
         # オンライン人数サマリは省略（長文化対策）
         desc = (
             f"```python\n"
-            f"ギルド名: {name} [{prefix}]\n"
-            f"オーナー: {owner}\n"
-            f"作成日: {created_date}\n"
-            f"レベル: {level} [{xp_percent}%]\n"
-            f"戦争回数: {wars}\n"
-            f"最新SR: {rating_display} [Season {latest_season}]\n"
-            f"領地数: {territories}\n"
-            f"メンバー数: {total_members}\n"
+            f"Guild: {name} [{prefix}]\n"
+            f"Owner: {owner}\n"
+            f"Created: {created_date}\n"
+            f"Level: {level} [{xp_percent}%]\n"
+            f"Wars: {wars}\n"
+            f"Latest SR: {rating_display} [Season {latest_season}]\n"
+            f"Territories: {territories}\n"
+            f"Members: {total_members}\n"
             f"```\n"
         )
     elif input_name:
