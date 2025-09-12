@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord.ui import View, Modal, TextInput, button
 import time
 from typing import Optional
+import logging
 
 from lib.db import save_application
 from lib.profile_renderer import generate_profile_card
@@ -11,6 +12,8 @@ from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.banner_renderer import BannerRenderer
 from PIL import Image
 from io import BytesIO
+
+logger = logging.getLogger(__name__)
 
 # ---------- 設定ID ----------
 APPLICATION_CATEGORY_ID = 1415492214087483484
