@@ -5,7 +5,12 @@ import time
 from typing import Optional
 
 from lib.db import save_application
-from lib.api_stocker import WynncraftAPI
+from lib.profile_renderer import generate_profile_card
+from cogs.player_cog import build_profile_info
+from lib.api_stocker import WynncraftAPI, OtherAPI
+from lib.banner_renderer import BannerRenderer
+from PIL import Image
+from io import BytesIO
 
 # ---------- 設定ID ----------
 APPLICATION_CATEGORY_ID = 1415492214087483484
@@ -65,17 +70,43 @@ def make_prev_guild_embed(guild_info, input_name):
     )
     return embed
 
-def make_profile_embed(mcid, profile_data):
-    desc = f"```\n{profile_data}\n```" if profile_data else "情報取得失敗"
-    # 6000文字制限対策
-    if len(desc) > 6000:
-        desc = desc[:5900] + "\n...（一部省略されました）"
-    embed = discord.Embed(
-        title=f"{mcid} さんのプロフィール",
-        description=desc,
-        color=discord.Color.blue()
-    )
-    return embed
+async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord.File]]:
+    """
+    プロファイル画像生成＋画像付きEmbed（画像生成失敗時はテキストEmbed）
+    """
+    try:
+        api = WynncraftAPI()
+        other_api = OtherAPI()
+        banner_renderer = BannerRenderer()
+        player_data = await api.get_official_player_data(mcid)
+        if not player_data:
+            raise Exception("APIからプレイヤーデータ取得失敗")
+        profile_info = await build_profile_info(player_data, api, banner_renderer)
+        uuid = profile_info.get("uuid")
+        skin_image = None
+        if uuid:
+            try:
+                skin_bytes = await other_api.get_vzge_skin(uuid)
+                if skin_bytes:
+                    skin_image = Image.open(BytesIO(skin_bytes)).convert("RGBA")
+            except Exception:
+                skin_image = None
+        output_path = f"profile_card_{uuid}.png" if uuid else "profile_card.png"
+        generate_profile_card(profile_info, output_path, skin_image=skin_image)
+        embed = discord.Embed(
+            title=f"{mcid} さんのプロフィール",
+            description="プレイヤーカード",
+            color=discord.Color.blue()
+        )
+        embed.set_image(url=f"attachment://{output_path}")
+        return embed, discord.File(output_path)
+    except Exception as e:
+        embed = discord.Embed(
+            title="プレイヤープロフィール取得失敗",
+            description=f"MCID: {mcid}\n情報取得中にエラーが発生しました。",
+            color=discord.Color.red()
+        )
+        return embed, None
 
 def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
     if lang == "ja":
