@@ -97,8 +97,8 @@ async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord
         output_path = f"profile_card_{uuid}.png" if uuid else "profile_card.png"
         generate_profile_card(profile_info, output_path, skin_image=skin_image)
         embed = discord.Embed(
-            title=f"{mcid} さんのプロフィール",
-            description="プレイヤーカード",
+            title="プレイヤー情報 / Player Info",
+            description=f"MCID - {mcid}",
             color=discord.Color.blue()
         )
         embed.set_image(url=f"attachment://{output_path}")
