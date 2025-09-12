@@ -106,6 +106,7 @@ async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord
             description=f"MCID: {mcid}\n情報取得中にエラーが発生しました。",
             color=discord.Color.red()
         )
+        logger.error(f"ぷろふぁいるいめーじせいせいにしっっぱいしたました: {e}")
         return embed, None
 
 def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
