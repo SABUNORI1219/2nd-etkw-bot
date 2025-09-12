@@ -67,6 +67,9 @@ def make_prev_guild_embed(guild_info, input_name):
 
 def make_profile_embed(mcid, profile_data):
     desc = f"```\n{profile_data}\n```" if profile_data else "情報取得失敗"
+    # 6000文字制限対策
+    if len(desc) > 6000:
+        desc = desc[:5900] + "\n...（一部省略されました）"
     embed = discord.Embed(
         title=f"{mcid} さんのプロフィール",
         description=desc,
@@ -235,6 +238,9 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         self.add_item(self.prev_guild)
 
     async def on_submit(self, interaction: discord.Interaction):
+        # 1. defer（最初に必ず返す！）
+        await interaction.response.defer(ephemeral=True)
+
         guild = interaction.guild
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
@@ -249,7 +255,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
             category=category
         )
 
-        # ①ご案内Embed（async関数はawaitして呼ぶ！）
+        # ①ご案内Embed
         await send_ticket_user_embed(channel, interaction.user.id, STAFF_ROLE_ID)
 
         # ②MCIDからの情報Embed
@@ -295,7 +301,9 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
 
         # DB登録
         save_application(self.mcid.value, interaction.user.id)
-        await interaction.response.send_message(
+
+        # 5. followupで通知
+        await interaction.followup.send(
             f"{channel.mention} に申請内容を送信しました。スタッフが確認するまでお待ちください。",
             ephemeral=True
         )
