@@ -298,12 +298,13 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
             api = WynncraftAPI()
             profile_data = await api.get_player_profile(self.mcid.value)
             profile_embed = make_profile_embed(self.mcid.value, profile_data)
-        except Exception:
+        except Exception as ee:
             profile_embed = discord.Embed(
                 title="プレイヤープロフィール取得失敗",
                 description=f"MCID: {self.mcid.value}\n情報取得中にエラーが発生しました。",
                 color=discord.Color.red()
             )
+            logger.error(f"ぷろふぁいるいめーじせいせいにしっっぱいしたました: {ee}")
         await channel.send(embed=profile_embed)
 
         # ③理由Embed
