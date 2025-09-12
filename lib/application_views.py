@@ -22,12 +22,42 @@ def make_reason_embed(reason):
     )
 
 def make_prev_guild_embed(guild_info, input_name):
-    if guild_info:
-        desc = f"ギルド情報:\n{guild_info}"
+    # guild_infoがdictならguild_cogと同じ要約方式で整形
+    if isinstance(guild_info, dict) and guild_info.get("name"):
+        name = guild_info.get('name', 'N/A')
+        prefix = guild_info.get('prefix', 'N/A')
+        owner_list = guild_info.get('members', {}).get('owner', {})
+        owner = list(owner_list.keys())[0] if owner_list else "N/A"
+        created_date = guild_info.get('created', 'N/A').split("T")[0] if guild_info.get('created') else "N/A"
+        level = guild_info.get('level', 0)
+        xp_percent = guild_info.get('xpPercent', 0)
+        wars = guild_info.get('wars', 0)
+        territories = guild_info.get('territories', 0)
+        season_ranks = guild_info.get('seasonRanks', {})
+        latest_season = str(max([int(k) for k in season_ranks.keys()])) if season_ranks else "N/A"
+        rating = season_ranks.get(latest_season, {}).get('rating', "N/A") if season_ranks else "N/A"
+        rating_display = f"{rating:,}" if isinstance(rating, int) else rating
+        total_members = guild_info.get('members', {}).get('total', 0)
+        # オンライン人数サマリは省略（長文化対策）
+        desc = (
+            f"```python\n"
+            f"ギルド名: {name} [{prefix}]\n"
+            f"オーナー: {owner}\n"
+            f"作成日: {created_date}\n"
+            f"レベル: {level} [{xp_percent}%]\n"
+            f"戦争回数: {wars}\n"
+            f"最新SR: {rating_display} [Season {latest_season}]\n"
+            f"領地数: {territories}\n"
+            f"メンバー数: {total_members}\n"
+            f"```\n"
+        )
     elif input_name:
         desc = f"ギルド「{input_name}」の情報が見つかりませんでした。"
     else:
         desc = "過去ギルド情報は未入力です。"
+    # 6000文字制限対策
+    if len(desc) > 6000:
+        desc = desc[:5900] + "\n...（一部省略されました）"
     embed = discord.Embed(
         title="過去ギルド情報",
         description=desc,
