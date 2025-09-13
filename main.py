@@ -124,8 +124,8 @@ async def ensure_application_embed():
     async for msg in channel.history(limit=100):
         if msg.author != bot.user:
             continue
-        # --- Embedタイトルで判定する（カスタマイズしてOK） ---
-        if msg.embeds and msg.embeds[0].title and "加入申請" in msg.embeds[0].title:
+        # Embedタイトルで判定
+        if msg.embeds and msg.embeds[0].title and "メンバー申請" in msg.embeds[0].title:
             # --- ボタン(custom_id)も判定 ---
             for action_row in msg.components:
                 for component in getattr(action_row, "children", []):
