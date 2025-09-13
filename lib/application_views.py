@@ -191,13 +191,47 @@ def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
 
 def make_application_guide_embed():
     desc = (
-        "ギルド加入希望の方はこちらのボタンから申請してください。\n"
-        "申請後、スタッフが順次ご案内します。"
+        "# > 🇯🇵｜日本語"
+        "チケットを作成し質問に回答した上で、ゲーム内でのスタッフからの招待をお待ち下さい。"
+        "スタッフが確認し次第、対応いたします。\n"
+        "このギルドは、日本人と海外の人たちが共に仲良くWynncraftを楽しむためのギルドです。"
+        "日本人の間ではあまりメジャーではないGuild Warにも取り組んでおり、Guild Raidも活発です。"
+        "ぜひ、お気軽にご申請ください！\n\n\n"
+        "## > 要件(無制限になる場合があります)"
+        "- 少なくとも一つのClassが105レベル以上であること。"
+        "- 週に合計で10時間以上プレイしていること。"
+        "- メインアカウントであること - サブアカウントでの参加は原則禁止です。\n"
+        "## > 質問"
+        "- あなたのMCID(アカウントのお名前)をご記入ください。"
+        "- 当ギルドに加入したいと考えた理由を教えて下さい。"
+        "- 当ギルドへ参加する以前に、他のギルドに所属していたことがありますか？その場合、そのギルドの名前を教えていただけると幸いです。(任意です)\n"
+        "## > 注意"
+        "- 現在多くの申請をいただいているため、参加までしばらくの間お待ちいただく場合がございます。"
+        "- また長期間ログインした記録がない場合(__1週間から2週間ほど__)や、プレイ時間が少ない場合にこちら側で退会の手続きを執り行う場合がございます。"
+        "- その場合でも、再度Chiefにご連絡していただければ優先的に再加入することが可能です。\n\n\n"
+        "# > 🇬🇧｜English"
+        "Please open a ticket, answer the questions below, and wait for a staff member to invite you in-game."
+        "Once a staff member checks your application, we’ll get back to you!\n"
+        "Our guild is all about bringing together Japanese and international players to enjoy Wynncraft together."
+        "We actively participate in Guild Wars and Guild Raids regularly."
+        "Feel free to apply—we’re looking forward to meeting you!\n\n\n"
+        "## > Requirements (may change depending on activity)"
+        "- At least one class at level 105+."
+        "- Around 10+ hours of playtime per week."
+        "- Main accounts only — alts are not allowed.\n"
+        "## > Questions"
+        "- What’s your MCID (in-game name)?"
+        "- Why would you like to join our guild?"
+        "- Have you ever been in another guild before? If yes, feel free to share the name. (optional)\n"
+        "## > Notes"
+        "- Due to the high number of applications, it may take some time before you can join."
+        "- Inactive players (__around 1–2 weeks without logging in__) or those with very low playtime may be removed."
+        "- Don’t worry though—if that happens, you can always reach out to a Chief member for priority rejoining."
     )
     embed = discord.Embed(
-        title="[ギルド加入申請] ご案内",
+        title="Empire of TKW [ETKW] ギルドメンバー申請/Member Application｜📝",
         description=desc,
-        color=discord.Color.green()
+        color=discord.Color.blue()
     )
     embed.set_footer(text="Minister Chikuwa | 加入申請システム")
     return embed
