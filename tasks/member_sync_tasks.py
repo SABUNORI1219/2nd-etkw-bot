@@ -165,18 +165,43 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
 
             for mcid, discord_id, channel_id in get_pending_applications():
                 if mcid in ingame_members:
+                    api_rank = ingame_members.get(mcid)
                     member = guild.get_member(discord_id)
                     if member is not None:
-                        role = guild.get_role(ROLE_ID)
-                        if role:
+                        # 1. 旧ランクロール全削除（ROLE_ID_TO_RANKに含まれるもの全て）
+                        old_roles = [role for role in member.roles if role.id in ROLE_ID_TO_RANK]
+                        if old_roles:
                             try:
-                                await member.add_roles(role, reason="Wynncraftギルド加入検知による自動承認")
+                                await member.remove_roles(*old_roles, reason="ランク同期: 旧ランクロール削除")
                             except Exception as e:
-                                logger.error(f"ロール付与失敗: {e}")
+                                logger.error(f"[ApplicationSync] 旧ランクロール削除失敗: {e}")
+                        # 2. 新ランクロール付与
+                        new_role_id = RANK_ROLE_ID_MAP.get(api_rank)
+                        new_role = guild.get_role(new_role_id) if new_role_id else None
+                        if new_role:
+                            try:
+                                await member.add_roles(new_role, reason="ランク同期: 新ランクロール付与")
+                            except Exception as e:
+                                logger.error(f"[ApplicationSync] 新ランクロール付与失敗: {e}")
+                        # 3. ETKWロール付与（必要あれば）
+                        if ETKW:
+                            etkw_role = guild.get_role(ETKW)
+                            if etkw_role:
+                                try:
+                                    await member.add_roles(etkw_role, reason="ランク同期: ETKWロール付与")
+                                except Exception as e:
+                                    logger.error(f"[ApplicationSync] ETKWロール付与失敗: {e}")
+                        # 4. ニックネーム変更（ロール名から[]除去）
+                        prefix = new_role.name if new_role else api_rank
+                        prefix = re.sub(r"\s*\[.*?]\s*", " ", prefix).strip()
+                        new_nick = f"{prefix} {mcid}"
+                        if len(new_nick) > 32:
+                            new_nick = new_nick[:32]
                         try:
-                            await member.edit(nick=mcid)
+                            if not member.guild_permissions.administrator:
+                                await member.edit(nick=new_nick, reason="ランク同期: ニックネーム更新")
                         except Exception as e:
-                            logger.error(f"ニックネーム変更失敗: {e}")
+                            logger.error(f"[ApplicationSync] ニックネーム更新失敗: {e}")
                     
                     app_channel = bot.get_channel(channel_id)
                     if app_channel:
@@ -199,7 +224,7 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                                         embed_data["profile"] = embed
                                     elif "ご案内" in t or "Welcome" in t:
                                         embed_data["user_guide"] = embed
-                            # --- ログ用Embedを生成 ---
+                            # ログ用Embedを生成
                             log_embed = discord.Embed(
                                 title="Guild 加入申請ログ/Application Log",
                                 color=discord.Color.blue(),
@@ -209,7 +234,6 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                                 log_embed.add_field(name="加入理由 / Reason", value=embed_data["reason"], inline=False)
                             if embed_data["prev_guild"]:
                                 log_embed.add_field(name="過去ギルド / Previous Guild", value=embed_data["prev_guild"], inline=False)
-                            # profile等画像付きEmbedを別途転送したい場合
                             await log_channel.send(embed=log_embed)
                             if embed_data["profile"]:
                                 await log_channel.send(embed=embed_data["profile"])
