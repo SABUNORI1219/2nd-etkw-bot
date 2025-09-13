@@ -49,7 +49,7 @@ def make_reason_embed(reason):
     )
 
 def make_prev_guild_embed(guild_info, input_name):
-    # guild_infoがdictならguild_cogと同じ要約方式で整形
+    self.banner_renderer = BannerRenderer()
     if isinstance(guild_info, dict) and guild_info.get("name"):
         name = guild_info.get('name', 'N/A')
         prefix = guild_info.get('prefix', 'N/A')
@@ -66,7 +66,10 @@ def make_prev_guild_embed(guild_info, input_name):
         rating_display = f"{rating:,}" if isinstance(rating, int) else rating
         total_members = guild_info.get('members', {}).get('total', 0)
         online_members = guild_info.get('online', 0)
-        # オンライン人数サマリは省略（長文化対策）
+
+        banner_bytes = self.banner_renderer.create_banner_image(guild_info.get('banner'))
+        
+        # オンライン人数サマリは省略
         desc = (
             f"```python\n"
             f"Guild: {name} [{prefix}]\n"
@@ -86,12 +89,19 @@ def make_prev_guild_embed(guild_info, input_name):
     # 6000文字制限対策
     if len(desc) > 6000:
         desc = desc[:5900] + "\n...（一部省略されました）"
+        
     embed = discord.Embed(
         title="過去ギルド/Previous Guild",
         description=desc,
         color=discord.Color.orange()
     )
+    
     embed.set_footer(text=f"入力情報/Input: {input_name}")
+
+    if banner_bytes:
+        banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
+        embed.set_thumbnail(url="attachment://guild_banner.png")
+        
     return embed
 
 async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord.File]]:
