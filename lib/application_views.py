@@ -153,7 +153,6 @@ def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
             "自己紹介用のチャンネルです。任意です。\n\n"
             "> <#1343603819610898545> \n"
             "ギルド内でのゲームに関する情報が共有されています。ぜひご一読ください。\n\n"
-            "- 情報の確認が終わりましたらスタッフの案内に従ってください。"
         )
         embed = discord.Embed(
             title="ご案内",
@@ -233,7 +232,7 @@ def make_application_guide_embed():
         description=desc,
         color=discord.Color.blue()
     )
-    embed.set_footer(text="Minister Chikuwa | 加入申請システム")
+    embed.set_footer(text="加入申請システム | Minister Chikuwa")
     return embed
 
 # チケット
