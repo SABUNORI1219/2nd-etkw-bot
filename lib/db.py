@@ -66,6 +66,7 @@ def create_table():
                 id SERIAL PRIMARY KEY,
                 mcid TEXT NOT NULL,
                 discord_id BIGINT NOT NULL,
+                channel_id BIGINT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         ''')
@@ -449,7 +450,7 @@ def save_application(mcid: str, discord_id: int, channel_id: int):
 def get_pending_applications():
     conn = get_conn()
     with conn.cursor() as cur:
-        cur.execute("SELECT mcid, discord_id FROM applications")
+        cur.execute("SELECT mcid, discord_id, channel_id FROM applications")
         return cur.fetchall()
     conn.close()
 
