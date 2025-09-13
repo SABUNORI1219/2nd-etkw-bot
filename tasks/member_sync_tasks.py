@@ -232,12 +232,11 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                                 description=f"**申請者:** <@{discord_id}>\n**MCID:** `{mcid}`"
                             )
                             if embed_data["reason"]:
-                                log_embed.add_field(name="加入理由 / Reason", value=embed_data["reason"], inline=False)
+                                log_embed.add_field(name="加入理由/Reason", value=embed_data["reason"], inline=False)
                             if embed_data["prev_guild"]:
-                                log_embed.add_field(name="過去ギルド / Previous Guild", value=embed_data["prev_guild"], inline=False)
+                                log_embed.add_field(name="過去ギルド/Previous Guild", value=embed_data["prev_guild"], inline=False)
+                            log_embed.set_footer(text="申請ログ｜Minister Chikuwa")
                             await log_channel.send(embed=log_embed)
-                            if embed_data["profile"]:
-                                await log_channel.send(embed=embed_data["profile"])
                             await app_channel.delete(reason="Wynncraftギルド加入検知→申請チャンネル削除")
                         except Exception as e:
                             logger.error(f"申請チャンネル削除・ログ転送失敗: {e}")
