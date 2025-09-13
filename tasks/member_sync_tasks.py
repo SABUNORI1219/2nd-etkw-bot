@@ -4,7 +4,7 @@ import re
 from discord.ext import tasks
 
 from lib.api_stocker import WynncraftAPI
-from lib.db import get_linked_members_page, add_member, remove_member, get_member
+from lib.db import get_linked_members_page, add_member, remove_member, get_member, get_pending_applications, delete_application_by_discord_id
 from lib.discord_notify import notify_member_removed
 from config import RANK_ROLE_ID_MAP, ETKW, ROLE_ID_TO_RANK
 
@@ -150,22 +150,53 @@ async def member_remove_sync_task(bot, api: WynncraftAPI):
             logger.error(f"[MemberSync] ギルド脱退検知で例外: {e}", exc_info=True)
         await asyncio.sleep(120)
 
-@tasks.loop(minutes=10)
-async def member_sync_task():
-    guild = bot.get_guild(GUILD_ID)
-    log_channel = bot.get_channel(LOG_CHANNEL_ID)
-    for mcid, discord_id in get_pending_applications():
-        member = guild.get_member(discord_id)
-        if member is not None:
-            # 加入判定
-            role = guild.get_role(ROLE_ID)
-            await member.add_roles(role, reason="ギルド加入申請承認")
-            await member.edit(nick=mcid)
-            # トランスクリプト送信
-            await log_channel.send(f"{member.mention} さんがギルドに加入しました。MCID: {mcid}")
-            delete_application_by_discord_id(discord_id)
+async def member_application_sync_task(bot, api: WynncraftAPI):
+    while True:
+        try:
+            logger.info("[ApplicationSync] 申請者のギルド加入チェック開始")
+            ingame_members = await fetch_guild_members(api)
+            if not ingame_members:
+                logger.warning("[ApplicationSync] APIからのギルドデータ取得失敗、同期処理をスキップ")
+                await asyncio.sleep(600)  # 10分
+                continue
+
+            guild = bot.get_guild(GUILD_ID)
+            log_channel = bot.get_channel(LOG_CHANNEL_ID)
+
+            for mcid, discord_id, channel_id in get_pending_applications():
+                if mcid in ingame_members:
+                    member = guild.get_member(discord_id)
+                    if member is not None:
+                        role = guild.get_role(ROLE_ID)
+                        if role:
+                            try:
+                                await member.add_roles(role, reason="Wynncraftギルド加入検知による自動承認")
+                            except Exception as e:
+                                logger.error(f"ロール付与失敗: {e}")
+                        try:
+                            await member.edit(nick=mcid)
+                        except Exception as e:
+                            logger.error(f"ニックネーム変更失敗: {e}")
+                    app_channel = bot.get_channel(channel_id)
+                    if app_channel:
+                        try:
+                            async for msg in app_channel.history(limit=20, oldest_first=True):
+                                if msg.embeds:
+                                    for embed in msg.embeds:
+                                        await log_channel.send(embed=embed)
+                                if msg.content:
+                                    await log_channel.send(msg.content)
+                            await app_channel.delete(reason="Wynncraftギルド加入検知→申請チャンネル削除")
+                        except Exception as e:
+                            logger.error(f"申請チャンネル削除・ログ転送失敗: {e}")
+                    delete_application_by_discord_id(discord_id)
+                    logger.info(f"[ApplicationSync] {mcid} の申請を処理し、チャンネル削除とDB削除を実施しました")
+        except Exception as e:
+            logger.error(f"[ApplicationSync] 申請加入同期で例外: {e}", exc_info=True)
+        await asyncio.sleep(600)  # 10分
 
 async def setup(bot):
     api = WynncraftAPI()
     bot.loop.create_task(member_rank_sync_task(api, bot))
     bot.loop.create_task(member_remove_sync_task(bot, api))
+    bot.loop.create_task(member_application_sync_task(bot, api))
