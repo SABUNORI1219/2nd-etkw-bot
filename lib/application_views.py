@@ -273,8 +273,27 @@ class ApplicationButtonView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @button(label="加入申請はこちら", style=discord.ButtonStyle.green, custom_id="application_start")
+    @button(label="加入申請/Application", style=discord.ButtonStyle.green, custom_id="application_start")
     async def application_start(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild = interaction.guild
+        user = interaction.user
+        category = guild.get_channel(APPLICATION_CATEGORY_ID)
+        ticket_exists = False
+        
+        if category and isinstance(category, discord.CategoryChannel):
+            for ch in category.text_channels:
+                # チャンネル名にuser idやMCIDが入っている場合は、それで判定
+                perms = ch.permissions_for(user)
+                if perms.send_messages:
+                    ticket_exists = True
+                    break
+        if ticket_exists:
+            await interaction.response.send_message(
+                "既にあなたのチケットが存在します。新しいチケットを作成できません。",
+                ephemeral=True
+            )
+            return
+            
         await interaction.response.send_modal(ApplicationFormModal())
 
     @staticmethod
@@ -297,13 +316,13 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         await interaction.response.defer(ephemeral=True)
 
         guild = interaction.guild
-        user_id = interaction.user.id
+        category = guild.get_channel(APPLICATION_CATEGORY_ID)
         
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
         }
-        category = guild.get_channel(APPLICATION_CATEGORY_ID)
+        
         if not isinstance(category, discord.CategoryChannel):
             category = None
         channel = await guild.create_text_channel(
@@ -311,25 +330,6 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
             overwrites=overwrites,
             category=category
         )
-
-        # すでにそのユーザーのチケットが存在するかチェック
-        ticket_exists = False
-        if category and isinstance(category, discord.CategoryChannel):
-            for ch in category.text_channels:
-                # チャンネル名にuser_idやMCIDが入っている場合は、それで判定してもOK
-                # ここではpermission_overwritesベースで判定
-                perms = ch.permissions_for(interaction.user)
-                # 例: "送信可能（Send Messages）" で判定
-                if perms.send_messages:
-                    ticket_exists = True
-                    break
-    
-        if ticket_exists:
-            await interaction.followup.send(
-                "既にあなたのチケットが存在します。新しいチケットを作成できません。",
-                ephemeral=True
-            )
-            return
 
         # ①ご案内Embed
         await send_ticket_user_embed(channel, interaction.user.id, STAFF_ROLE_ID)
