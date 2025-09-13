@@ -91,6 +91,7 @@ def make_prev_guild_embed(guild_info, input_name):
         description=desc,
         color=discord.Color.orange()
     )
+    embed.set_footer(text=f"入力情報/Input: {input_name}")
     return embed
 
 async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord.File]]:
@@ -121,7 +122,7 @@ async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord
             color=discord.Color.blue()
         )
         embed.set_image(url=f"attachment://{output_path}")
-        embed.set_footer(text=f"MCID: {mcid}")
+        embed.set_footer(text=f"入力情報/Input: {mcid}")
         return embed, discord.File(output_path)
     except Exception as e:
         embed = discord.Embed(
