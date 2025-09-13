@@ -297,6 +297,8 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         await interaction.response.defer(ephemeral=True)
 
         guild = interaction.guild
+        user_id = interaction.user.id
+        
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
@@ -309,6 +311,25 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
             overwrites=overwrites,
             category=category
         )
+
+        # すでにそのユーザーのチケットが存在するかチェック
+        ticket_exists = False
+        if category and isinstance(category, discord.CategoryChannel):
+            for ch in category.text_channels:
+                # チャンネル名にuser_idやMCIDが入っている場合は、それで判定してもOK
+                # ここではpermission_overwritesベースで判定
+                perms = ch.permissions_for(interaction.user)
+                # 例: "送信可能（Send Messages）" で判定
+                if perms.send_messages:
+                    ticket_exists = True
+                    break
+    
+        if ticket_exists:
+            await interaction.followup.send(
+                "既にあなたのチケットが存在します。新しいチケットを作成できません。",
+                ephemeral=True
+            )
+            return
 
         # ①ご案内Embed
         await send_ticket_user_embed(channel, interaction.user.id, STAFF_ROLE_ID)
