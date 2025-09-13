@@ -157,7 +157,7 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
             ingame_members = await fetch_guild_members(api)
             if not ingame_members:
                 logger.warning("[ApplicationSync] APIからのギルドデータ取得失敗、同期処理をスキップ")
-                await asyncio.sleep(600)  # 10分
+                await asyncio.sleep(120) # 2分
                 continue
 
             guild = bot.get_guild(GUILD_ID)
@@ -177,15 +177,42 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                             await member.edit(nick=mcid)
                         except Exception as e:
                             logger.error(f"ニックネーム変更失敗: {e}")
+                    
                     app_channel = bot.get_channel(channel_id)
                     if app_channel:
                         try:
+                            # --- 申請Embedから内容を抽出 ---
+                            embed_data = {
+                                "reason": None,
+                                "prev_guild": None,
+                                "profile": None,
+                                "user_guide": None,
+                            }
                             async for msg in app_channel.history(limit=20, oldest_first=True):
-                                if msg.embeds:
-                                    for embed in msg.embeds:
-                                        await log_channel.send(embed=embed)
-                                if msg.content:
-                                    await log_channel.send(msg.content)
+                                for embed in msg.embeds:
+                                    t = embed.title or ""
+                                    if "理由" in t:
+                                        embed_data["reason"] = embed.description
+                                    elif "過去ギルド" in t or "Previous Guild" in t:
+                                        embed_data["prev_guild"] = embed.description
+                                    elif "プレイヤー情報" in t or "Player Info" in t:
+                                        embed_data["profile"] = embed
+                                    elif "ご案内" in t or "Welcome" in t:
+                                        embed_data["user_guide"] = embed
+                            # --- ログ用Embedを生成 ---
+                            log_embed = discord.Embed(
+                                title="Guild 加入申請ログ/Application Log",
+                                color=discord.Color.blue(),
+                                description=f"**申請者:** <@{discord_id}>\n**MCID:** `{mcid}`"
+                            )
+                            if embed_data["reason"]:
+                                log_embed.add_field(name="加入理由 / Reason", value=embed_data["reason"], inline=False)
+                            if embed_data["prev_guild"]:
+                                log_embed.add_field(name="過去ギルド / Previous Guild", value=embed_data["prev_guild"], inline=False)
+                            # profile等画像付きEmbedを別途転送したい場合
+                            await log_channel.send(embed=log_embed)
+                            if embed_data["profile"]:
+                                await log_channel.send(embed=embed_data["profile"])
                             await app_channel.delete(reason="Wynncraftギルド加入検知→申請チャンネル削除")
                         except Exception as e:
                             logger.error(f"申請チャンネル削除・ログ転送失敗: {e}")
@@ -193,7 +220,7 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                     logger.info(f"[ApplicationSync] {mcid} の申請を処理し、チャンネル削除とDB削除を実施しました")
         except Exception as e:
             logger.error(f"[ApplicationSync] 申請加入同期で例外: {e}", exc_info=True)
-        await asyncio.sleep(600)  # 10分
+        await asyncio.sleep(300) # 5分
 
 async def setup(bot):
     api = WynncraftAPI()
