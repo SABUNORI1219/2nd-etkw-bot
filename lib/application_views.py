@@ -373,7 +373,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         await channel.send(embed=prev_guild_embed)
 
         # DB登録
-        save_application(self.mcid.value, interaction.user.id)
+        save_application(self.mcid.value, interaction.user.id, channel.id)
 
         # 5. followupで通知
         await interaction.followup.send(
