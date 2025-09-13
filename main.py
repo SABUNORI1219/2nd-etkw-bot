@@ -15,7 +15,6 @@ from lib.db import create_table
 from lib.discord_notify import LanguageSwitchView
 from lib.ticket_embeds import register_persistent_views
 from lib.application_views import ApplicationButtonView, register_persistent_views
-from lib.api_stocker import WynncraftAPI, OtherAPI
 
 APPLICATION_CHANNEL_ID = 1415107620108501082
 
@@ -37,10 +36,6 @@ activity = discord.Streaming(
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-
-# API close wo yaritai yone
-wynn_api = WynncraftAPI()
-other_api = OtherAPI()
 
 # commands.Botを継承したカスタムBotクラス
 class MyBot(commands.Bot):
@@ -93,19 +88,10 @@ class MyBot(commands.Bot):
         """Botの準備が完了したときに呼ばれるイベント"""
         logger.info("==================================================")
         logger.info(f"ログイン成功: {self.user} (ID: {self.user.id})")
-        # ステータスの設定は on_ready で行うのが最も確実
         await self.change_presence(status=discord.Status.online, activity=activity)
         logger.info(f"ステータス設定完了: {self.activity.type.name} {self.activity.name}")
-        guild_names = [guild.name for guild in self.guilds]
-        logger.info(f"Botが認識しているサーバー一覧: {guild_names}")
         logger.info("Botは正常に起動し、命令待機状態に入りました。")
         logger.info("==================================================")
-
-    async def close(self):
-        # 通常のclose前にAPIのセッションを閉じる
-        await wynn_api.close_session()
-        await other_api.close_session()
-        await super().close()
 
 # Botのインスタンスを作成
 bot = MyBot()
