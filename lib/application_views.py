@@ -306,7 +306,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         super().__init__()
         self.mcid = TextInput(label="MCID/Your IGN", placeholder="正確に入力/Type accurately", required=True)
         self.reason = TextInput(label="加入理由/Reason", placeholder="簡単でOK/Write simply", required=True, style=discord.TextStyle.long)
-        self.prev_guild = TextInput(label="前に所属していたギルド/Last Guild", placeholder="任意, 最後に入っていたギルドのプレフィックス/Optional, last guild prefix here", required=False)
+        self.prev_guild = TextInput(label="最後に所属していたギルド/The Last Guild", placeholder="任意/Optional", required=False)
         self.add_item(self.mcid)
         self.add_item(self.reason)
         self.add_item(self.prev_guild)
