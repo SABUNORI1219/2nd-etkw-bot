@@ -235,7 +235,7 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                                 log_embed.add_field(name="加入理由/Reason", value=embed_data["reason"], inline=False)
                             if embed_data["prev_guild"]:
                                 log_embed.add_field(name="過去ギルド/Previous Guild", value=embed_data["prev_guild"], inline=False)
-                            log_embed.set_footer(text="申請ログ｜Minister Chikuwa")
+                            log_embed.set_footer(text="申請ログ | Minister Chikuwa")
                             await log_channel.send(embed=log_embed)
                             await app_channel.delete(reason="Wynncraftギルド加入検知→申請チャンネル削除")
                         except Exception as e:
