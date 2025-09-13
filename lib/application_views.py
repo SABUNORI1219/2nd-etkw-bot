@@ -15,13 +15,32 @@ from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
-# ---------- 設定ID ----------
+# ID
 APPLICATION_CATEGORY_ID = 1415492214087483484
 APPLICATION_CHANNEL_ID = 1415107620108501082
 TICKET_STAFF_ROLE_ID = 1404665259112792095  # チケットのスタッフロールID
 STAFF_ROLE_ID = 1158540148783448134         # 申請フォーム用スタッフロールID
 
-# ---------- Embed生成 ----------
+async def search_guild(api, guild_input):
+    patterns = [
+        guild_input,
+        guild_input.capitalize(),
+        guild_input.upper(),
+        guild_input.lower()
+    ]
+    # プレフィックス検索
+    for pattern in patterns:
+        guild = await api.get_guild_by_prefix(pattern)
+        if guild and guild.get('name'):
+            return guild
+    # フルネーム検索
+    for pattern in patterns:
+        guild = await api.get_guild_by_name(pattern)
+        if guild and guild.get('name'):
+            return guild
+    return None
+
+# Embed
 def make_reason_embed(reason):
     return discord.Embed(
         title="加入理由/Reason",
@@ -182,7 +201,7 @@ def make_application_guide_embed():
     embed.set_footer(text="Minister Chikuwa | 加入申請システム")
     return embed
 
-# ---------- チケットビュー ----------
+# チケット
 class TicketUserView(discord.ui.View):
     _question_cooldowns = {}
     QUESTION_COOLDOWN_SEC = 600  # 10分
@@ -242,14 +261,14 @@ class TicketQuestionModal(discord.ui.Modal, title="質問 / Question"):
         await interaction.channel.send(content=staff_mention, embed=embed)
         await interaction.response.send_message("質問を送信しました。スタッフの回答をお待ちください。", ephemeral=True)
 
-# ---------- チケット用埋め込み送信 ----------
+# チケットEmbed送信
 async def send_ticket_user_embed(channel, user_id: int, staff_role_id: int):
     embed = make_user_guide_embed(lang="ja")
     view = TicketUserView()
     content = f"<@{user_id}>" if user_id else None
     await channel.send(content=content, embed=embed, view=view)
 
-# ---------- 申請ボタンView ----------
+# 申請ボタン
 class ApplicationButtonView(View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -262,7 +281,7 @@ class ApplicationButtonView(View):
     def make_application_guide_embed():
         return make_application_guide_embed()
 
-# ---------- 申請フォームModal ----------
+# 申請フォーム
 class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
     def __init__(self):
         super().__init__()
@@ -320,13 +339,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         if prev_guild_name:
             try:
                 api = WynncraftAPI()
-                guild_info = await api.get_guild_by_prefix(prev_guild_name)
-                if not guild_info:
-                    guild_info = await api.get_guild_by_prefix(prev_guild_name.capitalize())
-                if not guild_info:
-                    guild_info = await api.get_guild_by_prefix(prev_guild_name.upper())
-                if not guild_info:
-                    guild_info = await api.get_guild_by_prefix(prev_guild_name.lower())
+                guild_info = await search_guild(api, prev_guild_name)
                 prev_guild_embed = make_prev_guild_embed(guild_info, prev_guild_name)
             except Exception:
                 prev_guild_embed = discord.Embed(
@@ -347,7 +360,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
             ephemeral=True
         )
 
-# ---------- PersistentViewの登録 ----------
+# 登録
 def register_persistent_views(bot: discord.Client):
     bot.add_view(ApplicationButtonView())
     bot.add_view(TicketUserView())  # チケット内ガイド/質問ボタン用
