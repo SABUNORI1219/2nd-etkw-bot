@@ -439,10 +439,10 @@ def get_last_join_cache_for_members(mcid_list):
     finally:
         if conn: conn.close()
 
-def save_application(mcid: str, discord_id: int):
+def save_application(mcid: str, discord_id: int, channel_id: int):
     conn = get_conn()
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO applications (mcid, discord_id) VALUES (%s, %s)", (mcid, discord_id))
+        cur.execute("INSERT INTO applications (mcid, discord_id, channel_id) VALUES (%s, %s, %s)", (mcid, discord_id, channel_id))
         conn.commit()
     conn.close()
 
