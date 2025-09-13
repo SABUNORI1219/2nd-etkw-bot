@@ -24,7 +24,7 @@ STAFF_ROLE_ID = 1158540148783448134         # 申請フォーム用スタッフ�
 # ---------- Embed生成 ----------
 def make_reason_embed(reason):
     return discord.Embed(
-        title="加入理由",
+        title="加入理由/Reason",
         description=reason,
         color=discord.Color.purple()
     )
@@ -46,6 +46,7 @@ def make_prev_guild_embed(guild_info, input_name):
         rating = season_ranks.get(latest_season, {}).get('rating', "N/A") if season_ranks else "N/A"
         rating_display = f"{rating:,}" if isinstance(rating, int) else rating
         total_members = guild_info.get('members', {}).get('total', 0)
+        online_members = guild_info.get('online', 0)
         # オンライン人数サマリは省略（長文化対策）
         desc = (
             f"```python\n"
@@ -56,7 +57,7 @@ def make_prev_guild_embed(guild_info, input_name):
             f"Wars: {wars}\n"
             f"Latest SR: {rating_display} [Season {latest_season}]\n"
             f"Territories: {territories}\n"
-            f"Members: {total_members}\n"
+            f"Members online/total: {online_members}/{total_members}\n"
             f"```\n"
         )
     elif input_name:
@@ -67,7 +68,7 @@ def make_prev_guild_embed(guild_info, input_name):
     if len(desc) > 6000:
         desc = desc[:5900] + "\n...（一部省略されました）"
     embed = discord.Embed(
-        title="過去ギルド情報",
+        title="過去ギルド/Previous Guild",
         description=desc,
         color=discord.Color.orange()
     )
@@ -97,11 +98,11 @@ async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord
         output_path = f"profile_card_{uuid}.png" if uuid else "profile_card.png"
         generate_profile_card(profile_info, output_path, skin_image=skin_image)
         embed = discord.Embed(
-            title="プレイヤー情報 / Player Info",
-            description=f"MCID - {mcid}",
+            title="プレイヤー情報/Player Info",
             color=discord.Color.blue()
         )
         embed.set_image(url=f"attachment://{output_path}")
+        embed.set_footer(text=f"MCID: {mcid}")
         return embed, discord.File(output_path)
     except Exception as e:
         embed = discord.Embed(
@@ -265,9 +266,9 @@ class ApplicationButtonView(View):
 class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
     def __init__(self):
         super().__init__()
-        self.mcid = TextInput(label="Minecraft ID", placeholder="正確に入力", required=True)
-        self.reason = TextInput(label="加入理由", placeholder="簡単でOK", required=True, style=discord.TextStyle.long)
-        self.prev_guild = TextInput(label="過去のギルド経験", placeholder="任意", required=False)
+        self.mcid = TextInput(label="MCID/Your IGN", placeholder="正確に入力/Type accurately", required=True)
+        self.reason = TextInput(label="加入理由/Reason", placeholder="簡単でOK/Write simply", required=True, style=discord.TextStyle.long)
+        self.prev_guild = TextInput(label="前に所属していたギルド/Last Guild", placeholder="任意, 最後に入っていたギルドのプレフィックス/Optional, last guild prefix here", required=False)
         self.add_item(self.mcid)
         self.add_item(self.reason)
         self.add_item(self.prev_guild)
@@ -285,7 +286,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         if not isinstance(category, discord.CategoryChannel):
             category = None
         channel = await guild.create_text_channel(
-            name=f"申請-{self.mcid.value}",
+            name=f"application-{self.mcid.value}",
             overwrites=overwrites,
             category=category
         )
