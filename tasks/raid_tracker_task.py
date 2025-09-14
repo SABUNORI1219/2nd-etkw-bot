@@ -210,5 +210,5 @@ async def last_seen_tracker(api, guild_prefix="ETKW", loop_interval=120):
 
 async def setup(bot):
     api = WynncraftAPI()
-    bot.loop.create_task(guild_raid_tracker(api, bot, loop_interval=120))
+    # bot.loop.create_task(guild_raid_tracker(api, bot, loop_interval=120))
     bot.loop.create_task(last_seen_tracker(api, loop_interval=120))
