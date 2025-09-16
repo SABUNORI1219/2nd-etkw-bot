@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # ID
 APPLICATION_CATEGORY_ID = 1134345613585170542
-APPLICATION_CHANNEL_ID = 1330140235593678940
+APPLICATION_CHANNEL_ID = 1134342223484424353
 TICKET_STAFF_ROLE_ID = 1387259707743277177  # チケットのスタッフロールID
 
 # Guild Search Helper Function dayo!
@@ -204,15 +204,15 @@ def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
             "\n"
             "(以下ロール付与後に確認してください)\n"
             "**ギルドカテゴリ内チャンネル紹介:**\n"
-            "> <#1310992907527786538> \n"
+            "> 📢｜guild-announcements \n"
             "ギルド内でのアナウンスが行われます。\n\n"
-            "> <#1333036649075970058> \n"
+            "> ❗｜guild-info \n"
             "ギルドに関する情報が掲載されています。\n\n"
-            "> <#1134309996339925113> \n"
+            "> 💬｜guild-chat \n"
             "ギルド内専用のチャットです。お気軽に質問等どうぞ。\n\n"
-            "> <#1285559379890012282> \n"
+            "> 📝｜self-introduction \n"
             "自己紹介用のチャンネルです。任意です。\n\n"
-            "> <#1343603819610898545> \n"
+            "> 📙｜info-share-情報共有 \n"
             "ギルド内でのゲームに関する情報が共有されています。ぜひご一読ください。\n\n"
         )
         embed = discord.Embed(
@@ -229,15 +229,15 @@ def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
             "\n"
             "(Please check the contents below after you got member role.)\n"
             "**Guild Channels:**\n"
-            "> <#1310992907527786538> \n"
+            "> 📢｜guild-announcements \n"
             "Announcements for the guild.\n\n"
-            "> <#1333036649075970058> \n"
+            "> ❗｜guild-info \n"
             "Information about the guild.\n\n"
-            "> <#1195401593101766727> \n"
+            "> 💬｜guild-chat-english \n"
             "Guild chat channel. Feel free to ask questions, etc.\n\n"
-            "> <#1285559379890012282> \n"
+            "> 📝｜self-introduction \n"
             "Self-introduction channel (optional).\n\n"
-            "> <#1343603819610898545> \n"
+            "> 📙｜info-share-情報共有 \n"
             "Information sharing channel. Please take a look!\n\n"
             "- When you've read the info, please follow the staff's instructions."
         )
