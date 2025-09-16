@@ -155,7 +155,6 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.describe(guild="On-map Guild Prefix")
     async def map(self, interaction: discord.Interaction, guild: str = None):
         await interaction.response.defer()
-        logger.info(f"--- [TerritoryCmd] /territory map が実行されました by {interaction.user}")
 
         # キャッシュ経由でAPI・カラー取得
         territory_data = await self.get_territory_data_with_cache()
