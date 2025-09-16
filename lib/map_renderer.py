@@ -37,7 +37,7 @@ class MapRenderer:
 
             self._db_cache = None
             self._db_cache_time = 0
-        
+
         except FileNotFoundError as e:
             logger.error(f"マップ生成に必要なアセットが見つかりません: {e}")
             raise
@@ -86,13 +86,10 @@ class MapRenderer:
         return total
 
     def _get_owned_territories_map_from_db(self):
-        """
-        DBから「ギルドごとに '現所有+直近1時間以内に失領' を含む領地名セット」を返す
-        """
         now = time.time()
         if self._db_cache and (now - self._db_cache_time < 60):
             return self._db_cache
-        sync_history_from_db()  # 必ず最新化
+        sync_history_from_db()
         db_state = get_guild_territory_state()
         result = {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
         self._db_cache = result
@@ -100,17 +97,10 @@ class MapRenderer:
         return result
 
     def _pick_hq_candidate(self, hq_candidates, territory_api_data, all_owned_territories=None, exclude_lost=None, debug_prefix=None):
-        """
-        hq_candidates: HQ候補地（現所有のみ）
-        all_owned_territories: Conn/Ext計算用（現所有＋1時間以内失領）
-        exclude_lost: 1時間以内失領領地セット（HQ候補から除外）
-        """
-        # Conn/Ext計算用セット（現所有+1時間以内失領）を用意
         if all_owned_territories is None:
             all_owned_territories = set(hq_candidates) | (exclude_lost or set())
 
         hq_stats = []
-        # HQ候補（現所有のみ）でループ
         for t in hq_candidates:
             conn, ext, hq_buff = self._calc_conn_ext_hqbuff(all_owned_territories, t)
             acquired = territory_api_data.get(t, {}).get("acquired", "")
@@ -130,17 +120,13 @@ class MapRenderer:
         if not hq_stats:
             return None, [], [], {}
 
-        # Conn+Ext多い順→Conn多い順→HQバフ多い順→取得時刻古い順
         hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(all_owned_territories)
 
-        # Conn+Ext最大グループ（ネットワーク力最強グループ）抽出
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
         conn_ext_tops = [x for x in top5 if x["conn"] + x["ext"] == max_conn_ext]
-        conn_ext_top_names = [x["name"] for x in conn_ext_tops]
 
-        # Conn+Ext最大グループ以外のtop5領地で、Conn値が2個以上多いやつを探す
         other_top5 = [x for x in top5 if x not in conn_ext_tops]
         hq_conn_candidates = []
         max_group_conn = max(x["conn"] for x in conn_ext_tops)
@@ -148,12 +134,10 @@ class MapRenderer:
             if cand["conn"] - max_group_conn >= 2:
                 hq_conn_candidates.append(cand)
 
-        # もし該当があればその中でConn値最大のものをHQに
         if hq_conn_candidates:
             hq_conn_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
             return hq_conn_candidates[0]["name"], hq_stats, top5, total_res
 
-        # Conn+Ext最大グループ内で複数ある場合はConn最大ユニークならHQ
         if len(conn_ext_tops) > 1:
             conn_max_in_group = max(x["conn"] for x in conn_ext_tops)
             conn_maxs = [x for x in conn_ext_tops if x["conn"] == conn_max_in_group]
@@ -162,12 +146,10 @@ class MapRenderer:
         else:
             conn_maxs = conn_ext_tops
 
-        # 所持領地6個以下なら取得時刻最古
         if len(hq_candidates) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
 
-        # Conn同数&Ext<20で街領地あれば優先
         max_conn = max(x["conn"] for x in top5)
         conn_top_group = [x for x in top5 if x["conn"] == max_conn]
         if len(conn_top_group) > 1:
@@ -176,7 +158,6 @@ class MapRenderer:
             if city:
                 return city["name"], hq_stats, top5, total_res
 
-        # Ext,Conn同値→資源判定
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
             res_priority = ["crops", "ore", "wood", "fish"]
             min_val = float("inf")
@@ -219,7 +200,6 @@ class MapRenderer:
                             best_cand = cand
                 return best_cand["name"], hq_stats, top5, total_res
 
-        # fallback
         return conn_ext_tops[0]["name"], hq_stats, top5, total_res
 
     def _draw_trading_and_territories(
@@ -232,7 +212,6 @@ class MapRenderer:
         hq_territories=None,
         upscale_factor=1.5
     ):
-        # コネクション線の描画（アップスケールはコネクション線だけ！）
         up_w, up_h = int(map_to_draw_on.width * upscale_factor), int(map_to_draw_on.height * upscale_factor)
         upscaled_lines = Image.new("RGBA", (up_w, up_h), (0, 0, 0, 0))
         draw_lines = ImageDraw.Draw(upscaled_lines)
@@ -270,8 +249,11 @@ class MapRenderer:
 
         lines_down = upscaled_lines.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
         map_to_draw_on.alpha_composite(lines_down)
+        # 明示的に解放
+        if hasattr(upscaled_lines, 'close'):
+            upscaled_lines.close()
+        del upscaled_lines, draw_lines, lines_down
 
-        # 領地描画（アップスケールは絶対使わない！！）
         overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
         overlay_draw = ImageDraw.Draw(overlay)
         draw = ImageDraw.Draw(map_to_draw_on)
@@ -284,10 +266,10 @@ class MapRenderer:
         for name, info in territory_data.items():
             static = self.local_territories.get(name)
             if not static or "Location" not in static:
-                continue  # 座標がなければ描画不可
+                continue
             if "guild" not in info or not info["guild"].get("prefix"):
-                continue  # 所有ギルド情報がなければ描画不可
-        
+                continue
+
             t_px1, t_py1 = self._coord_to_pixel(*static["Location"]["start"])
             t_px2, t_py2 = self._coord_to_pixel(*static["Location"]["end"])
             t_scaled_px1, t_scaled_py1 = t_px1 * self.scale_factor, t_py1 * self.scale_factor
@@ -316,7 +298,9 @@ class MapRenderer:
                 stroke_fill="black"
             )
         map_to_draw_on.alpha_composite(overlay)
-        del overlay, overlay_draw, draw, upscaled_lines, draw_lines
+        if hasattr(overlay, 'close'):
+            overlay.close()
+        del overlay, overlay_draw, draw
         return map_to_draw_on
 
     def draw_guild_hq_on_map(
@@ -333,27 +317,23 @@ class MapRenderer:
             map_img = self.resized_map.copy()
         else:
             map_img = map_to_draw_on
-    
-        # HQ候補は「APIで今所有している領地」だけ
+
         prefix_to_territories = {}
         for name, info in territory_data.items():
             prefix = info.get("guild", {}).get("prefix", "")
             if not prefix:
                 continue
             prefix_to_territories.setdefault(prefix, set()).add(name)
-    
-        # DB履歴（1h以内失領含む）はConn/Ext/資源計算用
+
         db_state = get_guild_territory_state()
         hq_names = set()
         for prefix, api_owned in prefix_to_territories.items():
-            # Conn/Ext計算用セット
             all_owned = owned_territories_map.get(prefix, set()) if owned_territories_map else set(api_owned)
             lost_only = set()
             for t in db_state.get(prefix, {}):
                 lost_time = db_state[prefix][t].get("lost")
                 if lost_time is not None:
                     lost_only.add(t)
-            # HQ候補はAPIの現所有のみ
             candidate_territories = set(api_owned)
             hq_name, _, _, _ = self._pick_hq_candidate(
                 candidate_territories,
@@ -364,8 +344,7 @@ class MapRenderer:
             )
             if hq_name:
                 hq_names.add(hq_name)
-    
-        # 領地描画
+
         self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map, hq_territories=hq_names)
         draw = ImageDraw.Draw(map_img)
         for prefix, api_owned in prefix_to_territories.items():
@@ -418,6 +397,9 @@ class MapRenderer:
             crown_x = int(px - new_w/2)
             crown_y = int(py - new_h/2)
             map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
+            if hasattr(crown_img_resized, 'close'):
+                crown_img_resized.close()
+            del crown_img_resized
 
             prefix_font_size = crown_size
             font_found = False
@@ -451,8 +433,9 @@ class MapRenderer:
                 stroke_width=2,
                 stroke_fill="black"
             )
+        del draw
         return map_img, [(0, 0, "", hq_name) for hq_name in hq_names]
-    
+
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict, owned_territories_map=None) -> tuple[discord.File | None, discord.Embed | None]:
         if owned_territories_map is None:
             owned_territories_map = self._get_owned_territories_map_from_db()
@@ -481,7 +464,10 @@ class MapRenderer:
                     min(self.resized_map.width, max(all_x) + padding),
                     min(self.resized_map.height, max(all_y) + padding)
                 )
-                map_to_draw_on = map_to_draw_on.crop(box)
+                cropped = map_to_draw_on.crop(box)
+                if hasattr(map_to_draw_on, 'close'):
+                    map_to_draw_on.close()
+                map_to_draw_on = cropped
 
             final_map, _ = self.draw_guild_hq_on_map(
                 territory_data=territory_data,
@@ -494,22 +480,26 @@ class MapRenderer:
             )
 
             map_bytes = BytesIO()
-            final_map.save(map_bytes, format='PNG')
-            map_bytes.seek(0)
+            try:
+                final_map.save(map_bytes, format='PNG')
+                map_bytes.seek(0)
 
-            jst_now = datetime.now(timezone(timedelta(hours=9)))
-            formatted_time = jst_now.strftime("%Y/%m/%d %H:%M:%S")
+                jst_now = datetime.now(timezone(timedelta(hours=9)))
+                formatted_time = jst_now.strftime("%Y/%m/%d %H:%M:%S")
 
-            file = discord.File(map_bytes, filename="wynn_map.png")
-            embed = discord.Embed(
-                title="",
-                color=discord.Color.green()
-            )
-            embed.set_image(url="attachment://wynn_map.png")
-            embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
-
-            map_bytes.close()
-            del final_map, map_to_draw_on
+                file = discord.File(map_bytes, filename="wynn_map.png")
+                embed = discord.Embed(
+                    title="",
+                    color=discord.Color.green()
+                )
+                embed.set_image(url="attachment://wynn_map.png")
+                embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
+            finally:
+                map_bytes.close()
+                if hasattr(final_map, 'close'):
+                    final_map.close()
+                if hasattr(map_to_draw_on, 'close'):
+                    map_to_draw_on.close()
             return file, embed
 
         except Exception as e:
@@ -523,26 +513,24 @@ class MapRenderer:
         guild_color_map: dict
     ) -> BytesIO | None:
         logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
-    
-        # 静的データ（位置等）はself.local_territoriesから
+
         terri_static = self.local_territories.get(territory)
         if not terri_static or 'Location' not in terri_static:
             logger.error(f"'{territory}'にLocationデータがありません。")
             return None
-    
-        # 動的データ（所有ギルド等）はterritory_dataから
+
         terri_live = territory_data.get(territory)
         if not terri_live or "guild" not in terri_live:
             logger.error(f"領地 {territory} にAPIライブデータがありません。")
             return None
-    
+
         owner_prefix = terri_live["guild"].get("prefix")
         if not owner_prefix:
             logger.error(f"領地 {territory} の所有ギルドprefixがAPIデータにありません")
             return None
-    
+
         owned_territories_map = self._get_owned_territories_map_from_db()
-        
+
         map_to_draw_on = self.resized_map.copy()
         final_map, _ = self.draw_guild_hq_on_map(
             territory_data=territory_data,
@@ -553,15 +541,14 @@ class MapRenderer:
             map_to_draw_on=map_to_draw_on,
             owned_territories_map=owned_territories_map
         )
-    
-        # ここで「指定領地だけ」円を強調
+
         static = terri_static
         loc = static.get("Location", {})
         px1, py1 = self._coord_to_pixel(*loc.get("start", [0, 0]))
         px2, py2 = self._coord_to_pixel(*loc.get("end", [0, 0]))
         px1, py1 = px1 * self.scale_factor, py1 * self.scale_factor
         px2, py2 = px2 * self.scale_factor, py2 * self.scale_factor
-    
+
         left = min(px1, px2)
         right = max(px1, px2)
         top = min(py1, py2)
@@ -573,31 +560,42 @@ class MapRenderer:
             min(self.resized_map.width, right + padding),
             min(self.resized_map.height, bottom + padding)
         )
-    
+
         if not (box[0] < box[2] and box[1] < box[3]):
             logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。Box: {box}")
+            if hasattr(final_map, 'close'):
+                final_map.close()
+            if hasattr(map_to_draw_on, 'close'):
+                map_to_draw_on.close()
             return None
-    
+
         center_x = (px1 + px2) / 2
         center_y = (py1 + py2) / 2
         territory_width = abs(px2 - px1)
         territory_height = abs(py2 - py1)
         highlight_radius = int(sqrt(territory_width ** 2 + territory_height ** 2) / 2)
-    
+
         draw = ImageDraw.Draw(final_map)
-        # 円
         draw.ellipse(
             [(center_x - highlight_radius, center_y - highlight_radius),
              (center_x + highlight_radius, center_y + highlight_radius)],
             outline="gold",
             width=3
         )
-    
-        # クロップ
+        del draw
+
         cropped_image = final_map.crop(box)
         map_bytes = BytesIO()
-        cropped_image.save(map_bytes, format='PNG')
-        map_bytes.seek(0)
-        
-        del cropped_image, final_map, map_to_draw_on
-        return map_bytes
+        try:
+            cropped_image.save(map_bytes, format='PNG')
+            map_bytes.seek(0)
+            result = BytesIO(map_bytes.getvalue())
+        finally:
+            map_bytes.close()
+            if hasattr(cropped_image, 'close'):
+                cropped_image.close()
+            if hasattr(final_map, 'close'):
+                final_map.close()
+            if hasattr(map_to_draw_on, 'close'):
+                map_to_draw_on.close()
+        return result
