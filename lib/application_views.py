@@ -73,7 +73,7 @@ class DeclineConfirmView(View):
         await interaction.message.delete(delay=2)
 
 class DeclineButtonView(View):
-    def __init__(self, discord_id, channel_id):
+    def __init__(self, discord_id=None, channel_id=None):
         super().__init__(timeout=None)
         self.discord_id = discord_id
         self.channel_id = channel_id
