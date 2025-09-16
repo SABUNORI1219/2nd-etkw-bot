@@ -90,12 +90,9 @@ class DeclineButtonView(View):
         )
 
 def make_prev_guild_embed(guild_info, input_name):
-    try:
-        self.banner_renderer = BannerRenderer()
-    except Exception as e:
-        logger.error("ばなーれんだーの読み込みに失敗したよ")
-        continue
-        
+    banner_renderer = BannerRenderer()
+    banner_bytes = None
+    
     if isinstance(guild_info, dict) and guild_info.get("name"):
         name = guild_info.get('name', 'N/A')
         prefix = guild_info.get('prefix', 'N/A')
@@ -113,9 +110,11 @@ def make_prev_guild_embed(guild_info, input_name):
         total_members = guild_info.get('members', {}).get('total', 0)
         online_members = guild_info.get('online', 0)
 
-        banner_bytes = self.banner_renderer.create_banner_image(guild_info.get('banner'))
-        
-        # オンライン人数サマリは省略
+        # bannerがある場合のみ画像生成
+        banner_info = guild_info.get('banner')
+        if banner_info:
+            banner_bytes = banner_renderer.create_banner_image(banner_info)
+
         desc = (
             f"```python\n"
             f"Guild: {name} [{prefix}]\n"
@@ -141,13 +140,13 @@ def make_prev_guild_embed(guild_info, input_name):
         description=desc,
         color=discord.Color.orange()
     )
-    
     embed.set_footer(text=f"入力情報/Input: {input_name}")
 
+    # バナーが生成できた場合のみサムネ設定
     if banner_bytes:
         banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
         embed.set_thumbnail(url="attachment://guild_banner.png")
-        
+
     return embed
 
 async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord.File], Optional[str]]:
