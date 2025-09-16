@@ -104,7 +104,7 @@ def make_prev_guild_embed(guild_info, input_name):
         
     return embed
 
-async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord.File]]:
+async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord.File], Optional[str]]:
     """
     プロファイル画像生成＋画像付きEmbed（画像生成失敗時はテキストEmbed）
     """
@@ -116,6 +116,7 @@ async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord
         if not player_data:
             raise Exception("APIからプレイヤーデータ取得失敗")
         profile_info = await build_profile_info(player_data, api, banner_renderer)
+        username = profile_info.get("username") or mcid
         uuid = profile_info.get("uuid")
         skin_image = None
         if uuid:
@@ -133,7 +134,7 @@ async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord
         )
         embed.set_image(url=f"attachment://{output_path}")
         embed.set_footer(text=f"入力情報/Input: {mcid}")
-        return embed, discord.File(output_path)
+        return embed, discord.File(output_path), username
     except Exception as e:
         embed = discord.Embed(
             title="プレイヤープロフィール取得失敗",
@@ -141,7 +142,7 @@ async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord
             color=discord.Color.red()
         )
         logger.error(f"ぷろふぁいるいめーじせいせいにしっっぱいしたました: {e}")
-        return embed, None
+        return embed, None, None
 
 def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
     if lang == "ja":
@@ -379,13 +380,15 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         await send_ticket_user_embed(channel, interaction.user.id, STAFF_ROLE_ID)
 
         # ②MCIDからの情報Embed
+        username_for_db = None
         try:
-            profile_embed, profile_file = await make_profile_embed(self.mcid.value)
+            profile_embed, profile_file, username_for_db = await make_profile_embed(self.mcid.value)
             if profile_file:
                 await channel.send(embed=profile_embed, file=profile_file)
             else:
                 await channel.send(embed=profile_embed)
         except Exception as ee:
+            username_for_db = None
             profile_embed = discord.Embed(
                 title="プレイヤープロフィール取得失敗",
                 description=f"MCID: {self.mcid.value}\n情報取得中にエラーが発生しました。",
@@ -393,6 +396,15 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
             )
             logger.error(f"ぷろふぁいるいめーじせいせいにしっっぱいしたました: {ee}", exc_info=True)
             await channel.send(embed=profile_embed)
+
+        if not username_for_db:
+            # 万が一API/profile_infoから取得できなかった場合はAPI再取得
+            try:
+                api = WynncraftAPI()
+                player_data = await api.get_official_player_data(self.mcid.value)
+                username_for_db = player_data.get("username", self.mcid.value)
+            except Exception:
+                username_for_db = self.mcid.value
 
         # ③理由Embed
         reason_embed = make_reason_embed(self.reason.value)
@@ -417,7 +429,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         await channel.send(embed=prev_guild_embed)
 
         # DB登録
-        save_application(self.mcid.value, interaction.user.id, channel.id)
+        save_application(username_for_db, interaction.user.id, channel.id)
 
         # 5. followupで通知
         await interaction.followup.send(
