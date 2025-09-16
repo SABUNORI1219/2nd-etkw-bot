@@ -175,35 +175,35 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                             logger.error(f"[member_sync_core_logic] add_member failed: {mcid}, {discord_id}, {api_rank}")
                             return False
                     
-                        # 役職付与 & ニックネーム変更
-                        role_obj = None
-                        if member:
-                            role_id = RANK_ROLE_ID_MAP.get(api_rank)
-                            if role_id:
-                                role_obj = guild.get_role(role_id)
-                                if role_obj:
-                                    try:
-                                        await member.add_roles(role_obj, reason="ギルドランク連携")
-                                    except Exception as e:
-                                        logger.error(f"ロール付与エラー: {e}")
-                            if ETKW:
-                                etkw_role = guild.get_role(ETKW)
-                                if etkw_role:
-                                    try:
-                                        await member.add_roles(etkw_role, reason="ちくわロール")
-                                    except Exception as e:
-                                        logger.error(f"ちくわロール付与エラー: {e}")
-                            # ニックネーム変更
-                            role_name = role_obj.name if role_obj else api_rank
-                            prefix = re.sub(r"\s*\[.*?]\s*", " ", role_name).strip()
-                            new_nick = f"{prefix} {mcid}"
-                            if len(new_nick) > 32:
-                                new_nick = new_nick[:32]
+                        # 2. 新ランクロール付与
+                        new_role_id = RANK_ROLE_ID_MAP.get(api_rank)
+                        new_role = guild.get_role(new_role_id) if new_role_id else None
+                        if new_role:
                             try:
-                                if not member.guild_permissions.administrator:
-                                    await member.edit(nick=new_nick, reason="ギルドメンバー登録時の自動ニックネーム設定")
+                                await member.add_roles(new_role, reason="ランク同期: ランクロール付与")
                             except Exception as e:
-                                logger.error(f"ニックネーム編集エラー: {e}")
+                                logger.error(f"[ApplicationSync] ランクロール付与失敗: {e}")
+                    
+                        # 3. ETKWロール付与
+                        if ETKW:
+                            etkw_role = guild.get_role(ETKW)
+                            if etkw_role:
+                                try:
+                                    await member.add_roles(etkw_role, reason="ランク同期: ETKWロール付与")
+                                except Exception as e:
+                                    logger.error(f"[ApplicationSync] ETKWロール付与失敗: {e}")
+                    
+                        # 4. ニックネーム変更
+                        prefix = new_role.name if new_role else api_rank
+                        prefix = re.sub(r"\s*\[.*?]\s*", " ", prefix).strip()
+                        new_nick = f"{prefix} {mcid}"
+                        if len(new_nick) > 32:
+                            new_nick = new_nick[:32]
+                        try:
+                            if not member.guild_permissions.administrator:
+                                await member.edit(nick=new_nick, reason="ランク同期: ニックネーム更新")
+                        except Exception as e:
+                            logger.error(f"[ApplicationSync] ニックネーム更新失敗: {e}")
                     
                     app_channel = bot.get_channel(channel_id)
                     if app_channel:
