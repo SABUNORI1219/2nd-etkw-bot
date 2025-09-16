@@ -78,14 +78,17 @@ class DeclineButtonView(View):
         super().__init__(timeout=None)
 
     @button(label="拒否/Decline", style=discord.ButtonStyle.danger, custom_id="decline")
-    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not any(role.id == TICKET_STAFF_ROLE_ID for role in getattr(interaction.user, "roles", [])):
-            await interaction.response.send_message("この操作を行う権限がありません。", ephemeral=True)
-            return
-        
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):        
         # 必要な情報はinteractionから取得
         discord_id = interaction.user.id
         channel_id = interaction.channel.id
+        user_roles = getattr(interaction.user, "roles", [])
+        has_ticket = any(role.id == TICKET_STAFF_ROLE_ID for role in user_roles)
+    
+        if not has_ticket:
+            await interaction.response.send_message("権限がありません。", ephemeral=True)
+            return
+        
         view = DeclineConfirmView(discord_id, channel_id)
         await interaction.response.send_message(
             "本当にこの申請を拒否（削除）してもよろしいですか？\nAre you sure you want to decline and delete this application?",
@@ -371,14 +374,17 @@ class ApplicationButtonView(View):
 
     @button(label="加入申請/Application", style=discord.ButtonStyle.green, custom_id="application_start")
     async def application_start(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not any(role.id == ETKW for role in getattr(interaction.user, "roles", [])):
-            await interaction.response.send_message("すでにETKWに加入しているため、申請を実行することはできません。", ephemeral=True)
-            return
-        
         guild = interaction.guild
         user = interaction.user
         category = guild.get_channel(APPLICATION_CATEGORY_ID)
         ticket_exists = False
+        user_roles = getattr(user, "roles", [])
+        has_etkw = any(role.id == ETKW for role in user_roles)
+        logger.info(f"[申請ボタン] user={interaction.user} roles={[role.id for role in user_roles]} ETKW={ETKW} has_etkw={has_etkw}")
+    
+        if has_etkw:
+            await interaction.response.send_message("すでにETKWに加入しているため、申請を実行することはできません。", ephemeral=True)
+            return
         
         if category and isinstance(category, discord.CategoryChannel):
             for ch in category.text_channels:
