@@ -97,7 +97,7 @@ class DeclineButtonView(View):
         )
 
 def make_prev_guild_embed(guild_info, input_name):
-    self.banner_renderer = BannerRenderer()
+    banner_renderer = BannerRenderer()
     if isinstance(guild_info, dict) and guild_info.get("name"):
         name = guild_info.get('name', 'N/A')
         prefix = guild_info.get('prefix', 'N/A')
@@ -115,7 +115,7 @@ def make_prev_guild_embed(guild_info, input_name):
         total_members = guild_info.get('members', {}).get('total', 0)
         online_members = guild_info.get('online', 0)
 
-        banner_bytes = self.banner_renderer.create_banner_image(guild_info.get('banner'))
+        banner_bytes = banner_renderer.create_banner_image(guild_info.get('banner'))
         
         # オンライン人数サマリは省略
         desc = (
