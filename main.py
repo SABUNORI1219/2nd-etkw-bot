@@ -1,4 +1,4 @@
-import discord
+ import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 import os
@@ -152,7 +152,7 @@ async def wait_for_memory_ok(required=MAP_GEN_MEMORY_MB, limit=MEMORY_LIMIT_MB, 
         if mem_mb + required < limit:
             return
         if waited == 0:
-            print(f"[MemoryGuard] メモリ残量不足: {mem_mb:.1f}MB/上限{limit}MB。空き待機開始...")
+            logger.info(f"[MemoryGuard] メモリ残量不足: {mem_mb:.1f}MB/上限{limit}MB。空き待機開始...")
         await asyncio.sleep(2)
         waited += 2
         if waited >= timeout:
