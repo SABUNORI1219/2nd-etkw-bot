@@ -474,11 +474,10 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         else:
             prev_guild_embed, banner_file = make_prev_guild_embed(None, "")
         
-        view = DeclineButtonView(discord_id=interaction.user.id, channel_id=channel.id)
         if banner_file:
-            await channel.send(embed=prev_guild_embed, file=banner_file, view=view)
+            await channel.send(embed=prev_guild_embed, file=banner_file, view=DeclineButtonView())
         else:
-            await channel.send(embed=prev_guild_embed, view=view)
+            await channel.send(embed=prev_guild_embed, view=DeclineButtonView())
 
         # DB登録
         save_application(username_for_db, interaction.user.id, channel.id)
