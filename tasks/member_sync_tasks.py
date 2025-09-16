@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 GUILD_ID = 1158535340110381157
 ROLE_ID = 1415107839076335616
-LOG_CHANNEL_ID = 1415107585136132146
+LOG_CHANNEL_ID = 1249352336401236011
 
 async def fetch_guild_members(api: WynncraftAPI) -> dict:
     guild_data = await api.get_guild_by_prefix("ETKW")
