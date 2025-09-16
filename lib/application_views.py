@@ -147,7 +147,7 @@ def make_prev_guild_embed(guild_info, input_name):
         banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
         embed.set_thumbnail(url="attachment://guild_banner.png")
 
-    return embed
+    return embed, banner_file
 
 async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord.File], Optional[str]]:
     """
@@ -471,7 +471,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
                 )
         else:
             prev_guild_embed = make_prev_guild_embed(None, "")
-        await channel.send(embed=prev_guild_embed)
+        await channel.send(embed=prev_guild_embed, file=banner_file)
 
         # DB登録
         save_application(username_for_db, interaction.user.id, channel.id)
