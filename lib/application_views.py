@@ -336,8 +336,9 @@ class TicketUserView(discord.ui.View):
         await interaction.response.send_modal(modal)
 
 class TicketQuestionModal(discord.ui.Modal, title="質問 / Question"):
-    def __init__(self):
+    def __init__(self, staff_role_id: int):
         super().__init__()
+        self.staff_role_id = staff_role_id
         self.question = discord.ui.TextInput(
             label="質問内容 / Your Question",
             style=discord.TextStyle.paragraph,
@@ -348,7 +349,7 @@ class TicketQuestionModal(discord.ui.Modal, title="質問 / Question"):
         self.add_item(self.question)
 
     async def on_submit(self, interaction: discord.Interaction):
-        staff_mention = f"<@&{TICKET_STAFF_ROLE_ID}>"
+        staff_mention = f"<@&{self.staff_role_id}>"
         q_text = self.question.value
         embed = discord.Embed(
             title="新規メンバーからの質問 / Question from Applicant",
@@ -416,7 +417,6 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         self.add_item(self.prev_guild)
 
     async def on_submit(self, interaction: discord.Interaction):
-        # 1. defer（最初に必ず返す！）
         await interaction.response.defer(ephemeral=True)
 
         guild = interaction.guild
