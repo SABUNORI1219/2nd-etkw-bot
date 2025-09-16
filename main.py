@@ -15,7 +15,7 @@ from logger_setup import setup_logger
 from lib.db import create_table
 from lib.discord_notify import LanguageSwitchView
 from lib.ticket_embeds import register_persistent_views
-from lib.application_views import ApplicationButtonView, register_persistent_views
+from lib.application_views import ApplicationButtonView, register_persistent_views, DeclineButtonView, DeclineConfirmView
 
 APPLICATION_CHANNEL_ID = 1415107620108501082
 
@@ -82,9 +82,11 @@ class MyBot(commands.Bot):
             logger.info(f"[Minister Chikuwa] -> ✅ {len(synced)}個のコマンドの同期が完了しました")
         except Exception as e:
             logger.error(f"[Minister Chikuwa] -> ❌ コマンドの同期に失敗しました: {e}")
-
+        
         self.add_view(LanguageSwitchView())
         self.add_view(ApplicationButtonView())
+        self.add_view(DeclineButtonView())
+        self.add_view(DeclineConfirmView())
 
     async def on_ready(self):
         """Botの準備が完了したときに呼ばれるイベント"""
