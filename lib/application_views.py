@@ -23,21 +23,27 @@ STAFF_ROLE_ID = 1158540148783448134         # 申請フォーム用スタッフ�
 
 # Guild Search Helper Function dayo!
 async def search_guild(api, guild_input):
-    # setで重複排除、ただし順序は保つ
+    # 順序を保ちつつ重複排除
     patterns = []
     for pat in [guild_input, guild_input.capitalize(), guild_input.upper(), guild_input.lower()]:
         if pat not in patterns:
             patterns.append(pat)
     # prefix検索
     for pattern in patterns:
-        guild = await api.get_guild_by_prefix(pattern)
-        if guild and guild.get('name'):
-            return guild
+        try:
+            guild = await api.get_guild_by_prefix(pattern)
+            if guild and guild.get('name'):
+                return guild
+        except Exception as e:
+            logger.warning(f"Guild prefix search failed for {pattern}: {e}")
     # name検索
     for pattern in patterns:
-        guild = await api.get_guild_by_name(pattern)
-        if guild and guild.get('name'):
-            return guild
+        try:
+            guild = await api.get_guild_by_name(pattern)
+            if guild and guild.get('name'):
+                return guild
+        except Exception as e:
+            logger.warning(f"Guild name search failed for {pattern}: {e}")
     return None
 
 # Embed
