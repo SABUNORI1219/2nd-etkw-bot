@@ -74,15 +74,15 @@ class DeclineConfirmView(View):
         await interaction.message.delete(delay=2)
 
 class DeclineButtonView(View):
-    def __init__(self, discord_id=None, channel_id=None):
+    def __init__(self):
         super().__init__(timeout=None)
-        self.discord_id = discord_id
-        self.channel_id = channel_id
 
     @button(label="拒否/Decline", style=discord.ButtonStyle.danger, custom_id="decline")
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # 確認ダイアログ（ボタン）を送信
-        view = DeclineConfirmView(self.discord_id, self.channel_id)
+        # 必要な情報はinteractionから取得
+        discord_id = interaction.user.id
+        channel_id = interaction.channel.id
+        view = DeclineConfirmView(discord_id, channel_id)
         await interaction.response.send_message(
             "本当にこの申請を拒否（削除）してもよろしいですか？\nAre you sure you want to decline and delete this application?",
             view=view,
