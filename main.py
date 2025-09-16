@@ -44,42 +44,39 @@ class MyBot(commands.Bot):
 
     async def setup_hook(self):
         """Botの非同期セットアップを管理する"""
-        logger.info("--- [司令塔] 起動準備を開始します ---")
+        logger.info("[Minister Chikuwa] -> 起動準備を開始")
         
         # 同期的な準備処理を最初に実行
         create_table()
         keep_alive()
 
         # Cogsを読み込む
-        logger.info("--- [司令塔] -> 全ての受付係（Cogs）を配属させます...")
         for filename in os.listdir('./cogs'):
             if filename.endswith('.py'):
                 try:
                     await self.load_extension(f'cogs.{filename[:-3]}')
-                    logger.info(f"--- [司令塔] ✅ 受付係 '{filename}' の配属完了。")
+                    logger.info(f"[Minister Chikuwa] -> ✅ Cog '{filename}' をセットアップしました")
                 except Exception as e:
-                    logger.error(f"--- [司令塔] ❌ 受付係 '{filename}' の配属に失敗しました: {e}")
+                    logger.error(f"[Minister Chikuwa] -> ❌ Cog '{filename}' のセットアップに失敗: {e}")
 
         # tasksを読み込む
-        logger.info("--- [司令塔] -> 全ての内部処理係（tasks）を配属させます...")
         for filename in os.listdir('./tasks'):
             if filename.endswith('.py'):
                 try:
                     await self.load_extension(f'tasks.{filename[:-3]}')
-                    logger.info(f"--- [司令塔] ✅ 受付係 '{filename}' の配属完了。")
+                    logger.info(f"[Minister Chikuwa] -> ✅ Task '{filename}' をセットアップしました")
                 except Exception as e:
-                    logger.error(f"--- [司令塔] ❌ 受付係 '{filename}' の配属に失敗しました: {e}")
+                    logger.error(f"[Minister Chikuwa] -> ❌ Task '{filename}' のセットアップに失敗: {e}")
         
         register_persistent_views(self)
         # HElper Function Kidou
         await ensure_application_embed()
 
         try:
-            logger.info("--- [司令塔] -> スラッシュコマンドをグローバルに同期します... ---")
             synced = await self.tree.sync()
-            logger.info(f"--- [司令塔] ✅ {len(synced)}個のコマンドをグローバル同期しました。")
+            logger.info(f"[Minister Chikuwa] -> ✅ {len(synced)}個のコマンドの同期が完了しました")
         except Exception as e:
-            logger.error(f"--- [司令塔] ❌ コマンドの同期に失敗しました: {e}")
+            logger.error(f"[Minister Chikuwa] -> ❌ コマンドの同期に失敗しました: {e}")
 
         self.add_view(LanguageSwitchView())
         self.add_view(ApplicationButtonView())
@@ -90,7 +87,7 @@ class MyBot(commands.Bot):
         logger.info(f"ログイン成功: {self.user} (ID: {self.user.id})")
         await self.change_presence(status=discord.Status.online, activity=activity)
         logger.info(f"ステータス設定完了: {self.activity.type.name} {self.activity.name}")
-        logger.info("Botは正常に起動し、命令待機状態に入りました。")
+        logger.info("Botは正常に起動し、現在稼働中です。")
         logger.info("==================================================")
 
 # Botのインスタンスを作成
