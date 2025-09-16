@@ -336,9 +336,8 @@ class TicketUserView(discord.ui.View):
         await interaction.response.send_modal(modal)
 
 class TicketQuestionModal(discord.ui.Modal, title="質問 / Question"):
-    def __init__(self, staff_role_id: int):
+    def __init__(self):
         super().__init__()
-        self.staff_role_id = staff_role_id
         self.question = discord.ui.TextInput(
             label="質問内容 / Your Question",
             style=discord.TextStyle.paragraph,
@@ -349,7 +348,7 @@ class TicketQuestionModal(discord.ui.Modal, title="質問 / Question"):
         self.add_item(self.question)
 
     async def on_submit(self, interaction: discord.Interaction):
-        staff_mention = f"<@&{self.staff_role_id}>"
+        staff_mention = f"<@&{TICKET_STAFF_ROLE_ID}>"
         q_text = self.question.value
         embed = discord.Embed(
             title="新規メンバーからの質問 / Question from Applicant",
@@ -426,6 +425,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
+            guild.get_role(TICKET_STAFF_ROLE_ID): discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True, embed_links=True, add_reactions=True),
         }
         
         if not isinstance(category, discord.CategoryChannel):
@@ -441,6 +441,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
 
         # ②MCIDからの情報Embed
         username_for_db = None
+        staff_mention = f"<@&{TICKET_STAFF_ROLE_ID}>"
         try:
             profile_embed, profile_file, username_for_db = await make_profile_embed(self.mcid.value)
             if profile_file:
@@ -455,7 +456,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
                 color=discord.Color.red()
             )
             logger.error(f"ぷろふぁいるいめーじせいせいにしっっぱいしたました: {ee}", exc_info=True)
-            await channel.send(embed=profile_embed)
+            await channel.send(content=staff_mention, embed=profile_embed)
 
         if not username_for_db:
             # 万が一API/profile_infoから取得できなかった場合はAPI再取得
