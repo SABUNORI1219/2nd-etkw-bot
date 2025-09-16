@@ -11,8 +11,7 @@ from config import RANK_ROLE_ID_MAP, ETKW, ROLE_ID_TO_RANK
 
 logger = logging.getLogger(__name__)
 
-GUILD_ID = 1158535340110381157
-ROLE_ID = 1415107839076335616
+GUILD_ID = 1119277416431501394
 LOG_CHANNEL_ID = 1249352336401236011
 
 async def fetch_guild_members(api: WynncraftAPI) -> dict:
@@ -169,6 +168,12 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                     api_rank = ingame_members.get(mcid)
                     member = guild.get_member(discord_id)
                     if member is not None:
+                        # データベース登録
+                        success = add_member(mcid, discord_id, api_rank)
+                        if not success:
+                            logger.error(f"[member_sync_core_logic] add_member failed: {mcid}, {discord_id}, {api_rank}")
+                            return False
+                            
                         # 2. 新ランクロール付与
                         new_role_id = RANK_ROLE_ID_MAP.get(api_rank)
                         new_role = guild.get_role(new_role_id) if new_role_id else None
@@ -198,12 +203,6 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                                 await member.edit(nick=new_nick, reason="ランク同期: ニックネーム更新")
                         except Exception as e:
                             logger.error(f"[ApplicationSync] ニックネーム更新失敗: {e}")
-
-                        # 5. データベース登録
-                        success = add_member(mcid, discord_id, api_rank)
-                        if not success:
-                            logger.error(f"[member_sync_core_logic] add_member failed: {mcid}, {discord_id}, {api_rank}")
-                            return False
                     
                     app_channel = bot.get_channel(channel_id)
                     if app_channel:
