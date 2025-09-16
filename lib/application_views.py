@@ -10,6 +10,7 @@ from lib.profile_renderer import generate_profile_card
 from cogs.player_cog import build_profile_info
 from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.banner_renderer import BannerRenderer
+from config import ETKW
 from PIL import Image
 from io import BytesIO
 
@@ -370,6 +371,10 @@ class ApplicationButtonView(View):
 
     @button(label="加入申請/Application", style=discord.ButtonStyle.green, custom_id="application_start")
     async def application_start(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not any(role.id == ETKW for role in getattr(interaction.user, "roles", [])):
+            await interaction.response.send_message("すでにETKWに加入しているため、申請を実行することはできません。", ephemeral=True)
+            return
+        
         guild = interaction.guild
         user = interaction.user
         category = guild.get_channel(APPLICATION_CATEGORY_ID)
