@@ -42,14 +42,15 @@ intents.members = True
 MAP_GEN_MEMORY_MB = 100
 MEMORY_LIMIT_MB = 450
 
-def register_persistent_views(bot):
-    bot.add_view(DeclineButtonView(None, None))
-    bot.add_view(DeclineConfirmView(None, None))
-
 # commands.Botを継承したカスタムBotクラス
 class MyBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents, activity=activity)
+
+    def register_persistent_views(bot):
+        bot.add_view(ApplicationButtonView())
+        bot.add_view(TicketUserView())
+        bot.add_view(DeclineButtonView(None, None))
 
     async def setup_hook(self):
         """Botの非同期セットアップを管理する"""
@@ -86,9 +87,6 @@ class MyBot(commands.Bot):
             logger.info(f"[Minister Chikuwa] -> ✅ {len(synced)}個のコマンドの同期が完了しました")
         except Exception as e:
             logger.error(f"[Minister Chikuwa] -> ❌ コマンドの同期に失敗しました: {e}")
-        
-        self.add_view(LanguageSwitchView())
-        self.add_view(ApplicationButtonView())
 
     async def on_ready(self):
         """Botの準備が完了したときに呼ばれるイベント"""
