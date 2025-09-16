@@ -101,7 +101,13 @@ class Territory(commands.GroupCog, name="territory"):
     @tasks.loop(minutes=1.0)
     async def update_territory_cache(self):
         logger.info("--- [TerritoryCache] テリトリー所有ギルドのキャッシュを更新します...")
-        territory_data = await self.wynn_api.get_territory_list()
+        # キャッシュを利用してAPIの無駄な多重アクセスを防止
+        cache_key = "wynn_territory_list"
+        territory_data = self.cache.get_cache(cache_key)
+        if not territory_data:
+            territory_data = await self.wynn_api.get_territory_list()
+            if territory_data:
+                self.cache.set_cache(cache_key, territory_data)
         if territory_data:
             guild_names = set(
                 data['guild']['prefix']
@@ -125,6 +131,24 @@ class Territory(commands.GroupCog, name="territory"):
             for name in self.territory_guilds_cache if current.lower() in name.lower()
         ][:25]
 
+    async def get_territory_data_with_cache(self):
+        cache_key = "wynn_territory_list"
+        territory_data = self.cache.get_cache(cache_key)
+        if not territory_data:
+            territory_data = await self.wynn_api.get_territory_list()
+            if territory_data:
+                self.cache.set_cache(cache_key, territory_data)
+        return territory_data
+
+    async def get_guild_color_map_with_cache(self):
+        cache_key = "guild_color_map"
+        color_map = self.cache.get_cache(cache_key)
+        if not color_map:
+            color_map = await self.other_api.get_guild_color_map()
+            if color_map:
+                self.cache.set_cache(cache_key, color_map)
+        return color_map
+
     @app_commands.checks.cooldown(1, 20.0)
     @app_commands.command(name="map", description="現在のWynncraftのテリトリーマップを生成")
     @app_commands.autocomplete(guild=guild_autocomplete)
@@ -133,9 +157,9 @@ class Territory(commands.GroupCog, name="territory"):
         await interaction.response.defer()
         logger.info(f"--- [TerritoryCmd] /territory map が実行されました by {interaction.user}")
 
-        # WynncraftAPIで領地データ・ギルドカラー取得
-        territory_data = await self.wynn_api.get_territory_list()
-        guild_color_map = await self.other_api.get_guild_color_map()
+        # キャッシュ経由でAPI・カラー取得
+        territory_data = await self.get_territory_data_with_cache()
+        guild_color_map = await self.get_guild_color_map_with_cache()
 
         if not territory_data or not guild_color_map:
             await interaction.followup.send("テリトリーまたはギルドカラー情報の取得に失敗しました。コマンドをもう一度お試しください。")
@@ -144,7 +168,6 @@ class Territory(commands.GroupCog, name="territory"):
         # 所有＋1時間以内失領のDBキャッシュを同期
         sync_history_from_db()
         db_state = get_guild_territory_state()
-        # {prefix: set(territory_name)}
         owned_territories_map = {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
 
         if guild:
@@ -167,7 +190,6 @@ class Territory(commands.GroupCog, name="territory"):
             guild_color_map,
             owned_territories_map
         )
-
         if file and embed:
             await interaction.followup.send(file=file, embed=embed)
         else:
@@ -181,15 +203,8 @@ class Territory(commands.GroupCog, name="territory"):
         await interaction.response.defer()
 
         static_data = self.map_renderer.local_territories.get(territory)
-        guild_color_map = await self.other_api.get_guild_color_map()
-
-        cache_key = "wynn_territory_list"
-        territory_data = self.cache.get_cache(cache_key)
-        if not territory_data:
-            logger.info("--- [API] テリトリーリストのキャッシュがないため、APIから取得します。")
-            territory_data = await self.wynn_api.get_territory_list()
-            if territory_data:
-                self.cache.set_cache(cache_key, territory_data)
+        guild_color_map = await self.get_guild_color_map_with_cache()
+        territory_data = await self.get_territory_data_with_cache()
 
         if not territory_data:
             await interaction.followup.send("テリトリー情報の取得に失敗しました。")
