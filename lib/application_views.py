@@ -380,7 +380,6 @@ class ApplicationButtonView(View):
         ticket_exists = False
         user_roles = getattr(user, "roles", [])
         has_etkw = any(role.id == ETKW for role in user_roles)
-        logger.info(f"[申請ボタン] user={interaction.user} roles={[role.id for role in user_roles]} ETKW={ETKW} has_etkw={has_etkw}")
     
         if has_etkw:
             await interaction.response.send_message("すでにETKWに加入しているため、申請を実行することはできません。", ephemeral=True)
