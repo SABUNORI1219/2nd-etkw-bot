@@ -157,7 +157,7 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
             ingame_members = await fetch_guild_members(api)
             if not ingame_members:
                 logger.warning("[ApplicationSync] APIからのギルドデータ取得失敗、同期処理をスキップ")
-                await asyncio.sleep(60) # 2分
+                await asyncio.sleep(120) # 2分
                 continue
 
             guild = bot.get_guild(GUILD_ID)
@@ -244,7 +244,7 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                     logger.info(f"[ApplicationSync] {mcid} の申請を処理し、チャンネル削除とDB削除を実施しました")
         except Exception as e:
             logger.error(f"[ApplicationSync] 申請加入同期で例外: {e}", exc_info=True)
-        await asyncio.sleep(60) # 5分
+        await asyncio.sleep(300) # 5分
 
 async def setup(bot):
     api = WynncraftAPI()
