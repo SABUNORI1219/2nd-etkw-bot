@@ -16,10 +16,9 @@ from io import BytesIO
 logger = logging.getLogger(__name__)
 
 # ID
-APPLICATION_CATEGORY_ID = 1415492214087483484
-APPLICATION_CHANNEL_ID = 1415107620108501082
-TICKET_STAFF_ROLE_ID = 1404665259112792095  # チケットのスタッフロールID
-STAFF_ROLE_ID = 1158540148783448134         # 申請フォーム用スタッフロールID
+APPLICATION_CATEGORY_ID = 1134345613585170542
+APPLICATION_CHANNEL_ID = 1134342223484424353
+TICKET_STAFF_ROLE_ID = 1387259707743277177  # チケットのスタッフロールID
 
 # Guild Search Helper Function dayo!
 async def search_guild(api, guild_input):
@@ -79,6 +78,10 @@ class DeclineButtonView(View):
 
     @button(label="拒否/Decline", style=discord.ButtonStyle.danger, custom_id="decline")
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not any(role.id == TICKET_STAFF_ROLE_ID for role in getattr(interaction.user, "roles", [])):
+            await interaction.response.send_message("この操作を行う権限がありません。", ephemeral=True)
+            return
+        
         # 必要な情報はinteractionから取得
         discord_id = interaction.user.id
         channel_id = interaction.channel.id
@@ -412,7 +415,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+            interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
         }
         
         if not isinstance(category, discord.CategoryChannel):
@@ -424,7 +427,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         )
 
         # ①ご案内Embed
-        await send_ticket_user_embed(channel, interaction.user.id, STAFF_ROLE_ID)
+        await send_ticket_user_embed(channel, interaction.user.id, TICKET_STAFF_ROLE_ID)
 
         # ②MCIDからの情報Embed
         username_for_db = None
