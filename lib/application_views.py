@@ -92,7 +92,8 @@ class DeclineButtonView(View):
 def make_prev_guild_embed(guild_info, input_name):
     banner_renderer = BannerRenderer()
     banner_bytes = None
-    
+    banner_file = None
+
     if isinstance(guild_info, dict) and guild_info.get("name"):
         name = guild_info.get('name', 'N/A')
         prefix = guild_info.get('prefix', 'N/A')
@@ -114,6 +115,8 @@ def make_prev_guild_embed(guild_info, input_name):
         banner_info = guild_info.get('banner')
         if banner_info:
             banner_bytes = banner_renderer.create_banner_image(banner_info)
+            if banner_bytes:
+                banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
 
         desc = (
             f"```python\n"
@@ -134,7 +137,7 @@ def make_prev_guild_embed(guild_info, input_name):
     # 6000文字制限対策
     if len(desc) > 6000:
         desc = desc[:5900] + "\n...（一部省略されました）"
-        
+
     embed = discord.Embed(
         title="過去ギルド/Previous Guild",
         description=desc,
@@ -143,8 +146,7 @@ def make_prev_guild_embed(guild_info, input_name):
     embed.set_footer(text=f"入力情報/Input: {input_name}")
 
     # バナーが生成できた場合のみサムネ設定
-    if banner_bytes:
-        banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
+    if banner_file:
         embed.set_thumbnail(url="attachment://guild_banner.png")
 
     return embed, banner_file
@@ -462,16 +464,20 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
             try:
                 api = WynncraftAPI()
                 guild_info = await search_guild(api, prev_guild_name)
-                prev_guild_embed = make_prev_guild_embed(guild_info, prev_guild_name)
+                prev_guild_embed, banner_file = make_prev_guild_embed(guild_info, prev_guild_name)
             except Exception:
-                prev_guild_embed = discord.Embed(
+                prev_guild_embed, banner_file = discord.Embed(
                     title="過去ギルド情報取得失敗",
                     description=f"入力: {prev_guild_name}\n情報取得中にエラーが発生しました。",
                     color=discord.Color.red()
-                )
+                ), None
         else:
-            prev_guild_embed = make_prev_guild_embed(None, "")
-        await channel.send(embed=prev_guild_embed, file=banner_file)
+            prev_guild_embed, banner_file = make_prev_guild_embed(None, "")
+        
+        if banner_file:
+            await channel.send(embed=prev_guild_embed, file=banner_file)
+        else:
+            await channel.send(embed=prev_guild_embed)
 
         # DB登録
         save_application(username_for_db, interaction.user.id, channel.id)
