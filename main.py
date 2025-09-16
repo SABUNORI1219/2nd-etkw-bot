@@ -42,6 +42,10 @@ intents.members = True
 MAP_GEN_MEMORY_MB = 100
 MEMORY_LIMIT_MB = 450
 
+def register_persistent_views(bot):
+    bot.add_view(DeclineButtonView(None, None))
+    bot.add_view(DeclineConfirmView(None, None))
+
 # commands.Botを継承したカスタムBotクラス
 class MyBot(commands.Bot):
     def __init__(self):
@@ -85,8 +89,6 @@ class MyBot(commands.Bot):
         
         self.add_view(LanguageSwitchView())
         self.add_view(ApplicationButtonView())
-        self.add_view(DeclineButtonView())
-        self.add_view(DeclineConfirmView())
 
     async def on_ready(self):
         """Botの準備が完了したときに呼ばれるイベント"""
