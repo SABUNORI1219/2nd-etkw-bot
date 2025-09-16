@@ -48,6 +48,46 @@ def make_reason_embed(reason):
         color=discord.Color.purple()
     )
 
+class DeclineConfirmView(View):
+    def __init__(self, discord_id, channel_id):
+        super().__init__(timeout=60)
+        self.discord_id = discord_id
+        self.channel_id = channel_id
+
+    @button(label="拒否を確定/Confirm Decline", style=discord.ButtonStyle.danger, custom_id="decline_confirm")
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # DBから削除
+        delete_application_by_discord_id(self.discord_id)
+        # チャンネル削除
+        try:
+            await interaction.channel.delete(reason="申請を拒否(Decline)ボタンで削除")
+        except Exception as e:
+            await interaction.response.send_message("チャンネル削除に失敗しました。", ephemeral=True)
+            logger.error(f"申請チャンネル削除失敗(Decline): {e}")
+            return
+        # チャンネルが消えるので以降の処理は不要
+
+    @button(label="キャンセル/Cancel", style=discord.ButtonStyle.secondary, custom_id="decline_cancel")
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("申請拒否をキャンセルしました。", ephemeral=True)
+        await interaction.message.delete(delay=2)
+
+class DeclineButtonView(View):
+    def __init__(self, discord_id, channel_id):
+        super().__init__(timeout=None)
+        self.discord_id = discord_id
+        self.channel_id = channel_id
+
+    @button(label="拒否/Decline", style=discord.ButtonStyle.danger, custom_id="decline")
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # 確認ダイアログ（ボタン）を送信
+        view = DeclineConfirmView(self.discord_id, self.channel_id)
+        await interaction.response.send_message(
+            "本当にこの申請を拒否（削除）してもよろしいですか？\nAre you sure you want to decline and delete this application?",
+            view=view,
+            ephemeral=True,
+        )
+
 def make_prev_guild_embed(guild_info, input_name):
     self.banner_renderer = BannerRenderer()
     if isinstance(guild_info, dict) and guild_info.get("name"):
