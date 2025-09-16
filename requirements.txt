@@ -7,3 +7,4 @@ Pillow>=9.5.0
 imageio
 imageio-ffmpeg
 requests
+psutil
