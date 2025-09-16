@@ -50,7 +50,7 @@ class MyBot(commands.Bot):
     def register_persistent_views(bot):
         bot.add_view(ApplicationButtonView())
         bot.add_view(TicketUserView())
-        bot.add_view(DeclineButtonView(None, None))
+        bot.add_view(DeclineButtonView())
 
     async def setup_hook(self):
         """Botの非同期セットアップを管理する"""
