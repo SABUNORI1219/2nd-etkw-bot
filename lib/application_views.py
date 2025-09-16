@@ -506,3 +506,4 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
 def register_persistent_views(bot: discord.Client):
     bot.add_view(ApplicationButtonView())
     bot.add_view(TicketUserView())  # チケット内ガイド/質問ボタン用
+    bot.add_view(DeclineButtonView())
