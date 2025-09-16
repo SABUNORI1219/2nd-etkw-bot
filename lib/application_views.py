@@ -21,19 +21,19 @@ APPLICATION_CHANNEL_ID = 1415107620108501082
 TICKET_STAFF_ROLE_ID = 1404665259112792095  # チケットのスタッフロールID
 STAFF_ROLE_ID = 1158540148783448134         # 申請フォーム用スタッフロールID
 
+# Guild Search Helper Function dayo!
 async def search_guild(api, guild_input):
-    patterns = [
-        guild_input,
-        guild_input.capitalize(),
-        guild_input.upper(),
-        guild_input.lower()
-    ]
-    # プレフィックス検索
+    # setで重複排除、ただし順序は保つ
+    patterns = []
+    for pat in [guild_input, guild_input.capitalize(), guild_input.upper(), guild_input.lower()]:
+        if pat not in patterns:
+            patterns.append(pat)
+    # prefix検索
     for pattern in patterns:
         guild = await api.get_guild_by_prefix(pattern)
         if guild and guild.get('name'):
             return guild
-    # フルネーム検索
+    # name検索
     for pattern in patterns:
         guild = await api.get_guild_by_name(pattern)
         if guild and guild.get('name'):
