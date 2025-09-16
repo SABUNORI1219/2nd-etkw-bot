@@ -31,10 +31,12 @@ async def search_guild(api, guild_input):
     # prefix検索
     for pattern in patterns:
         try:
+            logger.info(f"searching by prefix: {pattern}")
             guild = await api.get_guild_by_prefix(pattern)
             if guild and guild.get('name'):
                 return guild
         except Exception as e:
+            logger.info(f"Error for prefix {pattern}: {e}")
             logger.warning(f"Guild prefix search failed for {pattern}: {e}")
     # name検索
     for pattern in patterns:
