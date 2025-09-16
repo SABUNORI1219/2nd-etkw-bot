@@ -7,6 +7,7 @@ import asyncio
 import math
 from dotenv import load_dotenv
 import logging
+import psutil
 
 # 作成したモジュールから必要な関数やクラスをインポート
 from keep_alive import keep_alive
@@ -36,6 +37,10 @@ activity = discord.Streaming(
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+
+# メモリ監視用の閾値
+MAP_GEN_MEMORY_MB = 100
+MEMORY_LIMIT_MB = 450
 
 # commands.Botを継承したカスタムBotクラス
 class MyBot(commands.Bot):
@@ -133,6 +138,25 @@ async def ensure_application_embed():
     embed = ApplicationButtonView.make_application_guide_embed()
     view = ApplicationButtonView()
     await channel.send(embed=embed, view=view)
+
+async def wait_for_memory_ok(required=MAP_GEN_MEMORY_MB, limit=MEMORY_LIMIT_MB, timeout=60):
+    """
+    required: この後実行する処理で消費する想定メモリ(MB)
+    limit: サービス全体で許容する最大メモリ(MB)
+    timeout: 最大待機秒数。超えたらRuntimeError
+    """
+    proc = psutil.Process()
+    waited = 0
+    while True:
+        mem_mb = proc.memory_info().rss / (1024 * 1024)
+        if mem_mb + required < limit:
+            return
+        if waited == 0:
+            print(f"[MemoryGuard] メモリ残量不足: {mem_mb:.1f}MB/上限{limit}MB。空き待機開始...")
+        await asyncio.sleep(2)
+        waited += 2
+        if waited >= timeout:
+            raise RuntimeError(f"サーバが高負荷状態（~{mem_mb:.1f}MB使用中）のため、処理を中断しました。")
 
 @tasks.loop(hours=1)
 async def start_embed_check():
