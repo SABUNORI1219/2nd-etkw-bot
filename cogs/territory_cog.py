@@ -14,6 +14,7 @@ from lib.cache_handler import CacheHandler
 from lib.db import get_guild_territory_state
 from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db
 from config import EMBED_COLOR_BLUE, RESOURCE_EMOJIS, AUTHORIZED_USER_IDS, send_authorized_only_message
+from main import wait_for_memory_ok
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +157,13 @@ class Territory(commands.GroupCog, name="territory"):
     async def map(self, interaction: discord.Interaction, guild: str = None):
         await interaction.response.defer()
 
+        # Memory Leak Taisaku !
+        try:
+            await wait_for_memory_ok()
+        except RuntimeError as e:
+            await interaction.followup.send(str(e))
+            return
+
         # キャッシュ経由でAPI・カラー取得
         territory_data = await self.get_territory_data_with_cache()
         guild_color_map = await self.get_guild_color_map_with_cache()
@@ -200,6 +208,13 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.describe(territory="Territory Name")
     async def status(self, interaction: discord.Interaction, territory: str):
         await interaction.response.defer()
+
+        # Memory Leak Taisaku !
+        try:
+            await wait_for_memory_ok()
+        except RuntimeError as e:
+            await interaction.followup.send(str(e))
+            return
 
         static_data = self.map_renderer.local_territories.get(territory)
         guild_color_map = await self.get_guild_color_map_with_cache()
