@@ -14,7 +14,6 @@ from keep_alive import keep_alive
 from logger_setup import setup_logger
 from lib.db import create_table
 from lib.discord_notify import LanguageSwitchView
-from lib.ticket_embeds import register_persistent_views
 from lib.application_views import APPLICATION_CHANNEL_ID, ApplicationButtonView, register_persistent_views, DeclineButtonView, DeclineConfirmView
 
 # ロガーを最初にセットアップ
