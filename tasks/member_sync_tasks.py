@@ -7,11 +7,10 @@ from discord.ext import tasks
 from lib.api_stocker import WynncraftAPI
 from lib.db import get_linked_members_page, add_member, remove_member, get_member, get_pending_applications, delete_application_by_discord_id
 from lib.discord_notify import notify_member_removed
-from config import RANK_ROLE_ID_MAP, ETKW, ROLE_ID_TO_RANK
+from config import RANK_ROLE_ID_MAP, ETKW_SERVER, ETKW, ROLE_ID_TO_RANK
 
 logger = logging.getLogger(__name__)
 
-GUILD_ID = 1119277416431501394
 LOG_CHANNEL_ID = 1249352336401236011
 
 async def fetch_guild_members(api: WynncraftAPI) -> dict:
@@ -160,7 +159,7 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                 await asyncio.sleep(120) # 2分
                 continue
 
-            guild = bot.get_guild(GUILD_ID)
+            guild = bot.get_guild(ETKW_SERVER)
             log_channel = bot.get_channel(LOG_CHANNEL_ID)
 
             for mcid, discord_id, channel_id in get_pending_applications():
