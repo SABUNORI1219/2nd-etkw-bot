@@ -5,7 +5,7 @@ import time
 from typing import Optional
 import logging
 
-from lib.db import save_application
+from lib.db import save_application, delete_application_by_discord_id
 from lib.profile_renderer import generate_profile_card
 from cogs.player_cog import build_profile_info
 from lib.api_stocker import WynncraftAPI, OtherAPI
