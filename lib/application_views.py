@@ -218,6 +218,7 @@ def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
             "自己紹介用のチャンネルです。任意です。\n\n"
             "> 📙｜info-share-情報共有 \n"
             "ギルド内でのゲームに関する情報が共有されています。ぜひご一読ください。\n\n"
+            "- チケットはゲーム内でギルドに加入した後に、自動で削除されます。"
         )
         embed = discord.Embed(
             title="ご案内",
@@ -243,7 +244,7 @@ def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
             "Self-introduction channel (optional).\n\n"
             "> 📙｜info-share-情報共有 \n"
             "Information sharing channel. Please take a look!\n\n"
-            "- When you've read the info, please follow the staff's instructions."
+            "- Ticket will be automatically deleted after joining our guild in-game."
         )
         embed = discord.Embed(
             title="Welcome & Info",
