@@ -215,10 +215,10 @@ async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord
     except Exception as e:
         embed = discord.Embed(
             title="プレイヤープロフィール取得失敗",
-            description=f"MCID: {mcid}\n情報取得中にエラーが発生しました。",
+            description="情報取得中にエラーが発生しました。",
             color=discord.Color.red()
         )
-        logger.error(f"ぷろふぁいるいめーじせいせいにしっっぱいしたました: {e}")
+        embed.set_footer(text=f"入力情報/Input: {mcid}")
         return embed, None, None
 
 def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
@@ -378,7 +378,7 @@ class TicketQuestionModal(discord.ui.Modal, title="質問 / Question"):
         embed = discord.Embed(
             title="新規メンバーからの質問 / Question from Applicant",
             description=q_text,
-            color=discord.Color.orange()
+            color=0xFFFFFF
         )
         embed.set_footer(text=f"質問者: {interaction.user.display_name}")
         await interaction.channel.send(content=staff_mention, embed=embed)
