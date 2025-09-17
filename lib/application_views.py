@@ -445,9 +445,9 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         try:
             profile_embed, profile_file, username_for_db = await make_profile_embed(self.mcid.value)
             if profile_file:
-                await channel.send(embed=profile_embed, file=profile_file)
+                await channel.send(content=staff_mention, embed=profile_embed, file=profile_file)
             else:
-                await channel.send(embed=profile_embed)
+                await channel.send(content=staff_mention, embed=profile_embed)
         except Exception as ee:
             username_for_db = None
             profile_embed = discord.Embed(
