@@ -71,7 +71,7 @@ class DeclineConfirmView(View):
 
     @button(label="キャンセル/Cancel", style=discord.ButtonStyle.secondary, custom_id="decline_cancel")
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message("申請拒否をキャンセルしました。", embed=None, view=None)
+        await interaction.response.edit_message(content="申請拒否をキャンセルしました。", embed=None, view=None)
 
 class DeclineButtonView(View):
     def __init__(self):
