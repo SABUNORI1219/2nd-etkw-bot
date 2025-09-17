@@ -4,8 +4,9 @@ from discord.ui import View, Modal, TextInput, button
 import time
 from typing import Optional
 import logging
+import re
 
-from lib.db import save_application, delete_application_by_discord_id
+from lib.db import save_application, delete_application_by_discord_id, get_pending_applications
 from lib.profile_renderer import generate_profile_card
 from cogs.player_cog import build_profile_info
 from lib.api_stocker import WynncraftAPI, OtherAPI
@@ -50,15 +51,16 @@ def make_reason_embed(reason):
     )
 
 class DeclineConfirmView(View):
-    def __init__(self, discord_id, channel_id):
+    def __init__(self, applicant_discord_id, channel_id):
         super().__init__(timeout=60)
-        self.discord_id = discord_id
+        self.applicant_discord_id = applicant_discord_id
         self.channel_id = channel_id
 
     @button(label="拒否を確定/Confirm Decline", style=discord.ButtonStyle.danger, custom_id="decline_confirm")
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         # DBから削除
-        delete_application_by_discord_id(self.discord_id)
+        logger.info(f"[DeclineConfirmView] delete_application_by_discord_id({self.applicant_discord_id})")
+        delete_application_by_discord_id(self.applicant_discord_id)
         # チャンネル削除
         try:
             await interaction.channel.delete(reason="申請を拒否(Decline)ボタンで削除")
@@ -66,30 +68,51 @@ class DeclineConfirmView(View):
             await interaction.response.send_message("チャンネル削除に失敗しました。", ephemeral=True)
             logger.error(f"申請チャンネル削除失敗(Decline): {e}")
             return
-        # チャンネルが消えるので以降の処理は不要
 
     @button(label="キャンセル/Cancel", style=discord.ButtonStyle.secondary, custom_id="decline_cancel")
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("申請拒否をキャンセルしました。", ephemeral=True)
-        await interaction.message.delete(delay=2)
+        await interaction.response.edit_message("申請拒否をキャンセルしました。", embed=None, view=None)
 
 class DeclineButtonView(View):
     def __init__(self):
         super().__init__(timeout=None)
 
     @button(label="拒否/Decline", style=discord.ButtonStyle.danger, custom_id="decline")
-    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):        
-        # 必要な情報はinteractionから取得
-        discord_id = interaction.user.id
-        channel_id = interaction.channel.id
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # 権限チェック
         user_roles = getattr(interaction.user, "roles", [])
         has_ticket = any(role.id == TICKET_STAFF_ROLE_ID for role in user_roles)
-    
         if not has_ticket:
             await interaction.response.send_message("権限がありません。", ephemeral=True)
             return
-        
-        view = DeclineConfirmView(discord_id, channel_id)
+
+        # ① チャンネル名からmcidを抽出（application-<mcid>、大文字小文字不一致）
+        channel = interaction.channel
+        mcid = None
+        m = re.match(r"application-(.+)", channel.name, re.IGNORECASE)
+        if m:
+            mcid_from_channel = m.group(1)
+            logger.info(f"[DeclineButtonView] チャンネル名から抽出: mcid={mcid_from_channel}")
+        else:
+            await interaction.response.send_message("チャンネル名からMCIDを取得できませんでした。", ephemeral=True)
+            logger.error(f"[DeclineButtonView] チャンネル名からMCID抽出失敗: {channel.name}")
+            return
+
+        # ② get_pending_applications()で一致するエントリを探す（case insensitive）
+        pending_apps = get_pending_applications()
+        applicant_discord_id = None
+        for mcid_db, discord_id, channel_id in pending_apps:
+            if mcid_db and mcid_from_channel and mcid_db.lower() == mcid_from_channel.lower():
+                applicant_discord_id = discord_id
+                logger.info(f"[DeclineButtonView] DB照合成功: mcid_db={mcid_db}, discord_id={discord_id}")
+                break
+
+        if not applicant_discord_id:
+            await interaction.response.send_message("申請者のDiscord IDが見つかりませんでした。", ephemeral=True)
+            logger.error(f"[DeclineButtonView] DB照合失敗: mcid_from_channel={mcid_from_channel}")
+            return
+
+        view = DeclineConfirmView(applicant_discord_id, channel.id)
         await interaction.response.send_message(
             "本当にこの申請を拒否（削除）してもよろしいですか？\nAre you sure you want to decline and delete this application?",
             view=view,
