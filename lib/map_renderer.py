@@ -5,6 +5,7 @@ import logging
 import json
 import discord
 import time
+import gc
 from datetime import datetime, timezone, timedelta
 from math import sqrt
 import collections
@@ -15,29 +16,15 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_PATH = os.path.join(project_root, "assets", "map")
 FONT_PATH = os.path.join(project_root, "assets", "fonts", "Minecraftia-Regular.ttf")
 
-# DBとキャッシュから履歴情報を取得
 from lib.db import get_guild_territory_state
 from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db
 
 class MapRenderer:
     def __init__(self):
         try:
-            self.map_img = Image.open(os.path.join(ASSETS_PATH, "main-map.png")).convert("RGBA")
-            self.crown_img = Image.open(os.path.join(ASSETS_PATH, "guild_headquarters.png")).convert("RGBA")
             with open(os.path.join(ASSETS_PATH, "territories.json"), "r", encoding='utf-8') as f:
                 self.local_territories = json.load(f)
-            self.font = ImageFont.truetype(FONT_PATH, 40)
-
-            TARGET_WIDTH = 1600
-            original_w, original_h = self.map_img.size
-            scale_factor = TARGET_WIDTH / original_w
-            new_h = int(original_h * scale_factor)
-            self.resized_map = self.map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
-            self.scale_factor = scale_factor
-
-            self._db_cache = None
-            self._db_cache_time = 0
-
+            self.font_path = FONT_PATH
         except FileNotFoundError as e:
             logger.error(f"マップ生成に必要なアセットが見つかりません: {e}")
             raise
@@ -87,7 +74,7 @@ class MapRenderer:
 
     def _get_owned_territories_map_from_db(self):
         now = time.time()
-        if self._db_cache and (now - self._db_cache_time < 60):
+        if hasattr(self, "_db_cache") and self._db_cache and (now - self._db_cache_time < 60):
             return self._db_cache
         sync_history_from_db()
         db_state = get_guild_territory_state()
@@ -99,7 +86,6 @@ class MapRenderer:
     def _pick_hq_candidate(self, hq_candidates, territory_api_data, all_owned_territories=None, exclude_lost=None, debug_prefix=None):
         if all_owned_territories is None:
             all_owned_territories = set(hq_candidates) | (exclude_lost or set())
-
         hq_stats = []
         for t in hq_candidates:
             conn, ext, hq_buff = self._calc_conn_ext_hqbuff(all_owned_territories, t)
@@ -116,28 +102,22 @@ class MapRenderer:
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
             })
-
         if not hq_stats:
             return None, [], [], {}
-
         hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(all_owned_territories)
-
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
         conn_ext_tops = [x for x in top5 if x["conn"] + x["ext"] == max_conn_ext]
-
         other_top5 = [x for x in top5 if x not in conn_ext_tops]
         hq_conn_candidates = []
         max_group_conn = max(x["conn"] for x in conn_ext_tops)
         for cand in other_top5:
             if cand["conn"] - max_group_conn >= 2:
                 hq_conn_candidates.append(cand)
-
         if hq_conn_candidates:
             hq_conn_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
             return hq_conn_candidates[0]["name"], hq_stats, top5, total_res
-
         if len(conn_ext_tops) > 1:
             conn_max_in_group = max(x["conn"] for x in conn_ext_tops)
             conn_maxs = [x for x in conn_ext_tops if x["conn"] == conn_max_in_group]
@@ -145,11 +125,9 @@ class MapRenderer:
                 return conn_maxs[0]["name"], hq_stats, top5, total_res
         else:
             conn_maxs = conn_ext_tops
-
         if len(hq_candidates) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
-
         max_conn = max(x["conn"] for x in top5)
         conn_top_group = [x for x in top5 if x["conn"] == max_conn]
         if len(conn_top_group) > 1:
@@ -157,7 +135,6 @@ class MapRenderer:
             city = next((x for x in ext_lt20 if x["is_city"]), None)
             if city:
                 return city["name"], hq_stats, top5, total_res
-
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
             res_priority = ["crops", "ore", "wood", "fish"]
             min_val = float("inf")
@@ -199,253 +176,245 @@ class MapRenderer:
                         if cand_res > best_res:
                             best_cand = cand
                 return best_cand["name"], hq_stats, top5, total_res
-
         return conn_ext_tops[0]["name"], hq_stats, top5, total_res
 
-    def _draw_trading_and_territories(
-        self,
-        map_to_draw_on,
-        box,
-        is_zoomed,
-        territory_data,
-        guild_color_map,
-        hq_territories=None,
-        upscale_factor=1.5
-    ):
-        up_w, up_h = int(map_to_draw_on.width * upscale_factor), int(map_to_draw_on.height * upscale_factor)
-        upscaled_lines = Image.new("RGBA", (up_w, up_h), (0, 0, 0, 0))
-        draw_lines = ImageDraw.Draw(upscaled_lines)
+    def _get_map_and_scale(self):
+        map_img = Image.open(os.path.join(ASSETS_PATH, "main-map.png")).convert("RGBA")
+        TARGET_WIDTH = 1600
+        original_w, original_h = map_img.size
+        scale_factor = TARGET_WIDTH / original_w
+        new_h = int(original_h * scale_factor)
+        resized_map = map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
+        map_img.close()
+        return resized_map, scale_factor
 
-        for name, data in self.local_territories.items():
-            if "Trading Routes" not in data or "Location" not in data:
-                continue
-            try:
-                x1 = (data["Location"]["start"][0] + data["Location"]["end"][0]) // 2
-                z1 = (data["Location"]["start"][1] + data["Location"]["end"][1]) // 2
-                l_px1, l_py1 = self._coord_to_pixel(x1, z1)
-                l_scaled_px1, l_scaled_py1 = l_px1 * self.scale_factor * upscale_factor, l_py1 * self.scale_factor * upscale_factor
-                for destination_name in data["Trading Routes"]:
-                    dest_data = self.local_territories.get(destination_name)
-                    if not dest_data or "Location" not in dest_data:
-                        continue
-                    x2 = (dest_data["Location"]["start"][0] + dest_data["Location"]["end"][0]) // 2
-                    z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
-                    l_px2, l_py2 = self._coord_to_pixel(x2, z2)
-                    l_scaled_px2, l_scaled_py2 = l_px2 * self.scale_factor * upscale_factor, l_py2 * self.scale_factor * upscale_factor
+    def _get_crown_img(self):
+        img = Image.open(os.path.join(ASSETS_PATH, "guild_headquarters.png")).convert("RGBA")
+        return img
 
-                    if is_zoomed and box:
-                        l_px1_rel = l_scaled_px1 - box[0] * upscale_factor
-                        l_py1_rel = l_scaled_py1 - box[1] * upscale_factor
-                        l_px2_rel = l_scaled_px2 - box[0] * upscale_factor
-                        l_py2_rel = l_scaled_py2 - box[1] * upscale_factor
-                        points = [(l_px1_rel, l_py1_rel), (l_px2_rel, l_py2_rel)]
-                    else:
-                        points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
-
-                    color_rgb = (30, 30, 30)
-                    draw_lines.line(points, fill=(*color_rgb, 180), width=3)
-            except KeyError:
-                continue
-
-        lines_down = upscaled_lines.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
-        map_to_draw_on.alpha_composite(lines_down)
-        # 明示的に解放
-        if hasattr(upscaled_lines, 'close'):
-            upscaled_lines.close()
-        del upscaled_lines, draw_lines, lines_down
-
-        overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
-        overlay_draw = ImageDraw.Draw(overlay)
-        draw = ImageDraw.Draw(map_to_draw_on)
-        scaled_font_size = max(12, int(self.font.size * self.scale_factor))
+    def _get_font(self, size):
         try:
-            scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
-        except IOError:
-            scaled_font = ImageFont.load_default()
+            return ImageFont.truetype(self.font_path, size)
+        except Exception:
+            return ImageFont.load_default()
 
-        for name, info in territory_data.items():
-            static = self.local_territories.get(name)
-            if not static or "Location" not in static:
-                continue
-            if "guild" not in info or not info["guild"].get("prefix"):
-                continue
-
-            t_px1, t_py1 = self._coord_to_pixel(*static["Location"]["start"])
-            t_px2, t_py2 = self._coord_to_pixel(*static["Location"]["end"])
-            t_scaled_px1, t_scaled_py1 = t_px1 * self.scale_factor, t_py1 * self.scale_factor
-            t_scaled_px2, t_scaled_py2 = t_px2 * self.scale_factor, t_py2 * self.scale_factor
-            if is_zoomed and box:
-                t_px1_rel, t_px2_rel = t_scaled_px1 - box[0], t_scaled_px2 - box[0]
-                t_py1_rel, t_py2_rel = t_scaled_py1 - box[1], t_scaled_py2 - box[1]
-            else:
-                t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
-            x_min, x_max = sorted([t_px1_rel, t_px2_rel])
-            y_min, y_max = sorted([t_py1_rel, t_py2_rel])
-            prefix = info["guild"]["prefix"]
-            color_hex = guild_color_map.get(prefix, "#FFFFFF")
-            color_rgb = self._hex_to_rgb(color_hex)
-            overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
-            draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
-            if hq_territories and name in hq_territories:
-                continue
-            draw.text(
-                ((x_min + x_max) / 2, (y_min + y_max) / 2),
-                prefix,
-                font=scaled_font,
-                fill=color_rgb,
-                anchor="mm",
-                stroke_width=2,
-                stroke_fill="black"
-            )
-        map_to_draw_on.alpha_composite(overlay)
-        if hasattr(overlay, 'close'):
-            overlay.close()
-        del overlay, overlay_draw, draw
-        return map_to_draw_on
-
-    def draw_guild_hq_on_map(
-        self, 
-        territory_data, 
-        guild_color_map, 
-        territory_api_data, 
-        box=None, 
-        is_zoomed=False, 
-        map_to_draw_on=None, 
-        owned_territories_map=None
-    ):
-        if map_to_draw_on is None:
-            map_img = self.resized_map.copy()
-        else:
-            map_img = map_to_draw_on
-
-        prefix_to_territories = {}
-        for name, info in territory_data.items():
-            prefix = info.get("guild", {}).get("prefix", "")
-            if not prefix:
-                continue
-            prefix_to_territories.setdefault(prefix, set()).add(name)
-
-        db_state = get_guild_territory_state()
-        hq_names = set()
-        for prefix, api_owned in prefix_to_territories.items():
-            all_owned = owned_territories_map.get(prefix, set()) if owned_territories_map else set(api_owned)
-            lost_only = set()
-            for t in db_state.get(prefix, {}):
-                lost_time = db_state[prefix][t].get("lost")
-                if lost_time is not None:
-                    lost_only.add(t)
-            candidate_territories = set(api_owned)
-            hq_name, _, _, _ = self._pick_hq_candidate(
-                candidate_territories,
-                territory_api_data,
-                all_owned_territories=all_owned,
-                exclude_lost=lost_only,
-                debug_prefix=prefix
-            )
-            if hq_name:
-                hq_names.add(hq_name)
-
-        self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map, hq_territories=hq_names)
-        draw = ImageDraw.Draw(map_img)
-        for prefix, api_owned in prefix_to_territories.items():
-            all_owned = owned_territories_map.get(prefix, set()) if owned_territories_map else set(api_owned)
-            lost_only = set()
-            for t in db_state.get(prefix, {}):
-                lost_time = db_state[prefix][t].get("lost")
-                if lost_time is not None:
-                    lost_only.add(t)
-            candidate_territories = set(api_owned)
-            hq_name, _, _, _ = self._pick_hq_candidate(
-                candidate_territories,
-                territory_api_data,
-                all_owned_territories=all_owned,
-                exclude_lost=lost_only,
-                debug_prefix=prefix
-            )
-            if not hq_name:
-                continue
-            loc = self.local_territories.get(hq_name, {}).get("Location")
-            if not loc:
-                continue
-            x = (loc["start"][0] + loc["end"][0]) // 2
-            z = (loc["start"][1] + loc["end"][1]) // 2
-            px, py = self._coord_to_pixel(x, z)
-            px, py = px * self.scale_factor, py * self.scale_factor
-            if is_zoomed and box:
-                px -= box[0]
-                py -= box[1]
-            color_hex = guild_color_map.get(prefix, "#FFFFFF")
-            color_rgb = self._hex_to_rgb(color_hex)
-
-            x1, y1 = self._coord_to_pixel(loc["start"][0], loc["start"][1])
-            x2, y2 = self._coord_to_pixel(loc["end"][0], loc["end"][1])
-            x1, x2 = x1 * self.scale_factor, x2 * self.scale_factor
-            y1, y2 = y1 * self.scale_factor, y2 * self.scale_factor
-            width = abs(x2 - x1)
-            height = abs(y2 - y1)
-            scaled_font_size = max(12, int(self.font.size * self.scale_factor))
-            crown_size_limit = int(scaled_font_size * 1.8)
-            crown_size_limit = max(28, min(crown_size_limit, 120))
-            crown_size = int(min(width, height) * 0.9)
-            crown_size = max(18, min(crown_size, crown_size_limit))
-
-            orig_w, orig_h = self.crown_img.size
-            ratio = min(crown_size / orig_w, crown_size / orig_h)
-            new_w = int(orig_w * ratio)
-            new_h = int(orig_h * ratio)
-            crown_img_resized = self.crown_img.resize((new_w, new_h), Image.LANCZOS)
-            crown_x = int(px - new_w/2)
-            crown_y = int(py - new_h/2)
-            map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
-            if hasattr(crown_img_resized, 'close'):
-                crown_img_resized.close()
-            del crown_img_resized
-
-            prefix_font_size = crown_size
-            font_found = False
-            for test_size in range(crown_size, 5, -1):
+    def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None, upscale_factor=2):
+        upscaled_lines = None
+        overlay = None
+        try:
+            up_w, up_h = int(map_to_draw_on.width * upscale_factor), int(map_to_draw_on.height * upscale_factor)
+            upscaled_lines = Image.new("RGBA", (up_w, up_h), (0, 0, 0, 0))
+            draw_lines = ImageDraw.Draw(upscaled_lines)
+            for name, data in self.local_territories.items():
+                if "Trading Routes" not in data or "Location" not in data:
+                    continue
                 try:
-                    test_font = ImageFont.truetype(FONT_PATH, test_size)
-                except IOError:
-                    test_font = ImageFont.load_default()
-                bbox = test_font.getbbox(prefix)
+                    x1 = (data["Location"]["start"][0] + data["Location"]["end"][0]) // 2
+                    z1 = (data["Location"]["start"][1] + data["Location"]["end"][1]) // 2
+                    l_px1, l_py1 = self._coord_to_pixel(x1, z1)
+                    l_scaled_px1, l_scaled_py1 = l_px1 * self.scale_factor * upscale_factor, l_py1 * self.scale_factor * upscale_factor
+                    for destination_name in data["Trading Routes"]:
+                        dest_data = self.local_territories.get(destination_name)
+                        if not dest_data or "Location" not in dest_data:
+                            continue
+                        x2 = (dest_data["Location"]["start"][0] + dest_data["Location"]["end"][0]) // 2
+                        z2 = (dest_data["Location"]["start"][1] + dest_data["Location"]["end"][1]) // 2
+                        l_px2, l_py2 = self._coord_to_pixel(x2, z2)
+                        l_scaled_px2, l_scaled_py2 = l_px2 * self.scale_factor * upscale_factor, l_py2 * self.scale_factor * upscale_factor
+                        if is_zoomed and box:
+                            l_px1_rel = l_scaled_px1 - box[0] * upscale_factor
+                            l_py1_rel = l_scaled_py1 - box[1] * upscale_factor
+                            l_px2_rel = l_scaled_px2 - box[0] * upscale_factor
+                            l_py2_rel = l_scaled_py2 - box[1] * upscale_factor
+                            points = [(l_px1_rel, l_py1_rel), (l_px2_rel, l_py2_rel)]
+                        else:
+                            points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
+                        color_rgb = (30, 30, 30)
+                        draw_lines.line(points, fill=(*color_rgb, 180), width=4)
+                except KeyError:
+                    continue
+            lines_down = upscaled_lines.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
+            map_to_draw_on.alpha_composite(lines_down)
+            del draw_lines, lines_down
+            overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
+            overlay_draw = ImageDraw.Draw(overlay)
+            draw = ImageDraw.Draw(map_to_draw_on)
+            scaled_font_size = max(12, int(self._get_font(40).size * self.scale_factor))
+            scaled_font = self._get_font(scaled_font_size)
+            for name, info in territory_data.items():
+                static = self.local_territories.get(name)
+                if not static or "Location" not in static:
+                    continue
+                if "guild" not in info or not info["guild"].get("prefix"):
+                    continue
+                t_px1, t_py1 = self._coord_to_pixel(*static["Location"]["start"])
+                t_px2, t_py2 = self._coord_to_pixel(*static["Location"]["end"])
+                t_scaled_px1, t_scaled_py1 = t_px1 * self.scale_factor, t_py1 * self.scale_factor
+                t_scaled_px2, t_scaled_py2 = t_px2 * self.scale_factor, t_py2 * self.scale_factor
+                if is_zoomed and box:
+                    t_px1_rel, t_px2_rel = t_scaled_px1 - box[0], t_scaled_px2 - box[0]
+                    t_py1_rel, t_py2_rel = t_scaled_py1 - box[1], t_scaled_py2 - box[1]
+                else:
+                    t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
+                x_min, x_max = sorted([t_px1_rel, t_px2_rel])
+                y_min, y_max = sorted([t_py1_rel, t_py2_rel])
+                prefix = info["guild"]["prefix"]
+                color_hex = guild_color_map.get(prefix, "#FFFFFF")
+                color_rgb = self._hex_to_rgb(color_hex)
+                overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
+                draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
+                if hq_territories and name in hq_territories:
+                    continue
+                draw.text(
+                    ((x_min + x_max) / 2, (y_min + y_max) / 2),
+                    prefix,
+                    font=scaled_font,
+                    fill=color_rgb,
+                    anchor="mm",
+                    stroke_width=2,
+                    stroke_fill="black"
+                )
+            map_to_draw_on.alpha_composite(overlay)
+            del overlay_draw, draw
+        finally:
+            if upscaled_lines is not None:
+                upscaled_lines.close()
+            if overlay is not None:
+                overlay.close()
+
+    def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False, map_to_draw_on=None, owned_territories_map=None):
+        crown_img = None
+        try:
+            map_img = map_to_draw_on
+            prefix_to_territories = {}
+            for name, info in territory_data.items():
+                prefix = info.get("guild", {}).get("prefix", "")
+                if not prefix:
+                    continue
+                prefix_to_territories.setdefault(prefix, set()).add(name)
+            db_state = get_guild_territory_state()
+            hq_names = set()
+            for prefix, api_owned in prefix_to_territories.items():
+                all_owned = owned_territories_map.get(prefix, set()) if owned_territories_map else set(api_owned)
+                lost_only = set()
+                for t in db_state.get(prefix, {}):
+                    lost_time = db_state[prefix][t].get("lost")
+                    if lost_time is not None:
+                        lost_only.add(t)
+                candidate_territories = set(api_owned)
+                hq_name, _, _, _ = self._pick_hq_candidate(
+                    candidate_territories,
+                    territory_api_data,
+                    all_owned_territories=all_owned,
+                    exclude_lost=lost_only,
+                    debug_prefix=prefix
+                )
+                if hq_name:
+                    hq_names.add(hq_name)
+            self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map, hq_territories=hq_names)
+            draw = ImageDraw.Draw(map_img)
+            crown_img = self._get_crown_img()
+            for prefix, api_owned in prefix_to_territories.items():
+                all_owned = owned_territories_map.get(prefix, set()) if owned_territories_map else set(api_owned)
+                lost_only = set()
+                for t in db_state.get(prefix, {}):
+                    lost_time = db_state[prefix][t].get("lost")
+                    if lost_time is not None:
+                        lost_only.add(t)
+                candidate_territories = set(api_owned)
+                hq_name, _, _, _ = self._pick_hq_candidate(
+                    candidate_territories,
+                    territory_api_data,
+                    all_owned_territories=all_owned,
+                    exclude_lost=lost_only,
+                    debug_prefix=prefix
+                )
+                if not hq_name:
+                    continue
+                loc = self.local_territories.get(hq_name, {}).get("Location")
+                if not loc:
+                    continue
+                x = (loc["start"][0] + loc["end"][0]) // 2
+                z = (loc["start"][1] + loc["end"][1]) // 2
+                px, py = self._coord_to_pixel(x, z)
+                px, py = px * self.scale_factor, py * self.scale_factor if hasattr(self, "scale_factor") else px, py
+                if is_zoomed and box:
+                    px -= box[0]
+                    py -= box[1]
+                color_hex = guild_color_map.get(prefix, "#FFFFFF")
+                color_rgb = self._hex_to_rgb(color_hex)
+                x1, y1 = self._coord_to_pixel(loc["start"][0], loc["start"][1])
+                x2, y2 = self._coord_to_pixel(loc["end"][0], loc["end"][1])
+                x1, x2 = x1 * self.scale_factor, x2 * self.scale_factor
+                y1, y2 = y1 * self.scale_factor, y2 * self.scale_factor
+                width = abs(x2 - x1)
+                height = abs(y2 - y1)
+                scaled_font_size = max(12, int(self._get_font(40).size * self.scale_factor))
+                crown_size_limit = int(scaled_font_size * 1.8)
+                crown_size_limit = max(28, min(crown_size_limit, 120))
+                crown_size = int(min(width, height) * 0.9)
+                crown_size = max(18, min(crown_size, crown_size_limit))
+                orig_w, orig_h = crown_img.size
+                ratio = min(crown_size / orig_w, crown_size / orig_h)
+                new_w = int(orig_w * ratio)
+                new_h = int(orig_h * ratio)
+                crown_img_resized = crown_img.resize((new_w, new_h), Image.LANCZOS)
+                crown_x = int(px - new_w/2)
+                crown_y = int(py - new_h/2)
+                map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
+                crown_img_resized.close()
+                prefix_font_size = crown_size
+                font_found = False
+                for test_size in range(crown_size, 5, -1):
+                    try:
+                        test_font = self._get_font(test_size)
+                    except IOError:
+                        test_font = ImageFont.load_default()
+                    bbox = test_font.getbbox(prefix)
+                    text_width = bbox[2] - bbox[0]
+                    text_height = bbox[3] - bbox[1]
+                    if text_width <= crown_size and text_height <= crown_size:
+                        prefix_font_size = test_size
+                        font_found = True
+                        break
+                if font_found:
+                    prefix_font = self._get_font(prefix_font_size)
+                else:
+                    prefix_font = ImageFont.load_default()
+                bbox = prefix_font.getbbox(prefix)
                 text_width = bbox[2] - bbox[0]
                 text_height = bbox[3] - bbox[1]
-                if text_width <= crown_size and text_height <= crown_size:
-                    prefix_font_size = test_size
-                    font_found = True
-                    break
-            if font_found:
-                prefix_font = ImageFont.truetype(FONT_PATH, prefix_font_size)
-            else:
-                prefix_font = ImageFont.load_default()
-            bbox = prefix_font.getbbox(prefix)
-            text_width = bbox[2] - bbox[0]
-            text_height = bbox[3] - bbox[1]
-            text_x = px
-            text_y = crown_y - text_height // 2 - 2
-            draw.text(
-                (text_x, text_y),
-                prefix,
-                font=prefix_font,
-                fill=color_rgb,
-                anchor="mm",
-                stroke_width=2,
-                stroke_fill="black"
-            )
-        del draw
-        return map_img, [(0, 0, "", hq_name) for hq_name in hq_names]
+                text_x = px
+                text_y = crown_y - text_height // 2 - 2
+                draw.text(
+                    (text_x, text_y),
+                    prefix,
+                    font=prefix_font,
+                    fill=color_rgb,
+                    anchor="mm",
+                    stroke_width=2,
+                    stroke_fill="black"
+                )
+            del draw
+            return map_img, [(0, 0, "", hq_name) for hq_name in hq_names]
+        finally:
+            if crown_img is not None:
+                crown_img.close()
 
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict, owned_territories_map=None) -> tuple[discord.File | None, discord.Embed | None]:
         if owned_territories_map is None:
             owned_territories_map = self._get_owned_territories_map_from_db()
         if not territories_to_render:
             return None, None
+        resized_map, scale_factor = self._get_map_and_scale()
+        self.scale_factor = scale_factor
+        map_to_draw_on = None
+        file = None
+        embed = None
+        box = None
+        all_x, all_y = [], []
+        is_zoomed = len(territories_to_render) < len(self.local_territories)
         try:
-            map_to_draw_on = self.resized_map.copy()
-            box = None
-            all_x, all_y = [], []
-            is_zoomed = len(territories_to_render) < len(self.local_territories)
             if is_zoomed:
                 for terri_data in territories_to_render.values():
                     loc = terri_data.get("location", {})
@@ -453,22 +422,21 @@ class MapRenderer:
                     end_x, end_z = loc.get("end", [0,0])
                     px1, py1 = self._coord_to_pixel(start_x, start_z)
                     px2, py2 = self._coord_to_pixel(end_x, end_z)
-                    all_x.extend([px1 * self.scale_factor, px2 * self.scale_factor])
-                    all_y.extend([py1 * self.scale_factor, py2 * self.scale_factor])
-
+                    all_x.extend([px1 * scale_factor, px2 * scale_factor])
+                    all_y.extend([py1 * scale_factor, py2 * scale_factor])
             if all_x and all_y:
                 padding = 30
                 box = (
                     max(0, min(all_x) - padding),
                     max(0, min(all_y) - padding),
-                    min(self.resized_map.width, max(all_x) + padding),
-                    min(self.resized_map.height, max(all_y) + padding)
+                    min(resized_map.width, max(all_x) + padding),
+                    min(resized_map.height, max(all_y) + padding)
                 )
-                cropped = map_to_draw_on.crop(box)
-                if hasattr(map_to_draw_on, 'close'):
-                    map_to_draw_on.close()
+                cropped = resized_map.crop(box)
+                resized_map.close()
                 map_to_draw_on = cropped
-
+            else:
+                map_to_draw_on = resized_map
             final_map, _ = self.draw_guild_hq_on_map(
                 territory_data=territory_data,
                 guild_color_map=guild_color_map,
@@ -478,15 +446,12 @@ class MapRenderer:
                 map_to_draw_on=map_to_draw_on,
                 owned_territories_map=owned_territories_map
             )
-
             map_bytes = BytesIO()
             try:
                 final_map.save(map_bytes, format='PNG')
                 map_bytes.seek(0)
-
                 jst_now = datetime.now(timezone(timedelta(hours=9)))
                 formatted_time = jst_now.strftime("%Y/%m/%d %H:%M:%S")
-
                 file = discord.File(map_bytes, filename="wynn_map.png")
                 embed = discord.Embed(
                     title="",
@@ -494,17 +459,16 @@ class MapRenderer:
                 )
                 embed.set_image(url="attachment://wynn_map.png")
                 embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
+                return file, embed
             finally:
                 map_bytes.close()
-                if hasattr(final_map, 'close'):
-                    final_map.close()
-                if hasattr(map_to_draw_on, 'close'):
-                    map_to_draw_on.close()
-            return file, embed
-
+                final_map.close()
+                map_to_draw_on.close()
         except Exception as e:
             logger.error(f"マップ生成中にエラー: {e}", exc_info=True)
             return None, None
+        finally:
+            gc.collect()
 
     def create_single_territory_image(
         self,
@@ -513,25 +477,22 @@ class MapRenderer:
         guild_color_map: dict
     ) -> BytesIO | None:
         logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
-
         terri_static = self.local_territories.get(territory)
         if not terri_static or 'Location' not in terri_static:
             logger.error(f"'{territory}'にLocationデータがありません。")
             return None
-
         terri_live = territory_data.get(territory)
         if not terri_live or "guild" not in terri_live:
             logger.error(f"領地 {territory} にAPIライブデータがありません。")
             return None
-
         owner_prefix = terri_live["guild"].get("prefix")
         if not owner_prefix:
             logger.error(f"領地 {territory} の所有ギルドprefixがAPIデータにありません")
             return None
-
         owned_territories_map = self._get_owned_territories_map_from_db()
-
-        map_to_draw_on = self.resized_map.copy()
+        resized_map, scale_factor = self._get_map_and_scale()
+        self.scale_factor = scale_factor
+        map_to_draw_on = resized_map
         final_map, _ = self.draw_guild_hq_on_map(
             territory_data=territory_data,
             guild_color_map=guild_color_map,
@@ -541,14 +502,12 @@ class MapRenderer:
             map_to_draw_on=map_to_draw_on,
             owned_territories_map=owned_territories_map
         )
-
         static = terri_static
         loc = static.get("Location", {})
         px1, py1 = self._coord_to_pixel(*loc.get("start", [0, 0]))
         px2, py2 = self._coord_to_pixel(*loc.get("end", [0, 0]))
         px1, py1 = px1 * self.scale_factor, py1 * self.scale_factor
         px2, py2 = px2 * self.scale_factor, py2 * self.scale_factor
-
         left = min(px1, px2)
         right = max(px1, px2)
         top = min(py1, py2)
@@ -557,24 +516,19 @@ class MapRenderer:
         box = (
             max(0, left - padding),
             max(0, top - padding),
-            min(self.resized_map.width, right + padding),
-            min(self.resized_map.height, bottom + padding)
+            min(resized_map.width, right + padding),
+            min(resized_map.height, bottom + padding)
         )
-
         if not (box[0] < box[2] and box[1] < box[3]):
             logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。Box: {box}")
-            if hasattr(final_map, 'close'):
-                final_map.close()
-            if hasattr(map_to_draw_on, 'close'):
-                map_to_draw_on.close()
+            final_map.close()
+            map_to_draw_on.close()
             return None
-
         center_x = (px1 + px2) / 2
         center_y = (py1 + py2) / 2
         territory_width = abs(px2 - px1)
         territory_height = abs(py2 - py1)
         highlight_radius = int(sqrt(territory_width ** 2 + territory_height ** 2) / 2)
-
         draw = ImageDraw.Draw(final_map)
         draw.ellipse(
             [(center_x - highlight_radius, center_y - highlight_radius),
@@ -583,19 +537,16 @@ class MapRenderer:
             width=3
         )
         del draw
-
         cropped_image = final_map.crop(box)
         map_bytes = BytesIO()
         try:
             cropped_image.save(map_bytes, format='PNG')
             map_bytes.seek(0)
             result = BytesIO(map_bytes.getvalue())
+            return result
         finally:
             map_bytes.close()
-            if hasattr(cropped_image, 'close'):
-                cropped_image.close()
-            if hasattr(final_map, 'close'):
-                final_map.close()
-            if hasattr(map_to_draw_on, 'close'):
-                map_to_draw_on.close()
-        return result
+            cropped_image.close()
+            final_map.close()
+            map_to_draw_on.close()
+            gc.collect()
