@@ -45,13 +45,15 @@ class PlayerCountView(discord.ui.View):
         self.page = page
         self.per_page = per_page
         self.max_page = (len(player_counts) - 1) // per_page
+        self.title = title  # タイトルを保持
+        self.color = color  # 色も保持
 
         # 最初のボタン状態をページ数に応じて設定
         self.previous.disabled = self.page == 0
         self.next.disabled = self.page == self.max_page
 
     async def update_message(self, interaction):
-        embed = discord.Embed(title="Guild Raid Player Counts")
+        embed = discord.Embed(title=self.title, color=self.color)
         start = self.page * self.per_page
         end = start + self.per_page
         for name, count in self.player_counts[start:end]:
@@ -121,17 +123,23 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             await send_authorized_only_message(interaction)
             return
         set_config("NOTIFY_CHANNEL_ID", str(channel.id))
-        await interaction.response.send_message(f"Guild Raid通知チャンネルを {channel.mention} に設定しました。", ephemeral=True)
-        logger.info(f"通知チャンネル設定: {channel.id}")
+        embed = create_embed(
+            description=None,
+            title="✅️ チャンネル設定が完了しました",
+            color=discord.Color.green()
+        )
+        embed.add_field(name="新しいチャンネル", value=channel.mention, inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # 履歴リスト出力コマンド
     @app_commands.command(name="list", description="指定レイド・日付の履歴をリスト表示")
     @app_commands.describe(
         raid_name="表示するレイド名(Totalはすべてのレイド合計)",
-        date="履歴を表示したい日付(YYYY-MM-DD表記)"
+        date="履歴を表示したい日付(YYYY-MM-DD表記)",
+        hidden="実行結果を自分だけに表示する（デフォルト: True）"
     )
     @app_commands.choices(raid_name=RAID_CHOICES)
-    async def guildraid_list(self, interaction: discord.Interaction, raid_name: str, date: str = None):
+    async def guildraid_list(self, interaction: discord.Interaction, raid_name: str, date: str = None, hidden: bool = True):
         """
         raid_name: 上記RAID_CHOICESから選択
         date: "2025-07-20"（日単位）, "2025-07"（月単位）, "2025"（年単位）など
@@ -165,7 +173,8 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             title_text = f"Guild Raid Player Counts: {raid_name}"
 
         if not rows:
-            await interaction.response.send_message("履歴がありません。", ephemeral=True)
+            embed = create_embed(description="履歴がありません。", title="🔴 エラーが発生しました", color=discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         # guild_raid_historyは1人1行で保存なので、playerカウント集計
@@ -177,15 +186,14 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
 
         # 最初のページを表示
-        view = PlayerCountView(sorted_counts, page=0)
-        embed = discord.Embed(title=title_text)
+        view = PlayerCountView(sorted_counts, title=title_text, color=discord.Color.blue(), page=0)
+        embed = discord.Embed(title=title_text, color=discord.Color.blue())
         for name, count in sorted_counts[:10]:
             safe_name = discord.utils.escape_markdown(name)
             embed.add_field(name=safe_name, value=f"Count: {count}", inline=False)
         embed.set_footer(text=f"Page 1/{view.max_page+1} | Minister Chikuwa")
 
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-        logger.info(f"履歴リスト出力: {raid_name} {date} (embed形式ページ付き)")
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=hidden)
 
     # 管理者補正コマンド
     @app_commands.command(name="count", description="指定プレイヤーのレイドクリア回数を補正")
