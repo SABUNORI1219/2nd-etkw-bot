@@ -1,4 +1,4 @@
-# lib/utils.py
+import discord
 import json
 import logging
 
@@ -10,7 +10,6 @@ def load_json_from_file(filepath: str) -> dict | list | None:
         with open(filepath, 'r', encoding='utf-8') as f:
             return json.load(f)
     except FileNotFoundError:
-        # ファイルが存在しないのは、まだキャッシュが作られていないだけなのでエラーではない
         return None
     except Exception as e:
         logger.error(f"ファイル'{filepath}'の読み込みに失敗: {e}")
@@ -25,3 +24,10 @@ def save_json_to_file(filepath: str, data: dict | list):
     except Exception as e:
         logger.error(f"ファイル'{filepath}'への書き込みに失敗: {e}")
         return False
+
+def create_embed(description: str = None, title: str = None, color: discord.Color = discord.Color.blurple()) -> discord.Embed:
+    embed = discord.Embed(description=description, color=color)
+    if title:
+        embed.title = title
+    embed.set_footer(text="Guild Raidシステム | Minister Chikuwa")
+    return embed
