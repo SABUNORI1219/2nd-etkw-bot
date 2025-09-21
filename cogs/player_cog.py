@@ -162,10 +162,9 @@ class PlayerSelectView(discord.ui.View):
         self.cog_instance = cog_instance
         self.owner_id = owner_id
 
-        # サーバーIDからGuildオブジェクト取得予定
-        self.skin_emojis = {}  # {uuid: emoji}
-        self.player_collision_dict = player_collision_dict  # 保存してcallbackで参照
-        self.options = []      # 保存してcallbackで参照
+        self.skin_emojis = {}
+        self.player_collision_dict = player_collision_dict
+        self.options = []
 
     async def prepare_options(self, bot):
         guild = bot.get_guild(SKIN_EMOJI_SERVER_ID)
@@ -244,9 +243,9 @@ class PlayerSelectView(discord.ui.View):
             await interaction.message.edit(embed=failed_embed, view=None)
             await self.cleanup_emojis()
             return
-        # 共通処理呼び出し（Viewからはeditのみ）
+        # 共通処理呼び出し
         await self.cog_instance.handle_player_data(interaction, data, use_edit=True)
-        await self.cleanup_emojis()  # 選択後に絵文字削除
+        await self.cleanup_emojis()
 
 class PlayerCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
