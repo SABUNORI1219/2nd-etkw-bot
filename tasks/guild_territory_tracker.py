@@ -91,6 +91,7 @@ async def track_guild_territories(loop_interval=60):
         else:
             global latest_territory_data
             latest_territory_data = territory_data
+            logger.info("[GuildTerritoryTracker] 領地データのグローバル保存に成功。オートコンプリートに利用されます。")
 
         current_guild_territories = defaultdict(set)
         for tname, tinfo in territory_data.items():
