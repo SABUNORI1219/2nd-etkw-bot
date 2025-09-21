@@ -103,10 +103,11 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         # 残り時間を秒単位で取得し、小数点以下を切り上げ
         remaining_seconds = math.ceil(error.retry_after)
         embed = create_embed(description=f"現在クールダウン中です。\nあと **{remaining_seconds}秒** 待ってからもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"Main System | Minister Chikuwa")
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     elif isinstance(error, app_commands.CheckFailure):
         # CheckFailure時のカスタムメッセージ
-        await interaction.response.send_message(str(error), ephemeral=True)
+        embed = create_embed(description=str(error), title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"Main System | Minister Chikuwa")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     else:
         # 他のエラーはコンソールに出力
         logger.error(f"--- [司令塔] 予期せぬエラーが発生: {error}", exc_info=True)
