@@ -5,7 +5,7 @@ def setup_logger():
     """
     Bot全体のロガーを設定する関数。
     """
-    # 既にハンドラが追加されていれば何もしない（多重出力防止）
+    # 既にハンドラが追加されていれば何もしない
     root_logger = logging.getLogger()
     if root_logger.hasHandlers():
         return
@@ -15,11 +15,9 @@ def setup_logger():
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
 
-    # ルートロガーだけにハンドラをつける（子ロガーはpropagateで十分）
+    # ルートロガーだけにハンドラをつける
     root_logger.setLevel(logging.INFO)
     root_logger.addHandler(handler)
 
-    # discordなどサードパーティのloggerはpropagate=Trueがデフォルトなので追加しなくてOK
-    # もし必要なら個別レベル設定だけ
     discord_logger = logging.getLogger('discord')
     discord_logger.setLevel(logging.INFO)
