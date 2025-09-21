@@ -39,7 +39,6 @@ def normalize_date(date_str):
         return parts[0]
     return date_str
 
-# ページ付きEmbed用View
 class PlayerCountView(discord.ui.View):
     def __init__(self, player_counts, title, color=discord.Color.blue(), page=0, per_page=10, timeout=120):
         super().__init__(timeout=timeout)
@@ -47,11 +46,10 @@ class PlayerCountView(discord.ui.View):
         self.page = page
         self.per_page = per_page
         self.max_page = (len(player_counts) - 1) // per_page
-        self.title = title  # タイトルを保持
-        self.color = color  # 色も保持
+        self.title = title
+        self.color = color
         self.message = None
 
-        # 最初のボタン状態をページ数に応じて設定
         self.previous.disabled = self.page == 0
         self.next.disabled = self.page == self.max_page
 
@@ -100,13 +98,11 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         self.system_name = "Guild Raidシステム"
 
     async def _get_etkw_members(self):
-        # Empire of TKWのメンバーを、get_guild_by_prefixで全ランクから収集
-        PREFIX = "ETKW"  # ETKWギルドのprefix（必要に応じてconfig参照にしてもOK）
+        PREFIX = "ETKW"
         data = await self.api.get_guild_by_prefix(PREFIX)
         members = set()
         if data and "members" in data:
             for rank_key, rank_obj in data["members"].items():
-                # rank_obj: {"MCID": {...}, ...} のdictであることが多いが、もしintなどなら無視
                 if isinstance(rank_obj, dict):
                     for mcid in rank_obj.keys():
                         members.add(mcid)
@@ -121,11 +117,9 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
     async def etkw_member_autocomplete(self, interaction: discord.Interaction, current: str):
         members = await self._get_etkw_members()
-        # currentの部分一致（大文字小文字区別・最大25件）
         results = [name for name in members if current in name]
         return [app_commands.Choice(name=name, value=name) for name in sorted(results)[:25]]
 
-    # 通知チャンネル設定コマンド
     @app_commands.command(name="channel", description="Guild Raid通知チャンネルを設定")
     async def guildraid_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
         # 権限チェック
@@ -142,7 +136,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         embed.add_field(name="新しいチャンネル", value=channel.mention, inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    # 履歴リスト出力コマンド
     @app_commands.command(name="list", description="指定レイド・日付の履歴をリスト表示")
     @app_commands.describe(
         raid_name="表示するレイド名(Totalはすべてのレイド合計)",
@@ -151,11 +144,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     )
     @app_commands.choices(raid_name=RAID_CHOICES)
     async def guildraid_list(self, interaction: discord.Interaction, raid_name: str, date: str = None, hidden: bool = True):
-        """
-        raid_name: 上記RAID_CHOICESから選択
-        date: "2025-07-20"（日単位）, "2025-07"（月単位）, "2025"（年単位）など
-        """
-
         date_from = None
         if date:
             normalized_date = normalize_date(date).strip()
@@ -188,15 +176,12 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
-        # guild_raid_historyは1人1行で保存なので、playerカウント集計
         player_counts = {}
         for row in rows:
-            # rowの構造: (id, raid_name, clear_time, member)
             member = row[3]
             player_counts[str(member)] = player_counts.get(str(member), 0) + 1
         sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
 
-        # 最初のページを表示
         view = PlayerCountView(sorted_counts, title=title_text, color=discord.Color.blue(), page=0)
         embed = discord.Embed(title=title_text, color=discord.Color.blue())
         for name, count in sorted_counts[:10]:
@@ -208,7 +193,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         msg = await interaction.original_response()
         view.message = msg
 
-    # 管理者補正コマンド
     @app_commands.command(name="count", description="指定プレイヤーのレイドクリア回数を補正")
     @app_commands.describe(
         player="プレイヤー名",
