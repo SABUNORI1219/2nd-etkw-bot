@@ -337,7 +337,9 @@ class MapRenderer:
                 x = (loc["start"][0] + loc["end"][0]) // 2
                 z = (loc["start"][1] + loc["end"][1]) // 2
                 px, py = self._coord_to_pixel(x, z)
-                px, py = px * self.scale_factor, py * self.scale_factor if hasattr(self, "scale_factor") else px, py
+                if hasattr(self, "scale_factor"):
+                    px = px * self.scale_factor
+                    py = py * self.scale_factor
                 if is_zoomed and box:
                     px -= box[0]
                     py -= box[1]
