@@ -28,9 +28,18 @@ class SpamDetectorCog(commands.Cog):
         if message.author == self.bot.user:
             return
 
-        #「atu」だけが送信された場合だけ"usi"と返す
+        # atu関連
         if message.content.strip() == "atu":
             await message.reply("usi")
+            return
+        if message.content.strip() == "ATU":
+            await message.reply("USI")
+            return
+        if message.content.strip() == "not atu":
+            await message.reply("fake usi")
+            return
+        if message.content.strip() == "NOT ATU":
+            await message.reply("FAKE USI")
             return
 
         # 監視対象のユーザーでなければ、何もしない
