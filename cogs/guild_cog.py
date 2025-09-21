@@ -44,11 +44,9 @@ class GuildCog(commands.Cog):
         }
 
         for rank_name, rank_group in members_data.items():
-            # 'total'キーは辞書ではないので、チェックしてスキップ
             if not isinstance(rank_group, dict):
                 continue
                 
-            # 各ランク内のプレイヤー情報をループ
             for player_name, player_data in rank_group.items():
                 if isinstance(player_data, dict) and player_data.get('online'):
                     star_rank = rank_to_stars_map.get(rank_name.upper(), "")
@@ -61,7 +59,6 @@ class GuildCog(commands.Cog):
         if not online_players:
             return "（現在オンラインのメンバーはいません）", 0
             
-        # 安全なデータアクセスに修正
         max_name_len = max((len(p.get('name','')) for p in online_players), default=6)
         max_server_len = max((len(p.get('server','')) for p in online_players), default=2)
         max_rank_len = max((len(p.get('rank','')) for p in online_players), default=5)
@@ -107,7 +104,6 @@ class GuildCog(commands.Cog):
         members_data = self._safe_get(data, ['members'], {})
         online_players_table, online_count = self._create_online_players_table(members_data)
         
-        # 埋め込みメッセージを作成
         description = f"""
     [公式サイトへのリンク](https://wynncraft.com/stats/guild/{encoded_name})
 ```python
@@ -139,22 +135,22 @@ Online Players: {online_count}/{total_members}
     async def guild(self, interaction: discord.Interaction, guild: str):
         await interaction.response.defer()
         
-        # キャッシュだと分かるようにキーを設定
+        # キャッシュキー
         cache_key = f"guild_{guild}"
         data_to_use = None
         from_cache = False
         is_stale = False
 
-        # --- ステップ1: まずキャッシュを確認 ---
+        # 1. キャッシュを確認
         cached_data = self.cache.get_cache(cache_key)
         if cached_data:
             logger.info(f"--- [Cache] ギルド'{guild}'のキャッシュを使用します。")
             data_to_use = cached_data
             from_cache = True
         
-        # --- ステップ2: キャッシュがなければ、公式APIで二段構えの検索 ---
+        # 2. 公式APIで二段構えの検索
         if not data_to_use:
-            # まずプレフィックスとして検索
+            # プレフィックス
             logger.info(f"--- [API] 公式API（プレフィックス）で '{guild}' を検索します...")
             data_as_prefix = await self.wynn_api.get_guild_by_prefix(guild)
 
@@ -179,13 +175,13 @@ Online Players: {online_count}/{total_members}
                 from_cache = True
                 is_stale = True
 
-        # --- ステップ4: データが何もなければ、ここで終了 ---
+        # 3. ここで終了
         if not data_to_use:
             embed = create_embed(description=f"ギルド **{guild}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
             return
 
-        # --- ステップ5: 取得したデータで、埋め込みとバナーを生成・送信 ---
+        # 4. 埋め込みとバナーを生成・送信
         embed = self._create_guild_embed(data_to_use, interaction, from_cache, is_stale)
         banner_bytes = self.banner_renderer.create_banner_image(data_to_use.get('banner'))
         
@@ -198,6 +194,6 @@ Online Players: {online_count}/{total_members}
             await interaction.followup.send(embed=embed)
 
             
-# BotにCogを登録するためのセットアップ関数
+# セットアップ関数
 async def setup(bot: commands.Bot):
     await bot.add_cog(GuildCog(bot))
