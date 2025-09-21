@@ -49,6 +49,7 @@ class PlayerCountView(discord.ui.View):
         self.max_page = (len(player_counts) - 1) // per_page
         self.title = title  # タイトルを保持
         self.color = color  # 色も保持
+        self.message = None
 
         # 最初のボタン状態をページ数に応じて設定
         self.previous.disabled = self.page == 0
@@ -77,6 +78,19 @@ class PlayerCountView(discord.ui.View):
         if self.page < self.max_page:
             self.page += 1
             await self.update_message(interaction)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if self.message is None:
+            self.message = interaction.message
+        return True
+
+    async def on_timeout(self):
+        for child in self.children:
+            if isinstance(child, discord.ui.Button):
+                child.disabled = True
+
+        if self.message:
+            await self.message.edit(view=self)
 
 class GuildRaidDetector(commands.GroupCog, name="graid"):
     def __init__(self, bot):
@@ -227,7 +241,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         )
         embed.add_field(name="プレイヤー", value=player, inline=False)
         embed.add_field(name="レイド名", value=raid_name, inline=False)
-        embed.add_field(name="補正後カウント", value=str(count), inline=False)
+        embed.add_field(name="補正カウント数", value=str(count), inline=False)
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
