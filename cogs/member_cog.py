@@ -387,7 +387,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
                 footer_text=f"{self.system_name} | Minister Chikuwa"
             )
             embed.add_field(name="MCID", value=mcid, inline=False)
-            embed.add_field(name="Discord ID", value=discord_user.id, inline=False)
+            embed.add_field(name="Discord ID", value=f"<@{discord_id}>", inline=False)
             await interaction.followup.send(embed=embed)
         else:
             embed = create_embed(description="登録解除に失敗したか、対象のメンバーが見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
