@@ -231,17 +231,16 @@ class PlayerSelectView(discord.ui.View):
 
     async def select_callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.owner_id:
-            await interaction.response.send_message(
-                "この操作はコマンドを実行したユーザーのみ有効です。", ephemeral=True
-            )
+            embed = create_embed(description="この操作はコマンドを実行したユーザーのみ有効です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.cog_instance.system_name} | Minister Chikuwa")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         selected_uuid = self.select_menu.values[0]
         self.select_menu.disabled = True
-        embed = create_embed(description="プレイヤー情報を取得中...", title="👀 複数のプレイヤーが見つかりました", color=discord.Color.purple(), footer_text=f"{self.system_name} | Minister Chikuwa")
+        embed = create_embed(description="プレイヤー情報を取得中...", title="👀 複数のプレイヤーが見つかりました", color=discord.Color.purple(), footer_text=f"{self.cog_instance.system_name} | Minister Chikuwa")
         await interaction.response.edit_message(embed=embed, view=self)
         data = await self.cog_instance.wynn_api.get_official_player_data(selected_uuid)
         if not data or 'uuid' not in data:
-            failed_embed = create_embed(description="選択されたプレイヤーの情報を取得できませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            failed_embed = create_embed(description="選択されたプレイヤーの情報を取得できませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.cog_instance.system_name} | Minister Chikuwa")
             await interaction.message.edit(embed=failed_embed, view=None)
             await self.cleanup_emojis()
             return
