@@ -96,7 +96,7 @@ class Territory(commands.GroupCog, name="territory"):
     def safe_filename(self, name: str) -> str:
         return re.sub(r'[^a-zA-Z0-9_-]', '_', name)
     
-    async def territory_autocomplete(
+    async def guild_autocomplete(
         interaction: discord.Interaction,
         current: str,
     ) -> list[app_commands.Choice[str]]:
