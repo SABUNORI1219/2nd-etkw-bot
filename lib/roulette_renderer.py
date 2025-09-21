@@ -53,24 +53,44 @@ class RouletteRenderer:
         )
 
     def _fit_text(self, text, font, max_width, max_height, max_lines=2):
-        # 自動改行＋フォントサイズ自動調整＋省略
+        """
+        できるだけ省略せず、フォントサイズ縮小と改行で枠内に収める。
+        どうしても収まらない場合のみ "..." を付けて省略。
+        """
         text = text.strip()
         orig_text = text
+
+        # 文字列をできるだけ省略せず表示する
         for size in range(font.size, 9, -1):
             try:
                 fnt = ImageFont.truetype(FONT_PATH, size)
             except IOError:
                 fnt = ImageFont.load_default()
-            wrapped = textwrap.wrap(text, width=8)
+            # 文字数に応じて自動改行
+            wrapped = textwrap.wrap(text, width=max(1, int(max_width // (size * 0.7))))
+            # 行数制限
             if len(wrapped) > max_lines:
                 wrapped = wrapped[:max_lines]
-                wrapped[-1] = wrapped[-1][:max(0, 6)] + "..."
             test_text = "\n".join(wrapped)
             bbox = fnt.getbbox(test_text)
             if bbox[2] <= max_width and bbox[3] <= max_height:
                 return test_text, fnt
-        # 最小サイズでも入らない場合
-        return orig_text[:5] + "...", ImageFont.truetype(FONT_PATH, 9) if os.path.exists(FONT_PATH) else ImageFont.load_default()
+
+        # 文字列長を少しずつ減らして収める
+        for trunc in range(len(orig_text) - 1, 0, -1):
+            truncated = orig_text[:trunc] + "..."
+            try:
+                fnt = ImageFont.truetype(FONT_PATH, 9)
+            except IOError:
+                fnt = ImageFont.load_default()
+            wrapped = textwrap.wrap(truncated, width=max(1, int(max_width // (9 * 0.7))))
+            wrapped = wrapped[:max_lines]
+            test_text = "\n".join(wrapped)
+            bbox = fnt.getbbox(test_text)
+            if bbox[2] <= max_width and bbox[3] <= max_height:
+                return test_text, fnt
+
+        return "…", ImageFont.truetype(FONT_PATH, 9) if os.path.exists(FONT_PATH) else ImageFont.load_default()
 
     def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text):
         draw.pieslice(
