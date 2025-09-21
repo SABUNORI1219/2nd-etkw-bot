@@ -13,7 +13,7 @@ from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.map_renderer import MapRenderer
 from lib.cache_handler import CacheHandler
 from lib.db import get_guild_territory_state
-from tasks.guild_territory_tracker import latest_territory_data, get_effective_owned_territories, sync_history_from_db
+from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db
 from config import EMBED_COLOR_BLUE, RESOURCE_EMOJIS, AUTHORIZED_USER_IDS, send_authorized_only_message
 
 logger = logging.getLogger(__name__)
@@ -99,6 +99,7 @@ class Territory(commands.GroupCog, name="territory"):
     @tasks.loop(minutes=1.0)
     async def update_territory_cache(self):
         logger.info("--- [TerritoryCache] テリトリー所有ギルドのキャッシュを更新します...")
+        from tasks.guild_territory_tracker import latest_territory_data
         global latest_territory_data
         territory_data = latest_territory_data
         if not territory_data:
