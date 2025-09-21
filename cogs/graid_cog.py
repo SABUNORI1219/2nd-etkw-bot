@@ -2,11 +2,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
-from lib.db import fetch_history, set_config, reset_player_raid_count
-from lib.api_stocker import WynncraftAPI
-from config import AUTHORIZED_USER_IDS, send_authorized_only_message, RESTRICTION
 import os
 import logging
+
+from lib.db import fetch_history, set_config, reset_player_raid_count
+from lib.api_stocker import WynncraftAPI
+from lib.utils import create_embed
+from config import AUTHORIZED_USER_IDS, send_authorized_only_message, RESTRICTION
 
 logger = logging.getLogger(__name__)
 
@@ -81,13 +83,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         self.bot = bot
         self.api = WynncraftAPI()
         self.etkw_member_cache = None
-
-    def create_embed(self, description: str = None, title: str = None, color: discord.Color = discord.Color.blurple()) -> discord.Embed:
-        embed = discord.Embed(description=description, color=color)
-        if title:
-            embed.title = title
-        embed.set_footer(text="Guild Raidシステム | Minister Chikuwa")
-        return embed
 
     async def _get_etkw_members(self):
         # Empire of TKWのメンバーを、get_guild_by_prefixで全ランクから収集
