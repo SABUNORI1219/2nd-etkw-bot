@@ -218,19 +218,21 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     @app_commands.choices(raid_name=ADDC_RAID_CHOICES)
     @app_commands.autocomplete(player=etkw_member_autocomplete)
     async def guildraid_count(self, interaction: discord.Interaction, player: str, raid_name: str, count: int):
+        await interaction.response.defer(ephemeral=True)
+        
         if not isinstance(interaction.user, discord.Member):
             embed = create_embed(description="このコマンドはサーバー内でのみ利用可能です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed)
             return
         if not self._has_required_role(interaction.user):
             embed = create_embed(description="このコマンドを使用する権限がありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed)
             return
 
         etkw_members = await self._get_etkw_members()
         if player not in etkw_members:
             embed = create_embed(description=f"指定プレイヤー **{player}** はETKWギルドメンバーではありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed)
             return
         
         reset_player_raid_count(player, raid_name, count)
@@ -245,7 +247,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         embed.add_field(name="レイド名", value=raid_name, inline=False)
         embed.add_field(name="補正カウント数", value=str(count), inline=False)
         
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
 # セットアップ関数
 async def setup(bot: commands.Bot):
