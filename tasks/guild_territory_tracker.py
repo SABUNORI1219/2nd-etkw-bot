@@ -107,7 +107,7 @@ async def track_guild_territories(loop_interval=60):
                     logger.warning(f"[GuildTerritoryTracker] 領地 {t} が複数ギルド({territory_to_current_guild[t]}, {guild_prefix})で同時所有状態")
                 territory_to_current_guild[t] = guild_prefix
 
-        # 修正: APIから消えた領地もlost付与して履歴に残す（1時間以内はDBにも残す）
+        # APIから消えた領地もlost付与して履歴に残す（1時間以内はDBにも残す）
         for g in list(guild_territory_history.keys()):
             hist = guild_territory_history[g]
             for tname in list(hist.keys()):
@@ -119,7 +119,6 @@ async def track_guild_territories(loop_interval=60):
                             hist[tname]["from_guild"] = g
                             hist[tname]["to_guild"] = current_owner
                 else:
-                    # APIから消えている場合もlost付与
                     if hist[tname].get("lost") is None:
                         hist[tname]["lost"] = now
                         hist[tname]["from_guild"] = g
