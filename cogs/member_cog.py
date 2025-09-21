@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import re
 
 from lib.api_stocker import WynncraftAPI
+from lib.utils import create_embed
 from lib.db import (
     add_member,
     remove_member,
@@ -116,113 +117,6 @@ def extract_role_display_name(role_name: str) -> str:
     s = re.sub(r"\s*\[.*?]\s*", " ", role_name)
     return s.strip()
 
-async def add_member_logic(
-    interaction: discord.Interaction,
-    mcid: str,
-    discord_user: discord.User = None,
-    *,
-    ephemeral: bool = True
-):
-    """
-    /member add の本体ロジックを共通関数化
-    - mcid: 正規化済みMCID（APIのusername）
-    - discord_user: DiscordユーザーオブジェクトまたはNone
-    - interaction: コマンド実行時のinteraction
-    - ephemeral: 応答をephemeralにするか
-    """
-    # ギルドデータ取得
-    api = WynncraftAPI()
-    guild_data = await api.get_guild_by_prefix("ETKW")
-    if not guild_data:
-        embed = discord.Embed(
-            title="エラー",
-            description="ギルドデータの取得に失敗しました。",
-            color=discord.Color.red()
-        )
-        await interaction.followup.send(embed=embed, ephemeral=ephemeral)
-        return False
-
-    # ギルド内ランク特定
-    ingame_rank = None
-    members_dict = guild_data.get('members', {})
-    found = False
-    for rank, rank_members in members_dict.items():
-        if rank == "total":
-            continue
-        if mcid in rank_members:
-            ingame_rank = rank.capitalize()
-            found = True
-            break
-    if not found:
-        embed = discord.Embed(
-            title="エラー",
-            description="❌ そのプレイヤーはギルドに所属していません。綴りを再確認してください。",
-            color=discord.Color.red()
-        )
-        await interaction.followup.send(embed=embed, ephemeral=ephemeral)
-        return False
-
-    # Discordユーザー取得
-    discord_id = discord_user.id if discord_user is not None else None
-    guild = interaction.guild
-    discord_member = None
-    if discord_id:
-        discord_member = guild.get_member(discord_id)
-        if discord_member is None:
-            try:
-                discord_member = await guild.fetch_member(discord_id)
-            except Exception:
-                discord_member = None
-
-    # データベース登録
-    success = add_member(mcid, discord_id, ingame_rank)
-    if not success:
-        embed = discord.Embed(
-            title="登録失敗",
-            description="❌ メンバーの登録に失敗しました。",
-            color=discord.Color.red()
-        )
-        await interaction.followup.send(embed=embed, ephemeral=ephemeral)
-        return False
-
-    # 役職付与 & ニックネーム変更
-    role_obj = None
-    if discord_member:
-        role_id = RANK_ROLE_ID_MAP.get(ingame_rank)
-        if role_id:
-            role_obj = guild.get_role(role_id)
-            if role_obj:
-                try:
-                    await discord_member.add_roles(role_obj, reason="ギルドランク連携")
-                except Exception as e:
-                    logger.error(f"ロール付与エラー: {e}")
-        if ETKW:
-            etkw_role = guild.get_role(ETKW)
-            if etkw_role:
-                try:
-                    await discord_member.add_roles(etkw_role, reason="ちくわロール")
-                except Exception as e:
-                    logger.error(f"ちくわロール付与エラー: {e}")
-        # ニックネーム変更
-        role_name = role_obj.name if role_obj else ingame_rank
-        prefix = extract_role_display_name(role_name)
-        new_nick = f"{prefix} {mcid}"
-        try:
-            if not discord_member.guild_permissions.administrator:
-                await discord_member.edit(nick=new_nick, reason="ギルドメンバー登録時の自動ニックネーム設定")
-        except Exception as e:
-            logger.error(f"ニックネーム編集エラー: {e}")
-
-    # 成功Embed
-    user_str = discord_member.display_name if discord_member else "Discordなし"
-    embed = discord.Embed(
-        title="メンバー登録成功",
-        description=f"✅ メンバー `{mcid}` を `{user_str}` としてランク `{ingame_rank}` で登録しました。",
-        color=discord.Color.green()
-    )
-    await interaction.followup.send(embed=embed, ephemeral=ephemeral)
-    return True
-
 class MemberListView(discord.ui.View):
     def __init__(self, cog_instance, initial_page: int, total_pages: int, rank_filter: str, sort_by: str, last_seen_members=None):
         super().__init__(timeout=180.0)
@@ -305,6 +199,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.api = WynncraftAPI()
+        self.system_name = "メンバーシステム"
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
     @commands.Cog.listener()
@@ -327,52 +222,120 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
     @app_commands.command(name="add", description="メンバーを登録")
     @app_commands.describe(discord_user="登録したいDiscordユーザー（いない場合は入力不要、またはNone）")
     async def add(self, interaction: discord.Interaction, mcid: str, discord_user: discord.User = None):
-        """
-        /member addコマンド本体
-        - mcid: ユーザー入力またはAPIの正規化済みusername
-        - discord_user: ユーザー指定（省略可）
-        """
         await interaction.response.defer(ephemeral=True)
 
         # サーバー内で実行しているかチェック
         guild = interaction.guild
         if guild is None:
-            embed = discord.Embed(
-                title="エラー",
-                description="サーバー内でのみ使用できます。",
-                color=discord.Color.red()
-            )
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            embed = create_embed(description="このコマンドはサーバー内でのみ利用可能です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
 
-        # 必要なら権限チェック（Ticketロールなど）
+        # 権限チェック（Ticket Chikuwaロール）
         member = interaction.user
         if Ticket:
             etkw_role = guild.get_role(Ticket)
             if etkw_role and etkw_role.id not in [r.id for r in member.roles]:
-                embed = discord.Embed(
-                    title="権限エラー",
-                    description="このコマンドを使う権限がありません。",
-                    color=discord.Color.red()
-                )
-                await interaction.followup.send(embed=embed, ephemeral=True)
+                embed = create_embed(description="このコマンドを使用する権限がありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=embed)
                 return
 
-        # 共通関数呼び出し
-        await add_member_logic(
-            interaction=interaction,
-            mcid=mcid,
-            discord_user=discord_user,
-            ephemeral=True
+        # ギルドデータ取得
+        guild_data = await self.api.get_guild_by_prefix("ETKW")
+        if not guild_data:
+            embed = create_embed(description="ギルドデータの取得に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
+            return False
+    
+        # ギルド内ランク特定
+        ingame_rank = None
+        members_dict = guild_data.get('members', {})
+        found = False
+        for rank, rank_members in members_dict.items():
+            if rank == "total":
+                continue
+            if mcid in rank_members:
+                ingame_rank = rank.capitalize()
+                found = True
+                break
+        if not found:
+            embed = create_embed(description=f"プレイヤー **{mcid}** はETKWに所属していません。\n綴りを再確認してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
+            return False
+    
+        # Discordユーザー取得
+        discord_id = discord_user.id if discord_user is not None else None
+        guild = interaction.guild
+        discord_member = None
+        if discord_id:
+            discord_member = guild.get_member(discord_id)
+            if discord_member is None:
+                try:
+                    discord_member = await guild.fetch_member(discord_id)
+                except Exception:
+                    discord_member = None
+    
+        # データベース登録
+        success = add_member(mcid, discord_id, ingame_rank)
+        if not success:
+            embed = create_embed(description="メンバーのDBへの登録が失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
+            return False
+    
+        # 役職付与 & ニックネーム変更
+        role_obj = None
+        if discord_member:
+            role_id = RANK_ROLE_ID_MAP.get(ingame_rank)
+            if role_id:
+                role_obj = guild.get_role(role_id)
+                if role_obj:
+                    try:
+                        await discord_member.add_roles(role_obj)
+                    except Exception as e:
+                        logger.error(f"ロール付与エラー: {e}")
+            if ETKW:
+                etkw_role = guild.get_role(ETKW)
+                if etkw_role:
+                    try:
+                        await discord_member.add_roles(etkw_role)
+                    except Exception as e:
+                        logger.error(f"ちくわロール付与エラー: {e}")
+            # ニックネーム変更
+            role_name = role_obj.name if role_obj else ingame_rank
+            prefix = extract_role_display_name(role_name)
+            new_nick = f"{prefix} {mcid}"
+            try:
+                if not discord_member.guild_permissions.administrator:
+                    await discord_member.edit(nick=new_nick)
+            except Exception as e:
+                logger.error(f"ニックネーム編集エラー: {e}")
+    
+        # 成功Embed
+        if discord_member:
+            user_str = f"<@{discord_member.id}>"
+        else:
+            user_str = "Discordなし"
+        
+        embed = create_embed(
+            description=None,
+            title="✅️ メンバーの登録に成功しました",
+            color=discord.Color.green(),
+            footer_text=f"{self.system_name} | Minister Chikuwa"
         )
+        embed.add_field(name="MCID", value=mcid, inline=False)
+        embed.add_field(name="Discord ID", value=user_str, inline=False)
+        embed.add_field(name="ギルド内ランク", value=`ingame_rank`, inline=False)
+
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="remove", description="メンバーの登録を解除")
     async def remove(self, interaction: discord.Interaction, mcid: str = None, discord_user: discord.User = None):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
 
         guild: discord.Guild | None = interaction.guild
         if guild is None:
-            await interaction.followup.send("サーバー内でのみ使用できます。")
+            embed = create_embed(description="このコマンドはサーバー内でのみ利用可能です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
 
         member: discord.Member = interaction.user
@@ -381,11 +344,14 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         if Ticket:
             etkw_role = guild.get_role(Ticket)
             if etkw_role and etkw_role.id not in [r.id for r in member.roles]:
-                await interaction.followup.send("このコマンドを使う権限がありません。")
+                embed = create_embed(description="このコマンドを使用する権限がありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=embed)
                 return
 
         if not mcid and not discord_user:
-            await interaction.followup.send("MCIDまたはDiscordユーザーのどちらかを指定してください。"); return
+            embed = create_embed(description="MCIDかDiscord IDのどちらかを必ず指定してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
+            return
 
         # Discordメンバー取得
         target_member: discord.Member = None
@@ -415,32 +381,40 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
 
         success = remove_member(mcid=mcid, discord_id=discord_user.id if discord_user else None)
         if success:
-            target = mcid if mcid else discord_user.display_name
-            await interaction.followup.send(f"✅ メンバー `{target}` の登録を解除しました。")
+            embed = create_embed(
+                description=None,
+                title="✅️ メンバーの登録解除に成功しました",
+                color=discord.Color.green(),
+                footer_text=f"{self.system_name} | Minister Chikuwa"
+            )
+            embed.add_field(name="MCID", value=mcid, inline=False)
+            embed.add_field(name="Discord ID", value=discord_user.id, inline=False)
+            await interaction.followup.send(embed=embed)
         else:
-            await interaction.followup.send("❌ 登録解除に失敗したか、対象のメンバーが見つかりませんでした。")
+            embed = create_embed(description="登録解除に失敗したか、対象のメンバーが見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
 
         if target_member is not None:
-            # ニックネームを元に戻す（None＝デフォルト名に戻す）
+            # ニックネームを元に戻す
             try:
                 if not target_member.guild_permissions.administrator:
-                    await target_member.edit(nick=None, reason="removeコマンドによるニックネームリセット")
+                    await target_member.edit(nick=None)
             except Exception as e:
                 logger.error(f"remove ニックネームリセット失敗: {e}")
 
             # ROLE_ID_TO_RANK内のロールを全て削除
             roles_to_remove = [role for role in target_member.roles if role.id in ROLE_ID_TO_RANK]
-            if ETKW:  # ETKWはint型のロールIDの場合
-                        etkw_role = guild.get_role(ETKW)
+            if ETKW: 
+                etkw_role = guild.get_role(ETKW)
             if roles_to_remove:
                 try:
-                    await target_member.remove_roles(*roles_to_remove, reason="removeコマンドによるランクロール削除")
+                    await target_member.remove_roles(*roles_to_remove)
                 except Exception as e:
                     logger.error(f"remove ランクロール削除失敗: {e}")
 
             if etkw_role:
                 try:
-                    await target_member.remove_roles(etkw_role, reason="ちくわロール")
+                    await target_member.remove_roles(etkw_role)
                 except Exception as e:
                     logger.error(f"ロール削除エラー: {e}")
 
@@ -450,7 +424,8 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
 
         guild: discord.Guild | None = interaction.guild
         if guild is None:
-            await interaction.followup.send("サーバー内でのみ使用できます。")
+            embed = create_embed(description="このコマンドはサーバー内でのみ利用可能です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
 
         member: discord.Member = interaction.user
@@ -459,22 +434,25 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         if Ticket:
             etkw_role = guild.get_role(Ticket)
             if etkw_role and etkw_role.id not in [r.id for r in member.roles]:
-                await interaction.followup.send("このコマンドを使う権限がありません。")
+                embed = create_embed(description="このコマンドを使用する権限がありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=embed)
                 return
 
         if not mcid and not discord_user:
-            await interaction.followup.send("MCIDまたはDiscordユーザーのどちらかを指定してください。"); return
+            embed = create_embed(description="MCIDかDiscord IDのどちらかを必ず指定してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
+            return
 
         db_data = get_member(mcid=mcid, discord_id=discord_user.id if discord_user else None)
         if not db_data:
-            await interaction.followup.send("指定されたメンバーは登録されていません。")
+            embed = create_embed(description="指定したメンバーは登録されていません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
         
         player_data = await self.api.get_official_player_data(db_data['mcid'])
         last_seen = "N/A"
         if player_data and player_data.get('lastJoin'):
             last_seen = player_data['lastJoin'].split('T')[0]
-        # それ以外は "N/A" のまま
         
         embed = discord.Embed(title=db_data['mcid'], color=discord.Color.green())
         embed.set_thumbnail(url=f"https://www.mc-heads.net/head/{db_data['mcid']}")
@@ -484,7 +462,8 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             embed.add_field(name="Discord", value=f"<@{db_data['discord_id']}>", inline=False)
         else:
             embed.add_field(name="Discord", value="Discordなし", inline=False)
-        
+
+        embed.set_footer(text=f"{self.system_name} | Minister Chikuwa")
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="list", description="登録メンバーの一覧を表示")
@@ -495,7 +474,8 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
 
         guild: discord.Guild | None = interaction.guild
         if guild is None:
-            await interaction.followup.send("サーバー内でのみ使用できます。")
+            embed = create_embed(description="このコマンドはサーバー内でのみ利用可能です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
 
         member: discord.Member = interaction.user
@@ -504,7 +484,8 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         if Ticket:
             etkw_role = guild.get_role(Ticket)
             if etkw_role and etkw_role.id not in [r.id for r in member.roles]:
-                await interaction.followup.send("このコマンドを使う権限がありません。")
+                embed = create_embed(description="このコマンドを使用する権限がありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=embed)
                 return
 
         if sort == "last_seen":
@@ -532,12 +513,14 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         await interaction.response.defer(ephemeral=True)
 
         if not PROMOTION_ROLE_MAP:
-            await interaction.followup.send("PROMOTION_ROLE_MAP が設定されていません。config.py を確認してください。")
+            embed = create_embed(description="必要なデータが設定されていません。Bot制作者に連絡してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
 
         guild: discord.Guild | None = interaction.guild
         if guild is None:
-            await interaction.followup.send("サーバー内でのみ使用できます。")
+            embed = create_embed(description="このコマンドはサーバー内でのみ利用可能です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
 
         target: discord.Member | None = guild.get_member(user.id)
@@ -547,7 +530,8 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             except Exception:
                 target = None
         if target is None:
-            await interaction.followup.send("対象ユーザーを取得できませんでした。")
+            embed = create_embed(description="対象のユーザーを取得できませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
 
         target_role_ids = {r.id for r in target.roles}
@@ -561,26 +545,28 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
                 break
 
         if old_role_id is None:
-            await interaction.followup.send("昇格可能な旧ロールを保持していません。")
+            embed = create_embed(description="対象のユーザーは昇格可能な旧ロールを保持していません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
 
         old_role = guild.get_role(old_role_id)
         new_role = guild.get_role(new_role_id) if new_role_id else None
         if new_role is None:
-            await interaction.followup.send("新ロールが見つかりません。PROMOTION_ROLE_MAP を確認してください。")
+            embed = create_embed(description="新しいロールが見つかりませんでした。Bot制作者に連絡してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
 
         add_ok = True
         remove_ok = True
         try:
-            await target.add_roles(new_role, reason="昇格: 新ロール付与")
+            await target.add_roles(new_role)
         except Exception as e:
             add_ok = False
             logger.error(f"新ロール付与失敗: {e}")
 
         if add_ok and old_role:
             try:
-                await target.remove_roles(old_role, reason="昇格: 旧ロール削除")
+                await target.remove_roles(old_role)
             except Exception as e:
                 remove_ok = False
                 logger.error(f"旧ロール削除失敗: {e}")
@@ -598,16 +584,21 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
             base_nick = base_nick[:32]
 
         try:
-            await target.edit(nick=base_nick, reason="昇格による接頭辞更新")
+            await target.edit(nick=base_nick)
         except Exception as e:
             logger.error(f"昇格ニックネーム変更失敗: {e}")
 
-        msgs = [f"✅ 昇格処理: <@{target.id}> {old_role.mention if old_role else old_role_id} -> {new_role.mention}"]
-        if not add_ok:
-            msgs.append("⚠️ 新ロール付与に失敗しました。")
-        if not remove_ok:
-            msgs.append("⚠️ 旧ロール削除に失敗しました。")
-        await interaction.followup.send("\n".join(msgs))
+        embed = create_embed(
+            description=None,
+            title="✅️ メンバー昇格処理に成功しました",
+            color=discord.Color.green(),
+            footer_text=f"{self.system_name} | Minister Chikuwa"
+        )
+        embed.add_field(name="Discord ID", value=f"<@{target.id}>", inline=False)
+        embed.add_field(name="旧ロール", value=f"{old_role.mention if old_role else old_role_id}", inline=False)
+        embed.add_field(name="新ロール", value=f"{new_role.mention}", inline=False)
+        
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="rename", description="任意の名前でニックネームを変更")
     @app_commands.describe(name="新しい名前")
@@ -616,16 +607,18 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
 
         guild: discord.Guild | None = interaction.guild
         if guild is None:
-            await interaction.followup.send("サーバー内でのみ使用できます。")
+            embed = create_embed(description="このコマンドはサーバー内でのみ利用可能です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
 
         member: discord.Member = interaction.user
 
-        # 権限判定（ETKW ロールを持っているかどうか。複数条件にしたい場合はリスト化）
+        # 権限判定（ETKW ロールを持っているかどうか）
         if ETKW:
             etkw_role = guild.get_role(ETKW)
             if etkw_role and etkw_role.id not in [r.id for r in member.roles]:
-                await interaction.followup.send("このコマンドを使う権限がありません。")
+                embed = create_embed(description="このコマンドを使用する権限がありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=embed)
                 return
 
         # ランクロール特定
@@ -639,7 +632,8 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
                 break
         
         if current_rank is None:
-            await interaction.followup.send("ランクロールを検出できませんでした。")
+            embed = create_embed(description="ランクロールを検出できませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
 
         if current_rank_role_obj:
@@ -654,15 +648,24 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
 
         try:
             if not member.guild_permissions.administrator:
-                await member.edit(nick=new_nick, reason="renameコマンド")
+                await member.edit(nick=new_nick)
             else:
                 logger.warning("管理者権限ユーザーはニックネーム変更できない場合があります。")
         except Exception as e:
             logger.error(f"rename ニックネーム変更失敗: {e}")
-            await interaction.followup.send("ニックネーム変更に失敗しました。Botのロール位置や権限を確認してください。")
+            embed = create_embed(description="ニックネーム変更に失敗しました。\nBotのロール位置や権限を確認してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
 
-        await interaction.followup.send(f"✅ ニックネームを `{new_nick}` に変更しました。")
+        embed = create_embed(
+            description=None,
+            title="✅️ ニックネームの変更に成功しました",
+            color=discord.Color.green(),
+            footer_text=f"{self.system_name} | Minister Chikuwa"
+        )
+        embed.add_field(name="ニックネーム", value=new_nick, inline=False)
+        
+        await interaction.followup.send(embed=embed)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(MemberCog(bot))
