@@ -108,12 +108,9 @@ class BannerRenderer:
             new_size = (original_width * scale_factor, original_height * scale_factor)
             resized_image = banner_image.resize(new_size, resample=Image.Resampling.NEAREST)
 
-            logger.info(f"--- [Banner] 画像を {scale_factor} 倍に拡大しました。新しいサイズ: {resized_image}")
-
             final_buffer = BytesIO()
             resized_image.save(final_buffer, format='PNG')
             final_buffer.seek(0)
-            logger.info("--- [Banner] ✅ バナー画像の生成と拡大に成功しました。")
             return final_buffer
 
         except Exception as e:
