@@ -13,7 +13,7 @@ from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.map_renderer import MapRenderer
 from lib.cache_handler import CacheHandler
 from lib.db import get_guild_territory_state
-from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db
+from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db, latest_territory_data
 from config import EMBED_COLOR_BLUE, RESOURCE_EMOJIS, AUTHORIZED_USER_IDS, send_authorized_only_message
 
 logger = logging.getLogger(__name__)
@@ -95,37 +95,18 @@ class Territory(commands.GroupCog, name="territory"):
 
     def safe_filename(self, name: str) -> str:
         return re.sub(r'[^a-zA-Z0-9_-]', '_', name)
-
-    @tasks.loop(minutes=1.0)
-    async def update_territory_cache(self):
-        logger.info("--- [TerritoryCache] テリトリー所有ギルドのキャッシュを更新します...")
-        cache_key = "wynn_territory_list"
-        territory_data = self.cache.get_cache(cache_key)
-        if not territory_data:
-            territory_data = await self.wynn_api.get_territory_list()
-            if territory_data:
-                self.cache.set_cache(cache_key, territory_data)
-        if territory_data:
-            guild_names = set(
-                data['guild']['prefix']
-                for data in territory_data.values()
-                if data['guild']['prefix']
-            )
-            self.territory_guilds_cache = sorted(list(guild_names))
-            logger.info(f"--- [TerritoryCache] ✅ {len(self.territory_guilds_cache)}個のギルドをキャッシュしました。")
-
-    @update_territory_cache.before_loop
-    async def before_cache_update(self):
-        await self.bot.wait_until_ready()
-
-    async def guild_autocomplete(
-        self,
+    
+    async def territory_autocomplete(
         interaction: discord.Interaction,
         current: str,
     ) -> list[app_commands.Choice[str]]:
+        try:
+            territory_names = list(latest_territory_data.keys())
+        except Exception:
+            territory_names = []
         return [
             app_commands.Choice(name=name, value=name)
-            for name in self.territory_guilds_cache if current.lower() in name.lower()
+            for name in territory_names if current.lower() in name.lower()
         ][:25]
 
     async def get_territory_data_with_cache(self):
