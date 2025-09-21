@@ -48,13 +48,12 @@ def estimate_and_save_parties(clear_events, window=None):
 
     saved_parties = []
     party_keys = set()
-    window_set = set(id(e) for e in window) if window is not None else set()  # eventのidで管理
+    window_set = set(id(e) for e in window) if window is not None else set()
 
-    # 追加: サーバーごと・時間ごとのグループ化を優先
     for raid, events in events_by_raid.items():
         events.sort(key=lambda x: x["clear_time"])
 
-        # --- 1. サーバー単位でグループ化してパーティ認定を優先 ---
+        # 1. サーバー単位でグループ化してパーティ認定を優先
         server_events = defaultdict(list)
         for e in events:
             server_events[e["server"]].append(e)
@@ -91,7 +90,7 @@ def estimate_and_save_parties(clear_events, window=None):
                     # 認定イベントのみwindowから除去
                     if window is not None:
                         remove_events_from_window(window, party_candidate, time_threshold=500)
-        # --- 2. サーバー混在グループは、残りイベントで通常スコア判定 ---
+        # 2. サーバー混在グループは、残りイベントで通常スコア判定
         # windowから既に除去されたイベントは対象外
         remaining_events = [e for e in events if window is None or id(e) in window_set]
         for i in range(len(remaining_events) - 3):
