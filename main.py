@@ -25,13 +25,13 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-# Botのステータス（アクティビティ）を定義
+# Botのステータスを定義
 activity = discord.Streaming(
     name="ちくちくちくわ",
     url="https://www.youtube.com/watch?v=E6O3-hAwJDY"
 )
 
-# Botが必要とする権限（Intents）を定義
+# Botが必要とする権限
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -95,7 +95,6 @@ class MyBot(commands.Bot):
         logger.info("Botは正常に起動し、現在稼働中です。")
         logger.info("==================================================")
 
-# Botのインスタンスを作成
 bot = MyBot()
 
 @bot.tree.error
@@ -109,10 +108,8 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         # CheckFailure時のカスタムメッセージ
         await interaction.response.send_message(str(error), ephemeral=True)
     else:
-        # 他のエラーはコンソールに出力（これまで通り）
+        # 他のエラーはコンソールに出力
         logger.error(f"--- [司令塔] 予期せぬエラーが発生: {error}", exc_info=True)
-        # 必要であれば、ユーザーにエラーが発生したことを伝えるメッセージを送信
-        # await interaction.response.send_message("コマンドの実行中にエラーが発生しました。", ephemeral=True)
 
 # HElper Function Desu
 async def ensure_application_embed():
