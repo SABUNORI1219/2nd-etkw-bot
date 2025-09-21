@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONT_PATH = os.path.join(project_root, "assets", "fonts", "NotoSansJP-Bold.ttf")
 
-
 class RouletteRenderer:
     """
     ルーレット画像・GIF生成担当
