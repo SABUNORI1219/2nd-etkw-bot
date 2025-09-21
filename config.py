@@ -70,5 +70,5 @@ async def send_authorized_only_message(interaction: discord.Interaction, user_id
         user_ids = AUTHORIZED_USER_IDS
     # mention形式のユーザー名リストを作る
     mentions = ", ".join([f"<@{uid}>" for uid in user_ids])
-    embed = create_embed(description=f"このコマンドは現在 {mentions} のみ使用できます！", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+    embed = create_embed(description=f"このコマンドは現在 {mentions} のみ使用できます！", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"Config | Minister Chikuwa")
     await interaction.response.send_message(embed=embed)
