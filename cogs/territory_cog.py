@@ -13,6 +13,7 @@ from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.map_renderer import MapRenderer
 from lib.cache_handler import CacheHandler
 from lib.db import get_guild_territory_state
+from lib.utils import create_embed
 from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db
 from config import RESOURCE_EMOJIS, AUTHORIZED_USER_IDS, send_authorized_only_message
 
@@ -44,6 +45,7 @@ class Territory(commands.GroupCog, name="territory"):
         self.other_api = OtherAPI()
         self.map_renderer = MapRenderer()
         self.cache = CacheHandler()
+        self.system_name = "Territory Map"
         self.territory_guilds_cache = [] # ギルド名のリスト
         self.update_territory_cache.start() # 定期更新タスクを開始
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
@@ -154,7 +156,8 @@ class Territory(commands.GroupCog, name="territory"):
         territory_data = await self.get_territory_data_with_cache()
         guild_color_map = await self.get_guild_color_map_with_cache()
         if not territory_data or not guild_color_map:
-            await interaction.followup.send("テリトリーまたはギルドカラー情報の取得に失敗しました。コマンドをもう一度お試しください。")
+            embed = create_embed(description="テリトリーまたはギルドカラー情報の取得に失敗しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
         sync_history_from_db()
         db_state = get_guild_territory_state()
@@ -165,7 +168,8 @@ class Territory(commands.GroupCog, name="territory"):
                 if data['guild']['prefix'].upper() == guild.upper()
             }
             if not territories_to_render:
-                await interaction.followup.send(f"ギルド「{guild}」は現在テリトリーを所有していません。")
+                embed = create_embed(description=f"ギルド **{guild}** は現在、領地を所有していません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=embed)
                 return
         else:
             territories_to_render = territory_data
@@ -184,7 +188,8 @@ class Territory(commands.GroupCog, name="territory"):
                 file.close()
             del file, embed
         else:
-            await interaction.followup.send("マップの生成中にエラーが発生しました。コマンドをもう一度お試しください。")
+            embed = create_embed(description="マップの生成中にエラーが発生しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
         gc.collect()
 
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
@@ -197,11 +202,13 @@ class Territory(commands.GroupCog, name="territory"):
         guild_color_map = await self.get_guild_color_map_with_cache()
         territory_data = await self.get_territory_data_with_cache()
         if not territory_data:
-            await interaction.followup.send("テリトリー情報の取得に失敗しました。")
+            embed = create_embed(description="テリトリー情報の取得に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
         target_territory_live_data = territory_data.get(territory)
         if not target_territory_live_data:
-            await interaction.followup.send(f"「{territory}」は無効なテリトリーか、現在どのギルドも所有していません。")
+            embed = create_embed(description=f"**{territory}** は存在しない領地か、現在どのギルドも所有していません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
         embed = self._create_status_embed(
             interaction,
