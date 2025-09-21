@@ -205,6 +205,8 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         embed.set_footer(text=f"Page 1/{view.max_page+1} | Minister Chikuwa")
 
         await interaction.response.send_message(embed=embed, view=view, ephemeral=hidden)
+        msg = await interaction.original_response()
+        view.message = msg
 
     # 管理者補正コマンド
     @app_commands.command(name="count", description="指定プレイヤーのレイドクリア回数を補正")
