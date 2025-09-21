@@ -82,7 +82,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         self.api = WynncraftAPI()
         self.etkw_member_cache = None
 
-    def create_embed(description: str = None, title: str = None, color: discord.Color = discord.Color.blurple()) -> discord.Embed:
+    def create_embed(self, description: str = None, title: str = None, color: discord.Color = discord.Color.blurple()) -> discord.Embed:
         embed = discord.Embed(description=description, color=color)
         if title:
             embed.title = title
