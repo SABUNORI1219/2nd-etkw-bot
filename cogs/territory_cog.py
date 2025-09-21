@@ -14,7 +14,7 @@ from lib.map_renderer import MapRenderer
 from lib.cache_handler import CacheHandler
 from lib.db import get_guild_territory_state
 from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db
-from config import EMBED_COLOR_BLUE, RESOURCE_EMOJIS, AUTHORIZED_USER_IDS, send_authorized_only_message
+from config import RESOURCE_EMOJIS, AUTHORIZED_USER_IDS, send_authorized_only_message
 
 logger = logging.getLogger(__name__)
 
