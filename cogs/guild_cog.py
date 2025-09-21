@@ -12,7 +12,6 @@ from lib.api_stocker import WynncraftAPI
 from lib.cache_handler import CacheHandler
 from lib.banner_renderer import BannerRenderer
 from lib.utils import create_embed
-from config import EMBED_COLOR_BLUE
 
 class GuildCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -125,7 +124,7 @@ Online Players: {online_count}/{total_members}
 """
         embed = discord.Embed(
             description=description,
-            color=EMBED_COLOR_BLUE
+            color=discord.Color.green()
         )
         
         embed.title = f"[{prefix}] {name}"
