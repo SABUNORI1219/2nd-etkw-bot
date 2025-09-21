@@ -220,7 +220,7 @@ class MapRenderer:
         except Exception:
             return ImageFont.load_default()
 
-    def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None, upscale_factor=2):
+    def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None, upscale_factor=1.5):
         upscaled_lines = None
         overlay = None
 
@@ -254,7 +254,7 @@ class MapRenderer:
                         else:
                             points = [(l_scaled_px1, l_scaled_py1), (l_scaled_px2, l_scaled_py2)]
                         color_rgb = (30, 30, 30)
-                        draw_lines.line(points, fill=(*color_rgb, 180), width=4)
+                        draw_lines.line(points, fill=(*color_rgb, 180), width=3)
                 except KeyError:
                     continue
             lines_down = upscaled_lines.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
