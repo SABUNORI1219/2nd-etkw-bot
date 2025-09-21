@@ -28,6 +28,11 @@ class SpamDetectorCog(commands.Cog):
         if message.author == self.bot.user:
             return
 
+        #「atu」だけが送信された場合だけ"usi"と返す
+        if message.content.strip() == "atu":
+            await message.reply("usi")
+            return
+
         # 監視対象のユーザーでなければ、何もしない
         if message.author.id not in SPAM_TARGET_USER_IDS:
             return
