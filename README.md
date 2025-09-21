@@ -1,7 +1,8 @@
-# 2nd-etkw-bot
+# Minister Chikuwa
 
 Empire of TKW [ETKW]メンバー専用のBot。
 Emperor Chikuwaという初代がいるため2ndとなっている。
+文字通り初代が皇帝なので、二代目は大臣となっている。
 
 ## 概要
 - Python製のDiscord Bot
