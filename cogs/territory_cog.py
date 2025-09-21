@@ -7,6 +7,7 @@ import json
 import os
 import re
 from datetime import datetime, timezone
+import gc
 
 from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.map_renderer import MapRenderer
@@ -60,7 +61,6 @@ class Territory(commands.GroupCog, name="territory"):
         days = duration.days
         hours, remainder = divmod(duration.seconds, 3600)
         minutes, _ = divmod(remainder, 60)
-
         held_for_parts = []
         if days > 0:
             held_for_parts.append(f"{days} days")
@@ -69,7 +69,6 @@ class Territory(commands.GroupCog, name="territory"):
         if minutes > 0:
             held_for_parts.append(f"{minutes} mins")
         held_for = " ".join(held_for_parts) if held_for_parts else "Just now"
-
         production_data = static_data.get('resources', {})
         production_text_list = []
         for res_name, amount in production_data.items():
@@ -81,7 +80,6 @@ class Territory(commands.GroupCog, name="territory"):
                 production_text_list.append(f"{emoji} {display_res_name}: `+{amount}/h`")
         production_text = "\n".join(production_text_list) if production_text_list else "None"
         conns_count = len(static_data.get('Trading Routes', []))
-
         embed = discord.Embed(title=f"{territory}", color=discord.Color.dark_teal())
         guild_name = target_territory_live_data['guild']['name']
         guild_prefix = target_territory_live_data['guild']['prefix']
@@ -101,7 +99,6 @@ class Territory(commands.GroupCog, name="territory"):
     @tasks.loop(minutes=1.0)
     async def update_territory_cache(self):
         logger.info("--- [TerritoryCache] テリトリー所有ギルドのキャッシュを更新します...")
-        # キャッシュを利用してAPIの無駄な多重アクセスを防止
         cache_key = "wynn_territory_list"
         territory_data = self.cache.get_cache(cache_key)
         if not territory_data:
@@ -155,20 +152,14 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.describe(guild="On-map Guild Prefix")
     async def map(self, interaction: discord.Interaction, guild: str = None):
         await interaction.response.defer()
-
-        # キャッシュ経由でAPI・カラー取得
         territory_data = await self.get_territory_data_with_cache()
         guild_color_map = await self.get_guild_color_map_with_cache()
-
         if not territory_data or not guild_color_map:
             await interaction.followup.send("テリトリーまたはギルドカラー情報の取得に失敗しました。コマンドをもう一度お試しください。")
             return
-
-        # 所有＋1時間以内失領のDBキャッシュを同期
         sync_history_from_db()
         db_state = get_guild_territory_state()
         owned_territories_map = {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
-
         if guild:
             territories_to_render = {
                 name: data for name, data in territory_data.items()
@@ -179,7 +170,6 @@ class Territory(commands.GroupCog, name="territory"):
                 return
         else:
             territories_to_render = territory_data
-
         loop = asyncio.get_running_loop()
         file, embed = await loop.run_in_executor(
             None,
@@ -191,8 +181,12 @@ class Territory(commands.GroupCog, name="territory"):
         )
         if file and embed:
             await interaction.followup.send(file=file, embed=embed)
+            if hasattr(file, 'close'):
+                file.close()
+            del file, embed
         else:
             await interaction.followup.send("マップの生成中にエラーが発生しました。コマンドをもう一度お試しください。")
+        gc.collect()
 
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.command(name="status", description="指定されたテリトリーのステータスを表示")
@@ -200,27 +194,22 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.describe(territory="Territory Name")
     async def status(self, interaction: discord.Interaction, territory: str):
         await interaction.response.defer()
-
         static_data = self.map_renderer.local_territories.get(territory)
         guild_color_map = await self.get_guild_color_map_with_cache()
         territory_data = await self.get_territory_data_with_cache()
-
         if not territory_data:
             await interaction.followup.send("テリトリー情報の取得に失敗しました。")
             return
-
         target_territory_live_data = territory_data.get(territory)
         if not target_territory_live_data:
             await interaction.followup.send(f"「{territory}」は無効なテリトリーか、現在どのギルドも所有していません。")
             return
-
         embed = self._create_status_embed(
             interaction,
             territory,
             target_territory_live_data,
             static_data,
         )
-
         image_bytes = self.map_renderer.create_single_territory_image(
             territory,
             territory_data,
@@ -232,8 +221,13 @@ class Territory(commands.GroupCog, name="territory"):
             image_file = discord.File(fp=image_bytes, filename=filename)
             embed.set_image(url=f"attachment://{filename}")
             await interaction.followup.send(embed=embed, file=image_file)
+            image_bytes.close()
+            image_file.close()
+            del image_bytes, image_file, embed
         else:
             await interaction.followup.send(embed=embed)
+            del embed
+        gc.collect()
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Territory(bot))
