@@ -25,9 +25,9 @@ def save_json_to_file(filepath: str, data: dict | list):
         logger.error(f"ファイル'{filepath}'への書き込みに失敗: {e}")
         return False
 
-def create_embed(description: str = None, title: str = None, color: discord.Color = discord.Color.blurple()) -> discord.Embed:
+def create_embed(description=None, title=None, color=discord.Color.blurple(), footer_text="Minister Chikuwa"):
     embed = discord.Embed(description=description, color=color)
     if title:
         embed.title = title
-    embed.set_footer(text="Guild Raidシステム | Minister Chikuwa")
+    embed.set_footer(text=footer_text)
     return embed
