@@ -13,13 +13,6 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONT_PATH = os.path.join(project_root, "assets", "fonts", "NotoSansJP-Bold.ttf")
 
 class RouletteRenderer:
-    """
-    ルーレット画像・GIF生成担当
-    - 軽量化/ゆっくり回転
-    - ランダム性強化
-    - 静止画生成対応
-    - 候補数・文字被り対応
-    """
     def __init__(self, size=260):
         self.size = size
         self.center = size // 2
@@ -52,22 +45,15 @@ class RouletteRenderer:
         )
 
     def _fit_text(self, text, font, max_width, max_height, max_lines=2):
-        """
-        できるだけ省略せず、フォントサイズ縮小と改行で枠内に収める。
-        どうしても収まらない場合のみ "..." を付けて省略。
-        """
         text = text.strip()
         orig_text = text
 
-        # 文字列をできるだけ省略せず表示する
         for size in range(font.size, 9, -1):
             try:
                 fnt = ImageFont.truetype(FONT_PATH, size)
             except IOError:
                 fnt = ImageFont.load_default()
-            # 文字数に応じて自動改行
             wrapped = textwrap.wrap(text, width=max(1, int(max_width // (size * 0.7))))
-            # 行数制限
             if len(wrapped) > max_lines:
                 wrapped = wrapped[:max_lines]
             test_text = "\n".join(wrapped)
@@ -75,7 +61,6 @@ class RouletteRenderer:
             if bbox[2] <= max_width and bbox[3] <= max_height:
                 return test_text, fnt
 
-        # 文字列長を少しずつ減らして収める
         for trunc in range(len(orig_text) - 1, 0, -1):
             truncated = orig_text[:trunc] + "..."
             try:
@@ -96,13 +81,11 @@ class RouletteRenderer:
             [(22, 22), (self.size - 22, self.size - 22)],
             start=start_angle, end=end_angle, fill=color, outline="white", width=2
         )
-        # テキスト座標計算（扇形の中心）
         text_angle = math.radians(start_angle + (end_angle - start_angle) / 2)
         text_radius = self.radius * 0.65
         text_x = self.center + int(text_radius * math.cos(text_angle))
         text_y = self.center + int(text_radius * math.sin(text_angle))
 
-        # 枠に合わせて自動調整
         fit_text, fit_font = self._fit_text(
             text,
             self.base_font,
@@ -113,9 +96,6 @@ class RouletteRenderer:
         draw.multiline_text((text_x, text_y), fit_text, font=fit_font, fill="black", anchor="mm", spacing=0)
 
     def create_roulette_gif(self, candidates: list, winner_index: int) -> tuple[BytesIO, float]:
-        """
-        ゆっくり止まるGIF生成（フレーム数は60～80）
-        """
         logger.info(f"ルーレットGIF生成開始。候補: {candidates}, 当選者: {candidates[winner_index]}")
         num_candidates = len(candidates)
         if num_candidates == 0:
@@ -126,7 +106,6 @@ class RouletteRenderer:
             "lightcoral", "skyblue", "gold", "plum", "lime", "mediumorchid"
         ]
 
-        # ランダム性強化
         seed = int(time.time() * 1000) ^ os.getpid() ^ random.randint(0, 999999)
         random.seed(seed)
         spin_count = random.randint(4, 6)
@@ -142,7 +121,6 @@ class RouletteRenderer:
         frames = []
         for i in range(num_frames):
             progress = i / (num_frames - 1)
-            # 強めのease-outで最後ゆっくり止まる
             ease_out_progress = 1 - (1 - progress) ** 15
             current_rotation = total_rotation_degrees * ease_out_progress
 
@@ -155,8 +133,7 @@ class RouletteRenderer:
                 self._draw_wheel_sector(draw, start_angle, end_angle, color, candidate)
             self._draw_static_elements(draw)
             frames.append(frame)
-
-        # 最終静止フレームを多めに追加（余韻）
+        
         last_frame = frames[-1]
         for _ in range(18):
             frames.append(last_frame)
@@ -167,13 +144,9 @@ class RouletteRenderer:
         import imageio
         imageio.mimsave(gif_buffer, frames, format="GIF", duration=(duration_ms/1000))
         gif_buffer.seek(0)
-        logger.info("✅ ルーレットGIF生成完了。")
         return gif_buffer, animation_duration
 
     def create_result_image(self, candidates: list, winner_index: int) -> BytesIO:
-        """
-        回転後の静止画像（PNGで返却）
-        """
         num_candidates = len(candidates)
         angle_per_candidate = 360 / num_candidates
         colors = [
