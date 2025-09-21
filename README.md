@@ -1,6 +1,7 @@
 # 2nd-etkw-bot
 
-Discord向けのカスタムBotプロジェクト。
+Empire of TKW [ETKW]メンバー専用のBot。
+Emperor Chikuwaという初代がいるため2ndとなっている。
 
 ## 概要
 - Python製のDiscord Bot
@@ -13,7 +14,7 @@ Discord向けのカスタムBotプロジェクト。
    pip install -r requirements.txt
    ```
 
-2. 必要な環境変数や設定は`config.py`で管理
+2. 必要な環境変数や設定はRenderのサービスおよび`config.py`で管理
 
 3. Botを起動
    ```
