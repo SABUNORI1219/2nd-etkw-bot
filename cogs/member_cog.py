@@ -324,7 +324,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         )
         embed.add_field(name="MCID", value=mcid, inline=False)
         embed.add_field(name="Discord ID", value=user_str, inline=False)
-        embed.add_field(name="ギルド内ランク", value=`ingame_rank`, inline=False)
+        embed.add_field(name="ギルド内ランク", value=ingame_rank, inline=False)
 
         await interaction.followup.send(embed=embed)
 
