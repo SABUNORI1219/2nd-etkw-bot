@@ -5,6 +5,7 @@ import time
 from typing import Optional
 import logging
 import re
+import itertools
 
 from lib.db import save_application, delete_application_by_discord_id, get_pending_applications
 from lib.profile_renderer import generate_profile_card
@@ -24,22 +25,24 @@ TICKET_STAFF_ROLE_ID = 1387259707743277177  # チケットのスタッフロー�
 
 # Guild Search Helper Function dayo!
 async def search_guild(api, guild_input):
-    patterns = [
-        guild_input,
-        guild_input.capitalize(),
-        guild_input.upper(),
-        guild_input.lower()
-    ]
-    # 全パターンでprefix検索（4回）
+    """
+    WynncraftAPIのget_guild_by_prefix, get_guild_by_nameを使ってギルドを検索する
+    - prefix: 3～4文字の場合は全大文字小文字パターンを試す
+    - nameは1回だけ
+    """
+    length = len(guild_input)
+    patterns = [guild_input]
+    if length in (3, 4) and guild_input.isalnum():
+        chars = [(c.lower(), c.upper()) for c in guild_input]
+        patterns = [''.join(p) for p in itertools.product(*chars)]
     for pattern in patterns:
         guild = await api.get_guild_by_prefix(pattern)
         if guild and guild.get('name'):
             return guild
-    # 全パターンでname検索（4回）
-    for pattern in patterns:
-        guild = await api.get_guild_by_name(pattern)
-        if guild and guild.get('name'):
-            return guild
+    # name検索（1回だけ）
+    guild = await api.get_guild_by_name(guild_input)
+    if guild and guild.get('name'):
+        return guild
     return None
 
 # Embed
