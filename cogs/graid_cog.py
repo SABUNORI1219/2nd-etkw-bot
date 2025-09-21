@@ -80,6 +80,13 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         self.api = WynncraftAPI()
         self.etkw_member_cache = None
 
+    def create_embed(description: str = None, title: str = None, color: discord.Color = discord.Color.blurple()) -> discord.Embed:
+        embed = discord.Embed(description=description, color=color)
+        if title:
+            embed.title = title
+        embed.set_footer(text="Guild Raidシステム | Minister Chikuwa")
+        return embed
+
     async def _get_etkw_members(self):
         # Empire of TKWのメンバーを、get_guild_by_prefixで全ランクから収集
         PREFIX = "ETKW"  # ETKWギルドのprefix（必要に応じてconfig参照にしてもOK）
@@ -191,20 +198,32 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     @app_commands.autocomplete(player=etkw_member_autocomplete)
     async def guildraid_count(self, interaction: discord.Interaction, player: str, raid_name: str, count: int):
         if not isinstance(interaction.user, discord.Member):
-            await interaction.response.send_message("このコマンドはサーバー内でのみ利用可能です。", ephemeral=True)
+            embed = create_embed(description="このコマンドはサーバー内でのみ利用可能です。", title="🔴 エラーが発生しました", color=discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         if not self._has_required_role(interaction.user):
-            await interaction.response.send_message("このコマンドを使用する権限がありません。", ephemeral=True)
+            embed = create_embed(description="このコマンドを使用する権限がありません。", title="🔴 エラーが発生しました", color=discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         etkw_members = await self._get_etkw_members()
         if player not in etkw_members:
-            await interaction.response.send_message(f"指定プレイヤー「{player}」はETKWギルドメンバーではありません。", ephemeral=True)
+            embed = create_embed(description=f"指定プレイヤー**{player}**はETKWギルドメンバーではありません。", title="🔴 エラーが発生しました", color=discord.Color.red())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
         reset_player_raid_count(player, raid_name, count)
-        await interaction.response.send_message(f"{player}の{raid_name}クリア回数を{count}に補正しました", ephemeral=True)
-        logger.info(f"管理者補正: {player} {raid_name} {count}")
+        
+        embed = create_embed(
+            description=None,
+            title="✅️ クリア回数を補正しました",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="プレイヤー", value=player, inline=False)
+        embed.add_field(name="レイド名", value=raid_name, inline=False)
+        embed.add_field(name="補正後カウント", value=str(count), inline=False)
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # セットアップ関数
 async def setup(bot: commands.Bot):
