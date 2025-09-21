@@ -6,19 +6,17 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-# configから設定をインポート
 from config import SPAM_TARGET_USER_IDS
 
 logger = logging.getLogger(__name__)
 
 # スパムと判断する基準
-SPAM_MESSAGE_COUNT = 3  # この回数以上投稿したら
-SPAM_TIME_WINDOW = timedelta(seconds=1.0) # この秒数以内に
+SPAM_MESSAGE_COUNT = 3
+SPAM_TIME_WINDOW = timedelta(seconds=1.0)
 
 class SpamDetectorCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        # {user_id: [message_timestamp, ...]} の形でメッセージ時刻を記録
         self.user_message_timestamps = defaultdict(list)
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
@@ -85,6 +83,6 @@ class SpamDetectorCog(commands.Cog):
             # 一度応答したら、そのユーザーの履歴をリセット
             self.user_message_timestamps[user_id] = []
 
-# BotにCogを登録するためのセットアップ関数
+# セットアップ関数
 async def setup(bot: commands.Bot):
     await bot.add_cog(SpamDetectorCog(bot))
