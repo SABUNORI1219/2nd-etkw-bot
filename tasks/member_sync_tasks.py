@@ -112,7 +112,7 @@ async def member_remove_sync_task(bot, api: WynncraftAPI):
                 for dbm in db_members:
                     mcid = dbm['mcid']
                     if mcid not in api_mcids:
-                        # --- ゲーム脱退時のみロール削除・ニックネームリセット ---
+                        # ゲーム脱退時のみロール削除・ニックネームリセット
                         if dbm.get('discord_id'):
                             for guild in bot.guilds:
                                 member = guild.get_member(dbm['discord_id'])
@@ -156,7 +156,7 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
             ingame_members = await fetch_guild_members(api)
             if not ingame_members:
                 logger.warning("[ApplicationSync] APIからのギルドデータ取得失敗、同期処理をスキップ")
-                await asyncio.sleep(120) # 2分
+                await asyncio.sleep(120)
                 continue
 
             guild = bot.get_guild(ETKW_SERVER)
@@ -206,7 +206,7 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                     app_channel = bot.get_channel(channel_id)
                     if app_channel:
                         try:
-                            # --- 申請Embedから内容を抽出 ---
+                            # 申請Embedから内容を抽出
                             embed_data = {
                                 "reason": None,
                                 "prev_guild": None,
@@ -243,7 +243,7 @@ async def member_application_sync_task(bot, api: WynncraftAPI):
                     logger.info(f"[ApplicationSync] {mcid} の申請を処理し、チャンネル削除とDB削除を実施しました")
         except Exception as e:
             logger.error(f"[ApplicationSync] 申請加入同期で例外: {e}", exc_info=True)
-        await asyncio.sleep(300) # 5分
+        await asyncio.sleep(300)
 
 async def setup(bot):
     api = WynncraftAPI()
