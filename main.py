@@ -14,6 +14,7 @@ from keep_alive import keep_alive
 from logger_setup import setup_logger
 from lib.db import create_table
 from lib.discord_notify import LanguageSwitchView
+from lib.utils import create_embed
 from lib.application_views import APPLICATION_CHANNEL_ID, ApplicationButtonView, register_persistent_views, DeclineButtonView, DeclineConfirmView
 
 # ロガーを最初にセットアップ
@@ -102,10 +103,8 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     if isinstance(error, app_commands.CommandOnCooldown):
         # 残り時間を秒単位で取得し、小数点以下を切り上げ
         remaining_seconds = math.ceil(error.retry_after)
-        await interaction.response.send_message(
-            f"現在クールダウン中です。あと **{remaining_seconds}秒** 待ってからもう一度お試しください。",
-            ephemeral=True # コマンドを実行した本人にだけ見えるメッセージ
-        )
+        embed = create_embed(description=f"現在クールダウン中です。\nあと **{remaining_seconds}秒** 待ってからもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"Main System | Minister Chikuwa")
+        await interaction.followup.send(embed=embed, ephemeral=True)
     elif isinstance(error, app_commands.CheckFailure):
         # CheckFailure時のカスタムメッセージ
         await interaction.response.send_message(str(error), ephemeral=True)
