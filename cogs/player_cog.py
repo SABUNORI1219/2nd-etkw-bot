@@ -10,6 +10,7 @@ from io import BytesIO
 from PIL import Image
 
 from lib.api_stocker import WynncraftAPI, OtherAPI
+from lib.utils import create_embed
 from config import AUTHORIZED_USER_IDS, SKIN_EMOJI_SERVER_ID
 from lib.cache_handler import CacheHandler
 from lib.banner_renderer import BannerRenderer
@@ -253,6 +254,7 @@ class PlayerCog(commands.Cog):
         self.other_api = OtherAPI()
         self.banner_renderer = BannerRenderer()
         self.cache = CacheHandler()
+        self.system_name = "Wynncraft Player's Stats"
 
     def _safe_get(self, data: dict, keys: list, default=None):
         v = data
@@ -312,9 +314,11 @@ class PlayerCog(commands.Cog):
         except Exception as e:
             logger.error(f"画像生成または送信失敗: {e}")
             if use_edit:
-                await interaction.message.edit(content="プロフィール画像生成に失敗しました。", embed=None, view=None)
+                failed_embed = create_embed(description="プロフィール画像生成に失敗しました", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=failed_embed, view=None)
             else:
-                await interaction.followup.send("プロフィール画像生成に失敗しました。")
+                embed = create_embed(description="プロフィール画像生成に失敗しました", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=embed)
 
     @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
     @app_commands.command(name="player", description="プレイヤーのプロファイルカードを表示")
@@ -329,7 +333,8 @@ class PlayerCog(commands.Cog):
         else:
             data = await self.wynn_api.get_official_player_data(player)
             if not data or (isinstance(data, dict) and "error" in data and data.get("error") != "MultipleObjectsReturned"):
-                await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
+                embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=embed)
                 return
 
             if isinstance(data, dict) and data.get("error") == "MultipleObjectsReturned" and "objects" in data:
@@ -337,16 +342,17 @@ class PlayerCog(commands.Cog):
                 view = PlayerSelectView(player_collision_dict=player_collision_dict, cog_instance=self, owner_id=interaction.user.id)
                 await view.prepare_options(self.bot)
                 if hasattr(view, "select_menu") and view.select_menu.options:
-                    await interaction.followup.send(
-                        "複数のプレイヤーが見つかりました。どちらの情報を表示しますか?\n(Multiple Object Returned)", view=view
-                    )
+                    embed = create_embed(description="どちらの情報を表示しますか?\n(Multiple Object Returned)", title="👀 複数のプレイヤーが見つかりました", color=discord.Color.purple(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                    await interaction.followup.send(embed=embed, view=view)
                 else:
-                    await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
+                    embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                    await interaction.followup.send(embed=embed)
                 return
             if isinstance(data, dict) and 'username' in data:
                 self.cache.set_cache(cache_key, data)
             else:
-                await interaction.followup.send(f"プレイヤー「{player}」が見つかりませんでした。")
+                embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=embed)
                 return
 
         # 共通処理呼び出し
