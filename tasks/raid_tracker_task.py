@@ -11,9 +11,9 @@ from lib.discord_notify import send_guild_raid_embed
 logger = logging.getLogger(__name__)
 
 # メモリ型で前回分を保持（uuidベース）
-previous_player_data = dict()  # {uuid: {"raids": {...}, "server": ..., "timestamp": ..., "name": ...}}
+previous_player_data = dict()
 
-# 直近3ループ分のクリアイベントを保持（30人×3ループ＝90件程度。最大200件に余裕を持たせる）
+# 直近3ループ分のクリアイベントを保持
 clear_events_window = deque(maxlen=200)
 
 def extract_online_members(guild_data):
@@ -92,7 +92,6 @@ async def get_all_players_lastjoin(api, mcid_uuid_list, batch_size=5, batch_slee
         batch_results = await asyncio.gather(*(get_lastjoin(mcid, uuid) for mcid, uuid in batch))
         results.extend(batch_results)
         await asyncio.sleep(batch_sleep)
-    # Noneを除外
     return [r for r in results if r is not None]
 
 async def guild_raid_tracker(api, bot=None, guild_prefix="ETKW", loop_interval=120):
