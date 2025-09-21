@@ -6,6 +6,7 @@ import logging
 import asyncio
 
 from lib.roulette_renderer import RouletteRenderer
+from lib.utils import create_embed
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class RouletteCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.renderer = RouletteRenderer()
+        self.system_name = "ルーレット"
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
     @app_commands.checks.cooldown(1, 20.0)
@@ -29,17 +31,20 @@ class RouletteCog(commands.Cog):
 
         candidate_list = options.split()
         if len(candidate_list) < 2:
-            await interaction.followup.send("候補は2つ以上指定してください。")
+            embed = create_embed(description="候補は2つ以上指定してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
         if len(candidate_list) > 10:
-            await interaction.followup.send("候補は最大10個までにしてください。")
+            embed = create_embed(description="候補は最大10個までにしてください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
             return
         for candidate in candidate_list:
             if len(candidate) > 15:
-                await interaction.followup.send(f"候補「{candidate}」が長すぎます。各候補は15文字以内にしてください。")
+                embed = create_embed(description=f"候補「{candidate}」が長すぎます。\n各候補は15文字以内にしてください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=embed)
                 return
 
-        # --- ランダム性強化 ---
+        # ランダム性強化
         seed = int(interaction.user.id) ^ int(asyncio.get_event_loop().time() * 1000) ^ random.randint(0, 999999)
         random.seed(seed)
         winner = random.choice(candidate_list)
@@ -75,7 +80,8 @@ class RouletteCog(commands.Cog):
             result_embed.set_footer(text=f"ルーレット | Minister Chikuwa")
             await message.edit(embed=result_embed, attachments=[result_file])
         else:
-            await interaction.followup.send("GIF画像の生成に失敗しました。もう一度コマンドをお試しください。")
+            embed = create_embed(description="GIF画像の生成に失敗しました。\nもう一度コマンドをお試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(RouletteCog(bot))
