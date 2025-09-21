@@ -39,7 +39,7 @@ def normalize_date(date_str):
 
 # ページ付きEmbed用View
 class PlayerCountView(discord.ui.View):
-    def __init__(self, player_counts, page=0, per_page=10, timeout=120):
+    def __init__(self, player_counts, title, color=discord.Color.blue(), page=0, per_page=10, timeout=120):
         super().__init__(timeout=timeout)
         self.player_counts = player_counts
         self.page = page
