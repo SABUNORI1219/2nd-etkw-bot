@@ -58,7 +58,6 @@ def fmt_num(val):
 
 def split_guild_name_by_pixel_and_word(guild_name, font, text_base_x, threshold_x, draw):
     words = guild_name.split()
-    # 判定は開始位置+テキスト幅
     if text_base_x + draw.textlength(guild_name, font=font) <= threshold_x:
         return [guild_name]
     # 2単語以上なら均等分割
@@ -77,14 +76,12 @@ def split_guild_name_by_pixel_and_word(guild_name, font, text_base_x, threshold_
         return [" ".join(words[:best_split]), " ".join(words[best_split:])]
     else:
         # 1単語しかない場合は強制分割
-        # 文字数の半分で分割する例（実際はピクセル長で分割した方がよい）
         text = words[0]
         for i in range(1, len(text)):
             part1 = text[:i]
             part2 = text[i:]
             if text_base_x + draw.textlength(part1, font=font) > threshold_x:
                 return [part1, part2]
-        # 最後まで行っても分割しないなら（すごく小さい単語）、そのまま
         return [text]
 
 def draw_status_circle(base_img, left_x, center_y, status="online"):
@@ -92,7 +89,6 @@ def draw_status_circle(base_img, left_x, center_y, status="online"):
     circle_img = Image.new("RGBA", (2*circle_radius, 2*circle_radius), (0,0,0,0))
     draw = ImageDraw.Draw(circle_img)
 
-    # ラジアルグラデーション（中央明るめ、外側暗め）
     for r in range(circle_radius, 0, -1):
         ratio = r / circle_radius
         if status == "online":
@@ -111,15 +107,12 @@ def draw_status_circle(base_img, left_x, center_y, status="online"):
             )
         draw.ellipse([circle_radius-r, circle_radius-r, circle_radius+r, circle_radius+r], fill=col)
 
-    # 輪郭（アウトライン）を描画
     if status == "online":
         outline_color = (16, 100, 16, 255)
     else:
         outline_color = (180, 32, 32, 255)
-    # 1px太さで外周に楕円描画
     draw.ellipse([0, 0, 2*circle_radius-1, 2*circle_radius-1], outline=outline_color, width=2)
 
-    # 影は描画しない（絵文字風にシャープに仕上げる）
     base_img.alpha_composite(circle_img, (left_x, center_y - circle_radius))
 
 def generate_profile_card(info, output_path="profile_card.png", skin_image=None):
