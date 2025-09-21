@@ -19,7 +19,7 @@ class GuildCog(commands.Cog):
         self.wynn_api = WynncraftAPI()
         self.cache = CacheHandler()
         self.banner_renderer = BannerRenderer()
-        self.system_name = "ギルドステータス"
+        self.system_name = "Wynncraft Guild's Stats"
         logger.info("--- [CommandsCog] ギルドコマンドCogが読み込まれました。")
 
     def _safe_get(self, data: dict, keys: list, default: any = "N/A"):
