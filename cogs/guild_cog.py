@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 from lib.api_stocker import WynncraftAPI
 from lib.cache_handler import CacheHandler
 from lib.banner_renderer import BannerRenderer
+from lib.utils import create_embed
 from config import EMBED_COLOR_BLUE
 
 class GuildCog(commands.Cog):
@@ -19,6 +20,7 @@ class GuildCog(commands.Cog):
         self.wynn_api = WynncraftAPI()
         self.cache = CacheHandler()
         self.banner_renderer = BannerRenderer()
+        self.system_name = "ギルドステータス"
         logger.info("--- [CommandsCog] ギルドコマンドCogが読み込まれました。")
 
     def _safe_get(self, data: dict, keys: list, default: any = "N/A"):
@@ -180,7 +182,8 @@ Online Players: {online_count}/{total_members}
 
         # --- ステップ4: データが何もなければ、ここで終了 ---
         if not data_to_use:
-            await interaction.followup.send(f"ギルド「{guild}」が見つかりませんでした。")
+            embed = create_embed(description=f"ギルド **{guild}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.response.send_message(embed=embed)
             return
 
         # --- ステップ5: 取得したデータで、埋め込みとバナーを生成・送信 ---
@@ -190,10 +193,9 @@ Online Players: {online_count}/{total_members}
         if banner_bytes:
             banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
             embed.set_thumbnail(url="attachment://guild_banner.png")
-            logger.info(f"--- [ばなー] バナーの画像生成に成功！")
             await interaction.followup.send(embed=embed, file=banner_file)
         else:
-            logger.error(f"--- [ばなー] バナーの画像生成に失敗！")
+            logger.error(f"[ばなー] バナーの画像生成に失敗！")
             await interaction.followup.send(embed=embed)
 
             
