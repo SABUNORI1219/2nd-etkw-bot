@@ -11,9 +11,6 @@ from lib.utils import create_embed
 logger = logging.getLogger(__name__)
 
 class RouletteCog(commands.Cog):
-    """
-    ルーレット機能：軽量化・ゆっくり回転・ランダム性強化・静止画対応・候補数/文字数制約緩和
-    """
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.renderer = RouletteRenderer()
@@ -44,14 +41,13 @@ class RouletteCog(commands.Cog):
                 await interaction.followup.send(embed=embed)
                 return
 
-        # ランダム性強化
         seed = int(interaction.user.id) ^ int(asyncio.get_event_loop().time() * 1000) ^ random.randint(0, 999999)
         random.seed(seed)
         winner = random.choice(candidate_list)
         winner_index = candidate_list.index(winner)
         logger.info(f"ルーレット実行: {title}, 候補: {candidate_list}, 当選: {winner}")
 
-        # GIF生成（軽量化・乱数強化・ゆっくり回転）
+        # GIF生成
         gif_buffer, animation_duration = self.renderer.create_roulette_gif(candidate_list, winner_index)
         if gif_buffer:
             gif_file = discord.File(fp=gif_buffer, filename="roulette.gif")
