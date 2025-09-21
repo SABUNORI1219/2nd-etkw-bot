@@ -13,21 +13,20 @@ class HelpCog(commands.Cog):
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.command(name="help", description="Botのコマンド一覧を表示")
     async def help(self, interaction: discord.Interaction):
-        # 埋め込みメッセージの器を作成
         embed = discord.Embed(
             title="💡 ヘルプメニュー",
             description="""
     このBotで利用できるコマンドの一覧です。
 引数に<>があるものは必須、[]があるものは任意です。
 """,
-            color=discord.Color.blurple() # Discordのブランドカラー
+            color=discord.Color.blurple()
         )
 
         embed.add_field(
             name="👤 プレイヤー・ギルド情報",
             value="`/player <name>`: プレイヤーの詳細情報を表示します。\n"
                   "`/guild <prefix/name>`: ギルドの詳細情報を表示します。",
-            inline=False # このフィールドは横幅をすべて使う
+            inline=False
         )
 
         embed.add_field(
@@ -38,7 +37,7 @@ class HelpCog(commands.Cog):
                   "`/member list [rank] [sort]`: メンバーリストを表示。rankでゲーム内ランクでの絞り込みが可能。sortでは最終ログイン順で表示できます。\n"
                   "`/member promote <user>`: Discord IDを指定。現在は**煮しめ**から**五目煮**, **五目煮**から**ちくわ懐石**への昇格のみができます。管理者のみ実行可能。\n"
                   "`/member rename <name>`: 自身のDiscord上での表示名を変更。ロール名含む32文字まで入力できます。",
-            inline=False # このフィールドは横幅をすべて使う
+            inline=False
         )
 
         embed.add_field(
@@ -65,9 +64,8 @@ class HelpCog(commands.Cog):
 
         embed.set_footer(text="ヘルプメニュー | Minister Chikuwa")
 
-        # ephemeral=True にすることで、コマンドを実行した本人にしか見えないメッセージになる
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# BotにCogを登録するためのセットアップ関数
+# セットアップ関数
 async def setup(bot: commands.Bot):
     await bot.add_cog(HelpCog(bot))
