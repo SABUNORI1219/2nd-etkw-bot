@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 guild_territory_history = defaultdict(dict)
 
+latest_territory_data = {}
+
 def _dt_to_str(dt):
     if dt is None:
         return None
@@ -86,7 +88,9 @@ async def track_guild_territories(loop_interval=60):
         if not territory_data:
             logger.warning("[GuildTerritoryTracker] 領地データ取得失敗。10秒後に再試行します。")
             await asyncio.sleep(10)
-            continue
+        else:
+            global latest_territory_data
+            latest_territory_data = territory_data
 
         current_guild_territories = defaultdict(set)
         for tname, tinfo in territory_data.items():
