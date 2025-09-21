@@ -227,7 +227,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
         etkw_members = await self._get_etkw_members()
         if player not in etkw_members:
-            embed = create_embed(description=f"指定プレイヤー**{player}**はETKWギルドメンバーではありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            embed = create_embed(description=f"指定プレイヤー **{player}** はETKWギルドメンバーではありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
