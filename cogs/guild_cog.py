@@ -182,7 +182,7 @@ Online Players: {online_count}/{total_members}
         # --- ステップ4: データが何もなければ、ここで終了 ---
         if not data_to_use:
             embed = create_embed(description=f"ギルド **{guild}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
-            await interaction.response.send_message(embed=embed)
+            await interaction.followup.send_message(embed=embed)
             return
 
         # --- ステップ5: 取得したデータで、埋め込みとバナーを生成・送信 ---
