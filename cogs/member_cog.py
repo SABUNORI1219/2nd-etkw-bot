@@ -18,7 +18,6 @@ from lib.db import (
 )
 from lib.discord_notify import notify_member_left_discord
 from config import (
-    EMBED_COLOR_BLUE,
     AUTHORIZED_USER_IDS,
     send_authorized_only_message,
     RANK_ROLE_ID_MAP,
