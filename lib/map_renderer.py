@@ -84,9 +84,12 @@ class MapRenderer:
         return result
 
     def _pick_hq_candidate(self, hq_candidates, territory_api_data, all_owned_territories=None, exclude_lost=None, debug_prefix=None):
+        # Conn/Ext計算用セット（現所有+1時間以内失領）を用意
         if all_owned_territories is None:
             all_owned_territories = set(hq_candidates) | (exclude_lost or set())
         hq_stats = []
+
+        # HQ候補（現所有のみ）でループ
         for t in hq_candidates:
             conn, ext, hq_buff = self._calc_conn_ext_hqbuff(all_owned_territories, t)
             acquired = territory_api_data.get(t, {}).get("acquired", "")
@@ -104,20 +107,31 @@ class MapRenderer:
             })
         if not hq_stats:
             return None, [], [], {}
+        
+        # Conn+Ext多い順→Conn多い順→HQバフ多い順→取得時刻古い順
         hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(all_owned_territories)
+
+        # 1. Conn+Ext最大グループ（ネットワーク力最強グループ）抽出
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
         conn_ext_tops = [x for x in top5 if x["conn"] + x["ext"] == max_conn_ext]
+        conn_ext_top_names = [x["name"] for x in conn_ext_tops]
+
+        # 2. Conn+Ext最大グループ以外のtop5領地で、Conn値が2個以上多いやつを探す
         other_top5 = [x for x in top5 if x not in conn_ext_tops]
         hq_conn_candidates = []
         max_group_conn = max(x["conn"] for x in conn_ext_tops)
         for cand in other_top5:
             if cand["conn"] - max_group_conn >= 2:
                 hq_conn_candidates.append(cand)
+
+        # もし該当があればその中でConn値最大のものをHQに
         if hq_conn_candidates:
             hq_conn_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
             return hq_conn_candidates[0]["name"], hq_stats, top5, total_res
+
+        # 3. Conn+Ext最大グループ内で複数ある場合はConn最大ユニークならHQ
         if len(conn_ext_tops) > 1:
             conn_max_in_group = max(x["conn"] for x in conn_ext_tops)
             conn_maxs = [x for x in conn_ext_tops if x["conn"] == conn_max_in_group]
@@ -125,9 +139,13 @@ class MapRenderer:
                 return conn_maxs[0]["name"], hq_stats, top5, total_res
         else:
             conn_maxs = conn_ext_tops
+
+        # 4. 所持領地6個以下なら取得時刻最古
         if len(hq_candidates) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
+
+        # 5. Conn同数&Ext<20で街領地あれば優先
         max_conn = max(x["conn"] for x in top5)
         conn_top_group = [x for x in top5 if x["conn"] == max_conn]
         if len(conn_top_group) > 1:
@@ -135,6 +153,8 @@ class MapRenderer:
             city = next((x for x in ext_lt20 if x["is_city"]), None)
             if city:
                 return city["name"], hq_stats, top5, total_res
+
+        # 6. Ext,Conn同値→資源判定
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
             res_priority = ["crops", "ore", "wood", "fish"]
             min_val = float("inf")
@@ -176,6 +196,8 @@ class MapRenderer:
                         if cand_res > best_res:
                             best_cand = cand
                 return best_cand["name"], hq_stats, top5, total_res
+
+        # fallback
         return conn_ext_tops[0]["name"], hq_stats, top5, total_res
 
     def _get_map_and_scale(self):
@@ -201,7 +223,9 @@ class MapRenderer:
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None, upscale_factor=2):
         upscaled_lines = None
         overlay = None
+
         try:
+            # コネクション線の描画
             up_w, up_h = int(map_to_draw_on.width * upscale_factor), int(map_to_draw_on.height * upscale_factor)
             upscaled_lines = Image.new("RGBA", (up_w, up_h), (0, 0, 0, 0))
             draw_lines = ImageDraw.Draw(upscaled_lines)
@@ -236,6 +260,8 @@ class MapRenderer:
             lines_down = upscaled_lines.resize((map_to_draw_on.width, map_to_draw_on.height), resample=Image.Resampling.LANCZOS)
             map_to_draw_on.alpha_composite(lines_down)
             del draw_lines, lines_down
+
+            # 領地描画
             overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
             overlay_draw = ImageDraw.Draw(overlay)
             draw = ImageDraw.Draw(map_to_draw_on)
@@ -403,6 +429,7 @@ class MapRenderer:
             if crown_img is not None:
                 crown_img.close()
 
+    # デフォルトマップ生成するやつ
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict, owned_territories_map=None) -> tuple[discord.File | None, discord.Embed | None]:
         if owned_territories_map is None:
             owned_territories_map = self._get_owned_territories_map_from_db()
@@ -472,13 +499,8 @@ class MapRenderer:
         finally:
             gc.collect()
 
-    def create_single_territory_image(
-        self,
-        territory: str,
-        territory_data: dict,
-        guild_color_map: dict
-    ) -> BytesIO | None:
-        logger.info(f"--- [MapRenderer] 単一テリトリー画像生成開始: {territory}")
+    # 単一テリトリー生成
+    def create_single_territory_image(self, territory: str, territory_data: dict, guild_color_map: dict) -> BytesIO | None:
         terri_static = self.local_territories.get(territory)
         if not terri_static or 'Location' not in terri_static:
             logger.error(f"'{territory}'にLocationデータがありません。")
