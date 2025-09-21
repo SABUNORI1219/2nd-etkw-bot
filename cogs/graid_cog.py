@@ -83,6 +83,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         self.bot = bot
         self.api = WynncraftAPI()
         self.etkw_member_cache = None
+        self.system_name = "Guild Raidシステム"
 
     async def _get_etkw_members(self):
         # Empire of TKWのメンバーを、get_guild_by_prefixで全ランクから収集
@@ -121,7 +122,8 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         embed = create_embed(
             description=None,
             title="✅️ チャンネル設定が完了しました",
-            color=discord.Color.green()
+            color=discord.Color.green(),
+            footer_text=f"{self.system_name} | Minister Chikuwa"
         )
         embed.add_field(name="新しいチャンネル", value=channel.mention, inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -168,7 +170,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             title_text = f"Guild Raid Player Counts: {raid_name}"
 
         if not rows:
-            embed = create_embed(description="履歴がありません。", title="🔴 エラーが発生しました", color=discord.Color.red())
+            embed = create_embed(description="履歴がありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
@@ -201,17 +203,17 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     @app_commands.autocomplete(player=etkw_member_autocomplete)
     async def guildraid_count(self, interaction: discord.Interaction, player: str, raid_name: str, count: int):
         if not isinstance(interaction.user, discord.Member):
-            embed = create_embed(description="このコマンドはサーバー内でのみ利用可能です。", title="🔴 エラーが発生しました", color=discord.Color.red())
+            embed = create_embed(description="このコマンドはサーバー内でのみ利用可能です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         if not self._has_required_role(interaction.user):
-            embed = create_embed(description="このコマンドを使用する権限がありません。", title="🔴 エラーが発生しました", color=discord.Color.red())
+            embed = create_embed(description="このコマンドを使用する権限がありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         etkw_members = await self._get_etkw_members()
         if player not in etkw_members:
-            embed = create_embed(description=f"指定プレイヤー**{player}**はETKWギルドメンバーではありません。", title="🔴 エラーが発生しました", color=discord.Color.red())
+            embed = create_embed(description=f"指定プレイヤー**{player}**はETKWギルドメンバーではありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         
@@ -220,7 +222,8 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         embed = create_embed(
             description=None,
             title="✅️ クリア回数を補正しました",
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
+            footer_text=f"{self.system_name} | Minister Chikuwa"
         )
         embed.add_field(name="プレイヤー", value=player, inline=False)
         embed.add_field(name="レイド名", value=raid_name, inline=False)
