@@ -76,7 +76,7 @@ class RouletteRenderer:
 
         return "…", ImageFont.truetype(FONT_PATH, 9) if os.path.exists(FONT_PATH) else ImageFont.load_default()
 
-    def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text):
+        def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text):
         draw.pieslice(
             [(22, 22), (self.size - 22, self.size - 22)],
             start=start_angle, end=end_angle, fill=color, outline="white", width=2
@@ -86,11 +86,17 @@ class RouletteRenderer:
         text_x = self.center + int(text_radius * math.cos(text_angle))
         text_y = self.center + int(text_radius * math.sin(text_angle))
 
+        angle = abs(end_angle - start_angle)
+        arc_length = 2 * math.pi * text_radius * (angle / 360)
+
+        max_width = int(arc_length * 0.85)
+        max_height = 32
+
         fit_text, fit_font = self._fit_text(
             text,
             self.base_font,
-            max_width=int(self.radius * 1.1 / max(1, 12)),
-            max_height=32,
+            max_width=max_width,
+            max_height=max_height,
             max_lines=2
         )
         draw.multiline_text((text_x, text_y), fit_text, font=fit_font, fill="black", anchor="mm", spacing=0)
