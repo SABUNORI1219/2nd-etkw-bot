@@ -24,7 +24,7 @@ class RouletteRenderer:
             self.base_font = ImageFont.load_default()
 
     def _draw_static_elements(self, draw):
-        # ポインタ（三角形）
+        # 三角形
         draw.polygon(
             [
                 (self.center - 12, 12),
@@ -106,51 +106,63 @@ class RouletteRenderer:
         num_candidates = len(candidates)
         if num_candidates == 0:
             return None, 0
-
+    
         colors = [
             "royalblue", "salmon", "palegreen", "wheat",
             "lightcoral", "skyblue", "gold", "plum", "lime", "mediumorchid"
         ]
-
+    
         seed = int(time.time() * 1000) ^ os.getpid() ^ random.randint(0, 999999)
         random.seed(seed)
         spin_count = random.randint(4, 6)
         spin_offset = random.uniform(-0.35, 0.35)
-
+    
         angle_per_candidate = 360 / num_candidates
         stop_angle = 270 - (angle_per_candidate * winner_index) - (angle_per_candidate / 2) + spin_offset * angle_per_candidate
         total_rotation_degrees = 360 * spin_count + stop_angle
-
+    
         num_frames = random.randint(90, 130)
         duration_ms = random.randint(26, 36)
-
+    
         frames = []
-        for i in range(num_frames):
-            progress = i / (num_frames - 1)
-            ease_out_progress = 1 - (1 - progress) ** 15
-            current_rotation = total_rotation_degrees * ease_out_progress
-
-            frame = Image.new("RGBA", (self.size, self.size), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(frame)
-            for j, candidate in enumerate(candidates):
-                start_angle = angle_per_candidate * j + current_rotation
-                end_angle = angle_per_candidate * (j + 1) + current_rotation
-                color = colors[j % len(colors)]
-                self._draw_wheel_sector(draw, start_angle, end_angle, color, candidate)
-            self._draw_static_elements(draw)
-            frames.append(frame)
-        
-        last_frame = frames[-1]
-        for _ in range(18):
-            frames.append(last_frame)
-
-        animation_duration = (num_frames * duration_ms) / 1000.0
-
-        gif_buffer = BytesIO()
-        import imageio
-        imageio.mimsave(gif_buffer, frames, format="GIF", duration=(duration_ms/1000))
-        gif_buffer.seek(0)
-        return gif_buffer, animation_duration
+        try:
+            for i in range(num_frames):
+                progress = i / (num_frames - 1)
+                ease_out_progress = 1 - (1 - progress) ** 15
+                current_rotation = total_rotation_degrees * ease_out_progress
+    
+                frame = Image.new("RGBA", (self.size, self.size), (0, 0, 0, 0))
+                draw = ImageDraw.Draw(frame)
+                for j, candidate in enumerate(candidates):
+                    start_angle = angle_per_candidate * j + current_rotation
+                    end_angle = angle_per_candidate * (j + 1) + current_rotation
+                    color = colors[j % len(colors)]
+                    self._draw_wheel_sector(draw, start_angle, end_angle, color, candidate)
+                self._draw_static_elements(draw)
+                frames.append(frame)
+    
+            last_frame = frames[-1]
+            for _ in range(18):
+                frames.append(last_frame.copy())
+    
+            animation_duration = (num_frames * duration_ms) / 1000.0
+    
+            gif_buffer = BytesIO()
+            import imageio
+            imageio_frames = [frame.convert("RGBA") for frame in frames]
+            imageio.mimsave(gif_buffer, [frame for frame in imageio_frames], format="GIF", duration=(duration_ms/1000))
+            gif_buffer.seek(0)
+            for frame in frames:
+                frame.close()
+            return gif_buffer, animation_duration
+        finally:
+            for frame in frames:
+                try:
+                    frame.close()
+                except Exception:
+                    pass
+            import gc
+            gc.collect()
 
     def create_result_image(self, candidates: list, winner_index: int) -> BytesIO:
         num_candidates = len(candidates)
@@ -159,19 +171,24 @@ class RouletteRenderer:
             "royalblue", "salmon", "palegreen", "wheat",
             "lightcoral", "skyblue", "gold", "plum", "lime", "mediumorchid"
         ]
-
+    
         stop_angle = 270 - (angle_per_candidate * winner_index) - (angle_per_candidate / 2)
-
+    
         frame = Image.new("RGBA", (self.size, self.size), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(frame)
-        for j, candidate in enumerate(candidates):
-            start_angle = angle_per_candidate * j + stop_angle
-            end_angle = angle_per_candidate * (j + 1) + stop_angle
-            color = colors[j % len(colors)]
-            self._draw_wheel_sector(draw, start_angle, end_angle, color, candidate)
-        self._draw_static_elements(draw)
-
-        png_buffer = BytesIO()
-        frame.save(png_buffer, format='PNG')
-        png_buffer.seek(0)
-        return png_buffer
+        try:
+            draw = ImageDraw.Draw(frame)
+            for j, candidate in enumerate(candidates):
+                start_angle = angle_per_candidate * j + stop_angle
+                end_angle = angle_per_candidate * (j + 1) + stop_angle
+                color = colors[j % len(colors)]
+                self._draw_wheel_sector(draw, start_angle, end_angle, color, candidate)
+            self._draw_static_elements(draw)
+    
+            png_buffer = BytesIO()
+            frame.save(png_buffer, format='PNG')
+            png_buffer.seek(0)
+            return png_buffer
+        finally:
+            frame.close()
+            import gc
+            gc.collect()
