@@ -4,6 +4,7 @@ from io import BytesIO
 import logging
 import os
 import asyncio
+import gc
 from lib.api_stocker import OtherAPI
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,16 @@ def draw_status_circle(base_img, left_x, center_y, status="online"):
     base_img.alpha_composite(circle_img, (left_x, center_y - circle_radius))
 
 def generate_profile_card(info, output_path="profile_card.png", skin_image=None):
+    img = None
+    PLAYER_BACKGROUND = None
+    rank_star_img = None
+    guild_banner_img = None
+    icon_img = None
+    dummy = None
+    rect_img = None
+    shadow = None
+    unknown_skin = None
+    skin = None
     try:
         img = Image.open(BASE_IMG_PATH).convert("RGBA")
     except Exception as e:
@@ -419,5 +430,13 @@ def generate_profile_card(info, output_path="profile_card.png", skin_image=None)
         img.save(output_path)
     except Exception as e:
         logger.error(f"画像保存失敗: {e}")
+    finally:
+        for obj in [img, PLAYER_BACKGROUND, rank_star_img, guild_banner_img, icon_img, dummy, rect_img, shadow, unknown_skin, skin]:
+            try:
+                if obj is not None:
+                    obj.close()
+            except Exception:
+                pass
+        gc.collect()
     return output_path
 
