@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 import logging
 import os
+import gc
 from datetime import datetime, timezone, timedelta
 import requests
 import time
@@ -292,16 +293,19 @@ class PlayerCog(commands.Cog):
 
         uuid = profile_info.get("uuid")
         skin_image = None
+        skin_bytes_io = None
         if uuid:
             try:
                 skin_bytes = await self.other_api.get_vzge_skin(uuid)
                 if skin_bytes:
-                    skin_image = Image.open(BytesIO(skin_bytes)).convert("RGBA")
+                    skin_bytes_io = BytesIO(skin_bytes)
+                    skin_image = Image.open(skin_bytes_io).convert("RGBA")
             except Exception as e:
                 logger.error(f"Skin image load failed: {e}")
                 skin_image = None
 
         output_path = f"profile_card_{uuid}.png" if uuid else "profile_card.png"
+        file = None
         try:
             generate_profile_card(profile_info, output_path, skin_image=skin_image)
             file = discord.File(output_path, filename=os.path.basename(output_path))
@@ -319,6 +323,17 @@ class PlayerCog(commands.Cog):
             else:
                 embed = create_embed(description="プロフィール画像生成に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
                 await interaction.followup.send(embed=embed)
+        finally:
+            if skin_image is not None:
+                try: skin_image.close()
+                except Exception: pass
+            if skin_bytes_io is not None:
+                try: skin_bytes_io.close()
+                except Exception: pass
+            if file is not None:
+                try: file.close()
+                except Exception: pass
+            gc.collect()
 
     @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
     @app_commands.command(name="player", description="プレイヤーのプロファイルカードを表示")
