@@ -439,6 +439,7 @@ def get_last_join_cache_for_members(mcid_list):
         logger.error(f"[DB Handler] get_last_join_cache_for_members failed: {e}")
     finally:
         if conn: conn.close()
+    return result
 
 def save_application(mcid: str, discord_id: int, channel_id: int):
     conn = get_conn()
