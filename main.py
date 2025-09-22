@@ -110,7 +110,7 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         await interaction.response.send_message(embed=embed, ephemeral=True)
     else:
         # 他のエラーはコンソールに出力
-        logger.error(f"--- [司令塔] 予期せぬエラーが発生: {error}", exc_info=True)
+        logger.error(f"[Minister Chikuwa] -> 予期せぬエラーが発生: {error}", exc_info=True)
 
 # HElper Function Desu
 async def ensure_application_embed():
@@ -166,8 +166,8 @@ if __name__ == '__main__':
         sys.exit(1)
         
     try:
-        logger.info("--- [司令塔] Botの起動を開始します... ---")
+        logger.info("[Minister Chikuwa] -> Botの起動を開始します... ---")
         bot.run(TOKEN)
     except Exception as e:
-        logger.critical(f"Botの起動中に予期せぬエラーが発生しました: {e}")
+        logger.critical(f"[Minister Chikuwa] -> Botの起動中に予期せぬエラーが発生しました: {e}")
         sys.exit(1)
