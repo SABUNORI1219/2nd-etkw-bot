@@ -38,7 +38,7 @@ RANK_CHOICES = [
 
 # ソート順の選択肢（rankは除外）
 SORT_CHOICES = [
-    app_commands.Choice(name="Last Seen (最終ログインが古い順)", value="last_seen")
+    app_commands.Choice(name="Last Seen", value="last_seen")
 ]
 
 def humanize_timedelta(dt: datetime) -> str:
