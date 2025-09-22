@@ -76,7 +76,7 @@ class RouletteRenderer:
 
         return "…", ImageFont.truetype(FONT_PATH, 9) if os.path.exists(FONT_PATH) else ImageFont.load_default()
 
-        def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text):
+    def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text):
         draw.pieslice(
             [(22, 22), (self.size - 22, self.size - 22)],
             start=start_angle, end=end_angle, fill=color, outline="white", width=2
