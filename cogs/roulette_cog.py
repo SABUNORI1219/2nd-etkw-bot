@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import random
+import gc
 import logging
 import asyncio
 
@@ -60,6 +61,11 @@ class RouletteCog(commands.Cog):
             embed.set_footer(text=f"ルーレット | Minister Chikuwa")
             message = await interaction.followup.send(embed=embed, file=gif_file)
 
+            # 送信後、gif_buffer/discord.Fileは不要になるのでclose
+            gif_buffer.close()
+            gif_file.close()
+            del gif_buffer, gif_file, embed
+
             # 回転アニメーション待機
             await asyncio.sleep(animation_duration + 0.5)
 
@@ -75,9 +81,17 @@ class RouletteCog(commands.Cog):
             result_embed.set_image(url="attachment://roulette_result.png")
             result_embed.set_footer(text=f"ルーレット | Minister Chikuwa")
             await message.edit(embed=result_embed, attachments=[result_file])
+
+            # 送信後、result_buffer/discord.Fileもclose
+            result_buffer.close()
+            result_file.close()
+            del result_buffer, result_file, result_embed
         else:
             embed = create_embed(description="GIF画像の生成に失敗しました。\nもう一度コマンドをお試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
+            del embed
+
+        gc.collect()
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(RouletteCog(bot))
