@@ -45,7 +45,7 @@ class RouletteRenderer:
             fill=(0, 0, 0),
         )
 
-    def pixel_wrap(text, font, max_width, max_lines):
+    def pixel_wrap(self, text, font, max_width, max_lines):
         """日本語もOKなピクセル幅wrap、max_lines超えたら最後に...を付ける"""
         lines = []
         line = ""
