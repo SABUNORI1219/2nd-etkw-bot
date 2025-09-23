@@ -45,6 +45,36 @@ class RouletteRenderer:
             fill=(0, 0, 0),
         )
 
+    def pixel_wrap(self, text, font, max_width, max_lines):
+        """日本語もOKなピクセル幅wrap、max_lines超えたら最後に...を付ける"""
+        lines = []
+        line = ""
+        for ch in text:
+            test_line = line + ch
+            bbox = font.getbbox(test_line)
+            w = bbox[2] - bbox[0]
+            if w > max_width:
+                if line:
+                    lines.append(line)
+                    line = ch
+                else:
+                    lines.append(ch)
+                    line = ""
+            else:
+                line = test_line
+            if len(lines) == max_lines:
+                break
+        if line and len(lines) < max_lines:
+            lines.append(line)
+        # max_lines超えた場合は最後の行に...をつけて省略
+        if len(lines) > max_lines:
+            lines = lines[:max_lines]
+            if len(lines[-1]) > 1:
+                lines[-1] = lines[-1][:-1] + "..."
+            else:
+                lines[-1] = "..."
+        return lines
+
     def ellipsis_text(self, text, font, max_width):
         """幅を超えたら '...' で省略する"""
         ellipsis = "..."
