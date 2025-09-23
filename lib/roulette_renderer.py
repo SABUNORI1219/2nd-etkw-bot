@@ -75,7 +75,7 @@ class RouletteRenderer:
                 lines[-1] = "..."
         return lines
     
-    def _fit_text(self, text, font, max_width, max_height, max_lines=2):
+    def _fit_text(self, text, font, max_width, max_height, max_lines=2, log_prefix=""):
         orig_text = text.strip()
         for size in range(font.size, 8, -1):
             try:
@@ -87,16 +87,17 @@ class RouletteRenderer:
             bbox = fnt.getbbox(test_text)
             w = bbox[2] - bbox[0]
             h = bbox[3] - bbox[1]
-            # 幅と高さがともにmax内なら合格
+            logger.info(f"{log_prefix} _fit_text try: size={size}, max_width={max_width}, max_height={max_height}, got_w={w}, got_h={h}, lines={lines}")
             if w <= max_width and h <= max_height:
+                logger.info(f"{log_prefix} _fit_text OK: size={size}, fit_text='{test_text}'")
                 return test_text, fnt
-        # どんなに小さくしても無理なら「…」のみ
         try:
             fnt = ImageFont.truetype(FONT_PATH, 9)
         except IOError:
             fnt = ImageFont.load_default()
+        logger.warning(f"{log_prefix} _fit_text FAIL: All sizes failed for text='{text}', using '…'")
         return "…", fnt
-    
+
     def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text, num_candidates=None):
         draw.pieslice(
             [(22, 22), (self.size - 22, self.size - 22)],
@@ -106,7 +107,7 @@ class RouletteRenderer:
         text_radius = self.radius * 0.65
         text_x = self.center + int(text_radius * math.cos(text_angle))
         text_y = self.center + int(text_radius * math.sin(text_angle))
-    
+
         angle = abs(end_angle - start_angle)
         arc_length = 2 * math.pi * text_radius * (angle / 360)
         max_width = int(arc_length * 0.85)
@@ -119,14 +120,24 @@ class RouletteRenderer:
         else:
             max_lines = 2
         max_height = min(22 + 22 * max_lines, int(self.size * 0.36))
-    
+
+        # ログ用prefix
+        log_prefix = f"[Roulette] text='{text}', start={start_angle:.2f}, end={end_angle:.2f}, arc_length={arc_length:.2f}, max_width={max_width}, text_xy=({text_x},{text_y})"
+
         fit_text, fit_font = self._fit_text(
             text,
             self.base_font,
             max_width=max_width,
             max_height=max_height,
-            max_lines=max_lines
+            max_lines=max_lines,
+            log_prefix=log_prefix
         )
+        # 最終採用テキストのbboxもログ
+        bbox = fit_font.getbbox(fit_text)
+        w = bbox[2] - bbox[0]
+        h = bbox[3] - bbox[1]
+        logger.info(f"{log_prefix} FINAL: fit_text='{fit_text}', font_size={fit_font.size}, w={w}, h={h}")
+
         draw.multiline_text((text_x, text_y), fit_text, font=fit_font, fill="black", anchor="mm", spacing=0)
 
     def create_roulette_gif(self, candidates: list, winner_index: int) -> tuple[BytesIO, float]:
