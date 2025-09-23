@@ -45,114 +45,61 @@ class RouletteRenderer:
             fill=(0, 0, 0),
         )
 
-    def pixel_wrap(self, text, font, max_width, max_lines):
-        """日本語もOKなピクセル幅wrap、max_lines超えたら最後に...を付ける"""
-        lines = []
-        line = ""
-        for ch in text:
-            test_line = line + ch
-            bbox = font.getbbox(test_line)
-            w = bbox[2] - bbox[0]
-            if w > max_width:
-                if line:
-                    lines.append(line)
-                    line = ch
-                else:
-                    lines.append(ch)
-                    line = ""
-            else:
-                line = test_line
-            if len(lines) == max_lines:
-                break
-        if line and len(lines) < max_lines:
-            lines.append(line)
-        # max_lines超えた場合は最後の行に...をつけて省略
-        if len(lines) > max_lines:
-            lines = lines[:max_lines]
-            if len(lines[-1]) > 1:
-                lines[-1] = lines[-1][:-1] + "..."
-            else:
-                lines[-1] = "..."
-        return lines
+    def _fit_text(self, text, font, max_width, max_height, max_lines=2):
+        text = text.strip()
+        orig_text = text
 
-    def ellipsis_text(self, text, font, max_width):
-        """幅を超えたら '...' で省略する"""
-        ellipsis = "..."
-        if font.getbbox(text)[2] - font.getbbox(text)[0] <= max_width:
-            return text
-        for i in range(len(text), 0, -1):
-            trial = text[:i] + ellipsis
-            if font.getbbox(trial)[2] - font.getbbox(trial)[0] <= max_width:
-                return trial
-        return ellipsis
-    
-    def _fit_text(self, text, font, max_width, max_height, max_lines=2, log_prefix="", ellipsis_mode=False):
-        orig_text = text.strip()
-        for size in range(font.size, 8, -1):
+        for size in range(font.size, 9, -1):
             try:
                 fnt = ImageFont.truetype(FONT_PATH, size)
             except IOError:
                 fnt = ImageFont.load_default()
-            if ellipsis_mode:
-                fitted = self.ellipsis_text(orig_text, fnt, max_width)
-                lines = [fitted]
-            else:
-                lines = self.pixel_wrap(orig_text, fnt, max_width, max_lines)
-            test_text = "\n".join(lines)
+            wrapped = textwrap.wrap(text, width=max(1, int(max_width // (size * 0.7))))
+            if len(wrapped) > max_lines:
+                wrapped = wrapped[:max_lines]
+            test_text = "\n".join(wrapped)
             bbox = fnt.getbbox(test_text)
-            w = bbox[2] - bbox[0]
-            h = bbox[3] - bbox[1]
-            logger.info(f"{log_prefix} _fit_text try: size={size}, max_width={max_width}, max_height={max_height}, got_w={w}, got_h={h}, lines={lines}")
-            if w <= max_width and h <= max_height:
-                logger.info(f"{log_prefix} _fit_text OK: size={size}, fit_text='{test_text}'")
+            if bbox[2] <= max_width and bbox[3] <= max_height:
                 return test_text, fnt
-        try:
-            fnt = ImageFont.truetype(FONT_PATH, 9)
-        except IOError:
-            fnt = ImageFont.load_default()
-        logger.warning(f"{log_prefix} _fit_text FAIL: All sizes failed for text='{text}', using '…'")
-        return "…", fnt
 
-    def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text, num_candidates=None):
+        for trunc in range(len(orig_text) - 1, 0, -1):
+            truncated = orig_text[:trunc] + "..."
+            try:
+                fnt = ImageFont.truetype(FONT_PATH, 9)
+            except IOError:
+                fnt = ImageFont.load_default()
+            wrapped = textwrap.wrap(truncated, width=max(1, int(max_width // (9 * 0.7))))
+            wrapped = wrapped[:max_lines]
+            test_text = "\n".join(wrapped)
+            bbox = fnt.getbbox(test_text)
+            if bbox[2] <= max_width and bbox[3] <= max_height:
+                return test_text, fnt
+
+        return "…", ImageFont.truetype(FONT_PATH, 9) if os.path.exists(FONT_PATH) else ImageFont.load_default()
+
+    def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text):
         draw.pieslice(
             [(22, 22), (self.size - 22, self.size - 22)],
             start=start_angle, end=end_angle, fill=color, outline="white", width=2
         )
         text_angle = math.radians(start_angle + (end_angle - start_angle) / 2)
-        text_radius = self.radius * 0.65
+        text_radius = self.radius * 0.5
         text_x = self.center + int(text_radius * math.cos(text_angle))
         text_y = self.center + int(text_radius * math.sin(text_angle))
 
         angle = abs(end_angle - start_angle)
         arc_length = 2 * math.pi * text_radius * (angle / 360)
-        max_width = int(arc_length * 0.85 * 0.8)
-        if num_candidates is None:
-            max_lines = 2
-        elif num_candidates <= 2:
-            max_lines = 4
-        elif num_candidates <= 4:
-            max_lines = 3
-        else:
-            max_lines = 2
-        max_height = min(22 + 22 * max_lines, int(self.size * 0.36))
 
-        # ログ用prefix
-        log_prefix = f"[Roulette] text='{text}', start={start_angle:.2f}, end={end_angle:.2f}, arc_length={arc_length:.2f}, max_width={max_width}, text_xy=({text_x},{text_y})"
+        max_width = int(arc_length * 0.85 * 0.8)
+        max_height = 32
 
         fit_text, fit_font = self._fit_text(
             text,
             self.base_font,
             max_width=max_width,
             max_height=max_height,
-            max_lines=max_lines,
-            log_prefix=log_prefix
+            max_lines=2
         )
-        # 最終採用テキストのbboxもログ
-        bbox = fit_font.getbbox(fit_text)
-        w = bbox[2] - bbox[0]
-        h = bbox[3] - bbox[1]
-        logger.info(f"{log_prefix} FINAL: fit_text='{fit_text}', font_size={fit_font.size}, w={w}, h={h}")
-
         draw.multiline_text((text_x, text_y), fit_text, font=fit_font, fill="black", anchor="mm", spacing=0)
 
     def create_roulette_gif(self, candidates: list, winner_index: int) -> tuple[BytesIO, float]:
