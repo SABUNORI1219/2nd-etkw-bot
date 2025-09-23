@@ -28,6 +28,8 @@ class RouletteCog(commands.Cog):
         await interaction.response.defer()
 
         candidate_list = options.split()
+        random.shuffle(candidate_list
+
         if len(candidate_list) < 2:
             embed = create_embed(description="候補は2つ以上指定してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
