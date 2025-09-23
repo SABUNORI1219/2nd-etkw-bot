@@ -63,15 +63,12 @@ class RouletteCog(commands.Cog):
             embed.set_footer(text=f"ルーレット | Minister Chikuwa")
             message = await interaction.followup.send(embed=embed, file=gif_file)
 
-            # 送信後、gif_buffer/discord.Fileは不要になるのでclose
             gif_buffer.close()
             gif_file.close()
             del gif_buffer, gif_file, embed
 
-            # 回転アニメーション待機
             await asyncio.sleep(animation_duration + 0.5)
 
-            # 結果静止画像生成
             result_buffer = self.renderer.create_result_image(candidate_list, winner_index)
             result_file = discord.File(fp=result_buffer, filename="roulette_result.png")
 
@@ -84,7 +81,6 @@ class RouletteCog(commands.Cog):
             result_embed.set_footer(text=f"ルーレット | Minister Chikuwa")
             await message.edit(embed=result_embed, attachments=[result_file])
 
-            # 送信後、result_buffer/discord.Fileもclose
             result_buffer.close()
             result_file.close()
             del result_buffer, result_file, result_embed
