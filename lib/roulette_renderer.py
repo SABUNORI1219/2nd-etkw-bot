@@ -130,7 +130,7 @@ class RouletteRenderer:
         stop_angle = 270 - (angle_per_candidate * winner_index) - (angle_per_candidate / 2) + spin_offset * angle_per_candidate
         total_rotation_degrees = 360 * spin_count + stop_angle
     
-        num_frames = random.randint(180, 260)
+        num_frames = random.randint(90, 130)
         duration_ms = random.randint(26, 36)
     
         frames = []
