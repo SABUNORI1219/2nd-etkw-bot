@@ -22,7 +22,7 @@ class RouletteCog(commands.Cog):
     @app_commands.command(name="roulette", description="ルーレットを回してランダムに一つを当選")
     @app_commands.describe(
         title="ルーレットのタイトル",
-        options="候補をスペース区切りで入力（各候補15文字以内、最大10個まで）"
+        options="候補をスペース区切りで入力（各候補10文字以内、最大8個まで）"
     )
     async def roulette(self, interaction: discord.Interaction, title: str, options: str):
         await interaction.response.defer()
@@ -32,13 +32,13 @@ class RouletteCog(commands.Cog):
             embed = create_embed(description="候補は2つ以上指定してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
             return
-        if len(candidate_list) > 10:
-            embed = create_embed(description="候補は最大10個までにしてください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+        if len(candidate_list) > 8:
+            embed = create_embed(description="候補は最大8個までにしてください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
             return
         for candidate in candidate_list:
-            if len(candidate) > 15:
-                embed = create_embed(description=f"候補「{candidate}」が長すぎます。\n各候補は15文字以内にしてください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            if len(candidate) > 10:
+                embed = create_embed(description=f"候補「{candidate}」が長すぎます。\n各候補は10文字以内にしてください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
                 await interaction.followup.send(embed=embed)
                 return
 
