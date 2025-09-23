@@ -82,7 +82,7 @@ class RouletteRenderer:
                 fnt = ImageFont.truetype(FONT_PATH, size)
             except IOError:
                 fnt = ImageFont.load_default()
-            lines = pixel_wrap(orig_text, fnt, max_width, max_lines)
+            lines = self.pixel_wrap(orig_text, fnt, max_width, max_lines)
             test_text = "\n".join(lines)
             bbox = fnt.getbbox(test_text)
             w = bbox[2] - bbox[0]
