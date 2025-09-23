@@ -52,19 +52,25 @@ class RouletteRenderer:
                 fnt = ImageFont.truetype(FONT_PATH, size)
             except IOError:
                 fnt = ImageFont.load_default()
+            # ピクセルwrapで行分割
             lines = []
+            line = ""
             for ch in orig_text:
-                if not lines:
-                    lines.append(ch)
-                else:
-                    test = lines[-1] + ch
-                    w, _ = fnt.getsize(test)
-                    if w > max_width:
-                        if len(lines) + 1 > max_lines:
-                            break
-                        lines.append(ch)
+                test = line + ch
+                bbox = fnt.getbbox(test)
+                w = bbox[2] - bbox[0]
+                if w > max_width:
+                    if line:
+                        lines.append(line)
+                        line = ch
                     else:
-                        lines[-1] = test
+                        lines.append(ch)
+                        line = ""
+                else:
+                    line = test
+            if line:
+                lines.append(line)
+            # 行数オーバーした場合は最後の行に...をつける
             if len(lines) > max_lines:
                 lines = lines[:max_lines]
                 if len(lines[-1]) > 1:
@@ -73,9 +79,11 @@ class RouletteRenderer:
                     lines[-1] = "..."
             test_text = "\n".join(lines)
             bbox = fnt.getbbox(test_text)
-            if bbox[2] <= max_width and bbox[3] <= max_height:
+            w = bbox[2] - bbox[0]
+            h = bbox[3] - bbox[1]
+            if w <= max_width and h <= max_height:
                 return test_text, fnt
-
+        # どんなに小さくしても無理なら「…」
         try:
             fnt = ImageFont.truetype(FONT_PATH, 9)
         except IOError:
