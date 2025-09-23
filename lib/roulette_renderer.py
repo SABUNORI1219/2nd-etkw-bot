@@ -49,33 +49,70 @@ class RouletteRenderer:
         text = text.strip()
         orig_text = text
 
-        for size in range(font.size, 9, -1):
+        for size in range(font.size, 8, -1):
             try:
                 fnt = ImageFont.truetype(FONT_PATH, size)
             except IOError:
                 fnt = ImageFont.load_default()
-            wrapped = textwrap.wrap(text, width=max(1, int(max_width // (size * 0.7))))
-            if len(wrapped) > max_lines:
-                wrapped = wrapped[:max_lines]
-            test_text = "\n".join(wrapped)
-            bbox = fnt.getbbox(test_text)
-            if bbox[2] <= max_width and bbox[3] <= max_height:
-                return test_text, fnt
+                
+            wrapped = textwrap.wrap(text, width=100)
+            for lines in range(min(len(wrapped), max_lines), 0, -1):
+                test_lines = wrapped[:lines]
+                test_text = "\n".join(test_lines)
+                bbox = fnt.getbbox(test_text)
+                if bbox[2] <= max_width and bbox[3] <= max_height:
+                    return test_text, fnt
 
-        for trunc in range(len(orig_text) - 1, 0, -1):
+        for trunc in range(len(orig_text), 0, -1):
             truncated = orig_text[:trunc] + "..."
             try:
                 fnt = ImageFont.truetype(FONT_PATH, 9)
             except IOError:
                 fnt = ImageFont.load_default()
-            wrapped = textwrap.wrap(truncated, width=max(1, int(max_width // (9 * 0.7))))
-            wrapped = wrapped[:max_lines]
-            test_text = "\n".join(wrapped)
-            bbox = fnt.getbbox(test_text)
-            if bbox[2] <= max_width and bbox[3] <= max_height:
-                return test_text, fnt
+            wrapped = textwrap.wrap(truncated, width=100)
+            for lines in range(min(len(wrapped), max_lines), 0, -1):
+                test_lines = wrapped[:lines]
+                test_text = "\n".join(test_lines)
+                bbox = fnt.getbbox(test_text)
+                if bbox[2] <= max_width and bbox[3] <= max_height:
+                    return test_text, fnt
 
         return "…", ImageFont.truetype(FONT_PATH, 9) if os.path.exists(FONT_PATH) else ImageFont.load_default()
+
+    def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text, num_candidates=None):
+        draw.pieslice(
+            [(22, 22), (self.size - 22, self.size - 22)],
+            start=start_angle, end=end_angle, fill=color, outline="white", width=2
+        )
+        text_angle = math.radians(start_angle + (end_angle - start_angle) / 2)
+        text_radius = self.radius * 0.65
+        text_x = self.center + int(text_radius * math.cos(text_angle))
+        text_y = self.center + int(text_radius * math.sin(text_angle))
+
+        angle = abs(end_angle - start_angle)
+        arc_length = 2 * math.pi * text_radius * (angle / 360)
+        max_width = int(arc_length * 0.85)
+
+        # 候補数によってmax_linesとmax_heightを調整
+        if num_candidates is None:
+            max_lines = 2
+        elif num_candidates <= 2:
+            max_lines = 4
+        elif num_candidates <= 4:
+            max_lines = 3
+        else:
+            max_lines = 2
+        # 行数ぶん高さを確保するが、画像の中心円を避ける形で最大値も制限する
+        max_height = min(22 + 18 * max_lines, int(self.size * 0.32))
+
+        fit_text, fit_font = self._fit_text(
+            text,
+            self.base_font,
+            max_width=max_width,
+            max_height=max_height,
+            max_lines=max_lines
+        )
+        draw.multiline_text((text_x, text_y), fit_text, font=fit_font, fill="black", anchor="mm", spacing=0)
 
     def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text, num_candidates=None):
         draw.pieslice(
