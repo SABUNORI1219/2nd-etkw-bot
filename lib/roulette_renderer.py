@@ -14,7 +14,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONT_PATH = os.path.join(project_root, "assets", "fonts", "NotoSansJP-Bold.ttf")
 
 class RouletteRenderer:
-    def __init__(self, size=260):
+    def __init__(self, size=360):
         self.size = size
         self.center = size // 2
         self.radius = self.center - 22
@@ -122,7 +122,7 @@ class RouletteRenderer:
         stop_angle = 270 - (angle_per_candidate * winner_index) - (angle_per_candidate / 2) + spin_offset * angle_per_candidate
         total_rotation_degrees = 360 * spin_count + stop_angle
     
-        num_frames = random.randint(90, 130)
+        num_frames = random.randint(180, 260)
         duration_ms = random.randint(26, 36)
     
         frames = []
