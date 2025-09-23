@@ -125,7 +125,7 @@ class RouletteRenderer:
 
         angle = abs(end_angle - start_angle)
         arc_length = 2 * math.pi * text_radius * (angle / 360)
-        max_width = int(arc_length * 0.85)
+        max_width = int(arc_length * 0.85 * 0.8)
         if num_candidates is None:
             max_lines = 2
         elif num_candidates <= 2:
