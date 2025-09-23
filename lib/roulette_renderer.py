@@ -83,7 +83,7 @@ class RouletteRenderer:
             start=start_angle, end=end_angle, fill=color, outline="white", width=2
         )
         text_angle = math.radians(start_angle + (end_angle - start_angle) / 2)
-        text_radius = self.radius * 0.5
+        text_radius = self.radius * 0.55
         text_x = self.center + int(text_radius * math.cos(text_angle))
         text_y = self.center + int(text_radius * math.sin(text_angle))
 
