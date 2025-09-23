@@ -45,44 +45,29 @@ class RouletteRenderer:
             fill=(0, 0, 0),
         )
 
-    def pixel_wrap(self, text, font, max_width, max_lines):
-        """日本語もOKなピクセル幅wrap、max_lines超えたら最後に...を付ける"""
-        lines = []
-        line = ""
-        for ch in text:
-            test_line = line + ch
-            bbox = font.getbbox(test_line)
-            w = bbox[2] - bbox[0]
-            if w > max_width:
-                if line:
-                    lines.append(line)
-                    line = ch
-                else:
-                    lines.append(ch)
-                    line = ""
-            else:
-                line = test_line
-            if len(lines) == max_lines:
-                break
-        if line and len(lines) < max_lines:
-            lines.append(line)
-        # max_lines超えた場合は最後の行に...をつけて省略
-        if len(lines) > max_lines:
-            lines = lines[:max_lines]
-            if len(lines[-1]) > 1:
-                lines[-1] = lines[-1][:-1] + "..."
-            else:
-                lines[-1] = "..."
-        return lines
+    def ellipsis_text(self, text, font, max_width):
+        """幅を超えたら '...' で省略する"""
+        ellipsis = "..."
+        if font.getbbox(text)[2] - font.getbbox(text)[0] <= max_width:
+            return text
+        for i in range(len(text), 0, -1):
+            trial = text[:i] + ellipsis
+            if font.getbbox(trial)[2] - font.getbbox(trial)[0] <= max_width:
+                return trial
+        return ellipsis
     
-    def _fit_text(self, text, font, max_width, max_height, max_lines=2, log_prefix=""):
+    def _fit_text(self, text, font, max_width, max_height, max_lines=2, log_prefix="", ellipsis_mode=False):
         orig_text = text.strip()
         for size in range(font.size, 8, -1):
             try:
                 fnt = ImageFont.truetype(FONT_PATH, size)
             except IOError:
                 fnt = ImageFont.load_default()
-            lines = self.pixel_wrap(orig_text, fnt, max_width, max_lines)
+            if ellipsis_mode:
+                fitted = self.ellipsis_text(orig_text, fnt, max_width)
+                lines = [fitted]
+            else:
+                lines = self.pixel_wrap(orig_text, fnt, max_width, max_lines)
             test_text = "\n".join(lines)
             bbox = fnt.getbbox(test_text)
             w = bbox[2] - bbox[0]
