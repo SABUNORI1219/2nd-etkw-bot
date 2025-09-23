@@ -46,38 +46,38 @@ class RouletteRenderer:
         )
 
     def _fit_text(self, text, font, max_width, max_height, max_lines=2):
-        text = text.strip()
-        orig_text = text
+        orig_text = text.strip()
+        best = None
 
         for size in range(font.size, 8, -1):
             try:
                 fnt = ImageFont.truetype(FONT_PATH, size)
             except IOError:
                 fnt = ImageFont.load_default()
-                
-            wrapped = textwrap.wrap(text, width=100)
-            for lines in range(min(len(wrapped), max_lines), 0, -1):
-                test_lines = wrapped[:lines]
-                test_text = "\n".join(test_lines)
+
+            for wrap_len in range(1, len(orig_text) + 1):
+                lines = []
+                t = orig_text
+                while t:
+                    lines.append(t[:wrap_len])
+                    t = t[wrap_len:]
+                    if len(lines) == max_lines:
+                        if t:
+                            lines[-1] = lines[-1][:-3] + "..."
+                        break
+                test_text = "\n".join(lines)
                 bbox = fnt.getbbox(test_text)
                 if bbox[2] <= max_width and bbox[3] <= max_height:
-                    return test_text, fnt
+                    if not best or size > best[0]:
+                        best = (size, len(lines), test_text, fnt)
+            if best:
+                return best[2], best[3]
 
-        for trunc in range(len(orig_text), 0, -1):
-            truncated = orig_text[:trunc] + "..."
-            try:
-                fnt = ImageFont.truetype(FONT_PATH, 9)
-            except IOError:
-                fnt = ImageFont.load_default()
-            wrapped = textwrap.wrap(truncated, width=100)
-            for lines in range(min(len(wrapped), max_lines), 0, -1):
-                test_lines = wrapped[:lines]
-                test_text = "\n".join(test_lines)
-                bbox = fnt.getbbox(test_text)
-                if bbox[2] <= max_width and bbox[3] <= max_height:
-                    return test_text, fnt
-
-        return "…", ImageFont.truetype(FONT_PATH, 9) if os.path.exists(FONT_PATH) else ImageFont.load_default()
+        try:
+            fnt = ImageFont.truetype(FONT_PATH, 9)
+        except IOError:
+            fnt = ImageFont.load_default()
+        return "…", fnt
 
     def _draw_wheel_sector(self, draw, start_angle, end_angle, color, text, num_candidates=None):
         draw.pieslice(
@@ -93,7 +93,6 @@ class RouletteRenderer:
         arc_length = 2 * math.pi * text_radius * (angle / 360)
         max_width = int(arc_length * 0.85)
 
-        # 候補数によってmax_linesとmax_heightを調整
         if num_candidates is None:
             max_lines = 2
         elif num_candidates <= 2:
@@ -102,8 +101,8 @@ class RouletteRenderer:
             max_lines = 3
         else:
             max_lines = 2
-        # 行数ぶん高さを確保するが、画像の中心円を避ける形で最大値も制限する
-        max_height = min(22 + 18 * max_lines, int(self.size * 0.32))
+
+        max_height = min(22 + 22 * max_lines, int(self.size * 0.36))
 
         fit_text, fit_font = self._fit_text(
             text,
