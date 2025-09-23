@@ -47,31 +47,34 @@ class RouletteRenderer:
 
     def _fit_text(self, text, font, max_width, max_height, max_lines=2):
         orig_text = text.strip()
-        best = None
-
         for size in range(font.size, 8, -1):
             try:
                 fnt = ImageFont.truetype(FONT_PATH, size)
             except IOError:
                 fnt = ImageFont.load_default()
-
-            for wrap_len in range(1, len(orig_text) + 1):
-                lines = []
-                t = orig_text
-                while t:
-                    lines.append(t[:wrap_len])
-                    t = t[wrap_len:]
-                    if len(lines) == max_lines:
-                        if t:
-                            lines[-1] = lines[-1][:-3] + "..."
-                        break
-                test_text = "\n".join(lines)
-                bbox = fnt.getbbox(test_text)
-                if bbox[2] <= max_width and bbox[3] <= max_height:
-                    if not best or size > best[0]:
-                        best = (size, len(lines), test_text, fnt)
-            if best:
-                return best[2], best[3]
+            lines = []
+            for ch in orig_text:
+                if not lines:
+                    lines.append(ch)
+                else:
+                    test = lines[-1] + ch
+                    w, _ = fnt.getsize(test)
+                    if w > max_width:
+                        if len(lines) + 1 > max_lines:
+                            break
+                        lines.append(ch)
+                    else:
+                        lines[-1] = test
+            if len(lines) > max_lines:
+                lines = lines[:max_lines]
+                if len(lines[-1]) > 1:
+                    lines[-1] = lines[-1][:-1] + "..."
+                else:
+                    lines[-1] = "..."
+            test_text = "\n".join(lines)
+            bbox = fnt.getbbox(test_text)
+            if bbox[2] <= max_width and bbox[3] <= max_height:
+                return test_text, fnt
 
         try:
             fnt = ImageFont.truetype(FONT_PATH, 9)
