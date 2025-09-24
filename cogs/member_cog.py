@@ -109,10 +109,6 @@ async def get_last_seen_dict_db(limit=10):
     return results_raw[:limit]
 
 def extract_role_display_name(role_name: str) -> str:
-    """
-    ロール名から [★★] や [ABC] など [ ] で囲まれた部分を全て除去し、残りの文字列を返す。
-    例: "[★★] 2nd Example [ABC]" -> "2nd Example"
-    """
     s = re.sub(r"\s*\[.*?]\s*", " ", role_name)
     return s.strip()
 
@@ -219,7 +215,7 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
         await interaction.response.send_message(f"✅ メンバー通知チャンネルを {channel.mention} に設定しました。", ephemeral=True)
 
     @app_commands.command(name="add", description="メンバーを登録")
-    @app_commands.describe(discord_user="登録したいDiscordユーザー（いない場合は入力不要、またはNone）")
+    @app_commands.describe(discord_user="登録したいDiscordユーザー（いない場合は入力不要）")
     async def add(self, interaction: discord.Interaction, mcid: str, discord_user: discord.User = None):
         await interaction.response.defer(ephemeral=True)
 
