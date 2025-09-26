@@ -51,6 +51,9 @@ class SpamDetectorCog(commands.Cog):
         if message.content.strip() == "FAKE USI":
             await message.reply("NOT ATU")
             return
+        if message.content.strip() == "attu":
+            await message.reply("morph")
+            return
 
         # 監視対象のユーザーでなければ、何もしない
         if message.author.id not in SPAM_TARGET_USER_IDS:
