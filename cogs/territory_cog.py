@@ -12,6 +12,7 @@ import subprocess
 import pickle
 import tempfile
 import sys
+from io import BytesIO
 
 from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.map_renderer import MapRenderer
