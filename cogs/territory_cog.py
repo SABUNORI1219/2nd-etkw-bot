@@ -217,6 +217,7 @@ class Territory(commands.GroupCog, name="territory"):
                 [sys.executable, 'lib/subproc_map_worker.py'],
                 stdin=inpipe,
                 stdout=outpipe,
+                cwd=project_root
             )
             proc.wait()
             outpipe.seek(0)
