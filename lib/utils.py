@@ -31,3 +31,7 @@ def create_embed(description=None, title=None, color=discord.Color.blurple(), fo
         embed.title = title
     embed.set_footer(text=footer_text)
     return embed
+
+def log_mem(prefix=""):
+    mem_mb = psutil.Process().memory_info().rss / (1024 * 1024)
+    logger.info(f"[MEM] {prefix}: {mem_mb:.1f}MB")
