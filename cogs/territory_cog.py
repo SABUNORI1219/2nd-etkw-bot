@@ -8,6 +8,10 @@ import os
 import re
 from datetime import datetime, timezone
 import gc
+import subprocess
+import pickle
+import tempfile
+import sys
 
 from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.map_renderer import MapRenderer
@@ -195,27 +199,43 @@ class Territory(commands.GroupCog, name="territory"):
                 return
         else:
             territories_to_render = territory_data
-        log_mem("Territory.map: before map_renderer.create_territory_map")
-        loop = asyncio.get_running_loop()
-        file, embed = await loop.run_in_executor(
-            None,
-            self.map_renderer.create_territory_map,
-            territory_data,
-            territories_to_render,
-            guild_color_map,
-            owned_territories_map
-        )
-        log_mem("Territory.map: after map_renderer.create_territory_map")
-        if file and embed:
+
+        log_mem("Territory.map: before subproc image gen")
+
+        # サブプロセスで画像生成
+        params = {
+            'territory_data': territory_data,
+            'territories_to_render': territories_to_render,
+            'guild_color_map': guild_color_map,
+            'owned_territories_map': owned_territories_map
+        }
+        # tempfile経由でやると大きなデータも安全
+        with tempfile.TemporaryFile() as inpipe, tempfile.TemporaryFile() as outpipe:
+            pickle.dump(params, inpipe)
+            inpipe.seek(0)
+            proc = subprocess.Popen(
+                [sys.executable, 'lib/subproc_map_worker.py'],
+                stdin=inpipe,
+                stdout=outpipe,
+            )
+            proc.wait()
+            outpipe.seek(0)
+            result = pickle.load(outpipe)
+
+        map_bytes = result.get('map_bytes')
+        embed_dict = result.get('embed_dict')
+
+        if map_bytes and embed_dict:
+            file = discord.File(fp=BytesIO(map_bytes), filename="wynn_map.png")
+            embed = discord.Embed.from_dict(embed_dict)
             await interaction.followup.send(file=file, embed=embed)
-            if hasattr(file, 'close'):
-                file.close()
+            file.close()
             del file, embed
-            log_mem("Territory.map: end (success)")
+            log_mem("Territory.map: end (success, subproc)")
         else:
             embed = create_embed(description="マップの生成中にエラーが発生しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
-            log_mem("Territory.map: end (fail map)")
+            log_mem("Territory.map: end (fail map, subproc)")
         gc.collect()
         log_mem("Territory.map: after gc.collect")
 
