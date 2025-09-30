@@ -5,6 +5,8 @@ from psycopg2.extras import execute_values
 from datetime import datetime, timedelta
 from collections import defaultdict
 
+from lib.utils import log_mem
+
 logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")  # Renderの環境変数利用
@@ -75,6 +77,7 @@ def create_table():
     logger.info("全テーブルを作成/確認しました")
 
 def upsert_guild_territory_state(guild_territory_history):
+    log_mem("upsert_guild_territory_state: start")
     conn = get_conn()
     try:
         with conn.cursor() as cur:
@@ -91,6 +94,7 @@ def upsert_guild_territory_state(guild_territory_history):
                         lost if isinstance(lost, datetime) else None,
                         from_guild, to_guild
                     ))
+            log_mem("upsert_guild_territory_state: before execute_values")
             if rows:
                 execute_values(
                     cur,
@@ -107,11 +111,10 @@ def upsert_guild_territory_state(guild_territory_history):
         logger.error(f"upsert_guild_territory_state failed: {e}")
     finally:
         if conn: conn.close()
+        log_mem("upsert_guild_territory_state: end")
 
 def get_guild_territory_state():
-    """
-    すべてのguild_territory_stateを {guild_prefix: {territory_name: {"acquired":..., "lost":..., "from_guild":..., "to_guild":...}}} 形式で返す
-    """
+    log_mem("get_guild_territory_state: start")
     conn = get_conn()
     result = defaultdict(dict)
     try:
@@ -119,6 +122,7 @@ def get_guild_territory_state():
             cur.execute("""
                 SELECT guild_prefix, territory_name, acquired, lost, from_guild, to_guild FROM guild_territory_state
             """)
+            log_mem("get_guild_territory_state: after fetchall")
             for g, t, acq, lost, from_guild, to_guild in cur.fetchall():
                 result[g][t] = {
                     "acquired": acq,
@@ -130,6 +134,7 @@ def get_guild_territory_state():
         logger.error(f"get_guild_territory_state failed: {e}")
     finally:
         if conn: conn.close()
+        log_mem("get_guild_territory_state: end")
     return result
 
 def insert_history(raid_name, clear_time, member):
