@@ -1,6 +1,7 @@
 import discord
 import json
 import logging
+import psutil
 
 logger = logging.getLogger(__name__)
 
