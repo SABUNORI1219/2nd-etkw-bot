@@ -186,7 +186,6 @@ class Territory(commands.GroupCog, name="territory"):
             'guild_color_map': guild_color_map,
             'owned_territories_map': owned_territories_map
         }
-
         with tempfile.TemporaryFile() as inpipe, tempfile.TemporaryFile() as outpipe:
             pickle.dump(params, inpipe)
             inpipe.seek(0)
@@ -202,7 +201,6 @@ class Territory(commands.GroupCog, name="territory"):
 
         map_bytes = result.get('map_bytes')
         embed_dict = result.get('embed_dict')
-
         if map_bytes and embed_dict:
             file = discord.File(fp=BytesIO(map_bytes), filename="wynn_map.png")
             embed = discord.Embed.from_dict(embed_dict)
@@ -238,20 +236,35 @@ class Territory(commands.GroupCog, name="territory"):
             target_territory_live_data,
             static_data,
         )
-        image_bytes = self.map_renderer.create_single_territory_image(
-            territory,
-            territory_data,
-            guild_color_map,
-        )
-        if image_bytes:
+
+        params = {
+            'mode': 'single',
+            'territory': territory,
+            'territory_data': territory_data,
+            'guild_color_map': guild_color_map,
+        }
+        with tempfile.TemporaryFile() as inpipe, tempfile.TemporaryFile() as outpipe:
+            pickle.dump(params, inpipe)
+            inpipe.seek(0)
+            proc = subprocess.Popen(
+                [sys.executable, 'lib/subproc_map_worker.py'],
+                stdin=inpipe,
+                stdout=outpipe,
+                cwd=project_root
+            )
+            proc.wait()
+            outpipe.seek(0)
+            result = pickle.load(outpipe)
+
+        img_bytes = result.get('image_bytes')
+        if img_bytes:
             safe_name = self.safe_filename(territory)
             filename = f"{safe_name}.png"
-            image_file = discord.File(fp=image_bytes, filename=filename)
+            image_file = discord.File(fp=BytesIO(img_bytes), filename=filename)
             embed.set_image(url=f"attachment://{filename}")
             await interaction.followup.send(embed=embed, file=image_file)
-            image_bytes.close()
             image_file.close()
-            del image_bytes, image_file, embed
+            del image_file, embed
         else:
             await interaction.followup.send(embed=embed)
             del embed
