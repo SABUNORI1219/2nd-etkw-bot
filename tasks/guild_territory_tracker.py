@@ -5,7 +5,6 @@ from collections import defaultdict
 
 from lib.api_stocker import WynncraftAPI
 from lib.db import upsert_guild_territory_state, get_guild_territory_state
-from lib.utils import log_mem
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,6 @@ def _str_to_dt(dtstr):
     return dt
 
 def get_effective_owned_territories(guild_prefix, current_time=None):
-    log_mem(f"get_effective_owned_territories: start ({guild_prefix})")
     if current_time is None:
         current_time = datetime.now(timezone.utc)
     result = set()
@@ -46,20 +44,14 @@ def get_effective_owned_territories(guild_prefix, current_time=None):
                 lost_time = lost_time.replace(tzinfo=timezone.utc)
             if (current_time - lost_time) <= timedelta(hours=1):
                 result.add(tname)
-    log_mem(f"get_effective_owned_territories: end ({guild_prefix})")
     return result
 
 def get_current_owned_territories(guild_prefix):
-    log_mem(f"get_current_owned_territories: start ({guild_prefix})")
-    result = {tname for tname, info in guild_territory_history[guild_prefix].items() if info.get("lost") is None}
-    log_mem(f"get_current_owned_territories: end ({guild_prefix})")
-    return result
+    return {tname for tname, info in guild_territory_history[guild_prefix].items() if info.get("lost") is None}
 
 def get_territory_held_time(guild_prefix, territory_name, now=None):
-    log_mem(f"get_territory_held_time: start ({guild_prefix}, {territory_name})")
     info = guild_territory_history[guild_prefix].get(territory_name)
     if not info or not info.get("acquired"):
-        log_mem(f"get_territory_held_time: end ({guild_prefix}, {territory_name}) [no info]")
         return 0
     acquired = info.get("acquired")
     if acquired and acquired.tzinfo is None:
@@ -68,35 +60,28 @@ def get_territory_held_time(guild_prefix, territory_name, now=None):
         lost = info.get("lost")
         if lost and lost.tzinfo is None:
             lost = lost.replace(tzinfo=timezone.utc)
-        log_mem(f"get_territory_held_time: end ({guild_prefix}, {territory_name}) [lost]")
         return int((lost - acquired).total_seconds())
     if not now:
         now = datetime.now(timezone.utc)
-    log_mem(f"get_territory_held_time: end ({guild_prefix}, {territory_name}) [held]")
     return int((now - acquired).total_seconds())
 
 def sync_history_from_db():
-    log_mem("sync_history_from_db: start")
     global guild_territory_history
     db_state = get_guild_territory_state()
-    log_mem("sync_history_from_db: after get_guild_territory_state")
     guild_territory_history.clear()
     for g, tdict in db_state.items():
         for t, info in tdict.items():
             acquired = _str_to_dt(info.get("acquired"))
             lost = _str_to_dt(info.get("lost"))
             guild_territory_history[g][t] = {"acquired": acquired, "lost": lost}
-    log_mem("sync_history_from_db: end")
 
 async def track_guild_territories(loop_interval=60):
-    log_mem("track_guild_territories: start")
     api = WynncraftAPI()
     sync_history_from_db()
     while True:
         now = datetime.now(timezone.utc)
         logger.info("[GuildTerritoryTracker] 領地データの取得を開始します...")
         territory_data = await api.get_territory_list()
-        log_mem("track_guild_territories: after api.get_territory_list")
         if not territory_data:
             logger.warning("[GuildTerritoryTracker] 領地データ取得失敗。10秒後に再試行します。")
             await asyncio.sleep(10)
@@ -104,14 +89,12 @@ async def track_guild_territories(loop_interval=60):
             global latest_territory_data
             latest_territory_data = territory_data
             logger.info("[GuildTerritoryTracker] 領地データのグローバル保存に成功。オートコンプリートに利用されます。")
-            log_mem("track_guild_territories: after latest_territory_data set")
 
         current_guild_territories = defaultdict(set)
         for tname, tinfo in territory_data.items():
             prefix = tinfo["guild"]["prefix"]
             if prefix:
                 current_guild_territories[prefix].add(tname)
-        log_mem("track_guild_territories: after current_guild_territories build")
 
         all_territory_names = set(territory_data.keys())
         territory_to_current_guild = {}
@@ -169,9 +152,7 @@ async def track_guild_territories(loop_interval=60):
                 del guild_territory_history[guild_prefix]
 
         upsert_guild_territory_state(guild_territory_history)
-        log_mem("track_guild_territories: after upsert_guild_territory_state")
         logger.info(f"[GuildTerritoryTracker] 領地履歴キャッシュ＆DB永続化: {len(guild_territory_history)} ギルド")
-        log_mem("track_guild_territories: loop end")
         await asyncio.sleep(loop_interval)
 
 async def setup(bot):
