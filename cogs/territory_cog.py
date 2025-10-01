@@ -18,7 +18,7 @@ from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.map_renderer import MapRenderer
 from lib.cache_handler import CacheHandler
 from lib.db import get_guild_territory_state
-from lib.utils import create_embed, log_mem
+from lib.utils import create_embed
 from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db
 from config import RESOURCE_EMOJIS, AUTHORIZED_USER_IDS, send_authorized_only_message
 
@@ -31,13 +31,11 @@ async def territory_autocomplete(
     interaction: discord.Interaction,
     current: str,
 ) -> list[app_commands.Choice[str]]:
-    log_mem("territory_autocomplete: start")
     try:
         with open(TERRITORIES_JSON_PATH, "r", encoding='utf-8') as f:
             territory_names = list(json.load(f).keys())
     except Exception:
         territory_names = []
-    log_mem("territory_autocomplete: end")
     return [
         app_commands.Choice(name=name, value=name)
         for name in territory_names if current.lower() in name.lower()
@@ -47,7 +45,6 @@ async def territory_autocomplete(
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 class Territory(commands.GroupCog, name="territory"):
     def __init__(self, bot: commands.Bot):
-        log_mem("Territory.__init__: start")
         self.bot = bot
         self.wynn_api = WynncraftAPI()
         self.other_api = OtherAPI()
@@ -64,10 +61,8 @@ class Territory(commands.GroupCog, name="territory"):
         except Exception as e:
             self.territory_names = []
             logger.error(f"territories.jsonの読み込みに失敗: {e}")
-        log_mem("Territory.__init__: end")
 
     def _create_status_embed(self, interaction: discord.Interaction, territory: str, target_territory_live_data: dict, static_data: dict) -> discord.Embed:
-        log_mem("Territory._create_status_embed: start")
         acquired_dt = datetime.fromisoformat(target_territory_live_data['acquired'].replace("Z", "+00:00"))
         duration = datetime.now(timezone.utc) - acquired_dt
         days = duration.days
@@ -100,7 +95,6 @@ class Territory(commands.GroupCog, name="territory"):
         embed.add_field(name="Production", value=production_text, inline=False)
         embed.add_field(name="Original Conns", value=f"{conns_count} Conns", inline=False)
         embed.set_footer(text="Territory Status | Minister Chikuwa")
-        log_mem("Territory._create_status_embed: end")
         return embed
 
     def cog_unload(self):
@@ -111,15 +105,12 @@ class Territory(commands.GroupCog, name="territory"):
 
     @tasks.loop(minutes=1.0)
     async def update_territory_cache(self):
-        log_mem("Territory.update_territory_cache: start")
         logger.info("--- [TerritoryCache] テリトリー所有ギルドのキャッシュを更新します...")
         from tasks.guild_territory_tracker import latest_territory_data
         global latest_territory_data
         territory_data = latest_territory_data
-        log_mem("Territory.update_territory_cache: after latest_territory_data")
         if not territory_data:
             logger.warning("latest_territory_dataが空のためキャッシュ更新をスキップ")
-            log_mem("Territory.update_territory_cache: end (empty)")
             return
         guild_names = set(
             data['guild']['prefix']
@@ -128,7 +119,6 @@ class Territory(commands.GroupCog, name="territory"):
         )
         self.territory_guilds_cache = sorted(list(guild_names))
         logger.info(f"--- [TerritoryCache] ✅ {len(self.territory_guilds_cache)}個のギルドをキャッシュしました。")
-        log_mem("Territory.update_territory_cache: end")
 
     @update_territory_cache.before_loop
     async def before_cache_update(self):
@@ -139,34 +129,28 @@ class Territory(commands.GroupCog, name="territory"):
         interaction: discord.Interaction,
         current: str,
     ) -> list[app_commands.Choice[str]]:
-        log_mem("Territory.guild_autocomplete: start")
         result = [
             app_commands.Choice(name=name, value=name)
             for name in self.territory_guilds_cache if current.lower() in name.lower()
         ][:25]
-        log_mem("Territory.guild_autocomplete: end")
         return result
 
     async def get_territory_data_with_cache(self):
-        log_mem("Territory.get_territory_data_with_cache: start")
         cache_key = "wynn_territory_list"
         territory_data = self.cache.get_cache(cache_key)
         if not territory_data:
             territory_data = await self.wynn_api.get_territory_list()
             if territory_data:
                 self.cache.set_cache(cache_key, territory_data)
-        log_mem("Territory.get_territory_data_with_cache: end")
         return territory_data
 
     async def get_guild_color_map_with_cache(self):
-        log_mem("Territory.get_guild_color_map_with_cache: start")
         cache_key = "guild_color_map"
         color_map = self.cache.get_cache(cache_key)
         if not color_map:
             color_map = await self.other_api.get_guild_color_map()
             if color_map:
                 self.cache.set_cache(cache_key, color_map)
-        log_mem("Territory.get_guild_color_map_with_cache: end")
         return color_map
 
     @app_commands.checks.cooldown(1, 20.0)
@@ -174,20 +158,16 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.autocomplete(guild=guild_autocomplete)
     @app_commands.describe(guild="On-map Guild Prefix")
     async def map(self, interaction: discord.Interaction, guild: str = None):
-        log_mem("Territory.map: start")
         await interaction.response.defer()
         territory_data = await self.get_territory_data_with_cache()
         guild_color_map = await self.get_guild_color_map_with_cache()
-        log_mem("Territory.map: after get_territory_data_with_cache/guild_color_map")
         if not territory_data or not guild_color_map:
             embed = create_embed(description="テリトリーまたはギルドカラー情報の取得に失敗しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
             return
         sync_history_from_db()
         db_state = get_guild_territory_state()
-        log_mem("Territory.map: after sync_history_from_db/get_guild_territory_state")
         owned_territories_map = {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
-        log_mem("Territory.map: after owned_territories_map")
         if guild:
             territories_to_render = {
                 name: data for name, data in territory_data.items()
@@ -196,21 +176,17 @@ class Territory(commands.GroupCog, name="territory"):
             if not territories_to_render:
                 embed = create_embed(description=f"ギルド **{guild}** は現在、領地を所有していません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
                 await interaction.followup.send(embed=embed)
-                log_mem("Territory.map: end (no territories)")
                 return
         else:
             territories_to_render = territory_data
 
-        log_mem("Territory.map: before subproc image gen")
-
-        # サブプロセスで画像生成
         params = {
             'territory_data': territory_data,
             'territories_to_render': territories_to_render,
             'guild_color_map': guild_color_map,
             'owned_territories_map': owned_territories_map
         }
-        # tempfile経由でやると大きなデータも安全
+
         with tempfile.TemporaryFile() as inpipe, tempfile.TemporaryFile() as outpipe:
             pickle.dump(params, inpipe)
             inpipe.seek(0)
@@ -233,13 +209,10 @@ class Territory(commands.GroupCog, name="territory"):
             await interaction.followup.send(file=file, embed=embed)
             file.close()
             del file, embed
-            log_mem("Territory.map: end (success, subproc)")
         else:
             embed = create_embed(description="マップの生成中にエラーが発生しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
-            log_mem("Territory.map: end (fail map, subproc)")
         gc.collect()
-        log_mem("Territory.map: after gc.collect")
 
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.command(name="status", description="指定されたテリトリーのステータスを表示")
