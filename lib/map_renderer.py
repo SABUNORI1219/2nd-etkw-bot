@@ -10,8 +10,6 @@ from datetime import datetime, timezone, timedelta
 from math import sqrt
 import collections
 
-from lib.utils import log_mem
-
 logger = logging.getLogger(__name__)
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -23,7 +21,6 @@ from tasks.guild_territory_tracker import get_effective_owned_territories, sync_
 
 class MapRenderer:
     def __init__(self):
-        log_mem("MapRenderer.__init__: start")
         try:
             with open(os.path.join(ASSETS_PATH, "territories.json"), "r", encoding='utf-8') as f:
                 self.local_territories = json.load(f)
@@ -31,7 +28,6 @@ class MapRenderer:
         except FileNotFoundError as e:
             logger.error(f"マップ生成に必要なアセットが見つかりません: {e}")
             raise
-        log_mem("MapRenderer.__init__: end")
 
     def _coord_to_pixel(self, x, z):
         return x + 2383, z + 6572
@@ -77,7 +73,6 @@ class MapRenderer:
         return total
 
     def _get_owned_territories_map_from_db(self):
-        log_mem("MapRenderer._get_owned_territories_map_from_db: start")
         now = time.time()
         if hasattr(self, "_db_cache") and self._db_cache and (now - self._db_cache_time < 60):
             return self._db_cache
@@ -86,11 +81,9 @@ class MapRenderer:
         result = {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
         self._db_cache = result
         self._db_cache_time = now
-        log_mem("MapRenderer._get_owned_territories_map_from_db: end")
         return result
 
     def _pick_hq_candidate(self, hq_candidates, territory_api_data, all_owned_territories=None, exclude_lost=None, debug_prefix=None):
-        log_mem("MapRenderer._pick_hq_candidate: start")
         # Conn/Ext計算用セット（現所有+1時間以内失領）を用意
         if all_owned_territories is None:
             all_owned_territories = set(hq_candidates) | (exclude_lost or set())
@@ -112,7 +105,6 @@ class MapRenderer:
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
             })
-        log_mem("MapRenderer._pick_hq_candidate: after HQ candidate build")
         if not hq_stats:
             return None, [], [], {}
         
@@ -137,7 +129,6 @@ class MapRenderer:
         # もし該当があればその中でConn値最大のものをHQに
         if hq_conn_candidates:
             hq_conn_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
-            log_mem("MapRenderer._pick_hq_candidate: end (hq_conn_candidates)")
             return hq_conn_candidates[0]["name"], hq_stats, top5, total_res
 
         # 3. Conn+Ext最大グループ内で複数ある場合はConn最大ユニークならHQ
@@ -145,7 +136,6 @@ class MapRenderer:
             conn_max_in_group = max(x["conn"] for x in conn_ext_tops)
             conn_maxs = [x for x in conn_ext_tops if x["conn"] == conn_max_in_group]
             if len(conn_maxs) == 1:
-                log_mem("MapRenderer._pick_hq_candidate: end (conn_maxs)")
                 return conn_maxs[0]["name"], hq_stats, top5, total_res
         else:
             conn_maxs = conn_ext_tops
@@ -153,7 +143,6 @@ class MapRenderer:
         # 4. 所持領地6個以下なら取得時刻最古
         if len(hq_candidates) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
-            log_mem("MapRenderer._pick_hq_candidate: end (oldest)")
             return oldest["name"], hq_stats, top5, total_res
 
         # 5. Conn同数&Ext<20で街領地あれば優先
@@ -163,7 +152,6 @@ class MapRenderer:
             ext_lt20 = [x for x in conn_top_group if x["ext"] < 20]
             city = next((x for x in ext_lt20 if x["is_city"]), None)
             if city:
-                log_mem("MapRenderer._pick_hq_candidate: end (city)")
                 return city["name"], hq_stats, top5, total_res
 
         # 6. Ext,Conn同値→資源判定
@@ -207,15 +195,12 @@ class MapRenderer:
                         best_res = int(self.local_territories[best_cand["name"]].get("resources", {}).get(min_type, "0"))
                         if cand_res > best_res:
                             best_cand = cand
-                log_mem("MapRenderer._pick_hq_candidate: end (best_cand)")
                 return best_cand["name"], hq_stats, top5, total_res
 
         # fallback
-        log_mem("MapRenderer._pick_hq_candidate: end (fallback)")
         return conn_ext_tops[0]["name"], hq_stats, top5, total_res
 
     def _get_map_and_scale(self):
-        log_mem("MapRenderer._get_map_and_scale: start")
         map_img = Image.open(os.path.join(ASSETS_PATH, "main-map.png")).convert("RGBA")
         TARGET_WIDTH = 1600
         original_w, original_h = map_img.size
@@ -223,13 +208,10 @@ class MapRenderer:
         new_h = int(original_h * scale_factor)
         resized_map = map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
         map_img.close()
-        log_mem("MapRenderer._get_map_and_scale: end")
         return resized_map, scale_factor
 
     def _get_crown_img(self):
-        log_mem("MapRenderer._get_crown_img: start")
         img = Image.open(os.path.join(ASSETS_PATH, "guild_headquarters.png")).convert("RGBA")
-        log_mem("MapRenderer._get_crown_img: end")
         return img
 
     def _get_font(self, size):
@@ -239,7 +221,6 @@ class MapRenderer:
             return ImageFont.load_default()
 
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None, upscale_factor=1.5):
-        log_mem("MapRenderer._draw_trading_and_territories: start")
         upscaled_lines = None
         overlay = None
 
@@ -321,7 +302,6 @@ class MapRenderer:
                 )
             map_to_draw_on.alpha_composite(overlay)
             del overlay_draw, draw
-            log_mem("MapRenderer._draw_trading_and_territories: end")
         finally:
             if upscaled_lines is not None:
                 upscaled_lines.close()
@@ -329,7 +309,6 @@ class MapRenderer:
                 overlay.close()
 
     def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False, map_to_draw_on=None, owned_territories_map=None):
-        log_mem("MapRenderer.draw_guild_hq_on_map: start")
         crown_img = None
         try:
             map_img = map_to_draw_on
@@ -359,7 +338,6 @@ class MapRenderer:
                 if hq_name:
                     hq_names.add(hq_name)
             self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map, hq_territories=hq_names)
-            log_mem("MapRenderer.draw_guild_hq_on_map: after _draw_trading_and_territories")
             draw = ImageDraw.Draw(map_img)
             crown_img = self._get_crown_img()
             for prefix, api_owned in prefix_to_territories.items():
@@ -446,7 +424,6 @@ class MapRenderer:
                     stroke_fill="black"
                 )
             del draw
-            log_mem("MapRenderer.draw_guild_hq_on_map: end")
             return map_img, [(0, 0, "", hq_name) for hq_name in hq_names]
         finally:
             if crown_img is not None:
@@ -454,12 +431,9 @@ class MapRenderer:
 
     # デフォルトマップ生成するやつ
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict, owned_territories_map=None) -> tuple[discord.File | None, discord.Embed | None]:
-        log_mem("MapRenderer.create_territory_map: start")
         if owned_territories_map is None:
             owned_territories_map = self._get_owned_territories_map_from_db()
-        log_mem("MapRenderer.create_territory_map: after owned_territories_map")
         if not territories_to_render:
-            log_mem("MapRenderer.create_territory_map: end (early exit)")
             return None, None
         resized_map, scale_factor = self._get_map_and_scale()
         self.scale_factor = scale_factor
@@ -480,7 +454,6 @@ class MapRenderer:
                     all_x.extend([px1 * scale_factor, px2 * scale_factor])
                     all_y.extend([py1 * scale_factor, py2 * scale_factor])
             if all_x and all_y:
-                log_mem("MapRenderer.create_territory_map: before crop")
                 padding = 30
                 box = (
                     max(0, min(all_x) - padding),
@@ -493,7 +466,6 @@ class MapRenderer:
                 map_to_draw_on = cropped
             else:
                 map_to_draw_on = resized_map
-            log_mem("MapRenderer.create_territory_map: before draw_guild_hq_on_map")
             final_map, _ = self.draw_guild_hq_on_map(
                 territory_data=territory_data,
                 guild_color_map=guild_color_map,
@@ -503,13 +475,10 @@ class MapRenderer:
                 map_to_draw_on=map_to_draw_on,
                 owned_territories_map=owned_territories_map
             )
-            log_mem("MapRenderer.create_territory_map: after draw_guild_hq_on_map")
             map_bytes = BytesIO()
             try:
-                log_mem("MapRenderer.create_territory_map: before final_map.save")
                 final_map.save(map_bytes, format='PNG')
                 map_bytes.seek(0)
-                log_mem("MapRenderer.create_territory_map: after final_map.save/before build discord.File/embed")
                 jst_now = datetime.now(timezone(timedelta(hours=9)))
                 formatted_time = jst_now.strftime("%Y/%m/%d %H:%M:%S")
                 file = discord.File(map_bytes, filename="wynn_map.png")
@@ -519,38 +488,30 @@ class MapRenderer:
                 )
                 embed.set_image(url="attachment://wynn_map.png")
                 embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
-                log_mem("MapRenderer.create_territory_map: end (success)")
                 return file, embed
             finally:
                 map_bytes.close()
                 final_map.close()
                 map_to_draw_on.close()
-                log_mem("MapRenderer.create_territory_map: finally/after close")
         except Exception as e:
             logger.error(f"マップ生成中にエラー: {e}", exc_info=True)
-            log_mem("MapRenderer.create_territory_map: end (exception)")
             return None, None
         finally:
             gc.collect()
-            log_mem("MapRenderer.create_territory_map: finally/gc.collect")
 
     # 単一テリトリー生成
     def create_single_territory_image(self, territory: str, territory_data: dict, guild_color_map: dict) -> BytesIO | None:
-        log_mem("MapRenderer.create_single_territory_image: start")
         terri_static = self.local_territories.get(territory)
         if not terri_static or 'Location' not in terri_static:
             logger.error(f"'{territory}'にLocationデータがありません。")
-            log_mem("MapRenderer.create_single_territory_image: end (no static)")
             return None
         terri_live = territory_data.get(territory)
         if not terri_live or "guild" not in terri_live:
             logger.error(f"領地 {territory} にAPIライブデータがありません。")
-            log_mem("MapRenderer.create_single_territory_image: end (no live)")
             return None
         owner_prefix = terri_live["guild"].get("prefix")
         if not owner_prefix:
             logger.error(f"領地 {territory} の所有ギルドprefixがAPIデータにありません")
-            log_mem("MapRenderer.create_single_territory_image: end (no prefix)")
             return None
         owned_territories_map = self._get_owned_territories_map_from_db()
         resized_map, scale_factor = self._get_map_and_scale()
@@ -565,7 +526,6 @@ class MapRenderer:
             map_to_draw_on=map_to_draw_on,
             owned_territories_map=owned_territories_map
         )
-        log_mem("MapRenderer.create_single_territory_image: after draw_guild_hq_on_map")
         static = terri_static
         loc = static.get("Location", {})
         px1, py1 = self._coord_to_pixel(*loc.get("start", [0, 0]))
@@ -587,7 +547,6 @@ class MapRenderer:
             logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。Box: {box}")
             final_map.close()
             map_to_draw_on.close()
-            log_mem("MapRenderer.create_single_territory_image: end (invalid box)")
             return None
         center_x = (px1 + px2) / 2
         center_y = (py1 + py2) / 2
@@ -603,13 +562,11 @@ class MapRenderer:
         )
         del draw
         cropped_image = final_map.crop(box)
-        log_mem("MapRenderer.create_single_territory_image: after crop")
         map_bytes = BytesIO()
         try:
             cropped_image.save(map_bytes, format='PNG')
             map_bytes.seek(0)
             result = BytesIO(map_bytes.getvalue())
-            log_mem("MapRenderer.create_single_territory_image: end (success)")
             return result
         finally:
             map_bytes.close()
@@ -617,4 +574,3 @@ class MapRenderer:
             final_map.close()
             map_to_draw_on.close()
             gc.collect()
-            log_mem("MapRenderer.create_single_territory_image: finally/gc.collect")
