@@ -49,6 +49,7 @@ class MyBot(commands.Bot):
         bot.add_view(ApplicationButtonView())
         bot.add_view(TicketUserView())
         bot.add_view(DeclineButtonView())
+        bot.add_view(LanguageSwitchView())
 
     async def setup_hook(self):
         """Botの非同期セットアップを管理する"""
