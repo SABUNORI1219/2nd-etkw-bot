@@ -159,7 +159,35 @@ def reset_player_raid_count(player, raid_name, count):
         conn.commit()
     conn.close()
 
-from datetime import datetime
+def adjust_player_raid_count(player, raid_name, count):
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            if count > 0:
+                now = datetime.utcnow()
+                from psycopg2.extras import execute_values
+                execute_values(
+                    cur,
+                    "INSERT INTO guild_raid_history (raid_name, clear_time, member) VALUES %s",
+                    [(raid_name, now, player)] * count
+                )
+            elif count < 0:
+                cur.execute(
+                    """
+                    DELETE FROM guild_raid_history
+                    WHERE id IN (
+                        SELECT id FROM guild_raid_history
+                        WHERE raid_name = %s AND member = %s
+                        ORDER BY clear_time DESC
+                        LIMIT %s
+                    )
+                    """,
+                    (raid_name, player, abs(count))
+                )
+            conn.commit()
+    finally:
+        if conn:
+            conn.close()
 
 def fetch_history(raid_name=None, date_from=None):
     conn = get_conn()
