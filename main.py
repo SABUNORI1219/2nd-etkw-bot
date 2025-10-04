@@ -15,7 +15,7 @@ from logger_setup import setup_logger
 from lib.db import create_table
 from lib.discord_notify import LanguageSwitchView
 from lib.utils import create_embed
-from lib.application_views import APPLICATION_CHANNEL_ID, ApplicationButtonView, DeclineButtonView, DeclineConfirmView
+from lib.application_views import APPLICATION_CHANNEL_ID, ApplicationButtonView, TicketUserView, DeclineButtonView, DeclineConfirmView
 
 # ロガーを最初にセットアップ
 setup_logger()
