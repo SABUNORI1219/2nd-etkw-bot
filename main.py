@@ -77,6 +77,7 @@ class MyBot(commands.Bot):
                 except Exception as e:
                     logger.error(f"[Minister Chikuwa] -> ❌ Task '{filename}' のセットアップに失敗: {e}")
         
+        # Views Touroku (main.py nai no yatu)
         register_persistent_views(self)
         # HElper Function Kidou
         await ensure_application_embed()
