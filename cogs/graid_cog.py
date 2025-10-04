@@ -218,8 +218,10 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             embed = create_embed(description=f"指定プレイヤー **{player}** はETKWギルドメンバーではありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
             return
-        
+            
+        before_count = len([row for row in fetch_history(raid_name=raid_name) if row[3] == player])
         adjust_player_raid_count(player, raid_name, count)
+        after_count = len([row for row in fetch_history(raid_name=raid_name) if row[3] == player])
         
         embed = create_embed(
             description=None,
@@ -229,7 +231,8 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         )
         embed.add_field(name="プレイヤー", value=player, inline=False)
         embed.add_field(name="レイド名", value=raid_name, inline=False)
-        embed.add_field(name="補正カウント数", value=str(count), inline=False)
+        embed.add_field(name="補正前", value=str(before_count), inline=False)
+        embed.add_field(name="補正後", value=str(after_count), inline=True)
         
         await interaction.followup.send(embed=embed)
 
