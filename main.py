@@ -40,16 +40,16 @@ intents.members = True
 MAP_GEN_MEMORY_MB = 100
 MEMORY_LIMIT_MB = 450
 
+def register_persistent_views(bot):
+    bot.add_view(ApplicationButtonView())
+    bot.add_view(TicketUserView())
+    bot.add_view(DeclineButtonView())
+    bot.add_view(LanguageSwitchView())
+
 # commands.Botを継承したカスタムBotクラス
 class MyBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents, activity=activity)
-
-    def register_persistent_views(bot):
-        bot.add_view(ApplicationButtonView())
-        bot.add_view(TicketUserView())
-        bot.add_view(DeclineButtonView())
-        bot.add_view(LanguageSwitchView())
 
     async def setup_hook(self):
         """Botの非同期セットアップを管理する"""
