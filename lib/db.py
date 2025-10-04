@@ -142,23 +142,6 @@ def insert_history(raid_name, clear_time, member):
     except Exception as e:
         logger.error(f"insert_history failed: {raid_name}, {clear_time}, {member}, error={e}")
 
-def reset_player_raid_count(player, raid_name, count):
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute(
-            "DELETE FROM guild_raid_history WHERE member=%s AND raid_name=%s",
-            (player, raid_name)
-        )
-        now = datetime.utcnow()
-        if count > 0:
-            execute_values(
-                cur,
-                "INSERT INTO guild_raid_history (raid_name, clear_time, member) VALUES %s",
-                [(raid_name, now, player)] * count
-            )
-        conn.commit()
-    conn.close()
-
 def adjust_player_raid_count(player, raid_name, count):
     conn = get_conn()
     try:
