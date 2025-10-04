@@ -44,6 +44,7 @@ def register_persistent_views(bot):
     bot.add_view(ApplicationButtonView())
     bot.add_view(TicketUserView())
     bot.add_view(DeclineButtonView())
+    bot.add_view(DeclineConfirmView())
     bot.add_view(LanguageSwitchView())
 
 # commands.Botを継承したカスタムBotクラス
