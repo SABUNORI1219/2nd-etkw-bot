@@ -528,9 +528,3 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
             f"{channel.mention} に申請内容を送信しました。スタッフが確認するまでお待ちください。",
             ephemeral=True
         )
-
-# 登録
-def register_persistent_views(bot: discord.Client):
-    bot.add_view(ApplicationButtonView())
-    bot.add_view(TicketUserView())  # チケット内ガイド/質問ボタン用
-    bot.add_view(DeclineButtonView())
