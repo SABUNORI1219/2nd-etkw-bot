@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 import logging
 
-from lib.db import fetch_history, set_config, reset_player_raid_count
+from lib.db import fetch_history, set_config, adjust_player_raid_count
 from lib.api_stocker import WynncraftAPI
 from lib.utils import create_embed
 from config import AUTHORIZED_USER_IDS, send_authorized_only_message, RESTRICTION
@@ -219,7 +219,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             await interaction.followup.send(embed=embed)
             return
         
-        reset_player_raid_count(player, raid_name, count)
+        adjust_player_raid_count(player, raid_name, count)
         
         embed = create_embed(
             description=None,
