@@ -231,7 +231,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         )
         embed.add_field(name="プレイヤー", value=player, inline=False)
         embed.add_field(name="レイド名", value=raid_name, inline=False)
-        embed.add_field(name="補正前", value=str(before_count), inline=False)
+        embed.add_field(name="補正前", value=str(before_count), inline=True)
         embed.add_field(name="補正後", value=str(after_count), inline=True)
         
         await interaction.followup.send(embed=embed)
