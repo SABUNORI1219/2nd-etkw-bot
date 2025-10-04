@@ -15,7 +15,7 @@ from logger_setup import setup_logger
 from lib.db import create_table
 from lib.discord_notify import LanguageSwitchView
 from lib.utils import create_embed
-from lib.application_views import APPLICATION_CHANNEL_ID, ApplicationButtonView, TicketUserView, DeclineButtonView, DeclineConfirmView
+from lib.application_views import APPLICATION_CHANNEL_ID, ApplicationButtonView, TicketUserView, DeclineButtonView
 
 # ロガーを最初にセットアップ
 setup_logger()
@@ -44,7 +44,6 @@ def register_persistent_views(bot):
     bot.add_view(ApplicationButtonView())
     bot.add_view(TicketUserView())
     bot.add_view(DeclineButtonView())
-    bot.add_view(DeclineConfirmView())
     bot.add_view(LanguageSwitchView())
 
 # commands.Botを継承したカスタムBotクラス
