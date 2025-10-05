@@ -164,7 +164,7 @@ class GraidRejectModal(discord.ui.Modal, title="拒否理由を入力"):
         )
         embed_dm.add_field(
             name="メンバー",
-            value=", ".join([discord.utils.escape_markdown(m) for m in member_ids]),
+            value=", ".join([discord.utils.escape_markdown(m) for m in self.member_ids]),
             inline=False
         )
         embed_dm.add_field(name="レイド", value=raid_name, inline=False)
