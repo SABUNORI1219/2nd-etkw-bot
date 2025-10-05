@@ -46,7 +46,7 @@ def register_persistent_views(bot):
     bot.add_view(TicketUserView())
     bot.add_view(DeclineButtonView())
     bot.add_view(LanguageSwitchView())
-    bot.add_view(GraidSubmitView("Guild Raidシステム", None, [], "", ""))
+    bot.add_view(GraidSubmitView())
 
 # commands.Botを継承したカスタムBotクラス
 class MyBot(commands.Bot):
