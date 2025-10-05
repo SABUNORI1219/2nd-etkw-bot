@@ -16,6 +16,7 @@ from lib.db import create_table
 from lib.discord_notify import LanguageSwitchView
 from lib.utils import create_embed
 from lib.application_views import APPLICATION_CHANNEL_ID, ApplicationButtonView, TicketUserView, DeclineButtonView
+from cogs.graid_cog import GraidSubmitView
 
 # ロガーを最初にセットアップ
 setup_logger()
@@ -45,6 +46,7 @@ def register_persistent_views(bot):
     bot.add_view(TicketUserView())
     bot.add_view(DeclineButtonView())
     bot.add_view(LanguageSwitchView())
+    bot.add_view(GraidSubmitView(None, [], "", ""))
 
 # commands.Botを継承したカスタムBotクラス
 class MyBot(commands.Bot):
