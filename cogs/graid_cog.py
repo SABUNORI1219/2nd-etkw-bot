@@ -93,50 +93,51 @@ class PlayerCountView(discord.ui.View):
             await self.message.edit(view=self)
 
 class GraidSubmitView(discord.ui.View):
-    def __init__(self, system_name, submitter_id, member_ids, raid_name, image_url):
+    def __init__(self):
         super().__init__(timeout=None)
-        self.system_name = system_name
-        self.submitter_id = submitter_id
-        self.member_ids = member_ids
-        self.raid_name = raid_name
-        self.image_url = image_url
 
     @discord.ui.button(label="承認/Approve", style=discord.ButtonStyle.success, custom_id="graid_approve")
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # 例: ここでDB登録（1回ずつ追加）
-        for mcid in self.member_ids:
-            adjust_player_raid_count(mcid, self.raid_name, 1)
-        # DM通知
-        user = await interaction.client.fetch_user(self.submitter_id)
-        
-        embed_dm = create_embed(
-            description=None,
-            title="✅️ あなたのギルドレイド申請が承認されました",
-            color=discord.Color.green(),
-            footer_text=f"{self.system_name} | Minister Chikuwa"
-        )
-        embed_dm.add_field(
-            name="メンバー",
-            value=", ".join([discord.utils.escape_markdown(m) for m in member_ids]),
-            inline=False
-        )
-        embed_dm.add_field(name="レイド", value=raid_name, inline=False)
-        await user.send(embed=embed_dm)
-        
-        # メッセージ削除
+        # メッセージのEmbedからデータを取得
+        embed = interaction.message.embeds[0]
+        member_field = next((f for f in embed.fields if f.name == "メンバー"), None)
+        raid_field = next((f for f in embed.fields if f.name == "レイド"), None)
+        members = [m.strip() for m in member_field.value.split(",")] if member_field else []
+        raid_name = raid_field.value if raid_field else ""
+        submitter_id = int(embed.description.split("申請者: <@")[1].split(">")[0]) if embed.description else None
+
+        for mcid in members:
+            adjust_player_raid_count(mcid, raid_name, 1)
+        if submitter_id:
+            user = await interaction.client.fetch_user(submitter_id)
+            dm_embed = create_embed(
+                description=None,
+                title="✅️ あなたのギルドレイド申請が承認されました",
+                color=discord.Color.green(),
+                footer_text="Guild Raidシステム | Minister Chikuwa"
+            )
+            dm_embed.add_field(name="メンバー", value=", ".join(members), inline=False)
+            dm_embed.add_field(name="レイド", value=raid_name, inline=False)
+            await user.send(embed=dm_embed)
         await interaction.message.delete()
         embed = create_embed(
             description="申請者にDMが送信されます。",
             title="✅️ 申請を承認しました",
             color=discord.Color.green(),
-            footer_text=f"{self.system_name} | Minister Chikuwa"
+            footer_text="Guild Raidシステム | Minister Chikuwa"
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @discord.ui.button(label="拒否/Decline", style=discord.ButtonStyle.danger, custom_id="graid_reject")
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # モーダルで理由入力
-        await interaction.response.send_modal(GraidRejectModal(self.submitter_id, self.member_ids, self.raid_name, interaction.message))
+        # approve同様、メッセージから情報を取得してモーダルに渡す
+        embed = interaction.message.embeds[0]
+        member_field = next((f for f in embed.fields if f.name == "メンバー"), None)
+        raid_field = next((f for f in embed.fields if f.name == "レイド"), None)
+        members = [m.strip() for m in member_field.value.split(",")] if member_field else []
+        raid_name = raid_field.value if raid_field else ""
+        submitter_id = int(embed.description.split("申請者: <@")[1].split(">")[0]) if embed.description else None
+        await interaction.response.send_modal(GraidRejectModal(submitter_id, members, raid_name, interaction.message))
 
 class GraidRejectModal(discord.ui.Modal, title="拒否理由を入力"):
     reason = discord.ui.TextInput(label="理由", style=discord.TextStyle.paragraph, required=True)
