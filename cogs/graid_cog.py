@@ -114,8 +114,8 @@ class GraidSubmitView(discord.ui.View):
         raid_name = raid_field.value if raid_field else ""
         submitter_id = int(embed.description.split("申請者: <@")[1].split(">")[0]) if embed.description else None
 
-        real_members = [unescape_mcid(m.strip()) for m in member_field.value.split(",")] if member_field else []
-        real_raid_name = extract_raid_name(raid_field.value) if raid_field else ""
+        real_members = [self.unescape_mcid(m.strip()) for m in member_field.value.split(",")] if member_field else []
+        real_raid_name = self.extract_raid_name(raid_field.value) if raid_field else ""
 
         for mcid in real_members:
             adjust_player_raid_count(mcid, real_raid_name, 1)
