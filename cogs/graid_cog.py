@@ -428,6 +428,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         )
         app_embed.add_field(name="レイド", value=f"{emoji}{raid_name}", inline=False)
         app_embed.set_image(url=image_url)
+        app_embed.set_footer(text=f"{self.system_name} | Minister Chikuwa")
         view = GraidSubmitView()
 
         channel = interaction.client.get_channel(GUILDRAID_SUBMIT_CHANNEL_ID)
