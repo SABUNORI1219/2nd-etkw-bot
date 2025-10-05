@@ -99,7 +99,7 @@ class GraidSubmitView(discord.ui.View):
         super().__init__(timeout=None)
 
     def extract_raid_name(self, field_value):
-        return re.sub(r"^[^\w\d]+", "", field_value).strip()
+        return re.sub(r"^(<a?:\w+:\d+>|\s*[\U0001F300-\U0001FAFF\u2600-\u27BF])+[\s]*", "", field_value)
     
     def unescape_mcid(self, m):
         return m.replace("\\_", "_").replace("\\*", "*").replace("\\~", "~")
