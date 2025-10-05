@@ -141,7 +141,7 @@ class GraidSubmitView(discord.ui.View):
         members = [m.strip() for m in member_field.value.split(",")] if member_field else []
         raid_name = raid_field.value if raid_field else ""
         submitter_id = int(embed.description.split("申請者: <@")[1].split(">")[0]) if embed.description else None
-        await interaction.response.send_modal(GraidRejectModal(submitter_id, members, raid_name, interaction.message))
+        await interaction.response.send_modal(GraidRejectModal("Guild Raidシステム", submitter_id, members, raid_name, interaction.message))
 
 class GraidRejectModal(discord.ui.Modal, title="拒否理由を入力"):
     reason = discord.ui.TextInput(label="理由", style=discord.TextStyle.paragraph, required=True)
