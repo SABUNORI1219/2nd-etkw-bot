@@ -8,7 +8,7 @@ import logging
 from lib.db import fetch_history, set_config, adjust_player_raid_count
 from lib.api_stocker import WynncraftAPI
 from lib.utils import create_embed
-from config import AUTHORIZED_USER_IDS, send_authorized_only_message, RESTRICTION
+from config import AUTHORIZED_USER_IDS, send_authorized_only_message, RESTRICTION, ETKW
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,8 @@ ADDC_RAID_CHOICES = [
     app_commands.Choice(name="The Canyon Colossus", value="The Canyon Colossus"),
     app_commands.Choice(name="The Nameless Anomaly", value="The Nameless Anomaly")
 ]
+
+GUILDRAID_SUBMIT_CHANNEL_ID = 1397480193270222888
 
 def normalize_date(date_str):
     parts = date_str.split('-')
@@ -89,6 +91,89 @@ class PlayerCountView(discord.ui.View):
 
         if self.message:
             await self.message.edit(view=self)
+
+class GraidSubmitView(discord.ui.View):
+    def __init__(self, system_name, submitter_id, member_ids, raid_name, image_url):
+        super().__init__(timeout=None)
+        self.system_name = system_name
+        self.submitter_id = submitter_id
+        self.member_ids = member_ids
+        self.raid_name = raid_name
+        self.image_url = image_url
+
+    @discord.ui.button(label="承認/Approve", style=discord.ButtonStyle.success, custom_id="graid_approve")
+    async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # 例: ここでDB登録（1回ずつ追加）
+        for mcid in self.member_ids:
+            adjust_player_raid_count(mcid, self.raid_name, 1)
+        # DM通知
+        user = await interaction.client.fetch_user(self.submitter_id)
+        
+        embed_dm = create_embed(
+            description=None,
+            title="✅️ あなたのギルドレイド申請が承認されました",
+            color=discord.Color.green(),
+            footer_text=f"{self.system_name} | Minister Chikuwa"
+        )
+        embed_dm.add_field(
+            name="メンバー",
+            value=", ".join([discord.utils.escape_markdown(m) for m in member_ids]),
+            inline=False
+        )
+        embed_dm.add_field(name="レイド", value=raid_name, inline=False)
+        await user.send(embed=embed_dm)
+        
+        # メッセージ削除
+        await interaction.message.delete()
+        embed = create_embed(
+            description="申請者にDMが送信されます。",
+            title="✅️ 申請を承認しました",
+            color=discord.Color.green(),
+            footer_text=f"{self.system_name} | Minister Chikuwa"
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="拒否/Decline", style=discord.ButtonStyle.danger, custom_id="graid_reject")
+    async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # モーダルで理由入力
+        await interaction.response.send_modal(GraidRejectModal(self.submitter_id, self.member_ids, self.raid_name, interaction.message))
+
+class GraidRejectModal(discord.ui.Modal, title="拒否理由を入力"):
+    reason = discord.ui.TextInput(label="理由", style=discord.TextStyle.paragraph, required=True)
+
+    def __init__(self, system_name, submitter_id, member_ids, raid_name, message):
+        super().__init__()
+        self.system_name = system_name
+        self.submitter_id = submitter_id
+        self.member_ids = member_ids
+        self.raid_name = raid_name
+        self.message = message
+
+    async def on_submit(self, interaction: discord.Interaction):
+        user = await interaction.client.fetch_user(self.submitter_id)
+        embed_dm = create_embed(
+            description=None,
+            title="❌️ あなたのギルドレイド申請が拒否されました",
+            color=discord.Color.red(),
+            footer_text=f"{self.system_name} | Minister Chikuwa"
+        )
+        embed_dm.add_field(
+            name="メンバー",
+            value=", ".join([discord.utils.escape_markdown(m) for m in member_ids]),
+            inline=False
+        )
+        embed_dm.add_field(name="レイド", value=raid_name, inline=False)
+        embed_dm.add_field(name="理由", value=self.reason.value, inline=False)
+        await user.send(embed=embed_dm)
+
+        await self.message.delete()
+        embed = create_embed(
+            description="拒否理由を送信し、申請Embedを削除しました。",
+            title="✅️ 申請を拒否しました",
+            color=discord.Color.green(),
+            footer_text=f"{self.system_name} | Minister Chikuwa"
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 class GuildRaidDetector(commands.GroupCog, name="graid"):
     def __init__(self, bot):
@@ -234,6 +319,69 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         embed.add_field(name="補正前", value=str(before_count), inline=True)
         embed.add_field(name="補正後", value=str(after_count), inline=True)
         
+        await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="submit", description="レイドクリア申請")
+    @app_commands.describe(members="メンバー4人のMCID(空白区切り)", raid_name="レイド名", proof="証拠画像")
+    async def guildraid_submit(self, interaction: discord.Interaction, members: str, raid_name: str, proof: discord.Attachment):
+        await interaction.response.defer(ephemeral=True)
+
+        # 権限チェック
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
+            return
+
+        guild: discord.Guild | None = interaction.guild
+        if guild is None:
+            embed = create_embed(description="このコマンドはサーバー内でのみ利用可能です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
+            return
+
+        member: discord.Member = interaction.user
+
+        # 権限判定（ETKW ロールを持っているかどうか）
+        if ETKW:
+            etkw_role = guild.get_role(ETKW)
+            if etkw_role and etkw_role.id not in [r.id for r in member.roles]:
+                embed = create_embed(description="このコマンドを使用する権限がありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=embed)
+                return
+        
+        member_ids = members.split()
+        if len(member_ids) != 4:
+            embed = create_embed(description="メンバーは4人分のIDを空白区切りで指定してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
+            return
+
+        # 証拠画像URL取得
+        image_url = proof.url
+
+        # 申請Embed
+        app_embed = discord.Embed(
+            title="ギルドレイドクリア申請",
+            color=discord.Color.orange()
+        )
+        app_embed.add_field(
+            name="メンバー",
+            value=", ".join([discord.utils.escape_markdown(m) for m in member_ids]),
+            inline=False
+        )
+        app_embed.add_field(name="レイド", value=raid_name, inline=False)
+        app_embed.set_image(url=image_url)
+        view = GraidSubmitView(interaction.user.id, member_ids, raid_name, image_url)
+
+        channel = interaction.client.get_channel(GUILDRAID_SUBMIT_CHANNEL_ID)
+        if not channel:
+            channel = await interaction.client.fetch_channel(GUILDRAID_SUBMIT_CHANNEL_ID)
+        await channel.send(embed=app_embed, view=view)
+
+        embed = create_embed(
+            description="承認をお待ち下さい。\n通知はDMで行われます。",
+            title="✅️ 申請を送信しました",
+            color=discord.Color.green(),
+            footer_text=f"{self.system_name} | Minister Chikuwa"
+        )
+
         await interaction.followup.send(embed=embed)
 
 # セットアップ関数
