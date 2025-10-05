@@ -110,15 +110,19 @@ class GraidSubmitView(discord.ui.View):
             adjust_player_raid_count(mcid, raid_name, 1)
         if submitter_id:
             user = await interaction.client.fetch_user(submitter_id)
-            dm_embed = create_embed(
+            embed_dm = create_embed(
                 description=None,
                 title="✅️ あなたのギルドレイド申請が承認されました",
                 color=discord.Color.green(),
                 footer_text="Guild Raidシステム | Minister Chikuwa"
             )
-            dm_embed.add_field(name="メンバー", value=", ".join(members), inline=False)
-            dm_embed.add_field(name="レイド", value=raid_name, inline=False)
-            await user.send(embed=dm_embed)
+            embed_dm.add_field(name="メンバー", value=", ".join(members), inline=False)
+            embed_dm.add_field(name="レイド", value=raid_name, inline=False)
+            try:
+                await user.send(embed=embed_dm)
+            except discord.Forbidden:
+                embed = create_embed(description="申請者のDMがオフになっているため、DMを送信できませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                await interaction.followup.send(embed=embed, ephemeral=True)
         await interaction.message.delete()
         embed = create_embed(
             description="申請者にDMが送信されます。",
@@ -165,7 +169,11 @@ class GraidRejectModal(discord.ui.Modal, title="拒否理由を入力"):
         )
         embed_dm.add_field(name="レイド", value=raid_name, inline=False)
         embed_dm.add_field(name="理由", value=self.reason.value, inline=False)
-        await user.send(embed=embed_dm)
+        try:
+            await user.send(embed=embed_dm)
+        except discord.Forbidden:
+            embed = create_embed(description="申請者のDMがオフになっているため、DMを送信できませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
         await self.message.delete()
         embed = create_embed(
@@ -361,6 +369,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         # 申請Embed
         app_embed = discord.Embed(
             title="ギルドレイドクリア申請",
+            description=f"申請者: <@{interaction.user.id}>",
             color=discord.Color.orange()
         )
         app_embed.add_field(
