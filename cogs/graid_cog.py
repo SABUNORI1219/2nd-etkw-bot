@@ -324,6 +324,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
     @app_commands.command(name="submit", description="レイドクリア申請")
     @app_commands.describe(members="メンバー4人のMCID(空白区切り)", raid_name="レイド名", proof="証拠画像")
+    @app_commands.choices(raid_name=RAID_CHOICES)
     async def guildraid_submit(self, interaction: discord.Interaction, members: str, raid_name: str, proof: discord.Attachment):
         await interaction.response.defer(ephemeral=True)
 
