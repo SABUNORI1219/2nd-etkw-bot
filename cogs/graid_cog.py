@@ -324,7 +324,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
     @app_commands.command(name="submit", description="レイドクリア申請")
     @app_commands.describe(members="メンバー4人のMCID(空白区切り)", raid_name="レイド名", proof="証拠画像")
-    @app_commands.choices(raid_name=RAID_CHOICES)
+    @app_commands.choices(raid_name=ADDC_RAID_CHOICES)
     async def guildraid_submit(self, interaction: discord.Interaction, members: str, raid_name: str, proof: discord.Attachment):
         await interaction.response.defer(ephemeral=True)
 
@@ -370,7 +370,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         )
         app_embed.add_field(name="レイド", value=raid_name, inline=False)
         app_embed.set_image(url=image_url)
-        view = GraidSubmitView(interaction.user.id, member_ids, raid_name, image_url)
+        view = GraidSubmitView()
 
         channel = interaction.client.get_channel(GUILDRAID_SUBMIT_CHANNEL_ID)
         if not channel:
