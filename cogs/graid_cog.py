@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
 import os
+import re
 import logging
 
 from lib.db import fetch_history, set_config, adjust_player_raid_count
@@ -97,6 +98,12 @@ class GraidSubmitView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
+    def extract_raid_name(self, field_value):
+        return re.sub(r"^[^\w\d]+", "", field_value).strip()
+    
+    def unescape_mcid(self, m):
+        return m.replace("\\_", "_").replace("\\*", "*").replace("\\~", "~")
+
     @discord.ui.button(label="承認/Approve", style=discord.ButtonStyle.success, custom_id="graid_approve")
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
         # メッセージのEmbedからデータを取得
@@ -107,8 +114,12 @@ class GraidSubmitView(discord.ui.View):
         raid_name = raid_field.value if raid_field else ""
         submitter_id = int(embed.description.split("申請者: <@")[1].split(">")[0]) if embed.description else None
 
-        for mcid in members:
-            adjust_player_raid_count(mcid, raid_name, 1)
+        real_members = [unescape_mcid(m.strip()) for m in member_field.value.split(",")] if member_field else []
+        real_raid_name = extract_raid_name(raid_field.value) if raid_field else ""
+
+        for mcid in real_members:
+            adjust_player_raid_count(mcid, real_raid_name, 1)
+
         if submitter_id:
             user = await interaction.client.fetch_user(submitter_id)
             embed_dm = create_embed(
