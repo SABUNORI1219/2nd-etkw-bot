@@ -356,10 +356,57 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 embed = create_embed(description="このコマンドを使用する権限がありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
                 await interaction.followup.send(embed=embed)
                 return
+
+        # 画像サイズチェック（8MB = 8 * 1024 * 1024 = 8388608 bytes）
+        if proof.size > 8 * 1024 * 1024:
+            embed = create_embed(
+                description="添付された画像が8MBを超えています。8MB以下の画像をアップロードしてください。",
+                title="🔴 エラーが発生しました",
+                color=discord.Color.red(),
+                footer_text=f"{self.system_name} | Minister Chikuwa"
+            )
+            await interaction.followup.send(embed=embed)
+            return
         
         member_ids = members.split()
         if len(member_ids) != 4:
             embed = create_embed(description="メンバーは4人分のIDを空白区切りで指定してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
+            return
+
+        member_ids = members.split()
+        if len(member_ids) != 4:
+            embed = create_embed(
+                description="メンバーは4人分のIDを空白区切りで指定してください。",
+                title="🔴 エラーが発生しました",
+                color=discord.Color.red(),
+                footer_text=f"{self.system_name} | Minister Chikuwa"
+            )
+            await interaction.followup.send(embed=embed)
+            return
+        
+        etkw_members = await self._get_etkw_members()
+        
+        # 1. ETKWメンバーでない人がいる
+        not_in_guild = [mcid for mcid in member_ids if mcid not in etkw_members]
+        if not_in_guild:
+            embed = create_embed(
+                description=f"指定されたMCIDがETKWギルドメンバーに含まれていません: {', '.join(not_in_guild)}",
+                title="🔴 エラーが発生しました",
+                color=discord.Color.red(),
+                footer_text=f"{self.system_name} | Minister Chikuwa"
+            )
+            await interaction.followup.send(embed=embed)
+            return
+        
+        # 2. 重複チェック
+        if len(set(member_ids)) != 4:
+            embed = create_embed(
+                description="同じMCIDが重複しています。4人すべて異なるMCIDを入力してください。",
+                title="🔴 エラーが発生しました",
+                color=discord.Color.red(),
+                footer_text=f"{self.system_name} | Minister Chikuwa"
+            )
             await interaction.followup.send(embed=embed)
             return
 
