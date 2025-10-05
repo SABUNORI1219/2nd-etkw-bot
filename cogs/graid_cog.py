@@ -8,6 +8,7 @@ import logging
 from lib.db import fetch_history, set_config, adjust_player_raid_count
 from lib.api_stocker import WynncraftAPI
 from lib.utils import create_embed
+from lib.discord_notify import RAID_EMOJIS, DEFAULT_EMOJI, get_emoji_for_raid
 from config import AUTHORIZED_USER_IDS, send_authorized_only_message, RESTRICTION, ETKW
 
 logger = logging.getLogger(__name__)
@@ -412,6 +413,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
         # 証拠画像URL取得
         image_url = proof.url
+        emoji = get_emoji_for_raid(raid_name)
 
         # 申請Embed
         app_embed = discord.Embed(
@@ -424,7 +426,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             value=", ".join([discord.utils.escape_markdown(m) for m in member_ids]),
             inline=False
         )
-        app_embed.add_field(name="レイド", value=raid_name, inline=False)
+        app_embed.add_field(name="レイド", value=f"{emoji}{raid_name}", inline=False)
         app_embed.set_image(url=image_url)
         view = GraidSubmitView()
 
