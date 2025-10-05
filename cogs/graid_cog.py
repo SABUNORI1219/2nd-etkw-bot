@@ -168,7 +168,7 @@ class GraidRejectModal(discord.ui.Modal, title="拒否理由を入力"):
             value=", ".join([discord.utils.escape_markdown(m) for m in self.member_ids]),
             inline=False
         )
-        embed_dm.add_field(name="レイド", value=raid_name, inline=False)
+        embed_dm.add_field(name="レイド", value=self.raid_name, inline=False)
         embed_dm.add_field(name="理由", value=self.reason.value, inline=False)
         try:
             await user.send(embed=embed_dm)
