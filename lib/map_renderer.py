@@ -5,7 +5,6 @@ import logging
 import json
 import discord
 import time
-import gc
 from datetime import datetime, timezone, timedelta
 from math import sqrt
 import collections
@@ -16,15 +15,29 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_PATH = os.path.join(project_root, "assets", "map")
 FONT_PATH = os.path.join(project_root, "assets", "fonts", "Minecraftia-Regular.ttf")
 
+# DBとキャッシュから履歴情報を取得
 from lib.db import get_guild_territory_state
 from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db
 
 class MapRenderer:
     def __init__(self):
         try:
+            self.map_img = Image.open(os.path.join(ASSETS_PATH, "main-map.png")).convert("RGBA")
+            self.crown_img = Image.open(os.path.join(ASSETS_PATH, "guild_headquarters.png")).convert("RGBA")
             with open(os.path.join(ASSETS_PATH, "territories.json"), "r", encoding='utf-8') as f:
                 self.local_territories = json.load(f)
-            self.font_path = FONT_PATH
+            self.font = ImageFont.truetype(FONT_PATH, 40)
+
+            TARGET_WIDTH = 1600
+            original_w, original_h = self.map_img.size
+            scale_factor = TARGET_WIDTH / original_w
+            new_h = int(original_h * scale_factor)
+            self.resized_map = self.map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
+            self.scale_factor = scale_factor
+
+            self._db_cache = None
+            self._db_cache_time = 0
+        
         except FileNotFoundError as e:
             logger.error(f"マップ生成に必要なアセットが見つかりません: {e}")
             raise
@@ -74,9 +87,9 @@ class MapRenderer:
 
     def _get_owned_territories_map_from_db(self):
         now = time.time()
-        if hasattr(self, "_db_cache") and self._db_cache and (now - self._db_cache_time < 60):
+        if self._db_cache and (now - self._db_cache_time < 60):
             return self._db_cache
-        sync_history_from_db()
+        sync_history_from_db()  # 必ず最新化
         db_state = get_guild_territory_state()
         result = {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
         self._db_cache = result
@@ -87,8 +100,8 @@ class MapRenderer:
         # Conn/Ext計算用セット（現所有+1時間以内失領）を用意
         if all_owned_territories is None:
             all_owned_territories = set(hq_candidates) | (exclude_lost or set())
-        hq_stats = []
 
+        hq_stats = []
         # HQ候補（現所有のみ）でループ
         for t in hq_candidates:
             conn, ext, hq_buff = self._calc_conn_ext_hqbuff(all_owned_territories, t)
@@ -105,20 +118,21 @@ class MapRenderer:
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
             })
+
         if not hq_stats:
             return None, [], [], {}
-        
+
         # Conn+Ext多い順→Conn多い順→HQバフ多い順→取得時刻古い順
         hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(all_owned_territories)
 
-        # 1. Conn+Ext最大グループ（ネットワーク力最強グループ）抽出
+        # Conn+Ext最大グループ（ネットワーク力最強グループ）抽出
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
         conn_ext_tops = [x for x in top5 if x["conn"] + x["ext"] == max_conn_ext]
         conn_ext_top_names = [x["name"] for x in conn_ext_tops]
 
-        # 2. Conn+Ext最大グループ以外のtop5領地で、Conn値が2個以上多いやつを探す
+        # Conn+Ext最大グループ以外のtop5領地で、Conn値が2個以上多いやつを探す
         other_top5 = [x for x in top5 if x not in conn_ext_tops]
         hq_conn_candidates = []
         max_group_conn = max(x["conn"] for x in conn_ext_tops)
@@ -131,7 +145,7 @@ class MapRenderer:
             hq_conn_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
             return hq_conn_candidates[0]["name"], hq_stats, top5, total_res
 
-        # 3. Conn+Ext最大グループ内で複数ある場合はConn最大ユニークならHQ
+        # Conn+Ext最大グループ内で複数ある場合はConn最大ユニークならHQ
         if len(conn_ext_tops) > 1:
             conn_max_in_group = max(x["conn"] for x in conn_ext_tops)
             conn_maxs = [x for x in conn_ext_tops if x["conn"] == conn_max_in_group]
@@ -140,12 +154,12 @@ class MapRenderer:
         else:
             conn_maxs = conn_ext_tops
 
-        # 4. 所持領地6個以下なら取得時刻最古
+        # 所持領地6個以下なら取得時刻最古
         if len(hq_candidates) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
 
-        # 5. Conn同数&Ext<20で街領地あれば優先
+        # Conn同数&Ext<20で街領地あれば優先
         max_conn = max(x["conn"] for x in top5)
         conn_top_group = [x for x in top5 if x["conn"] == max_conn]
         if len(conn_top_group) > 1:
@@ -154,7 +168,7 @@ class MapRenderer:
             if city:
                 return city["name"], hq_stats, top5, total_res
 
-        # 6. Ext,Conn同値→資源判定
+        # Ext,Conn同値→資源判定
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
             res_priority = ["crops", "ore", "wood", "fish"]
             min_val = float("inf")
@@ -199,26 +213,6 @@ class MapRenderer:
 
         # fallback
         return conn_ext_tops[0]["name"], hq_stats, top5, total_res
-
-    def _get_map_and_scale(self):
-        map_img = Image.open(os.path.join(ASSETS_PATH, "main-map.png")).convert("RGBA")
-        TARGET_WIDTH = 1600
-        original_w, original_h = map_img.size
-        scale_factor = TARGET_WIDTH / original_w
-        new_h = int(original_h * scale_factor)
-        resized_map = map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
-        map_img.close()
-        return resized_map, scale_factor
-
-    def _get_crown_img(self):
-        img = Image.open(os.path.join(ASSETS_PATH, "guild_headquarters.png")).convert("RGBA")
-        return img
-
-    def _get_font(self, size):
-        try:
-            return ImageFont.truetype(self.font_path, size)
-        except Exception:
-            return ImageFont.load_default()
 
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None, upscale_factor=1.5):
         upscaled_lines = None
