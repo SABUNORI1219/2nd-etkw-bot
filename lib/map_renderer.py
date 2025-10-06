@@ -260,8 +260,12 @@ class MapRenderer:
             overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
             overlay_draw = ImageDraw.Draw(overlay)
             draw = ImageDraw.Draw(map_to_draw_on)
-            scaled_font_size = max(12, int(self._get_font(40).size * self.scale_factor))
-            scaled_font = self._get_font(scaled_font_size)
+            # フォントサイズ・フォント生成（旧_get_fontを排除）
+            scaled_font_size = max(12, int(self.font.size * self.scale_factor))
+            try:
+                scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
+            except IOError:
+                scaled_font = ImageFont.load_default()
             for name, info in territory_data.items():
                 static = self.local_territories.get(name)
                 if not static or "Location" not in static:
@@ -334,7 +338,7 @@ class MapRenderer:
                     hq_names.add(hq_name)
             self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map, hq_territories=hq_names)
             draw = ImageDraw.Draw(map_img)
-            crown_img = self._get_crown_img()
+            # クラウン画像・フォントサイズ計算
             for prefix, api_owned in prefix_to_territories.items():
                 all_owned = owned_territories_map.get(prefix, set()) if owned_territories_map else set(api_owned)
                 lost_only = set()
@@ -358,30 +362,31 @@ class MapRenderer:
                 x = (loc["start"][0] + loc["end"][0]) // 2
                 z = (loc["start"][1] + loc["end"][1]) // 2
                 px, py = self._coord_to_pixel(x, z)
-                if hasattr(self, "scale_factor"):
-                    px = px * self.scale_factor
-                    py = py * self.scale_factor
+                px = px * self.scale_factor
+                py = py * self.scale_factor
                 if is_zoomed and box:
                     px -= box[0]
                     py -= box[1]
                 color_hex = guild_color_map.get(prefix, "#FFFFFF")
                 color_rgb = self._hex_to_rgb(color_hex)
+
                 x1, y1 = self._coord_to_pixel(loc["start"][0], loc["start"][1])
                 x2, y2 = self._coord_to_pixel(loc["end"][0], loc["end"][1])
                 x1, x2 = x1 * self.scale_factor, x2 * self.scale_factor
                 y1, y2 = y1 * self.scale_factor, y2 * self.scale_factor
                 width = abs(x2 - x1)
                 height = abs(y2 - y1)
-                scaled_font_size = max(12, int(self._get_font(40).size * self.scale_factor))
+                scaled_font_size = max(12, int(self.font.size * self.scale_factor))
                 crown_size_limit = int(scaled_font_size * 1.8)
                 crown_size_limit = max(28, min(crown_size_limit, 120))
                 crown_size = int(min(width, height) * 0.9)
                 crown_size = max(18, min(crown_size, crown_size_limit))
-                orig_w, orig_h = crown_img.size
+
+                orig_w, orig_h = self.crown_img.size
                 ratio = min(crown_size / orig_w, crown_size / orig_h)
                 new_w = int(orig_w * ratio)
                 new_h = int(orig_h * ratio)
-                crown_img_resized = crown_img.resize((new_w, new_h), Image.LANCZOS)
+                crown_img_resized = self.crown_img.resize((new_w, new_h), Image.LANCZOS)
                 crown_x = int(px - new_w/2)
                 crown_y = int(py - new_h/2)
                 map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
@@ -390,7 +395,7 @@ class MapRenderer:
                 font_found = False
                 for test_size in range(crown_size, 5, -1):
                     try:
-                        test_font = self._get_font(test_size)
+                        test_font = ImageFont.truetype(FONT_PATH, test_size)
                     except IOError:
                         test_font = ImageFont.load_default()
                     bbox = test_font.getbbox(prefix)
@@ -401,7 +406,7 @@ class MapRenderer:
                         font_found = True
                         break
                 if font_found:
-                    prefix_font = self._get_font(prefix_font_size)
+                    prefix_font = ImageFont.truetype(FONT_PATH, prefix_font_size)
                 else:
                     prefix_font = ImageFont.load_default()
                 bbox = prefix_font.getbbox(prefix)
@@ -420,6 +425,7 @@ class MapRenderer:
                 )
             del draw
             return map_img, [(0, 0, "", hq_name) for hq_name in hq_names]
+
         finally:
             if crown_img is not None:
                 crown_img.close()
@@ -432,7 +438,6 @@ class MapRenderer:
             return None, None
         map_to_draw_on = self.resized_map.copy()
         scale_factor = self.scale_factor
-        map_to_draw_on = None
         file = None
         embed = None
         box = None
@@ -453,14 +458,10 @@ class MapRenderer:
                 box = (
                     max(0, min(all_x) - padding),
                     max(0, min(all_y) - padding),
-                    min(resized_map.width, max(all_x) + padding),
-                    min(resized_map.height, max(all_y) + padding)
+                    min(self.resized_map.width, max(all_x) + padding),
+                    min(self.resized_map.height, max(all_y) + padding)
                 )
-                cropped = resized_map.crop(box)
-                self.resized_map.close()
-                map_to_draw_on = cropped
-            else:
-                map_to_draw_on = self.resized_map
+                map_to_draw_on = map_to_draw_on.crop(box)
             final_map, _ = self.draw_guild_hq_on_map(
                 territory_data=territory_data,
                 guild_color_map=guild_color_map,
@@ -534,8 +535,8 @@ class MapRenderer:
         box = (
             max(0, left - padding),
             max(0, top - padding),
-            min(resized_map.width, right + padding),
-            min(resized_map.height, bottom + padding)
+            min(self.resized_map.width, right + padding),
+            min(self.resized_map.height, bottom + padding)
         )
         if not (box[0] < box[2] and box[1] < box[3]):
             logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。Box: {box}")
