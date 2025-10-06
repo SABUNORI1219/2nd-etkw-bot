@@ -272,19 +272,18 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             if interaction.user.id not in AUTHORIZED_USER_IDS:
                 await send_authorized_only_message(interaction)
                 return
-            
-            # Fetch all history for "Total"
+
+            # データ取得
             rows = []
-            for raid_choice in RAID_CHOICES[:-2]:  # RAID_CHOICES[:-2] excludes "Total" and "Test"
+            for raid_choice in RAID_CHOICES[:-2]:
                 raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from)
                 rows.extend(raid_rows)
-            title_text = "🏆 Guild Raid Counts"
-            # プレイヤーごとに集計
             player_counts = {}
             for row in rows:
                 member = row[3]
                 player_counts[str(member)] = player_counts.get(str(member), 0) + 1
             sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
+
             # 前日集計
             now = datetime.utcnow()
             if date_from:
@@ -295,7 +294,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 else:
                     period_start = now.strftime("%Y-%m-%d")
             period_end = now.strftime("%Y-%m-%d")
-            # 前日
             prev_day = now - timedelta(days=1)
             prev_rows = []
             for raid_choice in RAID_CHOICES[:-2]:
@@ -306,7 +304,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 member = row[3]
                 prev_player_counts[str(member)] = prev_player_counts.get(str(member), 0) + 1
 
-            # Total/平均/日次変化
             total_raids = sum(player_counts.values())
             num_players = len(player_counts)
             avg_raids = total_raids // num_players if num_players else 0
@@ -334,22 +331,42 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 )
             )
 
-            # 1位,2位,3位,それ以降
+            # 二列ずつフィールド生成
             rank_emojis = ["🥇", "🥈", "🥉"]
-            for idx, (name, count) in enumerate(sorted_counts[start_idx:end_idx]):
-                # 前日比
-                prev_count = prev_player_counts.get(name, 0)
-                diff = count - prev_count
-                diff_str = f"{'+' if diff > 0 else ''}{diff}" if diff != 0 else "0"
-                raid_diff_str = f"`{diff_str}`"
-                # ランク表記
-                rank_label = rank_emojis[idx] if idx < len(rank_emojis) else f"#{start_idx+idx+1}"
-                field_name = f"{rank_label} {name}"
-                field_value = f"{raid_emoji} Raids: {count} ({raid_diff_str})"
-                embed.add_field(name=field_name, value=field_value, inline=(idx % 2 == 0))
+            fields = []
+            for idx in range(start_idx, min(end_idx, len(sorted_counts)), 2):
+                left = sorted_counts[idx] if idx < len(sorted_counts) else None
+                right = sorted_counts[idx+1] if idx+1 < len(sorted_counts) else None
+
+                # 左（1列目）
+                if left:
+                    name_l, count_l = left
+                    prev_count_l = prev_player_counts.get(name_l, 0)
+                    diff_l = count_l - prev_count_l
+                    diff_str_l = f"{'+' if diff_l > 0 else ''}{diff_l}" if diff_l != 0 else "0"
+                    rank_label_l = rank_emojis[idx] if idx < len(rank_emojis) else f"#{idx+1}"
+                    field_name_l = f"{rank_label_l} {name_l}"
+                    field_value_l = f"{raid_emoji} Raids: {count_l} (`{diff_str_l}`)"
+                else:
+                    field_name_l, field_value_l = "\u200b", "\u200b"
+                # 右（2列目）
+                if right:
+                    name_r, count_r = right
+                    prev_count_r = prev_player_counts.get(name_r, 0)
+                    diff_r = count_r - prev_count_r
+                    diff_str_r = f"{'+' if diff_r > 0 else ''}{diff_r}" if diff_r != 0 else "0"
+                    rank_label_r = rank_emojis[idx+1] if (idx+1) < len(rank_emojis) else f"#{idx+2}"
+                    field_name_r = f"{rank_label_r} {name_r}"
+                    field_value_r = f"{raid_emoji} Raids: {count_r} (`{diff_str_r}`)"
+                else:
+                    field_name_r, field_value_r = "\u200b", "\u200b"
+
+                # 二列分を並べてadd_field
+                embed.add_field(name=field_name_l, value=field_value_l, inline=True)
+                embed.add_field(name=field_name_r, value=field_value_r, inline=True)
+
             # 空白フィールドで区切り
             embed.add_field(name="\u200b", value="\u200b", inline=False)
-            # 集計系
             embed.add_field(
                 name="\u200b",
                 value=(
@@ -466,7 +483,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 await interaction.followup.send(embed=embed)
                 return
 
-        # 画像サイズチェック（8MB = 8 * 1024 * 1024 = 8388608 bytes）
         if proof.size > 8 * 1024 * 1024:
             embed = create_embed(
                 description="添付された画像が8MBを超えています。8MB以下の画像をアップロードしてください。",
@@ -496,7 +512,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         
         etkw_members = await self._get_etkw_members()
         
-        # 1. ETKWメンバーでない人がいる
         not_in_guild = [mcid for mcid in member_ids if mcid not in etkw_members]
         if not_in_guild:
             embed = create_embed(
@@ -508,7 +523,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             await interaction.followup.send(embed=embed)
             return
         
-        # 2. 重複チェック
         if len(set(member_ids)) != 4:
             embed = create_embed(
                 description="同じMCIDが重複しています。4人すべて異なるMCIDを入力してください。",
@@ -519,11 +533,9 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             await interaction.followup.send(embed=embed)
             return
 
-        # 証拠画像URL取得
         image_url = proof.url
         emoji = get_emoji_for_raid(raid_name)
 
-        # 申請Embed
         app_embed = discord.Embed(
             title="ギルドレイドクリア申請",
             description=f"申請者: <@{interaction.user.id}>",
