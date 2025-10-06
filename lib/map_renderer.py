@@ -8,6 +8,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from math import sqrt
 import collections
+import gc
 
 logger = logging.getLogger(__name__)
 
