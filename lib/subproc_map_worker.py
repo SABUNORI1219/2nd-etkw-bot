@@ -42,5 +42,11 @@ def main():
         }
     pickle.dump(result, sys.stdout.buffer)
 
+    try:
+        import ctypes
+        ctypes.CDLL('libc.so.6').malloc_trim(0)
+    except Exception:
+        pass
+
 if __name__ == "__main__":
     main()
