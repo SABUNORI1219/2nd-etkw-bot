@@ -268,12 +268,10 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 logger.info(f"日付パース失敗: '{normalized_date}', error: {e}")
 
         if raid_name == "Test":
-            # 権限チェック
             if interaction.user.id not in AUTHORIZED_USER_IDS:
                 await send_authorized_only_message(interaction)
                 return
 
-            # データ取得
             rows = []
             for raid_choice in RAID_CHOICES[:-2]:
                 raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from)
@@ -284,7 +282,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 player_counts[str(member)] = player_counts.get(str(member), 0) + 1
             sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
 
-            # 前日集計
             now = datetime.utcnow()
             if date_from:
                 period_start = date_from.strftime("%Y-%m-%d")
@@ -311,9 +308,9 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             raid_diff = total_raids - prev_total_raids
             raid_diff_pct = int((raid_diff / prev_total_raids) * 100) if prev_total_raids else 0
 
-            # Embed生成
+            # 3列表示・1ページあたり12人
             page = 0
-            per_page = 10
+            per_page = 12
             max_page = (len(sorted_counts) - 1) // per_page if sorted_counts else 0
             start_idx = page * per_page
             end_idx = start_idx + per_page
@@ -331,41 +328,52 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 )
             )
 
-            # 2列ずつフィールド生成
+            # 3列ずつフィールド生成
             rank_emojis = ["🥇", "🥈", "🥉"]
             idx = start_idx
             while idx < min(end_idx, len(sorted_counts)):
                 # 左
-                name_l, count_l = sorted_counts[idx]
-                prev_count_l = prev_player_counts.get(name_l, 0)
-                diff_l = count_l - prev_count_l
-                diff_str_l = f"{'+' if diff_l > 0 else ''}{diff_l}" if diff_l != 0 else "0"
-                rank_label_l = rank_emojis[idx] if idx < len(rank_emojis) else f"#{idx+1}"
-                field_name_l = f"{rank_label_l} {name_l}"
-                field_value_l = f"{raid_emoji} Raids: {count_l} (`{diff_str_l}`)"
-        
-                # 右
+                name_a, count_a = sorted_counts[idx]
+                prev_count_a = prev_player_counts.get(name_a, 0)
+                diff_a = count_a - prev_count_a
+                diff_str_a = f"{'+' if diff_a > 0 else ''}{diff_a}" if diff_a != 0 else "0"
+                rank_label_a = rank_emojis[idx] if idx < len(rank_emojis) else f"#{idx+1}"
+                field_name_a = f"{rank_label_a} {name_a}"
+                field_value_a = f"{raid_emoji} Raids: {count_a} (`{diff_str_a}`)"
+
+                # 中央
                 if idx+1 < min(end_idx, len(sorted_counts)):
-                    name_r, count_r = sorted_counts[idx+1]
-                    prev_count_r = prev_player_counts.get(name_r, 0)
-                    diff_r = count_r - prev_count_r
-                    diff_str_r = f"{'+' if diff_r > 0 else ''}{diff_r}" if diff_r != 0 else "0"
-                    rank_label_r = rank_emojis[idx+1] if (idx+1) < len(rank_emojis) else f"#{idx+2}"
-                    field_name_r = f"{rank_label_r} {name_r}"
-                    field_value_r = f"{raid_emoji} Raids: {count_r} (`{diff_str_r}`)"
+                    name_b, count_b = sorted_counts[idx+1]
+                    prev_count_b = prev_player_counts.get(name_b, 0)
+                    diff_b = count_b - prev_count_b
+                    diff_str_b = f"{'+' if diff_b > 0 else ''}{diff_b}" if diff_b != 0 else "0"
+                    rank_label_b = rank_emojis[idx+1] if (idx+1) < len(rank_emojis) else f"#{idx+2}"
+                    field_name_b = f"{rank_label_b} {name_b}"
+                    field_value_b = f"{raid_emoji} Raids: {count_b} (`{diff_str_b}`)"
                 else:
-                    field_name_r = "\u200b"
-                    field_value_r = "\u200b"
-        
-                # 2列分add_field
-                embed.add_field(name=field_name_l, value=field_value_l, inline=True)
-                embed.add_field(name=field_name_r, value=field_value_r, inline=True)
-                # 改行を強制する（3列目を絶対に作らない）
-                embed.add_field(name="\u200b", value="\u200b", inline=False)
-                idx += 2
-        
-            # 空白フィールドで区切り
-            embed.add_field(name="\u200b", value="\u200b", inline=False)
+                    field_name_b = "\u200b"
+                    field_value_b = "\u200b"
+
+                # 右
+                if idx+2 < min(end_idx, len(sorted_counts)):
+                    name_c, count_c = sorted_counts[idx+2]
+                    prev_count_c = prev_player_counts.get(name_c, 0)
+                    diff_c = count_c - prev_count_c
+                    diff_str_c = f"{'+' if diff_c > 0 else ''}{diff_c}" if diff_c != 0 else "0"
+                    rank_label_c = rank_emojis[idx+2] if (idx+2) < len(rank_emojis) else f"#{idx+3}"
+                    field_name_c = f"{rank_label_c} {name_c}"
+                    field_value_c = f"{raid_emoji} Raids: {count_c} (`{diff_str_c}`)"
+                else:
+                    field_name_c = "\u200b"
+                    field_value_c = "\u200b"
+
+                # 3列分add_field
+                embed.add_field(name=field_name_a, value=field_value_a, inline=True)
+                embed.add_field(name=field_name_b, value=field_value_b, inline=True)
+                embed.add_field(name=field_name_c, value=field_value_c, inline=True)
+                idx += 3
+
+            # 集計系
             embed.add_field(
                 name="\u200b",
                 value=(
