@@ -320,7 +320,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             emoji = "🏆"
             raid_emoji = "🗡️"
             total_emoji = RAID_EMOJIS.get("Total", "🏆")
-            raid_desc_emoji = total_emoji if total_emoji else "🏆"
+            raid_desc_emoji = "⚔️"
 
             embed = discord.Embed(
                 title=f"{emoji} Guild Raid Counts (Page `1/{max_page+1}` - `#{start_idx+1} ~ #{min(end_idx, len(sorted_counts))}`)",
@@ -331,27 +331,23 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 )
             )
 
-            # 二列ずつフィールド生成
+            # 2列ずつフィールド生成
             rank_emojis = ["🥇", "🥈", "🥉"]
-            fields = []
-            for idx in range(start_idx, min(end_idx, len(sorted_counts)), 2):
-                left = sorted_counts[idx] if idx < len(sorted_counts) else None
-                right = sorted_counts[idx+1] if idx+1 < len(sorted_counts) else None
-
-                # 左（1列目）
-                if left:
-                    name_l, count_l = left
-                    prev_count_l = prev_player_counts.get(name_l, 0)
-                    diff_l = count_l - prev_count_l
-                    diff_str_l = f"{'+' if diff_l > 0 else ''}{diff_l}" if diff_l != 0 else "0"
-                    rank_label_l = rank_emojis[idx] if idx < len(rank_emojis) else f"#{idx+1}"
-                    field_name_l = f"{rank_label_l} {name_l}"
-                    field_value_l = f"{raid_emoji} Raids: {count_l} (`{diff_str_l}`)"
-                else:
-                    field_name_l, field_value_l = "\u200b", "\u200b"
-                # 右（2列目）
-                if right:
-                    name_r, count_r = right
+            # ↓↓↓ここを修正↓↓↓
+            idx = start_idx
+            while idx < min(end_idx, len(sorted_counts)):
+                # 左側
+                name_l, count_l = sorted_counts[idx]
+                prev_count_l = prev_player_counts.get(name_l, 0)
+                diff_l = count_l - prev_count_l
+                diff_str_l = f"{'+' if diff_l > 0 else ''}{diff_l}" if diff_l != 0 else "0"
+                rank_label_l = rank_emojis[idx] if idx < len(rank_emojis) else f"#{idx+1}"
+                field_name_l = f"{rank_label_l} {name_l}"
+                field_value_l = f"{raid_emoji} Raids: {count_l} (`{diff_str_l}`)"
+        
+                # 右側
+                if idx+1 < min(end_idx, len(sorted_counts)):
+                    name_r, count_r = sorted_counts[idx+1]
                     prev_count_r = prev_player_counts.get(name_r, 0)
                     diff_r = count_r - prev_count_r
                     diff_str_r = f"{'+' if diff_r > 0 else ''}{diff_r}" if diff_r != 0 else "0"
@@ -359,12 +355,14 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                     field_name_r = f"{rank_label_r} {name_r}"
                     field_value_r = f"{raid_emoji} Raids: {count_r} (`{diff_str_r}`)"
                 else:
-                    field_name_r, field_value_r = "\u200b", "\u200b"
-
-                # 二列分を並べてadd_field
+                    field_name_r = "\u200b"
+                    field_value_r = "\u200b"
+        
+                # 二列分を1行でadd
                 embed.add_field(name=field_name_l, value=field_value_l, inline=True)
                 embed.add_field(name=field_name_r, value=field_value_r, inline=True)
-
+                idx += 2
+        
             # 空白フィールドで区切り
             embed.add_field(name="\u200b", value="\u200b", inline=False)
             embed.add_field(
