@@ -333,10 +333,9 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
             # 2列ずつフィールド生成
             rank_emojis = ["🥇", "🥈", "🥉"]
-            # ↓↓↓ここを修正↓↓↓
             idx = start_idx
             while idx < min(end_idx, len(sorted_counts)):
-                # 左側
+                # 左
                 name_l, count_l = sorted_counts[idx]
                 prev_count_l = prev_player_counts.get(name_l, 0)
                 diff_l = count_l - prev_count_l
@@ -345,7 +344,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 field_name_l = f"{rank_label_l} {name_l}"
                 field_value_l = f"{raid_emoji} Raids: {count_l} (`{diff_str_l}`)"
         
-                # 右側
+                # 右
                 if idx+1 < min(end_idx, len(sorted_counts)):
                     name_r, count_r = sorted_counts[idx+1]
                     prev_count_r = prev_player_counts.get(name_r, 0)
@@ -358,9 +357,11 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                     field_name_r = "\u200b"
                     field_value_r = "\u200b"
         
-                # 二列分を1行でadd
+                # 2列分add_field
                 embed.add_field(name=field_name_l, value=field_value_l, inline=True)
                 embed.add_field(name=field_name_r, value=field_value_r, inline=True)
+                # 改行を強制する（3列目を絶対に作らない）
+                embed.add_field(name="\u200b", value="\u200b", inline=False)
                 idx += 2
         
             # 空白フィールドで区切り
