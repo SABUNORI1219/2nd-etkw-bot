@@ -2,6 +2,7 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import pickle
+import ctypes
 from lib.map_renderer import MapRenderer
 
 def main():
@@ -43,7 +44,6 @@ def main():
     pickle.dump(result, sys.stdout.buffer)
 
     try:
-        import ctypes
         ctypes.CDLL('libc.so.6').malloc_trim(0)
     except Exception:
         pass
