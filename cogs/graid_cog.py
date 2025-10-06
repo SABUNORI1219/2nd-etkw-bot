@@ -266,6 +266,102 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             except Exception as e:
                 date_from = None
                 logger.info(f"日付パース失敗: '{normalized_date}', error: {e}")
+
+        if raid_name == "Test":
+            # 権限チェック
+            if interaction.user.id not in AUTHORIZED_USER_IDS:
+                await send_authorized_only_message(interaction)
+                return
+            
+            # Fetch all history for "Total"
+            rows = []
+            for raid_choice in RAID_CHOICES[:-2]:  # RAID_CHOICES[:-2] excludes "Total" and "Test"
+                raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from)
+                rows.extend(raid_rows)
+            title_text = "🏆 Guild Raid Counts"
+            # プレイヤーごとに集計
+            player_counts = {}
+            for row in rows:
+                member = row[3]
+                player_counts[str(member)] = player_counts.get(str(member), 0) + 1
+            sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
+            # 前日集計
+            now = datetime.utcnow()
+            if date_from:
+                period_start = date_from.strftime("%Y-%m-%d")
+            else:
+                if rows:
+                    period_start = min([r[2].strftime("%Y-%m-%d") for r in rows])
+                else:
+                    period_start = now.strftime("%Y-%m-%d")
+            period_end = now.strftime("%Y-%m-%d")
+            # 前日
+            prev_day = now - timedelta(days=1)
+            prev_rows = []
+            for raid_choice in RAID_CHOICES[:-2]:
+                prev_raid_rows = fetch_history(raid_name=raid_choice.value, date_from=prev_day)
+                prev_rows.extend(prev_raid_rows)
+            prev_player_counts = {}
+            for row in prev_rows:
+                member = row[3]
+                prev_player_counts[str(member)] = prev_player_counts.get(str(member), 0) + 1
+
+            # Total/平均/日次変化
+            total_raids = sum(player_counts.values())
+            num_players = len(player_counts)
+            avg_raids = total_raids // num_players if num_players else 0
+            prev_total_raids = sum(prev_player_counts.values())
+            raid_diff = total_raids - prev_total_raids
+            raid_diff_pct = int((raid_diff / prev_total_raids) * 100) if prev_total_raids else 0
+
+            # Embed生成
+            page = 0
+            per_page = 10
+            max_page = (len(sorted_counts) - 1) // per_page if sorted_counts else 0
+            start_idx = page * per_page
+            end_idx = start_idx + per_page
+            emoji = "🏆"
+            raid_emoji = "🗡️"
+            total_emoji = RAID_EMOJIS.get("Total", "🏆")
+            raid_desc_emoji = total_emoji if total_emoji else "🏆"
+
+            embed = discord.Embed(
+                title=f"{emoji} Guild Raid Counts (Page `1/{max_page+1}` - `#{start_idx+1} ~ #{min(end_idx, len(sorted_counts))}`)",
+                color=discord.Color.orange(),
+                description=(
+                    f"{raid_desc_emoji} Raid: Total\n"
+                    f"Period: `{period_start}` ~ `{period_end}`"
+                )
+            )
+
+            # 1位,2位,3位,それ以降
+            rank_emojis = ["🥇", "🥈", "🥉"]
+            for idx, (name, count) in enumerate(sorted_counts[start_idx:end_idx]):
+                # 前日比
+                prev_count = prev_player_counts.get(name, 0)
+                diff = count - prev_count
+                diff_str = f"{'+' if diff > 0 else ''}{diff}" if diff != 0 else "0"
+                raid_diff_str = f"`{diff_str}`"
+                # ランク表記
+                rank_label = rank_emojis[idx] if idx < len(rank_emojis) else f"#{start_idx+idx+1}"
+                field_name = f"{rank_label} {name}"
+                field_value = f"{raid_emoji} Raids: {count} ({raid_diff_str})"
+                embed.add_field(name=field_name, value=field_value, inline=(idx % 2 == 0))
+            # 空白フィールドで区切り
+            embed.add_field(name="\u200b", value="\u200b", inline=False)
+            # 集計系
+            embed.add_field(
+                name="\u200b",
+                value=(
+                    f"Total Raids: `{total_raids}`\n"
+                    f"Average Per Player: `{avg_raids}`\n"
+                    f"📈 Compared to Last Day: `{raid_diff}` (`{raid_diff_pct}%`)"
+                ),
+                inline=False
+            )
+            embed.set_footer(text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.response.send_message(embed=embed, ephemeral=hidden)
+            return
         
         # 合計集計
         if raid_name == "Total":
