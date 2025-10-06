@@ -429,8 +429,8 @@ class MapRenderer:
             owned_territories_map = self._get_owned_territories_map_from_db()
         if not territories_to_render:
             return None, None
-        resized_map, scale_factor = self._get_map_and_scale()
-        self.scale_factor = scale_factor
+        map_to_draw_on = self.resized_map.copy()
+        scale_factor = self.scale_factor
         map_to_draw_on = None
         file = None
         embed = None
@@ -508,9 +508,8 @@ class MapRenderer:
             logger.error(f"領地 {territory} の所有ギルドprefixがAPIデータにありません")
             return None
         owned_territories_map = self._get_owned_territories_map_from_db()
-        resized_map, scale_factor = self._get_map_and_scale()
-        self.scale_factor = scale_factor
-        map_to_draw_on = resized_map
+        map_to_draw_on = self.resized_map.copy()
+        scale_factor = self.scale_factor
         final_map, _ = self.draw_guild_hq_on_map(
             territory_data=territory_data,
             guild_color_map=guild_color_map,
