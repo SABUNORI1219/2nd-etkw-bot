@@ -456,10 +456,10 @@ class MapRenderer:
                     min(resized_map.height, max(all_y) + padding)
                 )
                 cropped = resized_map.crop(box)
-                resized_map.close()
+                self.resized_map.close()
                 map_to_draw_on = cropped
             else:
-                map_to_draw_on = resized_map
+                map_to_draw_on = self.resized_map
             final_map, _ = self.draw_guild_hq_on_map(
                 territory_data=territory_data,
                 guild_color_map=guild_color_map,
