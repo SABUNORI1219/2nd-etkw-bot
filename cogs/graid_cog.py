@@ -20,6 +20,7 @@ RAID_CHOICES = [
     app_commands.Choice(name="The Canyon Colossus", value="The Canyon Colossus"),
     app_commands.Choice(name="The Nameless Anomaly", value="The Nameless Anomaly"),
     app_commands.Choice(name="Total", value="Total"),
+    app_commands.Choice(name="Test", value="Test"),
 ]
 
 ADDC_RAID_CHOICES = [
