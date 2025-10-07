@@ -44,6 +44,96 @@ def normalize_date(date_str):
         return parts[0]
     return date_str
 
+class TestPlayerCountView(discord.ui.View):
+    def __init__(self, sorted_counts, prev_player_counts, total_today, total_yesterday, title, color, page=0, per_page=12, timeout=120):
+        super().__init__(timeout=timeout)
+        self.sorted_counts = sorted_counts
+        self.prev_player_counts = prev_player_counts
+        self.total_today = total_today
+        self.total_yesterday = total_yesterday
+        self.page = page
+        self.per_page = per_page
+        self.max_page = (len(sorted_counts) - 1) // per_page if sorted_counts else 0
+        self.title = title
+        self.color = color
+        self.message = None
+
+        self.previous.disabled = self.page == 0
+        self.next.disabled = self.page == self.max_page
+
+    def get_embed(self):
+        start = self.page * self.per_page
+        end = min(start + self.per_page, len(self.sorted_counts))
+        embed = discord.Embed(title=self.title, color=self.color)
+        # 3列ずつ
+        idx = start
+        rank_emojis = ["🥇", "🥈", "🥉"]
+        raid_emoji = "🗡️"
+        while idx < end:
+            for i in range(3):
+                if idx + i < end:
+                    name, count = self.sorted_counts[idx + i]
+                    prev_count = self.prev_player_counts.get(name, 0)
+                    today_count = count
+                    # 今日分: 今日の合計から昨日分を引いた値が「今日のカウント」
+                    # 前日分: 昨日分の合計
+                    # 1日分の履歴をちゃんと切り出して比較したいなら、fetch_historyで「今日の日付」「昨日の日付」でそれぞれ取得して集計する必要がある
+                    diff = today_count - prev_count
+                    pct = int((today_count / prev_count) * 100) if prev_count > 0 else 0
+                    rank_label = rank_emojis[idx + i] if (idx + i) < len(rank_emojis) else f"#{idx + i + 1}"
+                    field_name = f"{rank_label} {name}"
+                    # 表示: Raids: 今日のカウント (+今日-昨日, %)
+                    field_value = f"{raid_emoji} Raids: {today_count} (`{diff:+d} | {pct}%`)"
+                else:
+                    field_name = field_value = "\u200b"
+                embed.add_field(name=field_name, value=field_value, inline=True)
+            idx += 3
+        # トータル
+        total_diff = self.total_today - self.total_yesterday
+        total_pct = int((self.total_today / self.total_yesterday) * 100) if self.total_yesterday > 0 else 0
+        avg_raids = self.total_today // len(self.sorted_counts) if self.sorted_counts else 0
+        embed.add_field(
+            name="\u200b",
+            value=(
+                f"Total Raids: `{self.total_today}`\n"
+                f"Average Per Player: `{avg_raids}`\n"
+                f"📈 Compared to Last Day: `{total_diff}` (`{total_pct}%`)"
+            ),
+            inline=False
+        )
+        embed.set_footer(text="Guild Raidシステム | Minister Chikuwa")
+        return embed
+
+    async def update_message(self, interaction):
+        embed = self.get_embed()
+        self.previous.disabled = self.page == 0
+        self.next.disabled = self.page == self.max_page
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="⏪️", style=discord.ButtonStyle.secondary)
+    async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.page > 0:
+            self.page -= 1
+            await self.update_message(interaction)
+
+    @discord.ui.button(label="⏩️", style=discord.ButtonStyle.secondary)
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.page < self.max_page:
+            self.page += 1
+            await self.update_message(interaction)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if self.message is None:
+            self.message = interaction.message
+        return True
+
+    async def on_timeout(self):
+        for child in self.children:
+            if isinstance(child, discord.ui.Button):
+                child.disabled = True
+        if self.message:
+            await self.message.edit(view=self)
+
 class PlayerCountView(discord.ui.View):
     def __init__(self, player_counts, title, color=discord.Color.blue(), page=0, per_page=10, timeout=120):
         super().__init__(timeout=timeout)
@@ -271,7 +361,8 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             if interaction.user.id not in AUTHORIZED_USER_IDS:
                 await send_authorized_only_message(interaction)
                 return
-
+    
+            # データ取得
             rows = []
             for raid_choice in RAID_CHOICES[:-2]:
                 raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from)
@@ -280,111 +371,54 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             for row in rows:
                 member = row[3]
                 player_counts[str(member)] = player_counts.get(str(member), 0) + 1
-            sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
-
+    
+            # 今日の日付
             now = datetime.utcnow()
-            if date_from:
-                period_start = date_from.strftime("%Y-%m-%d")
-            else:
-                if rows:
-                    period_start = min([r[2].strftime("%Y-%m-%d") for r in rows])
-                else:
-                    period_start = now.strftime("%Y-%m-%d")
-            period_end = now.strftime("%Y-%m-%d")
-            prev_day = now - timedelta(days=1)
-            prev_rows = []
+            today_str = now.strftime("%Y-%m-%d")
+            # 昨日の日付
+            yesterday_dt = now - timedelta(days=1)
+            yesterday_str = yesterday_dt.strftime("%Y-%m-%d")
+    
+            # 今日分
+            today_rows = []
             for raid_choice in RAID_CHOICES[:-2]:
-                prev_raid_rows = fetch_history(raid_name=raid_choice.value, date_from=prev_day)
-                prev_rows.extend(prev_raid_rows)
-            prev_player_counts = {}
-            for row in prev_rows:
+                today_rows.extend(fetch_history(raid_name=raid_choice.value, date_from=today_str))
+            today_player_counts = {}
+            for row in today_rows:
                 member = row[3]
-                prev_player_counts[str(member)] = prev_player_counts.get(str(member), 0) + 1
-
-            total_raids = sum(player_counts.values())
-            num_players = len(player_counts)
-            avg_raids = total_raids // num_players if num_players else 0
-            prev_total_raids = sum(prev_player_counts.values())
-            raid_diff = total_raids - prev_total_raids
-            raid_diff_pct = int((raid_diff / prev_total_raids) * 100) if prev_total_raids else 0
-
-            # 3列表示・1ページあたり12人
-            page = 0
+                today_player_counts[str(member)] = today_player_counts.get(str(member), 0) + 1
+            # 昨日分
+            yesterday_rows = []
+            for raid_choice in RAID_CHOICES[:-2]:
+                yesterday_rows.extend(fetch_history(raid_name=raid_choice.value, date_from=yesterday_str))
+            yesterday_player_counts = {}
+            for row in yesterday_rows:
+                member = row[3]
+                yesterday_player_counts[str(member)] = yesterday_player_counts.get(str(member), 0) + 1
+    
+            # 並び順
+            sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
+    
+            # ページング
             per_page = 12
+            page = 0
             max_page = (len(sorted_counts) - 1) // per_page if sorted_counts else 0
-            start_idx = page * per_page
-            end_idx = start_idx + per_page
-            emoji = "🏆"
-            raid_emoji = "🗡️"
-            total_emoji = RAID_EMOJIS.get("Total", "🏆")
-            raid_desc_emoji = "⚔️"
-
-            embed = discord.Embed(
-                title=f"{emoji} Guild Raid Counts (Page `1/{max_page+1}` - `#{start_idx+1} ~ #{min(end_idx, len(sorted_counts))}`)",
+    
+            # 上記ロジックを使って表示
+            view = TestPlayerCountView(
+                sorted_counts,
+                yesterday_player_counts,
+                sum(today_player_counts.values()),
+                sum(yesterday_player_counts.values()),
+                title="Guild Raid Counts",
                 color=discord.Color.orange(),
-                description=(
-                    f"{raid_desc_emoji} Raid: Total\n"
-                    f"Period: `{period_start}` ~ `{period_end}`"
-                )
+                page=page,
+                per_page=per_page
             )
-
-            # 3列ずつフィールド生成
-            rank_emojis = ["🥇", "🥈", "🥉"]
-            idx = start_idx
-            while idx < min(end_idx, len(sorted_counts)):
-                # 左
-                name_a, count_a = sorted_counts[idx]
-                prev_count_a = prev_player_counts.get(name_a, 0)
-                diff_a = count_a - prev_count_a
-                diff_str_a = f"{'+' if diff_a > 0 else ''}{diff_a}" if diff_a != 0 else "0"
-                rank_label_a = rank_emojis[idx] if idx < len(rank_emojis) else f"#{idx+1}"
-                field_name_a = f"{rank_label_a} {name_a}"
-                field_value_a = f"{raid_emoji} Raids: {count_a} (`{diff_str_a}`)"
-
-                # 中央
-                if idx+1 < min(end_idx, len(sorted_counts)):
-                    name_b, count_b = sorted_counts[idx+1]
-                    prev_count_b = prev_player_counts.get(name_b, 0)
-                    diff_b = count_b - prev_count_b
-                    diff_str_b = f"{'+' if diff_b > 0 else ''}{diff_b}" if diff_b != 0 else "0"
-                    rank_label_b = rank_emojis[idx+1] if (idx+1) < len(rank_emojis) else f"#{idx+2}"
-                    field_name_b = f"{rank_label_b} {name_b}"
-                    field_value_b = f"{raid_emoji} Raids: {count_b} (`{diff_str_b}`)"
-                else:
-                    field_name_b = "\u200b"
-                    field_value_b = "\u200b"
-
-                # 右
-                if idx+2 < min(end_idx, len(sorted_counts)):
-                    name_c, count_c = sorted_counts[idx+2]
-                    prev_count_c = prev_player_counts.get(name_c, 0)
-                    diff_c = count_c - prev_count_c
-                    diff_str_c = f"{'+' if diff_c > 0 else ''}{diff_c}" if diff_c != 0 else "0"
-                    rank_label_c = rank_emojis[idx+2] if (idx+2) < len(rank_emojis) else f"#{idx+3}"
-                    field_name_c = f"{rank_label_c} {name_c}"
-                    field_value_c = f"{raid_emoji} Raids: {count_c} (`{diff_str_c}`)"
-                else:
-                    field_name_c = "\u200b"
-                    field_value_c = "\u200b"
-
-                # 3列分add_field
-                embed.add_field(name=field_name_a, value=field_value_a, inline=True)
-                embed.add_field(name=field_name_b, value=field_value_b, inline=True)
-                embed.add_field(name=field_name_c, value=field_value_c, inline=True)
-                idx += 3
-
-            # 集計系
-            embed.add_field(
-                name="\u200b",
-                value=(
-                    f"Total Raids: `{total_raids}`\n"
-                    f"Average Per Player: `{avg_raids}`\n"
-                    f"📈 Compared to Last Day: `{raid_diff}` (`{raid_diff_pct}%`)"
-                ),
-                inline=False
-            )
-            embed.set_footer(text=f"{self.system_name} | Minister Chikuwa")
-            await interaction.response.send_message(embed=embed, ephemeral=hidden)
+            embed = view.get_embed()
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=hidden)
+            msg = await interaction.original_response()
+            view.message = msg
             return
         
         # 合計集計
