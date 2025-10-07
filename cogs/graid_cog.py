@@ -45,10 +45,11 @@ def normalize_date(date_str):
     return date_str
 
 class TestPlayerCountView(discord.ui.View):
-    def __init__(self, sorted_counts, prev_player_counts, total_today, total_yesterday, title, color, page=0, per_page=12, timeout=120):
+    def __init__(self, sorted_counts, today_player_counts, yesterday_player_counts, total_today, total_yesterday, title, color, page=0, per_page=12, timeout=120):
         super().__init__(timeout=timeout)
         self.sorted_counts = sorted_counts
-        self.prev_player_counts = prev_player_counts
+        self.today_player_counts = today_player_counts  # dict
+        self.yesterday_player_counts = yesterday_player_counts  # dict
         self.total_today = total_today
         self.total_yesterday = total_yesterday
         self.page = page
@@ -57,41 +58,44 @@ class TestPlayerCountView(discord.ui.View):
         self.title = title
         self.color = color
         self.message = None
-
         self.previous.disabled = self.page == 0
         self.next.disabled = self.page == self.max_page
 
     def get_embed(self):
         start = self.page * self.per_page
         end = min(start + self.per_page, len(self.sorted_counts))
-        embed = discord.Embed(title=self.title, color=self.color)
-        # 3列ずつ
-        idx = start
-        rank_emojis = ["🥇", "🥈", "🥉"]
+        emoji = "🏆"
         raid_emoji = "🗡️"
+        rank_emojis = ["🥇", "🥈", "🥉"]
+        embed = discord.Embed(
+            title=f"{emoji} Guild Raid Counts (Page `{self.page+1}/{self.max_page+1}` - `#{start+1} ~ #{end}`)",
+            color=self.color,
+            description="⚔️ Raid: Total\nPeriod: `{}` ~ `{}`".format(
+                # 日付範囲は最初と最後の履歴から計算
+                min(self.today_player_counts.values(), default=0),
+                datetime.utcnow().strftime("%Y-%m-%d")
+            )
+        )
+        idx = start
         while idx < end:
             for i in range(3):
                 if idx + i < end:
-                    name, count = self.sorted_counts[idx + i]
-                    prev_count = self.prev_player_counts.get(name, 0)
-                    today_count = count
-                    # 今日分: 今日の合計から昨日分を引いた値が「今日のカウント」
-                    # 前日分: 昨日分の合計
-                    # 1日分の履歴をちゃんと切り出して比較したいなら、fetch_historyで「今日の日付」「昨日の日付」でそれぞれ取得して集計する必要がある
-                    diff = today_count - prev_count
-                    pct = int((today_count / prev_count) * 100) if prev_count > 0 else 0
+                    name, _ = self.sorted_counts[idx + i]
+                    today_count = self.today_player_counts.get(name, 0)
+                    yesterday_count = self.yesterday_player_counts.get(name, 0)
+                    diff = today_count - yesterday_count
+                    pct = int((today_count / yesterday_count) * 100) if yesterday_count > 0 else 0
                     rank_label = rank_emojis[idx + i] if (idx + i) < len(rank_emojis) else f"#{idx + i + 1}"
                     field_name = f"{rank_label} {name}"
-                    # 表示: Raids: 今日のカウント (+今日-昨日, %)
                     field_value = f"{raid_emoji} Raids: {today_count} (`{diff:+d} | {pct}%`)"
                 else:
                     field_name = field_value = "\u200b"
                 embed.add_field(name=field_name, value=field_value, inline=True)
             idx += 3
-        # トータル
+        # 集計系（ページ送り時も必ず表示）
         total_diff = self.total_today - self.total_yesterday
         total_pct = int((self.total_today / self.total_yesterday) * 100) if self.total_yesterday > 0 else 0
-        avg_raids = self.total_today // len(self.sorted_counts) if self.sorted_counts else 0
+        avg_raids = self.total_today // len(self.today_player_counts) if self.today_player_counts else 0
         embed.add_field(
             name="\u200b",
             value=(
@@ -362,7 +366,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 await send_authorized_only_message(interaction)
                 return
     
-            # データ取得
+            # データ取得（全履歴）
             rows = []
             for raid_choice in RAID_CHOICES[:-2]:
                 raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from)
@@ -371,11 +375,10 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             for row in rows:
                 member = row[3]
                 player_counts[str(member)] = player_counts.get(str(member), 0) + 1
+            sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
     
-            # 今日の日付
             now = datetime.utcnow()
             today_str = now.strftime("%Y-%m-%d")
-            # 昨日の日付
             yesterday_dt = now - timedelta(days=1)
             yesterday_str = yesterday_dt.strftime("%Y-%m-%d")
     
@@ -387,6 +390,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             for row in today_rows:
                 member = row[3]
                 today_player_counts[str(member)] = today_player_counts.get(str(member), 0) + 1
+    
             # 昨日分
             yesterday_rows = []
             for raid_choice in RAID_CHOICES[:-2]:
@@ -396,24 +400,16 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 member = row[3]
                 yesterday_player_counts[str(member)] = yesterday_player_counts.get(str(member), 0) + 1
     
-            # 並び順
-            sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
-    
-            # ページング
-            per_page = 12
-            page = 0
-            max_page = (len(sorted_counts) - 1) // per_page if sorted_counts else 0
-    
-            # 上記ロジックを使って表示
             view = TestPlayerCountView(
-                sorted_counts,
-                yesterday_player_counts,
-                sum(today_player_counts.values()),
-                sum(yesterday_player_counts.values()),
+                sorted_counts=sorted_counts,
+                today_player_counts=today_player_counts,
+                yesterday_player_counts=yesterday_player_counts,
+                total_today=sum(today_player_counts.values()),
+                total_yesterday=sum(yesterday_player_counts.values()),
                 title="Guild Raid Counts",
                 color=discord.Color.orange(),
-                page=page,
-                per_page=per_page
+                page=0,
+                per_page=12
             )
             embed = view.get_embed()
             await interaction.response.send_message(embed=embed, view=view, ephemeral=hidden)
