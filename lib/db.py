@@ -172,7 +172,7 @@ def adjust_player_raid_count(player, raid_name, count):
         if conn:
             conn.close()
 
-def fetch_history(raid_name=None, date_from=None):
+def fetch_history(raid_name=None, date_from=None, date_to=None):
     conn = get_conn()
     with conn.cursor() as cur:
         sql = "SELECT id, raid_name, clear_time, member FROM guild_raid_history WHERE 1=1"
@@ -203,6 +203,29 @@ def fetch_history(raid_name=None, date_from=None):
             if dt is not None:
                 sql += " AND clear_time >= %s"
                 params.append(dt)
+        if date_to:
+            dt_to = None
+            if isinstance(date_to, str):
+                if len(date_to) == 10:
+                    try:
+                        dt_to = datetime.strptime(date_to, "%Y-%m-%d")
+                    except Exception:
+                        pass
+                elif len(date_to) == 7:
+                    try:
+                        dt_to = datetime.strptime(date_to, "%Y-%m")
+                    except Exception:
+                        pass
+                elif len(date_to) == 4:
+                    try:
+                        dt_to = datetime.strptime(date_to, "%Y")
+                    except Exception:
+                        pass
+            elif isinstance(date_to, datetime):
+                dt_to = date_to
+            if dt_to is not None:
+                sql += " AND clear_time < %s"
+                params.append(dt_to)
         sql += " ORDER BY clear_time DESC"
         cur.execute(sql, params)
         rows = cur.fetchall()
