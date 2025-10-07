@@ -138,6 +138,10 @@ async def track_guild_territories(loop_interval=60):
                 else:
                     hist[tname] = {"acquired": now, "lost": None}
 
+        MAX_GUILDS = 100
+        MAX_TERRITORIES_PER_GUILD = 100
+        now = datetime.now(timezone.utc)
+
         # 1時間以上前に失領したものだけ履歴から削除する
         for guild_prefix in list(guild_territory_history.keys()):
             hist = guild_territory_history[guild_prefix]
@@ -148,8 +152,19 @@ async def track_guild_territories(loop_interval=60):
                         lost_at = lost_at.replace(tzinfo=timezone.utc)
                     if (now - lost_at) > timedelta(hours=1):
                         del hist[tname]
+            # 領地数上限
+            if len(hist) > MAX_TERRITORIES_PER_GUILD:
+                sorted_names = sorted(hist.items(), key=lambda x: x[1].get("acquired", now))
+                for tname, _ in sorted_names[:len(hist)-MAX_TERRITORIES_PER_GUILD]:
+                    del hist[tname]
             if not hist:
                 del guild_territory_history[guild_prefix]
+
+        # ギルド数上限
+        if len(guild_territory_history) > MAX_GUILDS:
+            sorted_guilds = sorted(guild_territory_history.items(), key=lambda x: min([v.get("acquired", now) for v in x[1].values()]))
+            for g, _ in sorted_guilds[:len(guild_territory_history)-MAX_GUILDS]:
+                del guild_territory_history[g]
 
         upsert_guild_territory_state(guild_territory_history)
         logger.info(f"[GuildTerritoryTracker] 領地履歴キャッシュ＆DB永続化: {len(guild_territory_history)} ギルド")        
