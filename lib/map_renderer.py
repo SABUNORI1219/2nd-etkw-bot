@@ -5,10 +5,10 @@ import logging
 import json
 import discord
 import time
+import gc
 from datetime import datetime, timezone, timedelta
 from math import sqrt
 import collections
-import gc
 
 logger = logging.getLogger(__name__)
 
@@ -16,29 +16,15 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_PATH = os.path.join(project_root, "assets", "map")
 FONT_PATH = os.path.join(project_root, "assets", "fonts", "Minecraftia-Regular.ttf")
 
-# DBとキャッシュから履歴情報を取得
 from lib.db import get_guild_territory_state
 from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db
 
 class MapRenderer:
     def __init__(self):
         try:
-            self.map_img = Image.open(os.path.join(ASSETS_PATH, "main-map.png")).convert("RGBA")
-            self.crown_img = Image.open(os.path.join(ASSETS_PATH, "guild_headquarters.png")).convert("RGBA")
             with open(os.path.join(ASSETS_PATH, "territories.json"), "r", encoding='utf-8') as f:
                 self.local_territories = json.load(f)
-            self.font = ImageFont.truetype(FONT_PATH, 40)
-
-            TARGET_WIDTH = 1600
-            original_w, original_h = self.map_img.size
-            scale_factor = TARGET_WIDTH / original_w
-            new_h = int(original_h * scale_factor)
-            self.resized_map = self.map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
-            self.scale_factor = scale_factor
-
-            self._db_cache = None
-            self._db_cache_time = 0
-        
+            self.font_path = FONT_PATH
         except FileNotFoundError as e:
             logger.error(f"マップ生成に必要なアセットが見つかりません: {e}")
             raise
@@ -88,9 +74,9 @@ class MapRenderer:
 
     def _get_owned_territories_map_from_db(self):
         now = time.time()
-        if self._db_cache and (now - self._db_cache_time < 60):
+        if hasattr(self, "_db_cache") and self._db_cache and (now - self._db_cache_time < 60):
             return self._db_cache
-        sync_history_from_db()  # 必ず最新化
+        sync_history_from_db()
         db_state = get_guild_territory_state()
         result = {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
         self._db_cache = result
@@ -101,8 +87,8 @@ class MapRenderer:
         # Conn/Ext計算用セット（現所有+1時間以内失領）を用意
         if all_owned_territories is None:
             all_owned_territories = set(hq_candidates) | (exclude_lost or set())
-
         hq_stats = []
+
         # HQ候補（現所有のみ）でループ
         for t in hq_candidates:
             conn, ext, hq_buff = self._calc_conn_ext_hqbuff(all_owned_territories, t)
@@ -119,21 +105,20 @@ class MapRenderer:
                 "acquired": acquired,
                 "resources": self.local_territories[t].get("resources", {})
             })
-
         if not hq_stats:
             return None, [], [], {}
-
+        
         # Conn+Ext多い順→Conn多い順→HQバフ多い順→取得時刻古い順
         hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
         top5 = hq_stats[:5]
         total_res = self._sum_resources(all_owned_territories)
 
-        # Conn+Ext最大グループ（ネットワーク力最強グループ）抽出
+        # 1. Conn+Ext最大グループ（ネットワーク力最強グループ）抽出
         max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
         conn_ext_tops = [x for x in top5 if x["conn"] + x["ext"] == max_conn_ext]
         conn_ext_top_names = [x["name"] for x in conn_ext_tops]
 
-        # Conn+Ext最大グループ以外のtop5領地で、Conn値が2個以上多いやつを探す
+        # 2. Conn+Ext最大グループ以外のtop5領地で、Conn値が2個以上多いやつを探す
         other_top5 = [x for x in top5 if x not in conn_ext_tops]
         hq_conn_candidates = []
         max_group_conn = max(x["conn"] for x in conn_ext_tops)
@@ -146,7 +131,7 @@ class MapRenderer:
             hq_conn_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
             return hq_conn_candidates[0]["name"], hq_stats, top5, total_res
 
-        # Conn+Ext最大グループ内で複数ある場合はConn最大ユニークならHQ
+        # 3. Conn+Ext最大グループ内で複数ある場合はConn最大ユニークならHQ
         if len(conn_ext_tops) > 1:
             conn_max_in_group = max(x["conn"] for x in conn_ext_tops)
             conn_maxs = [x for x in conn_ext_tops if x["conn"] == conn_max_in_group]
@@ -155,12 +140,12 @@ class MapRenderer:
         else:
             conn_maxs = conn_ext_tops
 
-        # 所持領地6個以下なら取得時刻最古
+        # 4. 所持領地6個以下なら取得時刻最古
         if len(hq_candidates) <= 6:
             oldest = min(top5, key=lambda x: x["acquired"] or "9999")
             return oldest["name"], hq_stats, top5, total_res
 
-        # Conn同数&Ext<20で街領地あれば優先
+        # 5. Conn同数&Ext<20で街領地あれば優先
         max_conn = max(x["conn"] for x in top5)
         conn_top_group = [x for x in top5 if x["conn"] == max_conn]
         if len(conn_top_group) > 1:
@@ -169,7 +154,7 @@ class MapRenderer:
             if city:
                 return city["name"], hq_stats, top5, total_res
 
-        # Ext,Conn同値→資源判定
+        # 6. Ext,Conn同値→資源判定
         if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
             res_priority = ["crops", "ore", "wood", "fish"]
             min_val = float("inf")
@@ -214,6 +199,26 @@ class MapRenderer:
 
         # fallback
         return conn_ext_tops[0]["name"], hq_stats, top5, total_res
+
+    def _get_map_and_scale(self):
+        map_img = Image.open(os.path.join(ASSETS_PATH, "main-map.png")).convert("RGBA")
+        TARGET_WIDTH = 1600
+        original_w, original_h = map_img.size
+        scale_factor = TARGET_WIDTH / original_w
+        new_h = int(original_h * scale_factor)
+        resized_map = map_img.resize((TARGET_WIDTH, new_h), Image.Resampling.LANCZOS)
+        map_img.close()
+        return resized_map, scale_factor
+
+    def _get_crown_img(self):
+        img = Image.open(os.path.join(ASSETS_PATH, "guild_headquarters.png")).convert("RGBA")
+        return img
+
+    def _get_font(self, size):
+        try:
+            return ImageFont.truetype(self.font_path, size)
+        except Exception:
+            return ImageFont.load_default()
 
     def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None, upscale_factor=1.5):
         upscaled_lines = None
@@ -260,12 +265,8 @@ class MapRenderer:
             overlay = Image.new("RGBA", map_to_draw_on.size, (0,0,0,0))
             overlay_draw = ImageDraw.Draw(overlay)
             draw = ImageDraw.Draw(map_to_draw_on)
-            # フォントサイズ・フォント生成（旧_get_fontを排除）
-            scaled_font_size = max(12, int(self.font.size * self.scale_factor))
-            try:
-                scaled_font = ImageFont.truetype(FONT_PATH, scaled_font_size)
-            except IOError:
-                scaled_font = ImageFont.load_default()
+            scaled_font_size = max(12, int(self._get_font(40).size * self.scale_factor))
+            scaled_font = self._get_font(scaled_font_size)
             for name, info in territory_data.items():
                 static = self.local_territories.get(name)
                 if not static or "Location" not in static:
@@ -338,7 +339,7 @@ class MapRenderer:
                     hq_names.add(hq_name)
             self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map, hq_territories=hq_names)
             draw = ImageDraw.Draw(map_img)
-            # クラウン画像・フォントサイズ計算
+            crown_img = self._get_crown_img()
             for prefix, api_owned in prefix_to_territories.items():
                 all_owned = owned_territories_map.get(prefix, set()) if owned_territories_map else set(api_owned)
                 lost_only = set()
@@ -362,31 +363,30 @@ class MapRenderer:
                 x = (loc["start"][0] + loc["end"][0]) // 2
                 z = (loc["start"][1] + loc["end"][1]) // 2
                 px, py = self._coord_to_pixel(x, z)
-                px = px * self.scale_factor
-                py = py * self.scale_factor
+                if hasattr(self, "scale_factor"):
+                    px = px * self.scale_factor
+                    py = py * self.scale_factor
                 if is_zoomed and box:
                     px -= box[0]
                     py -= box[1]
                 color_hex = guild_color_map.get(prefix, "#FFFFFF")
                 color_rgb = self._hex_to_rgb(color_hex)
-
                 x1, y1 = self._coord_to_pixel(loc["start"][0], loc["start"][1])
                 x2, y2 = self._coord_to_pixel(loc["end"][0], loc["end"][1])
                 x1, x2 = x1 * self.scale_factor, x2 * self.scale_factor
                 y1, y2 = y1 * self.scale_factor, y2 * self.scale_factor
                 width = abs(x2 - x1)
                 height = abs(y2 - y1)
-                scaled_font_size = max(12, int(self.font.size * self.scale_factor))
+                scaled_font_size = max(12, int(self._get_font(40).size * self.scale_factor))
                 crown_size_limit = int(scaled_font_size * 1.8)
                 crown_size_limit = max(28, min(crown_size_limit, 120))
                 crown_size = int(min(width, height) * 0.9)
                 crown_size = max(18, min(crown_size, crown_size_limit))
-
-                orig_w, orig_h = self.crown_img.size
+                orig_w, orig_h = crown_img.size
                 ratio = min(crown_size / orig_w, crown_size / orig_h)
                 new_w = int(orig_w * ratio)
                 new_h = int(orig_h * ratio)
-                crown_img_resized = self.crown_img.resize((new_w, new_h), Image.LANCZOS)
+                crown_img_resized = crown_img.resize((new_w, new_h), Image.LANCZOS)
                 crown_x = int(px - new_w/2)
                 crown_y = int(py - new_h/2)
                 map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
@@ -395,7 +395,7 @@ class MapRenderer:
                 font_found = False
                 for test_size in range(crown_size, 5, -1):
                     try:
-                        test_font = ImageFont.truetype(FONT_PATH, test_size)
+                        test_font = self._get_font(test_size)
                     except IOError:
                         test_font = ImageFont.load_default()
                     bbox = test_font.getbbox(prefix)
@@ -406,7 +406,7 @@ class MapRenderer:
                         font_found = True
                         break
                 if font_found:
-                    prefix_font = ImageFont.truetype(FONT_PATH, prefix_font_size)
+                    prefix_font = self._get_font(prefix_font_size)
                 else:
                     prefix_font = ImageFont.load_default()
                 bbox = prefix_font.getbbox(prefix)
@@ -425,7 +425,6 @@ class MapRenderer:
                 )
             del draw
             return map_img, [(0, 0, "", hq_name) for hq_name in hq_names]
-
         finally:
             if crown_img is not None:
                 crown_img.close()
@@ -436,8 +435,9 @@ class MapRenderer:
             owned_territories_map = self._get_owned_territories_map_from_db()
         if not territories_to_render:
             return None, None
-        map_to_draw_on = self.resized_map.copy()
-        scale_factor = self.scale_factor
+        resized_map, scale_factor = self._get_map_and_scale()
+        self.scale_factor = scale_factor
+        map_to_draw_on = None
         file = None
         embed = None
         box = None
@@ -458,10 +458,14 @@ class MapRenderer:
                 box = (
                     max(0, min(all_x) - padding),
                     max(0, min(all_y) - padding),
-                    min(self.resized_map.width, max(all_x) + padding),
-                    min(self.resized_map.height, max(all_y) + padding)
+                    min(resized_map.width, max(all_x) + padding),
+                    min(resized_map.height, max(all_y) + padding)
                 )
-                map_to_draw_on = map_to_draw_on.crop(box)
+                cropped = resized_map.crop(box)
+                resized_map.close()
+                map_to_draw_on = cropped
+            else:
+                map_to_draw_on = resized_map
             final_map, _ = self.draw_guild_hq_on_map(
                 territory_data=territory_data,
                 guild_color_map=guild_color_map,
@@ -510,8 +514,9 @@ class MapRenderer:
             logger.error(f"領地 {territory} の所有ギルドprefixがAPIデータにありません")
             return None
         owned_territories_map = self._get_owned_territories_map_from_db()
-        map_to_draw_on = self.resized_map.copy()
-        scale_factor = self.scale_factor
+        resized_map, scale_factor = self._get_map_and_scale()
+        self.scale_factor = scale_factor
+        map_to_draw_on = resized_map
         final_map, _ = self.draw_guild_hq_on_map(
             territory_data=territory_data,
             guild_color_map=guild_color_map,
@@ -535,8 +540,8 @@ class MapRenderer:
         box = (
             max(0, left - padding),
             max(0, top - padding),
-            min(self.resized_map.width, right + padding),
-            min(self.resized_map.height, bottom + padding)
+            min(resized_map.width, right + padding),
+            min(resized_map.height, bottom + padding)
         )
         if not (box[0] < box[2] and box[1] < box[3]):
             logger.error(f"'{territory}'の計算後の切り抜き範囲が無効です。Box: {box}")
