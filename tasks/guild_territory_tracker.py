@@ -12,8 +12,6 @@ guild_territory_history = defaultdict(dict)
 
 latest_territory_data = {}
 
-MAX_PLAYER_DATA_AGE = 12 * 60 * 60  # 12時間
-
 def _dt_to_str(dt):
     if dt is None:
         return None
@@ -154,14 +152,7 @@ async def track_guild_territories(loop_interval=60):
                 del guild_territory_history[guild_prefix]
 
         upsert_guild_territory_state(guild_territory_history)
-        logger.info(f"[GuildTerritoryTracker] 領地履歴キャッシュ＆DB永続化: {len(guild_territory_history)} ギルド")
-
-        now = datetime.utcnow()
-        for uuid, pdata in list(previous_player_data.items()):
-            ts = pdata.get("timestamp")
-            if ts and (now - ts).total_seconds() > MAX_PLAYER_DATA_AGE:
-                del previous_player_data[uuid]
-        
+        logger.info(f"[GuildTerritoryTracker] 領地履歴キャッシュ＆DB永続化: {len(guild_territory_history)} ギルド")        
         await asyncio.sleep(loop_interval)
 
 async def setup(bot):
