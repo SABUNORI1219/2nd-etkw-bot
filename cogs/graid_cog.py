@@ -45,13 +45,15 @@ def normalize_date(date_str):
     return date_str
 
 class TestPlayerCountView(discord.ui.View):
-    def __init__(self, sorted_counts, today_player_counts, yesterday_player_counts, total_today, total_yesterday, period_start, period_end, title, color, page=0, per_page=12, timeout=120):
+    def __init__(self, sorted_counts, period_counts, today_counts, yesterday_counts, total_period, total_today, total_yesterday, period_start, period_end, title, color, page=0, per_page=12, timeout=120):
         super().__init__(timeout=timeout)
         self.sorted_counts = sorted_counts
-        self.today_player_counts = today_player_counts
-        self.yesterday_player_counts = yesterday_player_counts
-        self.total_today = total_today
-        self.total_yesterday = total_yesterday
+        self.period_counts = period_counts  # 期間全体
+        self.today_counts = today_counts    # 今日分
+        self.yesterday_counts = yesterday_counts  # 昨日分
+        self.total_period = total_period    # 期間合計
+        self.total_today = total_today      # 今日合計
+        self.total_yesterday = total_yesterday  # 昨日合計
         self.period_start = period_start
         self.period_end = period_end
         self.page = page
@@ -78,27 +80,28 @@ class TestPlayerCountView(discord.ui.View):
         while idx < end:
             for i in range(3):
                 if idx + i < end:
-                    name, _ = self.sorted_counts[idx + i]
-                    today_count = self.today_player_counts.get(name, 0)
-                    yesterday_count = self.yesterday_player_counts.get(name, 0)
-                    diff = today_count - yesterday_count
+                    name, count = self.sorted_counts[idx + i]
+                    today_count = self.today_counts.get(name, 0)
+                    yesterday_count = self.yesterday_counts.get(name, 0)
+                    diff_val = today_count - yesterday_count
+                    diff_str = f"+{diff_val}" if diff_val > 0 else f"{diff_val}"
                     rank_label = rank_emojis[idx + i] if (idx + i) < len(rank_emojis) else f"#{idx + i + 1}"
                     field_name = f"{rank_label} {name}"
-                    # 表示: Raids: 今日のカウント (+今日-昨日)
-                    diff_str = f"+{diff}" if diff > 0 else f"{diff}"    # +x / -x
-                    field_value = f"{raid_emoji} Raids: {today_count} ({diff_str})"
+                    field_value = f"{raid_emoji} Raids: {count} ({diff_str})"
                 else:
                     field_name = field_value = "\u200b"
                 embed.add_field(name=field_name, value=field_value, inline=True)
             idx += 3
-        # 集計系（ページ送り時も必ず表示）
+        # 集計系
+        # Average Per Player: 期間合計 / プレイヤー数
+        avg_raids = int(self.total_period / len(self.period_counts)) if self.period_counts else 0
+        # 📈 Compared to Last Day: 今日合計 - 昨日合計
         total_diff = self.total_today - self.total_yesterday
         total_pct = int((self.total_today / self.total_yesterday) * 100) if self.total_yesterday > 0 else 0
-        avg_raids = int(self.total_today / len(self.today_player_counts)) if self.today_player_counts else 0
         embed.add_field(
             name="\u200b",
             value=(
-                f"Total Raids: `{self.total_today}`\n"
+                f"Total Raids: `{self.total_period}`\n"
                 f"Average Per Player: `{avg_raids}`\n"
                 f"📈 Compared to Last Day: `{total_diff}` (`{total_pct}%`)"
             ),
@@ -368,73 +371,52 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             for raid_choice in RAID_CHOICES[:-2]:
                 raid_rows = fetch_history(raid_name=raid_choice.value)
                 rows.extend(raid_rows)
-        
-            # 期間指定
-            if date_from:
-                # 終了日は指定期間の最終日+1日
-                if isinstance(date_from, str):
-                    start_dt = datetime.strptime(date_from, "%Y-%m-%d")
-                else:
-                    start_dt = date_from
-                # 終了日（例: 2025-10-07→2025-10-08）
-                end_dt = start_dt + timedelta(days=1)
-                period_start = start_dt.strftime("%Y-%m-%d")
-                period_end = end_dt.strftime("%Y-%m-%d")
-                filtered_rows = []
-                for raid_choice in RAID_CHOICES[:-2]:
-                    filtered_rows += fetch_history(raid_name=raid_choice.value, date_from=start_dt, date_to=end_dt)
-            else:
-                # 全期間
-                filtered_rows = rows
-                # 期間は一番古い履歴～最新履歴
-                if rows:
-                    period_start = min([r[2].strftime("%Y-%m-%d") for r in rows])
-                    period_end = max([r[2].strftime("%Y-%m-%d") for r in rows])
-                else:
-                    period_start = period_end = datetime.utcnow().strftime("%Y-%m-%d")
-        
-            # 前日分
-            if date_from:
-                prev_start_dt = start_dt - timedelta(days=1)
-                prev_end_dt = start_dt
-            else:
-                # 全履歴の最新日を取得
-                if rows:
-                    last_date = max([r[2] for r in rows])
-                    prev_start_dt = last_date - timedelta(days=1)
-                    prev_end_dt = last_date
-                else:
-                    prev_start_dt = prev_end_dt = datetime.utcnow() - timedelta(days=1)
-            prev_rows = []
-            for raid_choice in RAID_CHOICES[:-2]:
-                prev_rows += fetch_history(raid_name=raid_choice.value, date_from=prev_start_dt, date_to=prev_end_dt)
-        
-            # MCIDごと集計
+            # 期間集計
             period_counts = {}
-            for row in filtered_rows:
+            for row in rows:
                 member = row[3]
-                period_counts[member] = period_counts.get(member, 0) + 1
-            prev_counts = {}
-            for row in prev_rows:
-                member = row[3]
-                prev_counts[member] = prev_counts.get(member, 0) + 1
-        
+                period_counts[str(member)] = period_counts.get(str(member), 0) + 1
             sorted_counts = sorted(period_counts.items(), key=lambda x: (-x[1], x[0]))
         
-            # 集計
-            total_period = sum(period_counts.values())
-            total_prev = sum(prev_counts.values())
-            avg_raids = int(total_period / len(period_counts)) if period_counts else 0
-            total_diff = total_period - total_prev
-            total_pct = int((total_period / total_prev) * 100) if total_prev > 0 else 0
+            # 期間
+            if rows:
+                period_start = min([r[2].strftime("%Y-%m-%d") for r in rows])
+                period_end = max([r[2].strftime("%Y-%m-%d") for r in rows])
+            else:
+                period_start = period_end = datetime.utcnow().strftime("%Y-%m-%d")
         
-            # ページ送りView
+            # 今日分
+            now = datetime.utcnow()
+            today0 = datetime(now.year, now.month, now.day)
+            tomorrow0 = today0 + timedelta(days=1)
+            today_counts = {}
+            for raid_choice in RAID_CHOICES[:-2]:
+                today_rows = fetch_history(raid_name=raid_choice.value, date_from=today0, date_to=tomorrow0)
+                for row in today_rows:
+                    member = row[3]
+                    today_counts[str(member)] = today_counts.get(str(member), 0) + 1
+        
+            # 昨日分
+            yesterday0 = today0 - timedelta(days=1)
+            yesterday_counts = {}
+            for raid_choice in RAID_CHOICES[:-2]:
+                yesterday_rows = fetch_history(raid_name=raid_choice.value, date_from=yesterday0, date_to=today0)
+                for row in yesterday_rows:
+                    member = row[3]
+                    yesterday_counts[str(member)] = yesterday_counts.get(str(member), 0) + 1
+        
+            total_period = sum(period_counts.values())
+            total_today = sum(today_counts.values())
+            total_yesterday = sum(yesterday_counts.values())
+        
             view = TestPlayerCountView(
                 sorted_counts=sorted_counts,
-                today_player_counts=period_counts,
-                yesterday_player_counts=prev_counts,
-                total_today=total_period,
-                total_yesterday=total_prev,
+                period_counts=period_counts,
+                today_counts=today_counts,
+                yesterday_counts=yesterday_counts,
+                total_period=total_period,
+                total_today=total_today,
+                total_yesterday=total_yesterday,
                 period_start=period_start,
                 period_end=period_end,
                 title="Guild Raid Counts",
