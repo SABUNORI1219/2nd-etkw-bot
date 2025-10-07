@@ -348,67 +348,108 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     @app_commands.choices(raid_name=RAID_CHOICES)
     async def guildraid_list(self, interaction: discord.Interaction, raid_name: str, date: str = None, hidden: bool = True):
         date_from = None
+        period_start = None
+        period_end = None
         if date:
             normalized_date = normalize_date(date).strip()
             try:
                 dash_count = normalized_date.count('-')
                 if dash_count == 2:
                     date_from = datetime.strptime(normalized_date, "%Y-%m-%d")
+                    # 指定日のみ（0時～翌日0時まで）
+                    period_start = date_from.strftime("%Y-%m-%d")
+                    period_end = (date_from + timedelta(days=1)).strftime("%Y-%m-%d")
                 elif dash_count == 1:
                     date_from = datetime.strptime(normalized_date, "%Y-%m")
+                    # 月指定（その月の1日～翌月1日まで）
+                    next_month = (date_from.replace(day=28) + timedelta(days=4)).replace(day=1)
+                    period_start = date_from.strftime("%Y-%m")
+                    period_end = next_month.strftime("%Y-%m")
                 elif dash_count == 0:
                     date_from = datetime.strptime(normalized_date, "%Y")
+                    # 年指定（その年1月1日～翌年1月1日まで）
+                    next_year = date_from.replace(year=date_from.year + 1)
+                    period_start = date_from.strftime("%Y")
+                    period_end = next_year.strftime("%Y")
             except Exception as e:
                 date_from = None
-    
+
         if raid_name == "Test":
             if interaction.user.id not in AUTHORIZED_USER_IDS:
                 await send_authorized_only_message(interaction)
                 return
-        
-            # 全履歴
-            rows = []
-            for raid_choice in RAID_CHOICES[:-2]:
-                raid_rows = fetch_history(raid_name=raid_choice.value)
-                rows.extend(raid_rows)
-            # 期間集計
+
+            # 期間指定or全履歴
+            if date_from and period_start and period_end:
+                rows = []
+                for raid_choice in RAID_CHOICES[:-2]:
+                    raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from, date_to=datetime.strptime(period_end, "%Y-%m-%d"))
+                    rows.extend(raid_rows)
+            else:
+                rows = []
+                for raid_choice in RAID_CHOICES[:-2]:
+                    raid_rows = fetch_history(raid_name=raid_choice.value)
+                    rows.extend(raid_rows)
+
             period_counts = {}
             for row in rows:
                 member = row[3]
                 period_counts[str(member)] = period_counts.get(str(member), 0) + 1
             sorted_counts = sorted(period_counts.items(), key=lambda x: (-x[1], x[0]))
-        
-            # 期間
-            if rows:
-                period_start = min([r[2].strftime("%Y-%m-%d") for r in rows])
-                period_end = max([r[2].strftime("%Y-%m-%d") for r in rows])
+
+            # 表示期間
+            if date_from and period_start and period_end:
+                period_start_disp = period_start
+                period_end_disp = period_end
+            elif rows:
+                period_start_disp = min([r[2].strftime("%Y-%m-%d") for r in rows])
+                period_end_disp = max([r[2].strftime("%Y-%m-%d") for r in rows])
             else:
-                period_start = period_end = datetime.utcnow().strftime("%Y-%m-%d")
-        
-            # 今日分
-            now = datetime.utcnow()
-            today0 = datetime(now.year, now.month, now.day)
-            tomorrow0 = today0 + timedelta(days=1)
+                period_start_disp = period_end_disp = datetime.utcnow().strftime("%Y-%m-%d")
+
+            # 今日分（指定日のみ）
             today_counts = {}
-            for raid_choice in RAID_CHOICES[:-2]:
-                today_rows = fetch_history(raid_name=raid_choice.value, date_from=today0, date_to=tomorrow0)
-                for row in today_rows:
-                    member = row[3]
-                    today_counts[str(member)] = today_counts.get(str(member), 0) + 1
-        
-            # 昨日分
-            yesterday0 = today0 - timedelta(days=1)
+            if date_from:
+                # 今日分は指定日のみ
+                for raid_choice in RAID_CHOICES[:-2]:
+                    today_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from, date_to=date_from + timedelta(days=1))
+                    for row in today_rows:
+                        member = row[3]
+                        today_counts[str(member)] = today_counts.get(str(member), 0) + 1
+            else:
+                # 今日分は今日のみ
+                now = datetime.utcnow()
+                today0 = datetime(now.year, now.month, now.day)
+                tomorrow0 = today0 + timedelta(days=1)
+                for raid_choice in RAID_CHOICES[:-2]:
+                    today_rows = fetch_history(raid_name=raid_choice.value, date_from=today0, date_to=tomorrow0)
+                    for row in today_rows:
+                        member = row[3]
+                        today_counts[str(member)] = today_counts.get(str(member), 0) + 1
+
+            # 昨日分（指定日の前日）
             yesterday_counts = {}
-            for raid_choice in RAID_CHOICES[:-2]:
-                yesterday_rows = fetch_history(raid_name=raid_choice.value, date_from=yesterday0, date_to=today0)
-                for row in yesterday_rows:
-                    member = row[3]
-                    yesterday_counts[str(member)] = yesterday_counts.get(str(member), 0) + 1
-        
+            if date_from:
+                yesterday0 = date_from - timedelta(days=1)
+                for raid_choice in RAID_CHOICES[:-2]:
+                    yesterday_rows = fetch_history(raid_name=raid_choice.value, date_from=yesterday0, date_to=date_from)
+                    for row in yesterday_rows:
+                        member = row[3]
+                        yesterday_counts[str(member)] = yesterday_counts.get(str(member), 0) + 1
+            else:
+                now = datetime.utcnow()
+                today0 = datetime(now.year, now.month, now.day)
+                yesterday0 = today0 - timedelta(days=1)
+                for raid_choice in RAID_CHOICES[:-2]:
+                    yesterday_rows = fetch_history(raid_name=raid_choice.value, date_from=yesterday0, date_to=today0)
+                    for row in yesterday_rows:
+                        member = row[3]
+                        yesterday_counts[str(member)] = yesterday_counts.get(str(member), 0) + 1
+
             total_period = sum(period_counts.values())
             total_today = sum(today_counts.values())
             total_yesterday = sum(yesterday_counts.values())
-        
+
             view = TestPlayerCountView(
                 sorted_counts=sorted_counts,
                 period_counts=period_counts,
@@ -417,8 +458,8 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 total_period=total_period,
                 total_today=total_today,
                 total_yesterday=total_yesterday,
-                period_start=period_start,
-                period_end=period_end,
+                period_start=period_start_disp,
+                period_end=period_end_disp,
                 title="Guild Raid Counts",
                 color=discord.Color.orange(),
                 page=0,
