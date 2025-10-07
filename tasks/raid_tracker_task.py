@@ -205,6 +205,14 @@ async def last_seen_tracker(api, guild_prefix="ETKW", loop_interval=120):
 
         elapsed = time.time() - start_time
         logger.info(f"Last Seen Trackerタスク完了（処理時間: {elapsed:.1f}秒）")
+
+        MAX_PLAYER_DATA_AGE = 12 * 60 * 60  # 12時間
+        now = datetime.utcnow()
+        for uuid, pdata in list(previous_player_data.items()):
+            ts = pdata.get("timestamp")
+            if ts and (now - ts).total_seconds() > MAX_PLAYER_DATA_AGE:
+                del previous_player_data[uuid]
+        
         await asyncio.sleep(loop_interval)
 
 async def setup(bot):
