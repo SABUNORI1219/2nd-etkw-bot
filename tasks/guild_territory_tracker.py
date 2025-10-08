@@ -9,8 +9,9 @@ from lib.db import upsert_guild_territory_state, get_guild_territory_state
 logger = logging.getLogger(__name__)
 
 guild_territory_history = defaultdict(dict)
-
 latest_territory_data = {}
+
+api = WynncraftAPI()
 
 def _dt_to_str(dt):
     if dt is None:
@@ -76,7 +77,6 @@ def sync_history_from_db():
             guild_territory_history[g][t] = {"acquired": acquired, "lost": lost}
 
 async def track_guild_territories(loop_interval=60):
-    api = WynncraftAPI()
     sync_history_from_db()
     while True:
         now = datetime.now(timezone.utc)
