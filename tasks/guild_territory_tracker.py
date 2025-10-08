@@ -9,8 +9,9 @@ from lib.db import upsert_guild_territory_state, get_guild_territory_state
 logger = logging.getLogger(__name__)
 
 guild_territory_history = defaultdict(dict)
-
 latest_territory_data = {}
+
+api = WynncraftAPI()
 
 def _dt_to_str(dt):
     if dt is None:
@@ -170,5 +171,4 @@ async def track_guild_territories(loop_interval=60):
         await asyncio.sleep(loop_interval)
 
 async def setup(bot):
-    api = WynncraftAPI()
     bot.loop.create_task(track_guild_territories(loop_interval=60))
