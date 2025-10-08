@@ -5,7 +5,6 @@ import logging
 import os
 import asyncio
 import gc
-from lib.api_stocker import OtherAPI
 
 logger = logging.getLogger(__name__)
 
