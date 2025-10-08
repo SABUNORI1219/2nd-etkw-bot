@@ -25,11 +25,6 @@ TICKET_STAFF_ROLE_ID = 1387259707743277177  # チケットのスタッフロー�
 
 # Guild Search Helper Function dayo!
 async def search_guild(api, guild_input):
-    """
-    WynncraftAPIのget_guild_by_prefix, get_guild_by_nameを使ってギルドを検索する
-    - prefix: 3～4文字の場合は全大文字小文字パターンを試す
-    - nameは1回だけ
-    """
     length = len(guild_input)
     patterns = [guild_input]
     if length in (3, 4) and guild_input.isalnum():
@@ -39,7 +34,7 @@ async def search_guild(api, guild_input):
         guild = await api.get_guild_by_prefix(pattern)
         if guild and guild.get('name'):
             return guild
-    # name検索（1回だけ）
+
     guild = await api.get_guild_by_name(guild_input)
     if guild and guild.get('name'):
         return guild
@@ -123,10 +118,8 @@ class DeclineButtonView(View):
         )
 
 def make_prev_guild_embed(guild_info, input_name):
-    banner_renderer = BannerRenderer()
     banner_bytes = None
     banner_file = None
-
     if isinstance(guild_info, dict) and guild_info.get("name"):
         name = guild_info.get('name', 'N/A')
         prefix = guild_info.get('prefix', 'N/A')
@@ -144,10 +137,9 @@ def make_prev_guild_embed(guild_info, input_name):
         total_members = guild_info.get('members', {}).get('total', 0)
         online_members = guild_info.get('online', 0)
 
-        # bannerがある場合のみ画像生成
         banner_info = guild_info.get('banner')
         if banner_info:
-            banner_bytes = banner_renderer.create_banner_image(banner_info)
+            banner_bytes = self.banner_renderer.create_banner_image(banner_info)
             if banner_bytes:
                 banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
 
@@ -185,23 +177,17 @@ def make_prev_guild_embed(guild_info, input_name):
     return embed, banner_file
 
 async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord.File], Optional[str]]:
-    """
-    プロファイル画像生成＋画像付きEmbed（画像生成失敗時はテキストEmbed）
-    """
     try:
-        api = WynncraftAPI()
-        other_api = OtherAPI()
-        banner_renderer = BannerRenderer()
-        player_data = await api.get_official_player_data(mcid)
+        player_data = await self.wynn_api.get_official_player_data(mcid)
         if not player_data:
             raise Exception("APIからプレイヤーデータ取得失敗")
-        profile_info = await build_profile_info(player_data, api, banner_renderer)
+        profile_info = await build_profile_info(player_data, self.wynn_api, self.banner_renderer)
         username = profile_info.get("username") or mcid
         uuid = profile_info.get("uuid")
         skin_image = None
         if uuid:
             try:
-                skin_bytes = await other_api.get_vzge_skin(uuid)
+                skin_bytes = await self.other_api.get_vzge_skin(uuid)
                 if skin_bytes:
                     skin_image = Image.open(BytesIO(skin_bytes)).convert("RGBA")
             except Exception:
@@ -436,6 +422,9 @@ class ApplicationButtonView(View):
 class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
     def __init__(self):
         super().__init__()
+        self.wynn_api = WynncraftAPI()
+        self.other_api = OtherAPI()
+        self.banner_renderer = BannerRenderer()
         self.mcid = TextInput(label="MCID/Your IGN", placeholder="正確に入力/Type accurately", required=True)
         self.reason = TextInput(label="加入理由/Reason", placeholder="簡単でOK/Write simply", required=True, style=discord.TextStyle.long)
         self.prev_guild = TextInput(label="最後に所属していたギルド/The Last Guild", placeholder="任意/Optional", required=False)
@@ -488,8 +477,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         if not username_for_db:
             # 万が一API/profile_infoから取得できなかった場合はAPI再取得
             try:
-                api = WynncraftAPI()
-                player_data = await api.get_official_player_data(self.mcid.value)
+                player_data = await self.wynn_api.get_official_player_data(self.mcid.value)
                 username_for_db = player_data.get("username", self.mcid.value)
             except Exception:
                 username_for_db = self.mcid.value
@@ -503,8 +491,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         prev_guild_name = self.prev_guild.value.strip() if self.prev_guild.value else ""
         if prev_guild_name:
             try:
-                api = WynncraftAPI()
-                guild_info = await search_guild(api, prev_guild_name)
+                guild_info = await search_guild(self.wynn_api, prev_guild_name)
                 prev_guild_embed, banner_file = make_prev_guild_embed(guild_info, prev_guild_name)
             except Exception:
                 prev_guild_embed, banner_file = discord.Embed(
