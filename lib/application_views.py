@@ -40,14 +40,6 @@ async def search_guild(api, guild_input):
         return guild
     return None
 
-# Embed
-def make_reason_embed(reason):
-    return discord.Embed(
-        title="加入理由/Reason",
-        description=reason,
-        color=discord.Color.purple()
-    )
-
 class DeclineConfirmView(View):
     def __init__(self, applicant_discord_id, channel_id):
         super().__init__(timeout=60)
@@ -116,99 +108,6 @@ class DeclineButtonView(View):
             view=view,
             ephemeral=True,
         )
-
-def make_prev_guild_embed(guild_info, input_name):
-    banner_bytes = None
-    banner_file = None
-    if isinstance(guild_info, dict) and guild_info.get("name"):
-        name = guild_info.get('name', 'N/A')
-        prefix = guild_info.get('prefix', 'N/A')
-        owner_list = guild_info.get('members', {}).get('owner', {})
-        owner = list(owner_list.keys())[0] if owner_list else "N/A"
-        created_date = guild_info.get('created', 'N/A').split("T")[0] if guild_info.get('created') else "N/A"
-        level = guild_info.get('level', 0)
-        xp_percent = guild_info.get('xpPercent', 0)
-        wars = guild_info.get('wars', 0)
-        territories = guild_info.get('territories', 0)
-        season_ranks = guild_info.get('seasonRanks', {})
-        latest_season = str(max([int(k) for k in season_ranks.keys()])) if season_ranks else "N/A"
-        rating = season_ranks.get(latest_season, {}).get('rating', "N/A") if season_ranks else "N/A"
-        rating_display = f"{rating:,}" if isinstance(rating, int) else rating
-        total_members = guild_info.get('members', {}).get('total', 0)
-        online_members = guild_info.get('online', 0)
-
-        banner_info = guild_info.get('banner')
-        if banner_info:
-            banner_bytes = self.banner_renderer.create_banner_image(banner_info)
-            if banner_bytes:
-                banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
-
-        desc = (
-            f"```python\n"
-            f"Guild: {name} [{prefix}]\n"
-            f"Owner: {owner}\n"
-            f"Created: {created_date}\n"
-            f"Level: {level} [{xp_percent}%]\n"
-            f"Wars: {wars}\n"
-            f"Latest SR: {rating_display} [Season {latest_season}]\n"
-            f"Territories: {territories}\n"
-            f"Members online/total: {online_members}/{total_members}\n"
-            f"```\n"
-        )
-    elif input_name:
-        desc = f"ギルド「{input_name}」の情報が見つかりませんでした。"
-    else:
-        desc = "過去ギルド情報は未入力です。"
-    # 6000文字制限対策
-    if len(desc) > 6000:
-        desc = desc[:5900] + "\n...（一部省略されました）"
-
-    embed = discord.Embed(
-        title="過去ギルド/Previous Guild",
-        description=desc,
-        color=discord.Color.orange()
-    )
-    embed.set_footer(text=f"入力情報/Input: {input_name}")
-
-    # バナーが生成できた場合のみサムネ設定
-    if banner_file:
-        embed.set_thumbnail(url="attachment://guild_banner.png")
-
-    return embed, banner_file
-
-async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord.File], Optional[str]]:
-    try:
-        player_data = await self.wynn_api.get_official_player_data(mcid)
-        if not player_data:
-            raise Exception("APIからプレイヤーデータ取得失敗")
-        profile_info = await build_profile_info(player_data, self.wynn_api, self.banner_renderer)
-        username = profile_info.get("username") or mcid
-        uuid = profile_info.get("uuid")
-        skin_image = None
-        if uuid:
-            try:
-                skin_bytes = await self.other_api.get_vzge_skin(uuid)
-                if skin_bytes:
-                    skin_image = Image.open(BytesIO(skin_bytes)).convert("RGBA")
-            except Exception:
-                skin_image = None
-        output_path = f"profile_card_{uuid}.png" if uuid else "profile_card.png"
-        generate_profile_card(profile_info, output_path, skin_image=skin_image)
-        embed = discord.Embed(
-            title="プレイヤー情報/Player Info",
-            color=discord.Color.blue()
-        )
-        embed.set_image(url=f"attachment://{output_path}")
-        embed.set_footer(text=f"入力情報/Input: {mcid}")
-        return embed, discord.File(output_path), username
-    except Exception as e:
-        embed = discord.Embed(
-            title="プレイヤープロフィール取得失敗",
-            description="情報取得中にエラーが発生しました。",
-            color=discord.Color.red()
-        )
-        embed.set_footer(text=f"入力情報/Input: {mcid}")
-        return embed, None, None
 
 def make_user_guide_embed(lang: str = "ja") -> discord.Embed:
     if lang == "ja":
@@ -431,6 +330,106 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         self.add_item(self.mcid)
         self.add_item(self.reason)
         self.add_item(self.prev_guild)
+        
+    def make_reason_embed(reason):
+        return discord.Embed(
+            title="加入理由/Reason",
+            description=reason,
+            color=discord.Color.purple()
+        )
+        
+    def make_prev_guild_embed(guild_info, input_name):
+        banner_bytes = None
+        banner_file = None
+        if isinstance(guild_info, dict) and guild_info.get("name"):
+            name = guild_info.get('name', 'N/A')
+            prefix = guild_info.get('prefix', 'N/A')
+            owner_list = guild_info.get('members', {}).get('owner', {})
+            owner = list(owner_list.keys())[0] if owner_list else "N/A"
+            created_date = guild_info.get('created', 'N/A').split("T")[0] if guild_info.get('created') else "N/A"
+            level = guild_info.get('level', 0)
+            xp_percent = guild_info.get('xpPercent', 0)
+            wars = guild_info.get('wars', 0)
+            territories = guild_info.get('territories', 0)
+            season_ranks = guild_info.get('seasonRanks', {})
+            latest_season = str(max([int(k) for k in season_ranks.keys()])) if season_ranks else "N/A"
+            rating = season_ranks.get(latest_season, {}).get('rating', "N/A") if season_ranks else "N/A"
+            rating_display = f"{rating:,}" if isinstance(rating, int) else rating
+            total_members = guild_info.get('members', {}).get('total', 0)
+            online_members = guild_info.get('online', 0)
+    
+            banner_info = guild_info.get('banner')
+            if banner_info:
+                banner_bytes = self.banner_renderer.create_banner_image(banner_info)
+                if banner_bytes:
+                    banner_file = discord.File(fp=banner_bytes, filename="guild_banner.png")
+    
+            desc = (
+                f"```python\n"
+                f"Guild: {name} [{prefix}]\n"
+                f"Owner: {owner}\n"
+                f"Created: {created_date}\n"
+                f"Level: {level} [{xp_percent}%]\n"
+                f"Wars: {wars}\n"
+                f"Latest SR: {rating_display} [Season {latest_season}]\n"
+                f"Territories: {territories}\n"
+                f"Members online/total: {online_members}/{total_members}\n"
+                f"```\n"
+            )
+        elif input_name:
+            desc = f"ギルド「{input_name}」の情報が見つかりませんでした。"
+        else:
+            desc = "過去ギルド情報は未入力です。"
+        # 6000文字制限対策
+        if len(desc) > 6000:
+            desc = desc[:5900] + "\n...（一部省略されました）"
+    
+        embed = discord.Embed(
+            title="過去ギルド/Previous Guild",
+            description=desc,
+            color=discord.Color.orange()
+        )
+        embed.set_footer(text=f"入力情報/Input: {input_name}")
+    
+        # バナーが生成できた場合のみサムネ設定
+        if banner_file:
+            embed.set_thumbnail(url="attachment://guild_banner.png")
+    
+        return embed, banner_file
+    
+    async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord.File], Optional[str]]:
+        try:
+            player_data = await self.wynn_api.get_official_player_data(mcid)
+            if not player_data:
+                raise Exception("APIからプレイヤーデータ取得失敗")
+            profile_info = await build_profile_info(player_data, self.wynn_api, self.banner_renderer)
+            username = profile_info.get("username") or mcid
+            uuid = profile_info.get("uuid")
+            skin_image = None
+            if uuid:
+                try:
+                    skin_bytes = await self.other_api.get_vzge_skin(uuid)
+                    if skin_bytes:
+                        skin_image = Image.open(BytesIO(skin_bytes)).convert("RGBA")
+                except Exception:
+                    skin_image = None
+            output_path = f"profile_card_{uuid}.png" if uuid else "profile_card.png"
+            generate_profile_card(profile_info, output_path, skin_image=skin_image)
+            embed = discord.Embed(
+                title="プレイヤー情報/Player Info",
+                color=discord.Color.blue()
+            )
+            embed.set_image(url=f"attachment://{output_path}")
+            embed.set_footer(text=f"入力情報/Input: {mcid}")
+            return embed, discord.File(output_path), username
+        except Exception as e:
+            embed = discord.Embed(
+                title="プレイヤープロフィール取得失敗",
+                description="情報取得中にエラーが発生しました。",
+                color=discord.Color.red()
+            )
+            embed.set_footer(text=f"入力情報/Input: {mcid}")
+            return embed, None, None
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
