@@ -324,6 +324,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         self.wynn_api = WynncraftAPI()
         self.other_api = OtherAPI()
         self.banner_renderer = BannerRenderer()
+
         self.mcid = TextInput(label="MCID/Your IGN", placeholder="正確に入力/Type accurately", required=True)
         self.reason = TextInput(label="加入理由/Reason", placeholder="簡単でOK/Write simply", required=True, style=discord.TextStyle.long)
         self.prev_guild = TextInput(label="最後に所属していたギルド/The Last Guild", placeholder="任意/Optional", required=False)
@@ -331,14 +332,14 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         self.add_item(self.reason)
         self.add_item(self.prev_guild)
         
-    def make_reason_embed(reason):
+    def make_reason_embed(self, reason):
         return discord.Embed(
             title="加入理由/Reason",
             description=reason,
             color=discord.Color.purple()
         )
         
-    def make_prev_guild_embed(guild_info, input_name):
+    def make_prev_guild_embed(self, guild_info, input_name):
         banner_bytes = None
         banner_file = None
         if isinstance(guild_info, dict) and guild_info.get("name"):
@@ -380,7 +381,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
             desc = f"ギルド「{input_name}」の情報が見つかりませんでした。"
         else:
             desc = "過去ギルド情報は未入力です。"
-        # 6000文字制限対策
+
         if len(desc) > 6000:
             desc = desc[:5900] + "\n...（一部省略されました）"
     
@@ -391,13 +392,12 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         )
         embed.set_footer(text=f"入力情報/Input: {input_name}")
     
-        # バナーが生成できた場合のみサムネ設定
         if banner_file:
             embed.set_thumbnail(url="attachment://guild_banner.png")
     
         return embed, banner_file
     
-    async def make_profile_embed(mcid: str) -> tuple[discord.Embed, Optional[discord.File], Optional[str]]:
+    async def make_profile_embed(self, mcid: str) -> tuple[discord.Embed, Optional[discord.File], Optional[str]]:
         try:
             player_data = await self.wynn_api.get_official_player_data(mcid)
             if not player_data:
@@ -458,7 +458,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         username_for_db = None
         staff_mention = f"<@&{TICKET_STAFF_ROLE_ID}>"
         try:
-            profile_embed, profile_file, username_for_db = await make_profile_embed(self.mcid.value)
+            profile_embed, profile_file, username_for_db = await self.make_profile_embed(self.mcid.value)
             if profile_file:
                 await channel.send(content=staff_mention, embed=profile_embed, file=profile_file)
             else:
@@ -474,7 +474,6 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
             await channel.send(content=staff_mention, embed=profile_embed)
 
         if not username_for_db:
-            # 万が一API/profile_infoから取得できなかった場合はAPI再取得
             try:
                 player_data = await self.wynn_api.get_official_player_data(self.mcid.value)
                 username_for_db = player_data.get("username", self.mcid.value)
@@ -482,16 +481,15 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
                 username_for_db = self.mcid.value
 
         # ③理由Embed
-        reason_embed = make_reason_embed(self.reason.value)
+        reason_embed = self.make_reason_embed(self.reason.value)
         await channel.send(embed=reason_embed)
 
         # ④過去ギルドEmbed
-        prev_guild_embed = None
         prev_guild_name = self.prev_guild.value.strip() if self.prev_guild.value else ""
         if prev_guild_name:
             try:
                 guild_info = await search_guild(self.wynn_api, prev_guild_name)
-                prev_guild_embed, banner_file = make_prev_guild_embed(guild_info, prev_guild_name)
+                prev_guild_embed, banner_file = self.make_prev_guild_embed(guild_info, prev_guild_name)
             except Exception:
                 prev_guild_embed, banner_file = discord.Embed(
                     title="過去ギルド情報取得失敗",
@@ -499,7 +497,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
                     color=discord.Color.red()
                 ), None
         else:
-            prev_guild_embed, banner_file = make_prev_guild_embed(None, "")
+            prev_guild_embed, banner_file = self.make_prev_guild_embed(None, "")
         
         if banner_file:
             await channel.send(embed=prev_guild_embed, file=banner_file, view=DeclineButtonView())
@@ -509,7 +507,7 @@ class ApplicationFormModal(Modal, title="ギルド加入申請フォーム"):
         # DB登録
         save_application(username_for_db, interaction.user.id, channel.id)
 
-        # 5. followupで通知
+        # followup
         await interaction.followup.send(
             f"{channel.mention} に申請内容を送信しました。スタッフが確認するまでお待ちください。",
             ephemeral=True
