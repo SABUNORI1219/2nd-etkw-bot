@@ -23,23 +23,39 @@ class WynncraftAPI:
                     if 200 <= response.status < 301:
                         if return_bytes:
                             data = await response.read()
-                            return data if data else None
+                            if not data:
+                                return None
+                            return data
                         if response.content_length != 0:
                             return await response.json()
                         return None
-                    if response.status in [400, 404, 429]:
-                        logger.warning(f"APIが{response.status}エラーを返しました。URL: {url}")
+                    non_retryable_codes = [400, 404, 429]
+                    if response.status in non_retryable_codes:
+                        logger.warning(f"APIが{response.status}エラーを返しました。対象が見つかりません。URL: {url}")
                         return None
-                    if response.status in [408, 500, 502, 503, 504]:
-                        logger.warning(f"APIが{response.status}。再試行 ({i+1}/{max_retries}) URL: {url}")
+                    retryable_codes = [408, 500, 502, 503, 504]
+                    if response.status in retryable_codes:
+                        if response.status == 500:
+                            try:
+                                body = await response.json()
+                                if (
+                                    isinstance(body, dict)
+                                    and body.get("error") == "InternalError"
+                                    and body.get("detail") == "Unable to render this guild"
+                                ):
+                                    logger.warning(f"APIがステータス500かつギルド未存在エラー: {body} URL: {url}")
+                                    return None # リトライせず即None
+                            except Exception as e:
+                                logger.warning(f"500エラーのレスポンスパース失敗: {e}")
+                        logger.warning(f"APIがステータス{response.status}を返しました。再試行します... ({i+1}/{max_retries})")
                         await asyncio.sleep(2)
                         continue
-                    logger.error(f"API予期せぬエラー: Status {response.status}, URL: {url}")
+                    logger.error(f"APIから予期せぬエラー: Status {response.status}, URL: {url}")
                     return None
             except Exception as e:
-                logger.error(f"APIリクエスト例外: {repr(e)}", exc_info=True)
+                logger.error(f"リクエスト中に予期せぬエラー: {repr(e)}", exc_info=True)
                 await asyncio.sleep(2)
-        logger.error(f"最大再試行回数({max_retries})到達。URL: {url}")
+        logger.error(f"最大再試行回数({max_retries}回)に達しました。URL: {url}")
         return None
 
     async def get_guild_by_name(self, guild_name: str):
