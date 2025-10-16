@@ -16,8 +16,9 @@ MARGIN = 40
 LEFT_COLUMN_WIDTH = 600
 RIGHT_COLUMN_WIDTH = CANVAS_WIDTH - LEFT_COLUMN_WIDTH - MARGIN * 2
 LINE_COLOR = (40, 40, 40, 255)
-BACKGROUND_COLOR = (245, 242, 238, 255)  # 新聞風・薄いベージュ
-CARD_BG = (255, 255, 255, 255)
+# ベース色は薄いベージュ（新聞/カード風）
+BACKGROUND_COLOR = (245, 240, 232, 255)
+CARD_BG = (255, 255, 250, 255)
 TITLE_COLOR = (40, 30, 20, 255)
 SUBTITLE_COLOR = (80, 60, 40, 255)
 TABLE_HEADER_BG = (230, 230, 230, 255)
@@ -33,6 +34,62 @@ def _fmt_num(v):
         return str(v)
     except Exception:
         return str(v)
+
+def create_card_background(w: int, h: int) -> Image.Image:
+    """
+    キャラクターカード風の薄いベージュ背景を生成して返す。
+    - 縦グラデーション
+    - 微細ノイズ（可能なら effect_noise）
+    - 中央に角丸のカードパネル（白っぽい）を合成してカード感を出す
+    """
+    # ベースのグラデーション
+    base = Image.new("RGBA", (w, h), BACKGROUND_COLOR)
+    grad = Image.new("RGBA", (w, h))
+    grad_draw = ImageDraw.Draw(grad)
+    top = (250, 246, 238, 255)   # やや明るめ
+    bottom = (240, 232, 220, 255)  # やや暗め
+    for y in range(h):
+        ratio = y / max(h - 1, 1)
+        r = int(top[0] * (1 - ratio) + bottom[0] * ratio)
+        g = int(top[1] * (1 - ratio) + bottom[1] * ratio)
+        b = int(top[2] * (1 - ratio) + bottom[2] * ratio)
+        a = int(top[3] * (1 - ratio) + bottom[3] * ratio)
+        grad_draw.line([(0, y), (w, y)], fill=(r, g, b, a))
+    base = Image.alpha_composite(base, grad)
+
+    # ノイズオーバーレイ（環境によっては effect_noise がない場合があるので try）
+    try:
+        noise = Image.effect_noise((w, h), 80).convert("L")
+        noise = noise.filter(ImageFilter.GaussianBlur(1))
+        # ノイズを薄く白っぽく乗せる（アルファを小さく）
+        # scale down noise values to a low alpha (0-40)
+        noise_alpha = noise.point(lambda p: p // 8)  # roughly 0-31
+        noise_rgba = Image.new("RGBA", (w, h), (255, 255, 255, 0))
+        noise_rgba.putalpha(noise_alpha)
+        base = Image.alpha_composite(base, noise_rgba)
+    except Exception:
+        # effect_noise が使えない環境では何もしない（十分なフォールバック）
+        logger.debug("effect_noise not available; skipping noise overlay for background")
+
+    # 角丸カードパネル（白っぽい、薄い影つき）
+    panel_w = w - MARGIN * 2
+    panel_h = h - MARGIN * 2
+    panel = Image.new("RGBA", (panel_w, panel_h), (255, 255, 255, 0))
+    pd = ImageDraw.Draw(panel)
+    radius = 18
+    # shadow
+    shadow = Image.new("RGBA", (panel_w, panel_h), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shadow)
+    sd.rounded_rectangle([6, 6, panel_w - 6, panel_h - 6], radius=radius, fill=(0, 0, 0, 40))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(6))
+    base.alpha_composite(shadow, (MARGIN, MARGIN))
+    # panel fill
+    pd.rounded_rectangle([0, 0, panel_w, panel_h], radius=radius, fill=CARD_BG)
+    # subtle inner border
+    pd.rounded_rectangle([2, 2, panel_w - 2, panel_h - 2], radius=radius - 2, outline=(235, 225, 210, 200), width=1)
+    base.paste(panel, (MARGIN, MARGIN), panel)
+
+    return base
 
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
     """
@@ -118,24 +175,15 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     canvas_w = max_width
     canvas_h = content_height
 
-    # キャンバス作成
-    img = Image.new("RGBA", (canvas_w, canvas_h), BACKGROUND_COLOR)
+    # キャンバス作成（キャラクターカード風の薄いベージュ背景を使う）
+    img = create_card_background(canvas_w, canvas_h)
     draw = ImageDraw.Draw(img)
 
-    # カード背景（ちょっと影付きでカード風に）
+    # カード背景（ちょっと影付きでカード風に） - 既に create_card_background で描画済み
     card_x = MARGIN
     card_y = MARGIN
     card_w = canvas_w - MARGIN * 2
     card_h = canvas_h - MARGIN * 2
-    # 影
-    shadow = Image.new("RGBA", (card_w, card_h), (0,0,0,0))
-    sd = ImageDraw.Draw(shadow)
-    sd.rounded_rectangle([6,6,card_w-6,card_h-6], radius=16, fill=(0,0,0,30))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(4))
-    img.alpha_composite(shadow, (card_x, card_y))
-    # 背景矩形
-    card = Image.new("RGBA", (card_w, card_h), CARD_BG)
-    img.paste(card, (card_x, card_y), mask=card)
 
     # フォント設定（profile_renderer.py と同様の読み込み方法）
     try:
