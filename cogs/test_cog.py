@@ -7,7 +7,7 @@ from io import BytesIO
 from lib.api_stocker import WynncraftAPI
 from lib.cache_handler import CacheHandler
 from lib.banner_renderer import BannerRenderer
-from lib.guild_renderer import create_guild_image
+from lib.guild_profile_renderer import create_guild_image
 from lib.utils import create_embed
 from config import AUTHORIZED_USER_IDS, send_authorized_only_message
 
