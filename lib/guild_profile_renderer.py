@@ -24,13 +24,82 @@ TABLE_HEADER_BG = (230, 230, 230, 255)
 ONLINE_BADGE = (60, 200, 60, 255)
 OFFLINE_BADGE = (200, 60, 60, 255)
 
-def _load_font(size):
+# フォントキャッシュ（サイズごと）
+_FONT_CACHE: Dict[int, ImageFont.FreeTypeFont] = {}
+# 一度フォント候補一覧を試行したかどうか（失敗ログを大量に出さないため）
+_FONT_TRIED = False
+
+def _candidate_system_fonts() -> List[str]:
+    # 環境依存で存在しやすいフォント候補を列挙
+    candidates = []
+    # プロジェクト内指定フォント
+    candidates.append(os.path.abspath(FONT_PATH))
+    # よくあるシステムフォント（Linux, Windows, macOS の代表）
+    candidates.extend([
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        "DejaVuSans.ttf",  # PIL がパス解決できる場合がある
+        "/Library/Fonts/Arial.ttf",
+        "arial.ttf",
+    ])
+    return candidates
+
+def _load_font(size: int) -> ImageFont.ImageFont:
+    """
+    サイズごとにフォントをキャッシュして返す。
+    指定 FONT_PATH が使えなければ、システム候補を順に試し、最終的に ImageFont.load_default() にフォールバックする。
+    ログを見やすくし、存在チェックを行う。
+    """
+    global _FONT_TRIED
+    if size in _FONT_CACHE:
+        return _FONT_CACHE[size]
+
+    candidates = _candidate_system_fonts()
+    last_exc = None
+    for path in candidates:
+        try:
+            # path が相対文字列（例えば "DejaVuSans.ttf"）の場合も try してみる
+            abs_path = os.path.abspath(path)
+            exists = os.path.exists(abs_path)
+            # ログはデバッグレベルで出す（探査詳細）
+            logger.debug(f"Trying font path: {path} (abs: {abs_path}) exists={exists}")
+            # 優先: 明示的なファイルパスが存在するならそれを使う
+            if exists:
+                font = ImageFont.truetype(abs_path, size)
+            else:
+                # 存在しないファイルパスでも、PIL が名前で解決できる場合があるので試す
+                font = ImageFont.truetype(path, size)
+            _FONT_CACHE[size] = font
+            if not _FONT_TRIED:
+                logger.info(f"Loaded font for size {size} from: {path} (abs: {abs_path})")
+            _FONT_TRIED = True
+            return font
+        except Exception as e:
+            last_exc = e
+            # 次の候補へ（ただし詳細はデバッグレベルで残す）
+            logger.debug(f"Font try failed for '{path}': {e}")
+
+    # すべて失敗した場合はデフォルトフォントにフォールバック
+    logger.warning(f"フォント読み込みに失敗しました（候補を全て試行）。最後の例外: {last_exc}. デフォルトフォントを使用します")
+    from PIL import ImageFont
+    fallback = ImageFont.load_default()
+    _FONT_CACHE[size] = fallback
+    _FONT_TRIED = True
+    return fallback
+
+def _text_length(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> float:
+    """
+    draw.textlength が使える場合はそれを使い、高速に幅を取得。
+    使えない場合は draw.textbbox を使って幅を算出する。
+    """
     try:
-        return ImageFont.truetype(FONT_PATH, size)
+        # Pillow 新しいバージョンでは draw.textlength が存在する
+        length = draw.textlength(text, font=font)
+        return length
     except Exception:
-        logger.warning(f"フォント読み込み失敗 ({FONT_PATH}) - デフォルトフォントを使用します")
-        from PIL import ImageFont
-        return ImageFont.load_default()
+        bbox = draw.textbbox((0, 0), text, font=font)
+        return bbox[2] - bbox[0]
 
 def _fmt_num(v):
     try:
@@ -147,7 +216,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     card = Image.new("RGBA", (card_w, card_h), CARD_BG)
     img.paste(card, (card_x, card_y), mask=card)
 
-    # フォント
+    # フォント（堅牢にロード）
     font_title = _load_font(48)
     font_sub = _load_font(28)
     font_stats = _load_font(22)
@@ -213,9 +282,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
             name = p.get("name", "Unknown")
             rank = p.get("rank_stars", "")
 
-            # 行背景（交互）
-            # if idx % 2 == 0: draw.rectangle([...], fill=(250,250,250,255))
-
             # サーバー矩形
             draw.rectangle([table_x, y, table_x + col_server_w, y + row_h - 6], outline=LINE_COLOR, width=1)
             draw.text((table_x + 6, y + 10), server, font=font_table, fill=SUBTITLE_COLOR)
@@ -223,7 +289,17 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
             # プレイヤー名
             nx = table_x + col_server_w + 8
             draw.rectangle([nx - 2, y, nx + col_name_w, y + row_h - 6], outline=LINE_COLOR, width=1)
-            draw.text((nx + 6, y + 10), name, font=font_table, fill=TITLE_COLOR)
+            # 長い名前がはみ出す場合に備えて縮める（幅計算）
+            max_name_w = col_name_w - 12
+            display_name = name
+            if _text_length(draw, display_name, font_table) > max_name_w:
+                # 省略 +... を付ける
+                for i in range(len(display_name), 0, -1):
+                    cand = display_name[:i] + "..."
+                    if _text_length(draw, cand, font_table) <= max_name_w:
+                        display_name = cand
+                        break
+            draw.text((nx + 6, y + 10), display_name, font=font_table, fill=TITLE_COLOR)
 
             # ランク（星）
             rx = nx + col_name_w + 8
@@ -237,8 +313,8 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
 
     # フッター（小さく生成者表記）
     footer_text = "Generated by Minister Chikuwa"
-    # getsize を呼ばず、ImageDraw の textbbox / textlength を使って幅・高さを取得する
-    fw = draw.textlength(footer_text, font=font_small)
+    fw = _text_length(draw, footer_text, font_small)
+    # textbbox で高さを取得
     bbox = draw.textbbox((0, 0), footer_text, font=font_small)
     fh = bbox[3] - bbox[1]
     draw.text((card_x + card_w - fw - 16, card_y + card_h - 36), footer_text, font=font_small, fill=(120, 110, 100, 255))
