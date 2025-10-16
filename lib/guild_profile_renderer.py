@@ -24,83 +24,6 @@ TABLE_HEADER_BG = (230, 230, 230, 255)
 ONLINE_BADGE = (60, 200, 60, 255)
 OFFLINE_BADGE = (200, 60, 60, 255)
 
-# フォントキャッシュ（サイズごと）
-_FONT_CACHE: Dict[int, ImageFont.FreeTypeFont] = {}
-# 一度フォント候補一覧を試行したかどうか（失敗ログを大量に出さないため）
-_FONT_TRIED = False
-
-def _candidate_system_fonts() -> List[str]:
-    # 環境依存で存在しやすいフォント候補を列挙
-    candidates = []
-    # プロジェクト内指定フォント
-    candidates.append(os.path.abspath(FONT_PATH))
-    # よくあるシステムフォント（Linux, Windows, macOS の代表）
-    candidates.extend([
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-        "DejaVuSans.ttf",  # PIL がパス解決できる場合がある
-        "/Library/Fonts/Arial.ttf",
-        "arial.ttf",
-    ])
-    return candidates
-
-def _load_font(size: int) -> ImageFont.ImageFont:
-    """
-    サイズごとにフォントをキャッシュして返す。
-    指定 FONT_PATH が使えなければ、システム候補を順に試し、最終的に ImageFont.load_default() にフォールバックする。
-    ログを見やすくし、存在チェックを行う。
-    """
-    global _FONT_TRIED
-    if size in _FONT_CACHE:
-        return _FONT_CACHE[size]
-
-    candidates = _candidate_system_fonts()
-    last_exc = None
-    for path in candidates:
-        try:
-            # path が相対文字列（例えば "DejaVuSans.ttf"）の場合も try してみる
-            abs_path = os.path.abspath(path)
-            exists = os.path.exists(abs_path)
-            # ログはデバッグレベルで出す（探査詳細）
-            logger.debug(f"Trying font path: {path} (abs: {abs_path}) exists={exists}")
-            # 優先: 明示的なファイルパスが存在するならそれを使う
-            if exists:
-                font = ImageFont.truetype(abs_path, size)
-            else:
-                # 存在しないファイルパスでも、PIL が名前で解決できる場合があるので試す
-                font = ImageFont.truetype(path, size)
-            _FONT_CACHE[size] = font
-            if not _FONT_TRIED:
-                logger.info(f"Loaded font for size {size} from: {path} (abs: {abs_path})")
-            _FONT_TRIED = True
-            return font
-        except Exception as e:
-            last_exc = e
-            # 次の候補へ（ただし詳細はデバッグレベルで残す）
-            logger.debug(f"Font try failed for '{path}': {e}")
-
-    # すべて失敗した場合はデフォルトフォントにフォールバック
-    logger.warning(f"フォント読み込みに失敗しました（候補を全て試行）。最後の例外: {last_exc}. デフォルトフォントを使用します")
-    from PIL import ImageFont
-    fallback = ImageFont.load_default()
-    _FONT_CACHE[size] = fallback
-    _FONT_TRIED = True
-    return fallback
-
-def _text_length(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> float:
-    """
-    draw.textlength が使える場合はそれを使い、高速に幅を取得。
-    使えない場合は draw.textbbox を使って幅を算出する。
-    """
-    try:
-        # Pillow 新しいバージョンでは draw.textlength が存在する
-        length = draw.textlength(text, font=font)
-        return length
-    except Exception:
-        bbox = draw.textbbox((0, 0), text, font=font)
-        return bbox[2] - bbox[0]
-
 def _fmt_num(v):
     try:
         if isinstance(v, int):
@@ -178,9 +101,8 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     # バナー
     banner_img = None
     try:
-        banner_bytes = banner_renderer.create_banner_image(guild_data.get("banner"))
+        banner_bytes = banner_renderer.create_banner_image(guild_data.get("banner")) if banner_renderer is not None else None
         if banner_bytes:
-            from PIL import Image
             if isinstance(banner_bytes, (bytes, bytearray)):
                 banner_img = Image.open(BytesIO(banner_bytes)).convert("RGBA")
             elif hasattr(banner_bytes, "read"):
@@ -192,7 +114,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     base_height = 480  # ヘッダ等の固定領域
     row_height = 48     # オンラインプレイヤー1行の高さ
     online_count = len(online_players)
-    right_padding = MARGIN
     content_height = base_height + max(0, online_count) * row_height + 140
     canvas_w = max_width
     canvas_h = content_height
@@ -216,21 +137,24 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     card = Image.new("RGBA", (card_w, card_h), CARD_BG)
     img.paste(card, (card_x, card_y), mask=card)
 
-    # フォント（堅牢にロード）
-    font_title = _load_font(48)
-    font_sub = _load_font(28)
-    font_stats = _load_font(22)
-    font_table_header = _load_font(20)
-    font_table = _load_font(18)
-    font_small = _load_font(16)
+    # フォント設定（profile_renderer.py と同様の読み込み方法）
+    try:
+        font_title = ImageFont.truetype(FONT_PATH, 48)
+        font_sub = ImageFont.truetype(FONT_PATH, 28)
+        font_stats = ImageFont.truetype(FONT_PATH, 22)
+        font_table_header = ImageFont.truetype(FONT_PATH, 20)
+        font_table = ImageFont.truetype(FONT_PATH, 18)
+        font_small = ImageFont.truetype(FONT_PATH, 16)
+    except Exception as e:
+        logger.error(f"FONT_PATH 読み込み失敗: {e}")
+        # profile_renderer と同様に単純にデフォルトにフォールバック
+        font_title = font_sub = font_stats = font_table_header = font_table = font_small = ImageFont.load_default()
 
     inner_left = card_x + 30
     inner_top = card_y + 30
 
     # 左側：タイトル・バナー・主要統計
-    # タイトル
     draw.text((inner_left, inner_top), f"[{prefix}] {name}", font=font_title, fill=TITLE_COLOR)
-    # サブタイトル (owner, created)
     draw.text((inner_left, inner_top + 64), f"Owner: {owner}  |  Created: {created}", font=font_sub, fill=SUBTITLE_COLOR)
 
     # バナー表示（左カラム上部に）
@@ -277,44 +201,46 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     y = header_bottom + 10
     if online_players:
         for p in online_players:
-            # server
             server = p.get("server", "N/A")
-            name = p.get("name", "Unknown")
+            pname = p.get("name", "Unknown")
             rank = p.get("rank_stars", "")
 
-            # サーバー矩形
             draw.rectangle([table_x, y, table_x + col_server_w, y + row_h - 6], outline=LINE_COLOR, width=1)
             draw.text((table_x + 6, y + 10), server, font=font_table, fill=SUBTITLE_COLOR)
 
-            # プレイヤー名
             nx = table_x + col_server_w + 8
             draw.rectangle([nx - 2, y, nx + col_name_w, y + row_h - 6], outline=LINE_COLOR, width=1)
-            # 長い名前がはみ出す場合に備えて縮める（幅計算）
+
+            # 名前が長い場合は簡易省略（draw.textlength が無ければ textbbox を使う）
+            try:
+                name_w = draw.textlength(pname, font=font_table)
+            except Exception:
+                bbox = draw.textbbox((0,0), pname, font=font_table)
+                name_w = bbox[2] - bbox[0]
+            display_name = pname
             max_name_w = col_name_w - 12
-            display_name = name
-            if _text_length(draw, display_name, font_table) > max_name_w:
-                # 省略 +... を付ける
-                for i in range(len(display_name), 0, -1):
-                    cand = display_name[:i] + "..."
-                    if _text_length(draw, cand, font_table) <= max_name_w:
-                        display_name = cand
-                        break
+            if name_w > max_name_w:
+                # 末尾を切る簡易処理
+                while display_name and ( (draw.textlength(display_name + "...", font=font_table) if hasattr(draw, "textlength") else (draw.textbbox((0,0), display_name + "...", font=font_table)[2] - draw.textbbox((0,0), display_name + "...", font=font_table)[0]) ) > max_name_w):
+                    display_name = display_name[:-1]
+                display_name = display_name + "..."
             draw.text((nx + 6, y + 10), display_name, font=font_table, fill=TITLE_COLOR)
 
-            # ランク（星）
             rx = nx + col_name_w + 8
             draw.rectangle([rx - 2, y, rx + col_rank_w, y + row_h - 6], outline=LINE_COLOR, width=1)
             draw.text((rx + 6, y + 10), rank, font=font_table, fill=SUBTITLE_COLOR)
 
             y += row_h
     else:
-        # オンラインが0人
         draw.text((table_x + 8, header_bottom + 18), "No members online right now.", font=font_table, fill=SUBTITLE_COLOR)
 
     # フッター（小さく生成者表記）
     footer_text = "Generated by Minister Chikuwa"
-    fw = _text_length(draw, footer_text, font_small)
-    # textbbox で高さを取得
+    try:
+        fw = draw.textlength(footer_text, font=font_small)
+    except Exception:
+        bbox = draw.textbbox((0, 0), footer_text, font=font_small)
+        fw = bbox[2] - bbox[0]
     bbox = draw.textbbox((0, 0), footer_text, font=font_small)
     fh = bbox[3] - bbox[1]
     draw.text((card_x + card_w - fw - 16, card_y + card_h - 36), footer_text, font=font_small, fill=(120, 110, 100, 255))
