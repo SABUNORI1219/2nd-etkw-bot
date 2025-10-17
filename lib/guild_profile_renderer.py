@@ -44,23 +44,23 @@ def _fmt_num(v):
         return str(v)
 
 def add_burn_edges(base: Image.Image,
-                   edge_width: float = 0.28,
-                   noise_sd: float = 0.15,
-                   threshold: float = 0.18,
-                   blur_radius: float = 10,
-                   scorch_color=(160, 110, 70),
-                   scorch_alpha: int = 140,
-                   speckle_density: float = 8.0,
+                   edge_width: float = 0.14,
+                   noise_sd: float = 0.12,
+                   threshold: float = 0.22,
+                   blur_radius: float = 8,
+                   scorch_color=(70, 40, 20),
+                   scorch_alpha: int = 220,
+                   speckle_density: float = 2.0,
                    seed: Optional[int] = None) -> Image.Image:
     """
-    周囲全体にまばらで粒子的な“焦げ”を付与する実装。
-    - edge_width: 画像端からの広がり割合 (0..0.5)。大きめにして広く出す。
-    - noise_sd: ノイズのばらつき（numpy利用時のsd）
-    - threshold: マスクしきい値（低めで広がりを増やす）
-    - blur_radius: マスクのぼかし
-    - scorch_color: 茶色ベースの焦げ色 (R,G,B)
-    - scorch_alpha: 焦げの最大透過度
-    - speckle_density: 粒子量のスケール（大きいほど無数の粒子）
+    周縁に「ほどよく散る」微粒子レベルの焦げを付与する（返り値 RGBA）。
+    - edge_width: 端寄せの幅 (0..0.5)。小さめにして中央侵入を抑える。
+    - noise_sd: ノイズのばらつき（numpy 利用時）。
+    - threshold: マスクしきい値（0..1）。小さいほど広がる。
+    - blur_radius: マスクぼかし。
+    - scorch_color: 焦げ色 (R,G,B) — 濃い目の焦げ茶をデフォルトに。
+    - scorch_alpha: 焦げレイヤ最大アルファ。
+    - speckle_density: 粒子の密度スケール（2.0 程度がほどよい）。
     """
     rnd = random.Random(seed) if seed is not None else random.Random()
 
@@ -69,12 +69,10 @@ def add_burn_edges(base: Image.Image,
     max_r = math.hypot(cx, cy)
     max_inner = min(cx, cy) if min(cx, cy) > 0 else 1.0
 
-    # ----- 1) マスク作成: ノイズ * border-proximity -----
+    # 1) マスク（高周波ノイズ × edge proximity）
     if _HAS_NUMPY:
-        # noise [0..1]
         noise = np.random.normal(0.5, noise_sd, (h, w))
         noise = np.clip(noise, 0.0, 1.0)
-        # compute distance to nearest edge per-pixel
         ys = np.arange(h) - cy
         xs = np.arange(w) - cx
         xv, yv = np.meshgrid(xs, ys)
@@ -82,8 +80,7 @@ def add_burn_edges(base: Image.Image,
         abs_y = np.abs(yv)
         edge_dist_x = cx - abs_x
         edge_dist_y = cy - abs_y
-        edge_dist = np.minimum(edge_dist_x, edge_dist_y)  # smaller = closer to edge center
-        # normalized border proximity: 0 center, 1 edge
+        edge_dist = np.minimum(edge_dist_x, edge_dist_y)
         bp = 1.0 - (edge_dist / max_inner)
         bp = np.clip(bp, 0.0, 1.0)
         combined = noise * bp
@@ -104,26 +101,24 @@ def add_burn_edges(base: Image.Image,
                 val = n * bp
                 md[x, y] = 255 if val > threshold else 0
 
-    # soften mask
+    # 2) mask を馴染ませる
     mask = mask_img.filter(ImageFilter.GaussianBlur(int(blur_radius)))
     mask = mask.point(lambda p: int(min(255, p * 0.95)))
 
-    # scorch layer
+    # 3) 焦げレイヤ合成（色は下地に馴染むよう alpha で）
     alpha_layer = mask.point(lambda p: int((p / 255.0) * scorch_alpha))
     scorch = Image.new('RGBA', (w, h), scorch_color + (0,))
     scorch.putalpha(alpha_layer)
     out = Image.alpha_composite(base.convert('RGBA'), scorch)
 
-    # ----- 2) 微粒子を周囲全体に大量に撒く（粒子レベル） -----
+    # 4) 微粒子を周縁全体にまばらに撒く（粒子レベル感）
     speckle_layer = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     sd_draw = ImageDraw.Draw(speckle_layer)
-    base_count = int((w * h) / 300.0)
+    base_count = int((w * h) / 380.0)
     particle_count = int(base_count * speckle_density)
-    # cap to avoid pathological explosion
-    particle_count = min(particle_count, 30000)
+    particle_count = min(particle_count, 10000)  # 安全上の上限
 
     for _ in range(particle_count):
-        # acceptance sampling biased to edges but allow widespread distribution
         attempts = 0
         while True:
             attempts += 1
@@ -134,18 +129,81 @@ def add_burn_edges(base: Image.Image,
             edge_dist = min(cx - dx, cy - dy)
             bp = 1.0 - (edge_dist / max_inner) if max_inner > 0 else 0.0
             bp = max(0.0, min(1.0, bp))
-            # acceptance: favor edges but allow interior (0.15..1.0)
-            accept_p = 0.15 + 0.85 * bp
-            if rnd.random() < accept_p or attempts > 8:
+            # 周縁優先だが内部にも散る余地を残す（0.08..1.0）
+            accept_p = 0.08 + 0.92 * bp
+            if rnd.random() < accept_p or attempts > 6:
                 break
         rad = rnd.randint(1, 2)
-        alpha = rnd.randint(6, 56)
+        alpha = rnd.randint(12, 120)  # 濃い粒子も出るよう幅を確保
         color = (scorch_color[0], scorch_color[1], scorch_color[2], alpha)
         bbox = [int(x - rad), int(y - rad), int(x + rad), int(y + rad)]
         sd_draw.ellipse(bbox, fill=color)
 
-    speckle_layer = speckle_layer.filter(ImageFilter.GaussianBlur(0.85))
+    speckle_layer = speckle_layer.filter(ImageFilter.GaussianBlur(0.6))
     out = Image.alpha_composite(out, speckle_layer)
+
+    return out
+
+def draw_decorative_frame(img: Image.Image,
+                          outer_offset: int = 18,
+                          outer_width: int = 8,
+                          inner_offset: int = 28,
+                          inner_width: int = 2,
+                          frame_color=(85, 50, 30, 255)) -> Image.Image:
+    """
+    外枠（太）+ 内枠（細）+ 角飾りを描く。引数で太さやオフセットを調整可能。
+    返り値は RGBA イメージ。
+    """
+    w, h = img.size
+    out = img.convert("RGBA")
+    draw = ImageDraw.Draw(out)
+
+    # 外枠（太め）
+    ox = outer_offset
+    oy = outer_offset
+    ow = w - outer_offset * 2
+    oh = h - outer_offset * 2
+    # 外枠の輪郭（太線風に矩形を複数重ねて濃淡を出す）
+    draw.rectangle([ox, oy, ox + ow, oy + oh], outline=frame_color, width=outer_width)
+
+    # 内枠（細め）
+    ix = inner_offset
+    iy = inner_offset
+    iw = w - inner_offset * 2
+    ih = h - inner_offset * 2
+    inner_color = (95, 60, 35, 220)
+    draw.rectangle([ix, iy, ix + iw, iy + ih], outline=inner_color, width=inner_width)
+
+    # 角飾り（小さい切欠きっぽく）
+    corner_len = 18
+    corner_thick = max(2, outer_width // 3)
+    # 左上
+    draw.line([ (ox+corner_thick//2, oy+corner_len), (ox+corner_thick//2, oy+corner_thick//2), (ox+corner_len, oy+corner_thick//2) ],
+              fill=frame_color, width=corner_thick)
+    # 右上
+    draw.line([ (ox+ow-corner_len, oy+corner_thick//2), (ox+ow-corner_thick//2, oy+corner_thick//2), (ox+ow-corner_thick//2, oy+corner_len) ],
+              fill=frame_color, width=corner_thick)
+    # 左下
+    draw.line([ (ox+corner_thick//2, oy+oh-corner_len), (ox+corner_thick//2, oy+oh-corner_thick//2), (ox+corner_len, oy+oh-corner_thick//2) ],
+              fill=frame_color, width=corner_thick)
+    # 右下
+    draw.line([ (ox+ow-corner_len, oy+oh-corner_thick//2), (ox+ow-corner_thick//2, oy+oh-corner_thick//2), (ox+ow-corner_thick//2, oy+oh-corner_len) ],
+              fill=frame_color, width=corner_thick)
+
+    # さらに内側のルール線（画像サンプル風に、上・中・左の簡易的なガイドを描画）
+    rule_color = (110, 75, 45, 180)
+    # 上の水平ルール
+    y_rule = iy + int(ih * 0.12)
+    draw.line([(ix + 20, y_rule), (ix + iw - 20, y_rule)], fill=rule_color, width=4)
+    # 中央の長めの水平ルール（やや下）
+    y_rule2 = iy + int(ih * 0.56)
+    draw.line([(ix + 20, y_rule2), (ix + int(iw * 0.62), y_rule2)], fill=rule_color, width=4)
+    # 左の小矩形（バナー代替）
+    box_x = ix + 28
+    box_y = iy + int(ih * 0.08)
+    box_w = int(iw * 0.18)
+    box_h = int(ih * 0.22)
+    draw.rectangle([box_x, box_y, box_x + box_w, box_y + box_h], outline=rule_color, width=3)
 
     return out
 
@@ -154,7 +212,7 @@ def create_card_background(w: int, h: int,
                            noise_blend: float = 0.30,
                            vignette_blur: int = 80) -> Image.Image:
     """
-    ノイズ + 軽いブラー + ビネット + 改良焦げ（add_burn_edges）を作る背景生成。
+    ノイズ + 軽いブラー + ビネット + 焦げ + 装飾枠 を作る背景生成。
     """
     base = Image.new('RGB', (w, h), BASE_BG_COLOR)
 
@@ -179,9 +237,11 @@ def create_card_background(w: int, h: int,
                 nd.point((x, y), fill=(tone, tone, tone))
 
     img = Image.blend(base, noise_img, noise_blend)
+
+    # 軽くぼかして紙感を出す
     img = img.filter(ImageFilter.GaussianBlur(1))
 
-    # ==== ビネット（端の暗化）====
+    # ==== ビネット作成（端の暗化）====
     vignette = Image.new('L', (w, h), 0)
     dv = ImageDraw.Draw(vignette)
     max_r = int(max(w, h) * 0.75)
@@ -196,22 +256,33 @@ def create_card_background(w: int, h: int,
     dark_img = Image.new('RGB', (w, h), dark_color)
     composed = Image.composite(img, dark_img, vignette)
 
-    # ==== 改良焦げエッジ: add_burn_edges を呼び出す ====
+    # ==== 焦げエッジ（周縁にまばら）====
     try:
-        composed_rgba = add_burn_edges(composed,
-                                       edge_width=0.28,          # 広がりを増やす
-                                       noise_sd=0.15,
-                                       threshold=0.18,          # 低めで広がる
-                                       blur_radius=10,
-                                       scorch_color=(160, 110, 70),  # 薄めの茶色メイン
-                                       scorch_alpha=140,
-                                       speckle_density=8.0,
-                                       seed=None)
+        composed = add_burn_edges(composed,
+                                  edge_width=0.14,
+                                  noise_sd=0.12,
+                                  threshold=0.22,
+                                  blur_radius=8,
+                                  scorch_color=(70, 40, 20),
+                                  scorch_alpha=220,
+                                  speckle_density=2.0,
+                                  seed=None)
     except Exception as e:
         logger.exception(f"add_burn_edges failed: {e}")
-        composed_rgba = composed.convert('RGBA')
+        composed = composed.convert('RGBA')
 
-    return composed_rgba
+    # ==== 装飾枠を描画（外枠・内枠・角飾り・ルール線）====
+    try:
+        composed = draw_decorative_frame(composed.convert('RGBA'),
+                                        outer_offset=18,
+                                        outer_width=8,
+                                        inner_offset=28,
+                                        inner_width=2,
+                                        frame_color=(85, 50, 30, 255))
+    except Exception as e:
+        logger.exception(f"draw_decorative_frame failed: {e}")
+
+    return composed
 
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
     """
@@ -387,7 +458,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
             max_name_w = col_name_w - 12
             if name_w > max_name_w:
                 # 簡易省略処理
-                while display_name and ((draw.textlength(display_name + "...", font=font_table) if hasattr(draw, "textlength") else (draw.textbbox((0,0), display_name + "...", font=font_table)[2] - draw.textbbox((0,0), display_name + "...", font=font_table)[0])) > max_name_w):
+                while display_name and ((draw.textlength(display_name + "...", font=font_table) if hasattr(draw, "textlength") else (draw.textbbox((0,0), display_name + "...", font=font_table)[2] - dr[...]
                     display_name = display_name[:-1]
                 display_name = display_name + "..."
             draw.text((nx + 6, y + 10), display_name, font=font_table, fill=TITLE_COLOR)
