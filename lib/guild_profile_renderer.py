@@ -3,6 +3,7 @@ from io import BytesIO
 import os
 import logging
 import random
+import numpy as np
 from typing import Dict, List, Any
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ LEFT_COLUMN_WIDTH = 600
 RIGHT_COLUMN_WIDTH = CANVAS_WIDTH - LEFT_COLUMN_WIDTH - MARGIN * 2
 LINE_COLOR = (40, 40, 40, 255)
 # 単一背景に統一（ユーザー指定の黄土色ベース）
-BASE_BG_COLOR = (217, 180, 111)  # #d9b46f
+BASE_BG_COLOR = (218, 179, 99)  # #d9b46f
 TITLE_COLOR = (40, 30, 20, 255)
 SUBTITLE_COLOR = (80, 60, 40, 255)
 TABLE_HEADER_BG = (230, 230, 230, 255)
@@ -27,7 +28,6 @@ OFFLINE_BADGE = (200, 60, 60, 255)
 
 # Optional: try to import numpy for better noise; fallback if unavailable
 try:
-    import numpy as np
     _HAS_NUMPY = True
 except Exception:
     _HAS_NUMPY = False
