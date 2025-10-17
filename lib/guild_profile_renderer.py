@@ -3,6 +3,7 @@ from io import BytesIO
 import os
 import logging
 import random
+import math
 from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -42,82 +43,140 @@ def _fmt_num(v):
     except Exception:
         return str(v)
 
-def _add_burn_speckles(base: Image.Image, density_factor: float = 1.0, edge_bias: float = 0.5,
-                       radius_range=(1, 3), alpha_range=(10, 70), seed: Optional[int] = None) -> Image.Image:
+def add_burn_edges(base: Image.Image,
+                   edge_width: float = 0.16,
+                   noise_sd: float = 0.15,
+                   threshold: float = 0.36,
+                   blur_radius: float = 10,
+                   scorch_color=(45, 28, 16),
+                   scorch_alpha: int = 190,
+                   speckle_density: float = 1.6,
+                   seed: Optional[int] = None) -> Image.Image:
     """
-    ベース画像の周縁に「焦げの微粒子（小さな粒子が多数）」を散らす。
-    - density_factor: 粒子の総数スケーリング（1.0がデフォルト）
-    - edge_bias: 0..1.0 (0中央均一 / 1 完全に端寄せ)
-    - radius_range: 粒子の半径(px)の範囲（小さい値）
-    - alpha_range: 粒子の不透明度範囲
-    - seed: 再現シード
+    base に“焼け（焦げ）”を自然に付与して RGBA を返す。
+    - edge_width: 外縁領域の幅（0.0-0.5）
+    - noise_sd: ノイズの標準偏差（numpy 用、0.15 程度が細かめ）
+    - threshold: ノイズしきい値（0-1）で焼けの広がり調整
+    - blur_radius: マスクをブラーして馴染ませる(px)
+    - scorch_color: (R,G,B) 焦げ色
+    - scorch_alpha: 焦げの最大アルファ（0-255）
+    - speckle_density: 微粒子の量（1.0 基準）
+    - seed: 再現用シード
     """
-    rnd = random.Random(seed) if seed is not None else random.Random()
+    if seed is not None:
+        rnd = random.Random(seed)
+    else:
+        rnd = random.Random()
 
     w, h = base.size
     cx, cy = w / 2.0, h / 2.0
-    max_r = (cx ** 2 + cy ** 2) ** 0.5
+    max_r = math.hypot(cx, cy)
 
-    # 粒子数目安（画像サイズに依存）
-    base_count = int((w * h) / 900.0)
-    total_count = max(200, int(base_count * density_factor))
+    # 1) 作業マスク（combined noise × radial）
+    # Create noise and radial, combine to mask
+    if _HAS_NUMPY:
+        # noise: mean 0.5, sd noise_sd, clipped 0..1
+        noise = np.random.normal(0.5, noise_sd, (h, w))
+        noise = np.clip(noise, 0.0, 1.0)
+        # radial distance normalized (0 center, 1 corner)
+        ys = np.linspace(0, h - 1, h) - cy
+        xs = np.linspace(0, w - 1, w) - cx
+        xv, yv = np.meshgrid(xs, ys)
+        d = np.sqrt(xv * xv + yv * yv) / max_r  # 0..1
+        # scaled radial: only outer band passes (1 when near corner)
+        start = 1.0 - edge_width
+        scaled = (d - start) / (edge_width if edge_width > 0 else 1.0)
+        scaled = np.clip(scaled, 0.0, 1.0)
+        combined = noise * scaled  # fine-grained mask 0..1
+        # threshold to emphasize shapes
+        mask_arr = (combined > threshold).astype('uint8') * 255
+        mask_img = Image.fromarray(mask_arr, mode='L')
+    else:
+        # PIL fallback - compute radial and noise in Python (slower)
+        mask_img = Image.new("L", (w, h), 0)
+        md = mask_img.load()
+        for y in range(h):
+            dy = y - cy
+            for x in range(w):
+                dx = x - cx
+                d = math.hypot(dx, dy) / max_r
+                # radial scaled
+                start = 1.0 - edge_width
+                if d <= start:
+                    scaled = 0.0
+                else:
+                    scaled = min(1.0, (d - start) / (edge_width if edge_width > 0 else 1.0))
+                # noise approx by random value
+                n = rnd.gauss(0.5, noise_sd)
+                n = max(0.0, min(1.0, n))
+                val = n * scaled
+                md[x, y] = 255 if val > threshold else 0
 
+    # 2) soften mask
+    mask = mask_img.filter(ImageFilter.GaussianBlur(int(blur_radius)))
+    # optional reduce intensity slightly
+    mask = mask.point(lambda p: int(min(255, p * 0.95)))
+
+    # 3) create scorch layer with alpha from mask
+    alpha_layer = mask.point(lambda p: int((p / 255.0) * scorch_alpha))
+    scorch = Image.new("RGBA", (w, h), scorch_color + (0,))
+    scorch.putalpha(alpha_layer)
+    out = Image.alpha_composite(base.convert("RGBA"), scorch)
+
+    # 4) add many micro-speckles biased to the edge area to get "粒子レベル"
     speckle_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(speckle_layer)
-
-    for _ in range(total_count):
-        x = rnd.random() * w
-        y = rnd.random() * h
-        d = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5 / max_r
-        # transform distance to preference for edges
-        if edge_bias <= 0:
-            p = d
-        else:
-            p = max(0.0, min(1.0, (d - (1.0 - edge_bias)) / edge_bias))
-        if rnd.random() > p:
-            continue
-
-        r = rnd.randint(radius_range[0], radius_range[1])
-        a = rnd.randint(alpha_range[0], alpha_range[1])
-        if rnd.random() < 0.12:
-            rx = r + rnd.randint(0, r)
-            ry = r
-        else:
-            rx = ry = r
-
-        bbox = [int(x - rx), int(y - ry), int(x + rx), int(y + ry)]
-        color = (45, 28, 16, a)
-        sd.ellipse(bbox, fill=color)
-
-    # 軽いブラーで馴染ませる
-    speckle_layer = speckle_layer.filter(ImageFilter.GaussianBlur(1))
-
-    out = base.convert("RGBA")
+    sd_draw = ImageDraw.Draw(speckle_layer)
+    # particle count scaled with image area and speckle_density
+    base_count = int((w * h) / 350.0)
+    particle_count = int(base_count * speckle_density)
+    for _ in range(particle_count):
+        # sample a radius biased to outer area
+        # sample angle uniformly, radius biased toward max_r
+        angle = rnd.random() * 2.0 * math.pi
+        # rpos sample between inner_r and max_r
+        inner_r = max_r * (1.0 - edge_width * 1.3)
+        rpos = inner_r + (rnd.random() ** 1.8) * (max_r - inner_r)  # bias outward
+        x = cx + rpos * math.cos(angle)
+        y = cy + rpos * math.sin(angle)
+        rad = rnd.randint(1, 2)  # very small particles
+        a = rnd.randint(8, 60)
+        bbox = [int(x - rad), int(y - rad), int(x + rad), int(y + rad)]
+        sd_draw.ellipse(bbox, fill=(scorch_color[0], scorch_color[1], scorch_color[2], a))
+    # slight blur to integrate
+    speckle_layer = speckle_layer.filter(ImageFilter.GaussianBlur(0.9))
     out = Image.alpha_composite(out, speckle_layer)
+
     return out
 
 def create_card_background(w: int, h: int,
                            noise_std: float = 30.0,
                            noise_blend: float = 0.30,
-                           vignette_blur: int = 80,
-                           vignette_strength: float = 1.0) -> Image.Image:
+                           vignette_blur: int = 80) -> Image.Image:
     """
-    ノイズ + 軽いブラー + ビネット + 微粒子焦げ を作る背景生成。
+    ノイズ + 軽いブラー + ビネット + 改良焦げ（add_burn_edges）を作る背景生成。
     """
     base = Image.new("RGB", (w, h), BASE_BG_COLOR)
 
     # ==== ノイズ生成 ====
     if _HAS_NUMPY:
-        noise = np.random.normal(128, noise_std, (h, w))
-        noise = np.clip(noise, 0, 255).astype(np.uint8)
-        noise_img = Image.fromarray(noise, mode="L").convert("RGB")
+        try:
+            noise = np.random.normal(128, noise_std, (h, w))
+            noise = np.clip(noise, 0, 255).astype(np.uint8)
+            noise_img = Image.fromarray(noise, mode="L").convert("RGB")
+        except Exception:
+            noise_img = Image.effect_noise((w, h), max(10, int(noise_std))).convert("L").convert("RGB")
     else:
         try:
-            noise = Image.effect_noise((w, h), max(10, int(noise_std))).convert("L")
-            noise = noise.point(lambda p: int((p - 128) * (noise_std / 30.0) + 128))
-            noise_img = noise.convert("RGB")
+            noise_img = Image.effect_noise((w, h), max(10, int(noise_std))).convert("L").convert("RGB")
         except Exception:
+            # fallback sparse dots
             noise_img = Image.new("RGB", (w, h), (128, 128, 128))
+            nd = ImageDraw.Draw(noise_img)
+            for _ in range(w * h // 800):
+                x = random.randrange(0, w)
+                y = random.randrange(0, h)
+                tone = random.randint(80, 180)
+                nd.point((x, y), fill=(tone, tone, tone))
 
     img = Image.blend(base, noise_img, noise_blend)
     img = img.filter(ImageFilter.GaussianBlur(1))
@@ -137,35 +196,22 @@ def create_card_background(w: int, h: int,
     dark_img = Image.new("RGB", (w, h), dark_color)
     composed = Image.composite(img, dark_img, vignette)
 
-    # ==== 微粒子焦げ（粒子レベル）====
-    composed = _add_burn_speckles(composed, density_factor=1.8, edge_bias=0.6,
-                                  radius_range=(1, 3), alpha_range=(12, 70))
+    # ==== 改良焦げエッジ: add_burn_edges を呼び出す（これが中心の改良点） ====
+    try:
+        composed_rgba = add_burn_edges(composed,
+                                       edge_width=0.16,
+                                       noise_sd=0.15,
+                                       threshold=0.36,
+                                       blur_radius=10,
+                                       scorch_color=(45, 28, 16),
+                                       scorch_alpha=180,
+                                       speckle_density=1.8,
+                                       seed=None)
+    except Exception as e:
+        logger.exception(f"add_burn_edges failed: {e}")
+        composed_rgba = composed.convert("RGBA")
 
-    # 軽い小スポットオーバーレイ（周縁に小粒子）
-    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    od = ImageDraw.Draw(overlay)
-    spot_count = max(6, int((w * h) / (900 * 600))) * 6
-    for _ in range(spot_count):
-        side = random.choice(["top", "bottom", "left", "right"])
-        r = random.randint(6, 18)  # 小さいスポット中心
-        if side == "top":
-            x = random.randint(0, w)
-            y = random.randint(0, int(h * 0.12))
-        elif side == "bottom":
-            x = random.randint(0, w)
-            y = random.randint(int(h * 0.88), h - 1)
-        elif side == "left":
-            x = random.randint(0, int(w * 0.08))
-            y = random.randint(0, h)
-        else:
-            x = random.randint(int(w * 0.92), w - 1)
-            y = random.randint(0, h)
-        bbox = [x - r, y - r, x + r, y + r]
-        od.ellipse(bbox, fill=(45, 26, 14, random.randint(12, 60)))
-    overlay = overlay.filter(ImageFilter.GaussianBlur(3))
-    composed = Image.alpha_composite(composed.convert("RGBA"), overlay)
-
-    return composed
+    return composed_rgba
 
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
     """
@@ -198,7 +244,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         if not isinstance(rank_group, dict):
             continue
         for player_name, payload in rank_group.items():
-            # avoid assignment expressions (walrus) for compatibility
+            # avoid walrus assignment for compatibility
             if isinstance(payload, dict):
                 player_data = payload
                 if player_data.get("online"):
