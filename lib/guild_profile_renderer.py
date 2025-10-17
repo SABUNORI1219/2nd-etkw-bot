@@ -2,6 +2,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from io import BytesIO
 import os
 import logging
+import random
 from typing import Dict, List, Any
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,79 @@ def _fmt_num(v):
         return str(v)
     except Exception:
         return str(v)
+
+def add_scorch_marks(base: Image.Image, count: int = 10, max_radius: int = 120, intensity: float = 0.5, edge_margin: int = 20, seed: int | None = None) -> Image.Image:
+    """
+    base に「焦げ」スポットをランダムに追加して返す（非破壊で新しい Image を返す）。
+    - count: スポット数
+    - max_radius: スポット最大半径
+    - intensity: 0.0-1.0（色の濃さ）
+    - edge_margin: 画像端からの内側オフセット（スポットを端寄りにしたいとき小さく）
+    - seed: 再現用シード（Noneでランダム）
+    """
+    if seed is not None:
+        rnd = random.Random(seed)
+    else:
+        rnd = random.Random()
+
+    w, h = base.size
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+
+    for i in range(count):
+        # ランダムに角や辺に近い位置を選ぶ（四辺ランダム）
+        side = rnd.choice(["top", "bottom", "left", "right", "corner"])
+        r = rnd.randint(max(8, max_radius//6), max_radius)
+        # ランダム角度で端寄せ位置を決める
+        if side == "top":
+            x = rnd.randint(edge_margin, w - edge_margin)
+            y = rnd.randint(0, edge_margin + r // 2)
+        elif side == "bottom":
+            x = rnd.randint(edge_margin, w - edge_margin)
+            y = rnd.randint(h - edge_margin - r // 2, h)
+        elif side == "left":
+            x = rnd.randint(0, edge_margin + r // 2)
+            y = rnd.randint(edge_margin, h - edge_margin)
+        elif side == "right":
+            x = rnd.randint(w - edge_margin - r // 2, w)
+            y = rnd.randint(edge_margin, h - edge_margin)
+        else:  # corner
+            cx = rnd.choice([edge_margin, w - edge_margin])
+            cy = rnd.choice([edge_margin, h - edge_margin])
+            x = cx + rnd.randint(-r//2, r//2)
+            y = cy + rnd.randint(-r//2, r//2)
+
+        # スポットのマスク作成（楕円→ぼかし）
+        spot_size = (r * 2, r * 2)
+        spot = Image.new("L", spot_size, 0)
+        sd = ImageDraw.Draw(spot)
+        sd.ellipse([0, 0, spot_size[0]-1, spot_size[1]-1], fill=255)
+        blur_amount = max(6, int(r * 0.35))
+        spot = spot.filter(ImageFilter.GaussianBlur(blur_amount))
+
+        # 若干の不均一さを作るために切り欠きや小さな穴を足す
+        if rnd.random() < 0.5:
+            hole_r = max(4, r // 6)
+            hole_x = rnd.randint(hole_r, spot_size[0]-hole_r)
+            hole_y = rnd.randint(hole_r, spot_size[1]-hole_r)
+            hole = Image.new("L", (hole_r*2, hole_r*2), 0)
+            hd = ImageDraw.Draw(hole)
+            hd.ellipse([0, 0, hole_r*2-1, hole_r*2-1], fill=255)
+            hole = hole.filter(ImageFilter.GaussianBlur(2))
+            spot.paste(0, (hole_x - hole_r, hole_y - hole_r), hole)
+
+        # 焦げ色（暗い茶系） — intensity に応じて alpha を決める
+        scorch_color = (70, 40, 20, int(200 * intensity))  # RGB + alpha base
+        color_img = Image.new("RGBA", spot_size, scorch_color)
+        # 合成位置（中心合わせ）
+        px = int(x - r)
+        py = int(y - r)
+        overlay.paste(color_img, (px, py), mask=spot)
+
+    # 軽く全体をブレンドして馴染ませる
+    overlay = overlay.filter(ImageFilter.GaussianBlur(2))
+    out = base.copy()
+    out = Image.alpha_composite(out.convert("RGBA"), overlay)
+    return out
 
 def create_card_background(w: int, h: int) -> Image.Image:
     """
@@ -71,7 +145,10 @@ def create_card_background(w: int, h: int) -> Image.Image:
         # effect_noise が使えない環境では何もしない（十分なフォールバック）
         logger.debug("effect_noise not available; skipping noise overlay for background")
 
-    # 角丸カードパネル（白っぽい、薄い影つき）
+    # ここで焦げスポットを付与（周囲にまばらに配置）
+    base = add_scorch_marks(base, count=10, max_radius=120, intensity=0.55, edge_margin=28)
+
+    # 角丸カードパネル（薄いベージュ、薄い影つき）
     panel_w = w - MARGIN * 2
     panel_h = h - MARGIN * 2
     panel = Image.new("RGBA", (panel_w, panel_h), (255, 255, 255, 0))
@@ -83,10 +160,10 @@ def create_card_background(w: int, h: int) -> Image.Image:
     sd.rounded_rectangle([6, 6, panel_w - 6, panel_h - 6], radius=radius, fill=(0, 0, 0, 40))
     shadow = shadow.filter(ImageFilter.GaussianBlur(6))
     base.alpha_composite(shadow, (MARGIN, MARGIN))
-    # panel fill
+    # panel fill (CARD_BG を使う)
     pd.rounded_rectangle([0, 0, panel_w, panel_h], radius=radius, fill=CARD_BG)
     # subtle inner border
-    pd.rounded_rectangle([2, 2, panel_w - 2, panel_h - 2], radius=radius - 2, outline=(235, 225, 210, 200), width=1)
+    pd.rounded_rectangle([2, 2, panel_w - 2, panel_h - 2], radius=radius - 2, outline=(190, 140, 80, 200), width=1)
     base.paste(panel, (MARGIN, MARGIN), panel)
 
     return base
