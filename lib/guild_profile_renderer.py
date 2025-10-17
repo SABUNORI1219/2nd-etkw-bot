@@ -19,18 +19,15 @@ LEFT_COLUMN_WIDTH = 600
 RIGHT_COLUMN_WIDTH = CANVAS_WIDTH - LEFT_COLUMN_WIDTH - MARGIN * 2
 LINE_COLOR = (40, 40, 40, 255)
 # 単一背景に統一
-BASE_BG_COLOR = (218, 179, 99) #ベース色 変えるな
+BASE_BG_COLOR = (218, 179, 99)  # ベース色 変えるな
 TITLE_COLOR = (40, 30, 20, 255)
 SUBTITLE_COLOR = (80, 60, 40, 255)
 TABLE_HEADER_BG = (230, 230, 230, 255)
 ONLINE_BADGE = (60, 200, 60, 255)
 OFFLINE_BADGE = (200, 60, 60, 255)
 
-# Optional: try to import numpy for better noise; fallback if unavailable
-try:
-    _HAS_NUMPY = True
-except Exception:
-    _HAS_NUMPY = False
+# NumPy availability (we import at top; assume present in environment)
+_HAS_NUMPY = True
 
 def _fmt_num(v):
     try:
@@ -42,101 +39,142 @@ def _fmt_num(v):
     except Exception:
         return str(v)
 
+def _add_burn_speckles(base: Image.Image, density_factor: float = 1.0, edge_bias: float = 0.5,
+                       radius_range=(1, 3), alpha_range=(10, 70), seed: int | None = None) -> Image.Image:
+    """
+    ベース画像の周縁に「焦げの微粒子（小さな粒子が多数）」を散らす。
+    - density_factor: 粒子の総数スケーリング（1.0がデフォルト）
+    - edge_bias: 0..1.0 (0中央均一 / 1 完全に端寄せ)。値が大きいほど端に偏る。
+    - radius_range: 各粒子の半径(px)の範囲（小さい値を指定）
+    - alpha_range: 粒子の不透明度範囲
+    - seed: 再現シード
+    """
+    if seed is not None:
+        rnd = random.Random(seed)
+    else:
+        rnd = random.Random()
+
+    w, h = base.size
+    cx, cy = w / 2.0, h / 2.0
+    max_r = (cx ** 2 + cy ** 2) ** 0.5
+
+    # 粒子数目安（画像サイズに依存）：増やしすぎ注意
+    base_count = int((w * h) / 900.0)  # 例えば 1000x600 -> ~666
+    total_count = max(200, int(base_count * density_factor))
+
+    speckle_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(speckle_layer)
+
+    for i in range(total_count):
+        # candidate position
+        x = rnd.random() * w
+        y = rnd.random() * h
+        # compute normalized distance from center (0 center - 1 corner)
+        d = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5 / max_r
+        # probability to accept this speckle based on edge_bias
+        # transform d by bias: higher edge_bias -> prefer values near 1
+        p = max(0.0, min(1.0, (d - (1.0 - edge_bias)) / edge_bias)) if edge_bias > 0 else d
+        # random threshold to reduce count and emphasize edges
+        if rnd.random() > p:
+            continue
+
+        r = rnd.randint(radius_range[0], radius_range[1])
+        a = rnd.randint(alpha_range[0], alpha_range[1])
+        # small irregularity: sometimes make elongated ellipse
+        if rnd.random() < 0.12:
+            rx = r + rnd.randint(0, r)
+            ry = r
+        else:
+            rx = ry = r
+
+        bbox = [int(x - rx), int(y - ry), int(x + rx), int(y + ry)]
+        # color: dark burnt brown
+        color = (45, 28, 16, a)
+        sd.ellipse(bbox, fill=color)
+
+    # 微小ブラーで馴染ませ（ほんの少しだけ）
+    speckle_layer = speckle_layer.filter(ImageFilter.GaussianBlur(1))
+
+    # 軽く全体の暗さを変えるため multiply 合成の代わりに alpha_compositeで重ねる
+    out = base.convert("RGBA")
+    out = Image.alpha_composite(out, speckle_layer)
+    return out
+
 def create_card_background(w: int, h: int,
                            noise_std: float = 30.0,
                            noise_blend: float = 0.30,
                            vignette_blur: int = 80,
                            vignette_strength: float = 1.0) -> Image.Image:
     """
-    指定された手法（ノイズ + 軽いブラー + ビネット）で紙っぽい黄土色背景を作る。
-    - noise_std: ノイズの標準偏差（数値を大きくするとザラつきが強くなる）
-    - noise_blend: ベース色とノイズ画像のブレンド比（0.0-1.0）
-    - vignette_blur: ビネットをぼかす強さ
-    - vignette_strength: ビネットの強度（将来的に拡張用）
+    ノイズ + 軽いブラー + ビネット + 微粒子焦げ を作る。
     """
-    # ベース色（RGB）
     base_color = BASE_BG_COLOR
-    # ベースイメージ（RGB）
     base = Image.new("RGB", (w, h), base_color)
 
-    # ==== ノイズ生成 ====
-    # NumPy があれば高品質な正規分布ノイズを作る（推奨）
-    if _HAS_NUMPY:
-        # ノイズはグレースケールで作成し RGB に変換してブレンド
+    # ==== ノイズ生成（NumPy を使用）====
+    try:
         noise = np.random.normal(128, noise_std, (h, w))
         noise = np.clip(noise, 0, 255).astype(np.uint8)
         noise_img = Image.fromarray(noise, mode="L").convert("RGB")
-    else:
-        # fallback: PIL の effect_noise を使う（標準偏差の表現が違うが代用）
+    except Exception:
+        # fallback
         try:
             noise = Image.effect_noise((w, h), max(10, int(noise_std))).convert("L")
             noise = noise.point(lambda p: int((p - 128) * (noise_std / 30.0) + 128))
             noise_img = noise.convert("RGB")
         except Exception:
-            # 最終フォールバック：薄いランダム点を散らす（低品質）
             noise_img = Image.new("RGB", (w, h), (128, 128, 128))
-            nd = ImageDraw.Draw(noise_img)
-            for _ in range(w * h // 800):  # sparse dots
-                x = random.randrange(0, w)
-                y = random.randrange(0, h)
-                tone = random.randint(80, 180)
-                nd.point((x, y), fill=(tone, tone, tone))
 
-    # ノイズをブレンド
     img = Image.blend(base, noise_img, noise_blend)
 
-    # ==== 軽くぼかして紙感を出す ====
+    # 軽くぼかして紙感
     img = img.filter(ImageFilter.GaussianBlur(1))
 
-    # ==== ビネット（端の焦げ・暗化） ====
-    # ビネットマスク作成：中心は白（保持）、外周が黒（暗化）
+    # ==== ビネットマスク（端の暗化）====
     vignette = Image.new("L", (w, h), 0)
     dv = ImageDraw.Draw(vignette)
-    # ループで楕円を描く方法（徐々に明るくなるマスク）
     max_r = int(max(w, h) * 0.75)
-    # iterate from outer to inner to create radial gradient mask
-    for i in range(0, max_r, 6):
+    # ループ回数を減らして高速化（6 -> 8 step）
+    for i in range(0, max_r, 8):
         val = int(255 * (i / max_r))
-        # clip bounding box to image extents
         bbox = (-i, -i, w + i, h + i)
         dv.ellipse(bbox, fill=val)
-    # 大きくぼかして自然にする
     vignette = vignette.filter(ImageFilter.GaussianBlur(vignette_blur))
-    # Normalize to 0-255 (just in case)
-    vignette = vignette.point(lambda p: max(0, min(255, p)))
 
-    # Composite: dark color outside, keep img inside by mask
-    dark_color = (50, 30, 10)  # 焦げ暗色
+    dark_color = (50, 30, 10)
     dark_img = Image.new("RGB", (w, h), dark_color)
-    # vignette as mask: where mask is white -> pick img, where black -> pick dark_img
     composed = Image.composite(img, dark_img, vignette)
 
-    # 軽く焼け感の斑点（オプション）: 少量の大きめスポットを周縁に配置して馴染ませる
-    # ここでは周辺に少数の薄い斑点を描く処理を行う（Wanted風の焦げ）
+    # ==== 微粒子焦げ（粒子レベル）====
+    # パラメータ: density_factor を増やすと粒子数が増える（1.0がデフォルト）
+    # edge_bias: 1.0なら完全に端寄せ、0.0なら中央まで混ざる
+    composed = _add_burn_speckles(composed, density_factor=1.8, edge_bias=0.6,
+                                  radius_range=(1, 3), alpha_range=(12, 70))
+
+    # 軽い斑点オーバーレイ（小さめのスポットを少量）
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     od = ImageDraw.Draw(overlay)
-    spot_count = max(6, int((w * h) / (900 * 600))) * 8  # 画像に応じて適度に増減
+    spot_count = max(6, int((w * h) / (900 * 600))) * 6
     for _ in range(spot_count):
         side = random.choice(["top", "bottom", "left", "right"])
-        r = random.randint(20, 110)
+        r = random.randint(6, 26)  # 小さいスポットに変更
         if side == "top":
             x = random.randint(0, w)
-            y = random.randint(0, int(h * 0.15))
+            y = random.randint(0, int(h * 0.12))
         elif side == "bottom":
             x = random.randint(0, w)
-            y = random.randint(int(h * 0.85), h - 1)
+            y = random.randint(int(h * 0.88), h - 1)
         elif side == "left":
-            x = random.randint(0, int(w * 0.12))
+            x = random.randint(0, int(w * 0.08))
             y = random.randint(0, h)
         else:
-            x = random.randint(int(w * 0.88), w - 1)
+            x = random.randint(int(w * 0.92), w - 1)
             y = random.randint(0, h)
         bbox = [x - r, y - r, x + r, y + r]
-        od.ellipse(bbox, fill=(40, 22, 10, random.randint(24, 90)))
-    overlay = overlay.filter(ImageFilter.GaussianBlur(6))
+        od.ellipse(bbox, fill=(45, 26, 14, random.randint(18, 70)))
+    overlay = overlay.filter(ImageFilter.GaussianBlur(3))
     composed = Image.alpha_composite(composed.convert("RGBA"), overlay)
 
-    # 戻り値は RGBA（そのまま描画して良い）
     return composed
 
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
@@ -172,12 +210,13 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         if not isinstance(rank_group, dict):
             continue
         for player_name, payload in rank_group.items():
-            if isinstance(payload, dict) and payload.get("online"):
-                online_players.append({
-                    "name": player_name,
-                    "server": payload.get("server", "N/A"),
-                    "rank_stars": rank_to_stars.get(rank_name.upper(), "")
-                })
+            if isinstance(payload, dict) and player_data := payload:
+                if player_data.get("online"):
+                    online_players.append({
+                        "name": player_name,
+                        "server": player_data.get("server", "N/A"),
+                        "rank_stars": rank_to_stars.get(rank_name.upper(), "")
+                    })
 
     # 基本データ
     prefix = sg(guild_data, "prefix", default="")
