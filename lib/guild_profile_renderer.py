@@ -17,14 +17,20 @@ MARGIN = 40
 LEFT_COLUMN_WIDTH = 600
 RIGHT_COLUMN_WIDTH = CANVAS_WIDTH - LEFT_COLUMN_WIDTH - MARGIN * 2
 LINE_COLOR = (40, 40, 40, 255)
-# ベース色は薄いベージュ（新聞/カード風）
-BACKGROUND_COLOR = (218, 179, 99, 255)
-CARD_BG = (218, 179, 99, 220)
+# 単一背景に統一（ユーザー指定の黄土色ベース）
+BASE_BG_COLOR = (217, 180, 111)  # #d9b46f
 TITLE_COLOR = (40, 30, 20, 255)
 SUBTITLE_COLOR = (80, 60, 40, 255)
 TABLE_HEADER_BG = (230, 230, 230, 255)
 ONLINE_BADGE = (60, 200, 60, 255)
 OFFLINE_BADGE = (200, 60, 60, 255)
+
+# Optional: try to import numpy for better noise; fallback if unavailable
+try:
+    import numpy as np
+    _HAS_NUMPY = True
+except Exception:
+    _HAS_NUMPY = False
 
 def _fmt_num(v):
     try:
@@ -36,137 +42,102 @@ def _fmt_num(v):
     except Exception:
         return str(v)
 
-def add_scorch_marks(base: Image.Image, count: int = 10, max_radius: int = 120, intensity: float = 0.5, edge_margin: int = 20, seed: int | None = None) -> Image.Image:
+def create_card_background(w: int, h: int,
+                           noise_std: float = 30.0,
+                           noise_blend: float = 0.30,
+                           vignette_blur: int = 80,
+                           vignette_strength: float = 1.0) -> Image.Image:
     """
-    base に「焦げ」スポットをランダムに追加して返す（非破壊で新しい Image を返す）。
-    - count: スポット数
-    - max_radius: スポット最大半径
-    - intensity: 0.0-1.0（色の濃さ）
-    - edge_margin: 画像端からの内側オフセット（スポットを端寄りにしたいとき小さく）
-    - seed: 再現用シード（Noneでランダム）
+    指定された手法（ノイズ + 軽いブラー + ビネット）で紙っぽい黄土色背景を作る。
+    - noise_std: ノイズの標準偏差（数値を大きくするとザラつきが強くなる）
+    - noise_blend: ベース色とノイズ画像のブレンド比（0.0-1.0）
+    - vignette_blur: ビネットをぼかす強さ
+    - vignette_strength: ビネットの強度（将来的に拡張用）
     """
-    if seed is not None:
-        rnd = random.Random(seed)
+    # ベース色（RGB）
+    base_color = BASE_BG_COLOR
+    # ベースイメージ（RGB）
+    base = Image.new("RGB", (w, h), base_color)
+
+    # ==== ノイズ生成 ====
+    # NumPy があれば高品質な正規分布ノイズを作る（推奨）
+    if _HAS_NUMPY:
+        # ノイズはグレースケールで作成し RGB に変換してブレンド
+        noise = np.random.normal(128, noise_std, (h, w))
+        noise = np.clip(noise, 0, 255).astype(np.uint8)
+        noise_img = Image.fromarray(noise, mode="L").convert("RGB")
     else:
-        rnd = random.Random()
+        # fallback: PIL の effect_noise を使う（標準偏差の表現が違うが代用）
+        try:
+            noise = Image.effect_noise((w, h), max(10, int(noise_std))).convert("L")
+            noise = noise.point(lambda p: int((p - 128) * (noise_std / 30.0) + 128))
+            noise_img = noise.convert("RGB")
+        except Exception:
+            # 最終フォールバック：薄いランダム点を散らす（低品質）
+            noise_img = Image.new("RGB", (w, h), (128, 128, 128))
+            nd = ImageDraw.Draw(noise_img)
+            for _ in range(w * h // 800):  # sparse dots
+                x = random.randrange(0, w)
+                y = random.randrange(0, h)
+                tone = random.randint(80, 180)
+                nd.point((x, y), fill=(tone, tone, tone))
 
-    w, h = base.size
+    # ノイズをブレンド
+    img = Image.blend(base, noise_img, noise_blend)
+
+    # ==== 軽くぼかして紙感を出す ====
+    img = img.filter(ImageFilter.GaussianBlur(1))
+
+    # ==== ビネット（端の焦げ・暗化） ====
+    # ビネットマスク作成：中心は白（保持）、外周が黒（暗化）
+    vignette = Image.new("L", (w, h), 0)
+    dv = ImageDraw.Draw(vignette)
+    # ループで楕円を描く方法（徐々に明るくなるマスク）
+    max_r = int(max(w, h) * 0.75)
+    # iterate from outer to inner to create radial gradient mask
+    for i in range(0, max_r, 6):
+        val = int(255 * (i / max_r))
+        # clip bounding box to image extents
+        bbox = (-i, -i, w + i, h + i)
+        dv.ellipse(bbox, fill=val)
+    # 大きくぼかして自然にする
+    vignette = vignette.filter(ImageFilter.GaussianBlur(vignette_blur))
+    # Normalize to 0-255 (just in case)
+    vignette = vignette.point(lambda p: max(0, min(255, p)))
+
+    # Composite: dark color outside, keep img inside by mask
+    dark_color = (50, 30, 10)  # 焦げ暗色
+    dark_img = Image.new("RGB", (w, h), dark_color)
+    # vignette as mask: where mask is white -> pick img, where black -> pick dark_img
+    composed = Image.composite(img, dark_img, vignette)
+
+    # 軽く焼け感の斑点（オプション）: 少量の大きめスポットを周縁に配置して馴染ませる
+    # ここでは周辺に少数の薄い斑点を描く処理を行う（Wanted風の焦げ）
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-
-    for i in range(count):
-        # ランダムに角や辺に近い位置を選ぶ（四辺ランダム）
-        side = rnd.choice(["top", "bottom", "left", "right", "corner"])
-        r = rnd.randint(max(8, max_radius//6), max_radius)
-        # ランダム角度で端寄せ位置を決める
+    od = ImageDraw.Draw(overlay)
+    spot_count = max(6, int((w * h) / (900 * 600))) * 8  # 画像に応じて適度に増減
+    for _ in range(spot_count):
+        side = random.choice(["top", "bottom", "left", "right"])
+        r = random.randint(20, 110)
         if side == "top":
-            x = rnd.randint(edge_margin, w - edge_margin)
-            y = rnd.randint(0, edge_margin + r // 2)
+            x = random.randint(0, w)
+            y = random.randint(0, int(h * 0.15))
         elif side == "bottom":
-            x = rnd.randint(edge_margin, w - edge_margin)
-            y = rnd.randint(h - edge_margin - r // 2, h)
+            x = random.randint(0, w)
+            y = random.randint(int(h * 0.85), h - 1)
         elif side == "left":
-            x = rnd.randint(0, edge_margin + r // 2)
-            y = rnd.randint(edge_margin, h - edge_margin)
-        elif side == "right":
-            x = rnd.randint(w - edge_margin - r // 2, w)
-            y = rnd.randint(edge_margin, h - edge_margin)
-        else:  # corner
-            cx = rnd.choice([edge_margin, w - edge_margin])
-            cy = rnd.choice([edge_margin, h - edge_margin])
-            x = cx + rnd.randint(-r//2, r//2)
-            y = cy + rnd.randint(-r//2, r//2)
+            x = random.randint(0, int(w * 0.12))
+            y = random.randint(0, h)
+        else:
+            x = random.randint(int(w * 0.88), w - 1)
+            y = random.randint(0, h)
+        bbox = [x - r, y - r, x + r, y + r]
+        od.ellipse(bbox, fill=(40, 22, 10, random.randint(24, 90)))
+    overlay = overlay.filter(ImageFilter.GaussianBlur(6))
+    composed = Image.alpha_composite(composed.convert("RGBA"), overlay)
 
-        # スポットのマスク作成（楕円→ぼかし）
-        spot_size = (r * 2, r * 2)
-        spot = Image.new("L", spot_size, 0)
-        sd = ImageDraw.Draw(spot)
-        sd.ellipse([0, 0, spot_size[0]-1, spot_size[1]-1], fill=255)
-        blur_amount = max(6, int(r * 0.35))
-        spot = spot.filter(ImageFilter.GaussianBlur(blur_amount))
-
-        # 若干の不均一さを作るために切り欠きや小さな穴を足す
-        if rnd.random() < 0.5:
-            hole_r = max(4, r // 6)
-            hole_x = rnd.randint(hole_r, spot_size[0]-hole_r)
-            hole_y = rnd.randint(hole_r, spot_size[1]-hole_r)
-            hole = Image.new("L", (hole_r*2, hole_r*2), 0)
-            hd = ImageDraw.Draw(hole)
-            hd.ellipse([0, 0, hole_r*2-1, hole_r*2-1], fill=255)
-            hole = hole.filter(ImageFilter.GaussianBlur(2))
-            spot.paste(0, (hole_x - hole_r, hole_y - hole_r), hole)
-
-        # 焦げ色（暗い茶系） — intensity に応じて alpha を決める
-        scorch_color = (70, 40, 20, int(200 * intensity))  # RGB + alpha base
-        color_img = Image.new("RGBA", spot_size, scorch_color)
-        # 合成位置（中心合わせ）
-        px = int(x - r)
-        py = int(y - r)
-        overlay.paste(color_img, (px, py), mask=spot)
-
-    # 軽く全体をブレンドして馴染ませる
-    overlay = overlay.filter(ImageFilter.GaussianBlur(2))
-    out = base.copy()
-    out = Image.alpha_composite(out.convert("RGBA"), overlay)
-    return out
-
-def create_card_background(w: int, h: int) -> Image.Image:
-    """
-    キャラクターカード風の薄いベージュ背景を生成して返す。
-    - 縦グラデーション
-    - 微細ノイズ（可能なら effect_noise）
-    - 中央に角丸のカードパネル（白っぽい）を合成してカード感を出す
-    """
-    # ベースのグラデーション
-    base = Image.new("RGBA", (w, h), BACKGROUND_COLOR)
-    grad = Image.new("RGBA", (w, h))
-    grad_draw = ImageDraw.Draw(grad)
-    top = (235, 195, 120, 255)   # やや明るめ
-    bottom = (200, 140, 60, 255)  # やや暗め
-    for y in range(h):
-        ratio = y / max(h - 1, 1)
-        r = int(top[0] * (1 - ratio) + bottom[0] * ratio)
-        g = int(top[1] * (1 - ratio) + bottom[1] * ratio)
-        b = int(top[2] * (1 - ratio) + bottom[2] * ratio)
-        a = int(top[3] * (1 - ratio) + bottom[3] * ratio)
-        grad_draw.line([(0, y), (w, y)], fill=(r, g, b, a))
-    base = Image.alpha_composite(base, grad)
-
-    # ノイズオーバーレイ（環境によっては effect_noise がない場合があるので try）
-    try:
-        noise = Image.effect_noise((w, h), 40).convert("L")
-        noise = noise.filter(ImageFilter.GaussianBlur(1))
-        # ノイズを薄く白っぽく乗せる（アルファを小さく）
-        # scale down noise values to a low alpha (0-40)
-        noise_alpha = noise.point(lambda p: p // 10)  # roughly 0-31
-        noise_rgba = Image.new("RGBA", (w, h), (255, 255, 255, 0))
-        noise_rgba.putalpha(noise_alpha)
-        base = Image.alpha_composite(base, noise_rgba)
-    except Exception:
-        # effect_noise が使えない環境では何もしない（十分なフォールバック）
-        logger.debug("effect_noise not available; skipping noise overlay for background")
-
-    # ここで焦げスポットを付与（周囲にまばらに配置）
-    base = add_scorch_marks(base, count=10, max_radius=120, intensity=0.55, edge_margin=28)
-
-    # 角丸カードパネル（薄いベージュ、薄い影つき）
-    panel_w = w - MARGIN * 2
-    panel_h = h - MARGIN * 2
-    panel = Image.new("RGBA", (panel_w, panel_h), (255, 255, 255, 0))
-    pd = ImageDraw.Draw(panel)
-    radius = 18
-    # shadow
-    shadow = Image.new("RGBA", (panel_w, panel_h), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(shadow)
-    sd.rounded_rectangle([6, 6, panel_w - 6, panel_h - 6], radius=radius, fill=(0, 0, 0, 40))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(6))
-    base.alpha_composite(shadow, (MARGIN, MARGIN))
-    # panel fill (CARD_BG を使う)
-    pd.rounded_rectangle([0, 0, panel_w, panel_h], radius=radius, fill=CARD_BG)
-    # subtle inner border
-    pd.rounded_rectangle([2, 2, panel_w - 2, panel_h - 2], radius=radius - 2, outline=(190, 140, 80, 200), width=1)
-    base.paste(panel, (MARGIN, MARGIN), panel)
-
-    return base
+    # 戻り値は RGBA（そのまま描画して良い）
+    return composed
 
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
     """
@@ -252,11 +223,10 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     canvas_w = max_width
     canvas_h = content_height
 
-    # キャンバス作成（キャラクターカード風の薄いベージュ背景を使う）
+    # キャンバス作成（指定のノイズ + ビネット背景）
     img = create_card_background(canvas_w, canvas_h)
     draw = ImageDraw.Draw(img)
 
-    # カード背景（ちょっと影付きでカード風に） - 既に create_card_background で描画済み
     card_x = MARGIN
     card_y = MARGIN
     card_w = canvas_w - MARGIN * 2
@@ -272,13 +242,12 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         font_small = ImageFont.truetype(FONT_PATH, 16)
     except Exception as e:
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
-        # profile_renderer と同様に単純にデフォルトにフォールバック
         font_title = font_sub = font_stats = font_table_header = font_table = font_small = ImageFont.load_default()
 
     inner_left = card_x + 30
     inner_top = card_y + 30
 
-    # 左側：タイトル・バナー・主要統計
+    # テキスト色は暗めで描画（背景に馴染むように）
     draw.text((inner_left, inner_top), f"[{prefix}] {name}", font=font_title, fill=TITLE_COLOR)
     draw.text((inner_left, inner_top + 64), f"Owner: {owner}  |  Created: {created}", font=font_sub, fill=SUBTITLE_COLOR)
 
@@ -308,20 +277,16 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     sep_y2 = card_y + card_h - 40
     draw.line([(sep_x, sep_y1), (sep_x, sep_y2)], fill=LINE_COLOR, width=2)
 
-    # 右側：オンラインプレイヤーテーブル（新聞風スタイル）
+    # 右側：オンラインプレイヤーテーブル
     table_x = sep_x + 20
     table_y = inner_top + 10
-    # テーブルヘッダー
     draw.rectangle([table_x, table_y, table_x + RIGHT_COLUMN_WIDTH - 20, table_y + 40], fill=TABLE_HEADER_BG)
     draw.text((table_x + 8, table_y + 8), "Online Players", font=font_table_header, fill=TITLE_COLOR)
-    # ヘッダの下に行を描く
     header_bottom = table_y + 40
-    # 列幅
     col_server_w = 58
-    col_name_w = RIGHT_COLUMN_WIDTH - 20 - col_server_w - 70  # rank列の予備幅
+    col_name_w = RIGHT_COLUMN_WIDTH - 20 - col_server_w - 70
     col_rank_w = 70
 
-    # 各行を書く
     row_h = 44
     y = header_bottom + 10
     if online_players:
@@ -336,7 +301,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
             nx = table_x + col_server_w + 8
             draw.rectangle([nx - 2, y, nx + col_name_w, y + row_h - 6], outline=LINE_COLOR, width=1)
 
-            # 名前が長い場合は簡易省略（draw.textlength が無ければ textbbox を使う）
             try:
                 name_w = draw.textlength(pname, font=font_table)
             except Exception:
@@ -345,7 +309,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
             display_name = pname
             max_name_w = col_name_w - 12
             if name_w > max_name_w:
-                # 末尾を切る簡易処理
                 while display_name and ( (draw.textlength(display_name + "...", font=font_table) if hasattr(draw, "textlength") else (draw.textbbox((0,0), display_name + "...", font=font_table)[2] - draw.textbbox((0,0), display_name + "...", font=font_table)[0]) ) > max_name_w):
                     display_name = display_name[:-1]
                 display_name = display_name + "..."
@@ -359,23 +322,19 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     else:
         draw.text((table_x + 8, header_bottom + 18), "No members online right now.", font=font_table, fill=SUBTITLE_COLOR)
 
-    # フッター（小さく生成者表記）
+    # フッター
     footer_text = "Generated by Minister Chikuwa"
     try:
         fw = draw.textlength(footer_text, font=font_small)
     except Exception:
         bbox = draw.textbbox((0, 0), footer_text, font=font_small)
         fw = bbox[2] - bbox[0]
-    bbox = draw.textbbox((0, 0), footer_text, font=font_small)
-    fh = bbox[3] - bbox[1]
     draw.text((card_x + card_w - fw - 16, card_y + card_h - 36), footer_text, font=font_small, fill=(120, 110, 100, 255))
 
-    # 結果を BytesIO で返す
     out = BytesIO()
     img.save(out, format="PNG")
     out.seek(0)
 
-    # close images if any
     try:
         if banner_img:
             banner_img.close()
