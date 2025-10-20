@@ -97,160 +97,85 @@ def draw_decorative_frame(img: Image.Image,
                           inner_width: int = 2,
                           frame_color=(85, 50, 30, 255)) -> Image.Image:
     """
-    外枠（太）＋内枠（細）をアーク（凹み）＋直線のパーツで描画する。
-    - outer_offset/inner_offset を None にすると自動計算。
-    - 四隅は円弧（アーク）で描き、直線で接続するため線が途切れない。
-    戻り値は RGBA イメージ。
+    外枠（太）＋内枠（細）を描画する（改良版）。
+    以前の「背景で消す/丸を置く」方式は線が途切れたり
+    丸が目立ったりしていたため、ここではマスク（アルファ）方式を採用：
+    - 外側の矩形領域を塗り（マスク）、内側をくり抜き（内矩形を0に）、
+      そのマスクから四隅に円でくぼみ（0）を描いて凹ませる。
+    - 同様に内枠も別マスクで作り、アルファ合成で画像に重ねる。
+    これにより「アークが目立つ／線が途切れる」問題が解消されます。
     """
     w, h = img.size
+
+    # 自動オフセット
     if outer_offset is None:
         outer_offset = max(12, int(min(w, h) * 0.025))
     if inner_offset is None:
         inner_offset = outer_offset + max(8, int(min(w, h) * 0.02))
 
-    out = img.convert("RGBA")
-    draw = ImageDraw.Draw(out)
-
-    # 外枠 parameters
     ox = outer_offset
     oy = outer_offset
     ow = w - outer_offset * 2
     oh = h - outer_offset * 2
-    outer_radius = max(8, int(min(w, h) * 0.02))
 
-    # 内枠 parameters
     ix = inner_offset
     iy = inner_offset
     iw = w - inner_offset * 2
     ih = h - inner_offset * 2
-    inner_color = (95, 60, 35, 220)
-    inner_radius = max(6, int(min(w, h) * 0.015))
 
-    # notch/arc の半径（見た目調整）
+    # notch（凹み）の半径（見た目調整）
     notch_radius = max(12, int(min(w, h) * 0.035))
-    arc_bbox_offset = notch_radius
+    inner_notch = max(6, int(min(w, h) * 0.02))
 
-    # Overlap: アークと直線を確実に被せるための重なり量（ピクセル）
-    overlap = max(3, int(max(1, outer_width * 0.6)))
+    out = img.convert("RGBA")
 
-    # 外枠：アーク用ボックス（四隅）
-    left_arc_box = [ox, oy, ox + arc_bbox_offset * 2, oy + arc_bbox_offset * 2]
-    right_arc_box = [ox + ow - arc_bbox_offset * 2, oy, ox + ow, oy + arc_bbox_offset * 2]
-    bottom_left_arc_box = [ox, oy + oh - arc_bbox_offset * 2, ox + arc_bbox_offset * 2, oy + oh]
-    bottom_right_arc_box = [ox + ow - arc_bbox_offset * 2, oy + oh - arc_bbox_offset * 2, ox + ow, oy + oh]
+    # ----- 外枠（マスク作成） -----
+    mask_outer = Image.new("L", (w, h), 0)
+    md = ImageDraw.Draw(mask_outer)
+    # 外側矩形を 255 塗りつぶす
+    md.rectangle([ox, oy, ox + ow, oy + oh], fill=255)
+    # 内側（枠の肉厚分）を 0 でくり抜く（これでリング状になる）
+    inner_cut = [ox + outer_width, oy + outer_width, ox + ow - outer_width, oy + oh - outer_width]
+    if inner_cut[2] > inner_cut[0] and inner_cut[3] > inner_cut[1]:
+        md.rectangle(inner_cut, fill=0)
 
-    # 外枠：アーク描画（内向きに見える arcs）
-    try:
-        draw.arc(left_arc_box, start=90, end=180, fill=frame_color, width=outer_width)
-        draw.arc(right_arc_box, start=0, end=90, fill=frame_color, width=outer_width)
-        draw.arc(bottom_right_arc_box, start=270, end=360, fill=frame_color, width=outer_width)
-        draw.arc(bottom_left_arc_box, start=180, end=270, fill=frame_color, width=outer_width)
-    except Exception:
-        # フォールバック：幅指定が効かない環境では複数回偏移させて太線代替
-        draw.arc(left_arc_box, start=90, end=180, fill=frame_color)
-        draw.arc(right_arc_box, start=0, end=90, fill=frame_color)
-        draw.arc(bottom_right_arc_box, start=270, end=360, fill=frame_color)
-        draw.arc(bottom_left_arc_box, start=180, end=270, fill=frame_color)
-        for off in range(1, max(1, outer_width // 2) + 1):
-            draw.arc([left_arc_box[0] - off, left_arc_box[1] - off, left_arc_box[2] + off, left_arc_box[3] + off],
-                     start=90, end=180, fill=frame_color)
-            draw.arc([right_arc_box[0] - off, right_arc_box[1] - off, right_arc_box[2] + off, right_arc_box[3] + off],
-                     start=0, end=90, fill=frame_color)
-            draw.arc([bottom_right_arc_box[0] - off, bottom_right_arc_box[1] - off, bottom_right_arc_box[2] + off, bottom_right_arc_box[3] + off],
-                     start=270, end=360, fill=frame_color)
-            draw.arc([bottom_left_arc_box[0] - off, bottom_left_arc_box[1] - off, bottom_left_arc_box[2] + off, bottom_left_arc_box[3] + off],
-                     start=180, end=270, fill=frame_color)
+    # 四隅の notch をマスクでくり抜く（背景と同じでなく"透明"にする）
+    md.ellipse([ox - notch_radius, oy - notch_radius, ox + notch_radius, oy + notch_radius], fill=0)  # 左上
+    md.ellipse([ox + ow - notch_radius, oy - notch_radius, ox + ow + notch_radius, oy + notch_radius], fill=0)  # 右上
+    md.ellipse([ox - notch_radius, oy + oh - notch_radius, ox + notch_radius, oy + oh + notch_radius], fill=0)  # 左下
+    md.ellipse([ox + ow - notch_radius, oy + oh - notch_radius, ox + ow + notch_radius, oy + oh + notch_radius], fill=0)  # 右下
 
-    # ----- ここから：アークの正確な端点を取得して、直線をその端点同士でつなぐ（隙間を無くす） -----
-    # top: 左アークの top-point (angle=90) から 右アークの top-point (angle=90)
-    p_left_top = _arc_point(left_arc_box, 90)
-    p_right_top = _arc_point(right_arc_box, 90)
-    # 端点を確実に重ねるため、start を少し後退、end を少し進める（overlap）
-    start_top = _extend_point(p_left_top, p_right_top, -overlap)
-    end_top = _extend_point(p_right_top, p_left_top, -overlap)  # reverse to get direction
-    draw.line([start_top, end_top], fill=frame_color, width=outer_width)
+    # alpha を付けたカラー層を作って合成（frame_color を用いる）
+    layer_outer = Image.new("RGBA", (w, h), frame_color)
+    layer_outer.putalpha(mask_outer)
+    out = Image.alpha_composite(out, layer_outer)
 
-    # bottom: 左下アーク bottom-point (270) -> 右下アーク bottom-point (270)
-    p_left_bot = _arc_point(bottom_left_arc_box, 270)
-    p_right_bot = _arc_point(bottom_right_arc_box, 270)
-    start_bot = _extend_point(p_left_bot, p_right_bot, -overlap)
-    end_bot = _extend_point(p_right_bot, p_left_bot, -overlap)
-    draw.line([start_bot, end_bot], fill=frame_color, width=outer_width)
+    # ----- 内枠（細線） -----
+    mask_inner = Image.new("L", (w, h), 0)
+    md2 = ImageDraw.Draw(mask_inner)
+    md2.rectangle([ix, iy, ix + iw, iy + ih], fill=255)
+    inner2_cut = [ix + inner_width, iy + inner_width, ix + iw - inner_width, iy + ih - inner_width]
+    if inner2_cut[2] > inner2_cut[0] and inner2_cut[3] > inner2_cut[1]:
+        md2.rectangle(inner2_cut, fill=0)
+    md2.ellipse([ix - inner_notch, iy - inner_notch, ix + inner_notch, iy + inner_notch], fill=0)  # 内左上
+    md2.ellipse([ix + iw - inner_notch, iy - inner_notch, ix + iw + inner_notch, iy + inner_notch], fill=0)  # 内右上
+    md2.ellipse([ix - inner_notch, iy + ih - inner_notch, ix + inner_notch, iy + ih + inner_notch], fill=0)  # 内左下
+    md2.ellipse([ix + iw - inner_notch, iy + ih - inner_notch, ix + iw + inner_notch, iy + ih + inner_notch], fill=0)  # 内右下
 
-    # left vertical: top-left arc left-point (180) -> bottom-left arc left-point (180)
-    p_left_top_left = _arc_point(left_arc_box, 180)
-    p_left_bot_left = _arc_point(bottom_left_arc_box, 180)
-    start_left = _extend_point(p_left_top_left, p_left_bot_left, -overlap)
-    end_left = _extend_point(p_left_bot_left, p_left_top_left, -overlap)
-    draw.line([start_left, end_left], fill=frame_color, width=outer_width)
+    inner_color = (95, 60, 35, 220)
+    layer_inner = Image.new("RGBA", (w, h), inner_color)
+    layer_inner.putalpha(mask_inner)
+    out = Image.alpha_composite(out, layer_inner)
 
-    # right vertical: top-right arc right-point (0) -> bottom-right arc right-point (0)
-    p_right_top_right = _arc_point(right_arc_box, 0)
-    p_right_bot_right = _arc_point(bottom_right_arc_box, 0)
-    start_right = _extend_point(p_right_top_right, p_right_bot_right, -overlap)
-    end_right = _extend_point(p_right_bot_right, p_right_top_right, -overlap)
-    draw.line([start_right, end_right], fill=frame_color, width=outer_width)
-    # ----- 外枠ここまで -----
-
-
-    # 内枠：アーク＋直線（外枠より小さめ）
-    inner_arc_bbox = int(notch_radius * 0.65)
-    li_box = [ix, iy, ix + inner_arc_bbox * 2, iy + inner_arc_bbox * 2]
-    ri_box = [ix + iw - inner_arc_bbox * 2, iy, ix + iw, iy + inner_arc_bbox * 2]
-    br_box = [ix + iw - inner_arc_bbox * 2, iy + ih - inner_arc_bbox * 2, ix + iw, iy + ih]
-    bl_box = [ix, iy + ih - inner_arc_bbox * 2, ix + inner_arc_bbox * 2, iy + ih]
-
-    try:
-        draw.arc(li_box, start=90, end=180, fill=inner_color, width=inner_width)
-        draw.arc(ri_box, start=0, end=90, fill=inner_color, width=inner_width)
-        draw.arc(br_box, start=270, end=360, fill=inner_color, width=inner_width)
-        draw.arc(bl_box, start=180, end=270, fill=inner_color, width=inner_width)
-    except Exception:
-        draw.arc(li_box, start=90, end=180, fill=inner_color)
-        draw.arc(ri_box, start=0, end=90, fill=inner_color)
-        draw.arc(br_box, start=270, end=360, fill=inner_color)
-        draw.arc(bl_box, start=180, end=270, fill=inner_color)
-        for off in range(1, max(1, inner_width // 2) + 1):
-            draw.arc([li_box[0] - off, li_box[1] - off, li_box[2] + off, li_box[3] + off],
-                     start=90, end=180, fill=inner_color)
-            draw.arc([ri_box[0] - off, ri_box[1] - off, ri_box[2] + off, ri_box[3] + off],
-                     start=0, end=90, fill=inner_color)
-            draw.arc([br_box[0] - off, br_box[1] - off, br_box[2] + off, br_box[3] + off],
-                     start=270, end=360, fill=inner_color)
-            draw.arc([bl_box[0] - off, bl_box[1] - off, bl_box[2] + off, bl_box[3] + off],
-                     start=180, end=270, fill=inner_color)
-
-    # 内枠の直線をアーク端点で接続（overlap を用いて確実に繋ぐ）
-    p_li_top = _arc_point(li_box, 90)
-    p_ri_top = _arc_point(ri_box, 90)
-    start_itop = _extend_point(p_li_top, p_ri_top, -overlap)
-    end_itop = _extend_point(p_ri_top, p_li_top, -overlap)
-    draw.line([start_itop, end_itop], fill=inner_color, width=inner_width)
-
-    p_li_bot = _arc_point(bl_box, 270)
-    p_ri_bot = _arc_point(br_box, 270)
-    start_ibot = _extend_point(p_li_bot, p_ri_bot, -overlap)
-    end_ibot = _extend_point(p_ri_bot, p_li_bot, -overlap)
-    draw.line([start_ibot, end_ibot], fill=inner_color, width=inner_width)
-
-    p_li_left = _arc_point(li_box, 180)
-    p_li_bottomleft = _arc_point(bl_box, 180)
-    start_ileft = _extend_point(p_li_left, p_li_bottomleft, -overlap)
-    end_ileft = _extend_point(p_li_bottomleft, p_li_left, -overlap)
-    draw.line([start_ileft, end_ileft], fill=inner_color, width=inner_width)
-
-    p_ri_right = _arc_point(ri_box, 0)
-    p_ri_bottomright = _arc_point(br_box, 0)
-    start_iright = _extend_point(p_ri_right, p_ri_bottomright, -overlap)
-    end_iright = _extend_point(p_ri_bottomright, p_ri_right, -overlap)
-    draw.line([start_iright, end_iright], fill=inner_color, width=inner_width)
-
-    # 装飾的ルール線（上・中・左のガイド）を描画
+    # ----- ルール線などの装飾は上に描画 -----
+    draw = ImageDraw.Draw(out)
     rule_color = (110, 75, 45, 180)
+    # 横ルール
     y_rule = iy + int(ih * 0.12)
     draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color, width=max(2, inner_width + 2))
     y_rule2 = iy + int(ih * 0.48)
     draw.line([(ix + int(iw * 0.03), y_rule2), (ix + int(iw * 0.60), y_rule2)], fill=rule_color, width=max(2, inner_width + 2))
+    # バナー矩形（左上）
     box_x = ix + int(iw * 0.04)
     box_y = iy + int(ih * 0.06)
     box_w = int(iw * 0.18)
@@ -523,6 +448,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         fw = bbox[2] - bbox[0]
     draw.text((card_x + card_w - fw - 16, card_y + card_h - 36), footer_text, font=font_small, fill=(120, 110, 100, 255))
 
+    # <-- fixed: use variable name `out` like the rest of the code expects -->
     out = BytesIO()
     img.save(out, format="PNG")
     out.seek(0)
