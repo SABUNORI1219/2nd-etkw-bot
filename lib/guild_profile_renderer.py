@@ -13,7 +13,7 @@ FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia
 BANNER_PLACEHOLDER = None  # もしアセットのバナー用画像があれば設定
 
 # レイアウト定数 — 縦長に変更（横長から縦長へ）
-CANVAS_WIDTH = 700   # 縦長の幅に縮小（縦方向に伸ばします）
+CANVAS_WIDTH = 700   # 縦長の幅に固定（高さはオンライン人数に応じて伸縮）
 MARGIN = 28
 LEFT_COLUMN_WIDTH = 460
 RIGHT_COLUMN_WIDTH = CANVAS_WIDTH - LEFT_COLUMN_WIDTH - MARGIN * 2
@@ -27,7 +27,7 @@ TABLE_HEADER_BG = (230, 230, 230, 255)
 ONLINE_BADGE = (60, 200, 60, 255)
 OFFLINE_BADGE = (200, 60, 60, 255)
 
-# NumPy availability (not required, but optional for noise)
+# NumPy availability (optional for noise)
 try:
     import numpy as np
     _HAS_NUMPY = True
@@ -64,13 +64,12 @@ def draw_decorative_frame(img: Image.Image,
                           inner_width: int = 2,
                           frame_color=(85, 50, 30, 255)) -> Image.Image:
     """
-    外枠（太）＋内枠（細）＋角飾りを描画する。
-    outer_offset/inner_offset を None にすると画像サイズに応じた値を自動計算します。
-    四隅を少し丸く（凹み風）に見せるため、ラウンド＆小さな「くぼみ」を掛け合わせています。
-    返り値は RGBA イメージ。
+    外枠（太）＋内枠（細）をアーク（凹み）＋直線のパーツで描画する。
+    - outer_offset/inner_offset を None にすると自動計算。
+    - 四隅は円弧（アーク）で描き、直線で接続するため線が途切れない。
+    戻り値は RGBA イメージ。
     """
     w, h = img.size
-    # 自動オフセット: 画像サイズに応じた余白を計算（縦長を想定）
     if outer_offset is None:
         outer_offset = max(12, int(min(w, h) * 0.025))
     if inner_offset is None:
@@ -79,112 +78,110 @@ def draw_decorative_frame(img: Image.Image,
     out = img.convert("RGBA")
     draw = ImageDraw.Draw(out)
 
-    # 外枠（丸角の矩形）
+    # 外枠 parameters
     ox = outer_offset
     oy = outer_offset
     ow = w - outer_offset * 2
     oh = h - outer_offset * 2
-    # 外枠の角丸半径（ほどよく丸める）
     outer_radius = max(8, int(min(w, h) * 0.02))
-    try:
-        # Pillow の rounded_rectangle が使える場合は利用
-        draw.rounded_rectangle([ox, oy, ox + ow, oy + oh], radius=outer_radius, outline=frame_color, width=outer_width)
-    except Exception:
-        # フォールバック：普通の矩形
-        draw.rectangle([ox, oy, ox + ow, oy + oh], outline=frame_color, width=outer_width)
 
-    # 内枠（丸角の細い矩形）
+    # 内枠 parameters
     ix = inner_offset
     iy = inner_offset
     iw = w - inner_offset * 2
     ih = h - inner_offset * 2
     inner_color = (95, 60, 35, 220)
     inner_radius = max(6, int(min(w, h) * 0.015))
+
+    # まずはアーク+直線方式で外枠・内枠を描画する（四隅の凹みはアーク）
+    # notch/arc の半径（見た目調整）
+    notch_radius = max(12, int(min(w, h) * 0.035))
+    arc_bbox_offset = notch_radius
+
+    # 外枠：アーク用ボックス（四隅）
+    left_arc_box = [ox, oy, ox + arc_bbox_offset * 2, oy + arc_bbox_offset * 2]
+    right_arc_box = [ox + ow - arc_bbox_offset * 2, oy, ox + ow, oy + arc_bbox_offset * 2]
+    bottom_left_arc_box = [ox, oy + oh - arc_bbox_offset * 2, ox + arc_bbox_offset * 2, oy + oh]
+    bottom_right_arc_box = [ox + ow - arc_bbox_offset * 2, oy + oh - arc_bbox_offset * 2, ox + ow, oy + oh]
+
+    # 外枠：アーク描画（内向きに見える arcs）
     try:
-        draw.rounded_rectangle([ix, iy, ix + iw, iy + ih], radius=inner_radius, outline=inner_color, width=inner_width)
+        draw.arc(left_arc_box, start=90, end=180, fill=frame_color, width=outer_width)
+        draw.arc(right_arc_box, start=0, end=90, fill=frame_color, width=outer_width)
+        draw.arc(bottom_right_arc_box, start=270, end=360, fill=frame_color, width=outer_width)
+        draw.arc(bottom_left_arc_box, start=180, end=270, fill=frame_color, width=outer_width)
     except Exception:
-        draw.rectangle([ix, iy, ix + iw, iy + ih], outline=inner_color, width=inner_width)
+        # フォールバック：幅指定が効かない環境では複数回偏移させて太線代替
+        draw.arc(left_arc_box, start=90, end=180, fill=frame_color)
+        draw.arc(right_arc_box, start=0, end=90, fill=frame_color)
+        draw.arc(bottom_right_arc_box, start=270, end=360, fill=frame_color)
+        draw.arc(bottom_left_arc_box, start=180, end=270, fill=frame_color)
+        for off in range(1, max(1, outer_width // 2) + 1):
+            draw.arc([left_arc_box[0] - off, left_arc_box[1] - off, left_arc_box[2] + off, left_arc_box[3] + off],
+                     start=90, end=180, fill=frame_color)
+            draw.arc([right_arc_box[0] - off, right_arc_box[1] - off, right_arc_box[2] + off, right_arc_box[3] + off],
+                     start=0, end=90, fill=frame_color)
+            draw.arc([bottom_right_arc_box[0] - off, bottom_right_arc_box[1] - off, bottom_right_arc_box[2] + off, bottom_right_arc_box[3] + off],
+                     start=270, end=360, fill=frame_color)
+            draw.arc([bottom_left_arc_box[0] - off, bottom_left_arc_box[1] - off, bottom_left_arc_box[2] + off, bottom_left_arc_box[3] + off],
+                     start=180, end=270, fill=frame_color)
 
-    # 角飾りの基準長さ（外でも内でも使う）
-    corner_len = max(12, int(min(w, h) * 0.03))
+    # 外枠：アーク終端同士を直線で繋ぐ（途切れない）
+    x1 = left_arc_box[2] - 1
+    x2 = right_arc_box[0] + 1
+    y_top = oy + int(arc_bbox_offset / 2)
+    draw.line([(x1, y_top), (x2, y_top)], fill=frame_color, width=outer_width)
 
-    # 角の「凹み（concave notch）」を描く（改良版）
-    # 小さな円弧（BASE_BG_COLOR で塗りつぶし）で凹ませつつ、
-    # その上から枠線を短い線分で再描画して繋がりを維持する。
-    notch_size = max(10, int(min(w, h) * 0.03))
-    inner_notch = max(6, int(min(w, h) * 0.02))
-    # 作業レイヤ（凹みを描く）
-    notch_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    nd = ImageDraw.Draw(notch_layer)
-    # 外枠の四隅を背景色でくり抜くように描画（やや内側に寄せる）
-    nd.ellipse([ox - notch_size // 2, oy - notch_size // 2, ox + notch_size, oy + notch_size], fill=BASE_BG_COLOR + (255,))  # 左上
-    nd.ellipse([ox + ow - notch_size, oy - notch_size // 2, ox + ow + notch_size // 2, oy + notch_size], fill=BASE_BG_COLOR + (255,))  # 右上
-    nd.ellipse([ox - notch_size // 2, oy + oh - notch_size, ox + notch_size, oy + oh + notch_size // 2], fill=BASE_BG_COLOR + (255,))  # 左下
-    nd.ellipse([ox + ow - notch_size, oy + oh - notch_size, ox + ow + notch_size // 2, oy + oh + notch_size // 2], fill=BASE_BG_COLOR + (255,))  # 右下
-    # 内枠の四隅も同様に軽くくぼませる
-    nd.ellipse([ix - inner_notch // 2, iy - inner_notch // 2, ix + inner_notch, iy + inner_notch], fill=BASE_BG_COLOR + (255,))  # 内左上
-    nd.ellipse([ix + iw - inner_notch, iy - inner_notch // 2, ix + iw + inner_notch // 2, iy + inner_notch], fill=BASE_BG_COLOR + (255,))  # 内右上
-    nd.ellipse([ix - inner_notch // 2, iy + ih - inner_notch, ix + inner_notch, iy + ih + inner_notch // 2], fill=BASE_BG_COLOR + (255,))  # 内左下
-    nd.ellipse([ix + iw - inner_notch, iy + ih - inner_notch, ix + iw + inner_notch // 2, iy + ih + inner_notch // 2], fill=BASE_BG_COLOR + (255,))  # 内右下
+    x1b = bottom_left_arc_box[2] - 1
+    x2b = bottom_right_arc_box[0] + 1
+    y_bot = oy + oh - int(arc_bbox_offset / 2)
+    draw.line([(x1b, y_bot), (x2b, y_bot)], fill=frame_color, width=outer_width)
 
-    # ぼかして馴染ませて合成
-    notch_layer = notch_layer.filter(ImageFilter.GaussianBlur(1.0))
-    out = Image.alpha_composite(out, notch_layer)
+    y1 = left_arc_box[3] - 1
+    y2 = bottom_left_arc_box[1] + 1
+    x_left = ox + int(arc_bbox_offset / 2)
+    draw.line([(x_left, y1), (x_left, y2)], fill=frame_color, width=outer_width)
 
-    # 凹みで切れた枠線を短いキャップで再接続する（外枠・内枠それぞれ）
-    reconnect = ImageDraw.Draw(out)
-    # キャップ長は notch に合わせて調整
-    cap_len = max(8, int(notch_size * 0.6))
-    cap_offset = max(4, int(outer_width / 2))
+    y1r = right_arc_box[3] - 1
+    y2r = bottom_right_arc_box[1] + 1
+    x_right = ox + ow - int(arc_bbox_offset / 2)
+    draw.line([(x_right, y1r), (x_right, y2r)], fill=frame_color, width=outer_width)
 
-    # 外枠キャップ（frame_color, outer_width）
-    # 左上：水平と垂直を少し延ばす
-    reconnect.line([(ox + corner_len, oy + cap_offset), (ox + corner_len + cap_len, oy + cap_offset)],
-                   fill=frame_color, width=outer_width)
-    reconnect.line([(ox + cap_offset, oy + corner_len), (ox + cap_offset, oy + corner_len + cap_len)],
-                   fill=frame_color, width=outer_width)
-    # 右上
-    reconnect.line([(ox + ow - corner_len - cap_len, oy + cap_offset), (ox + ow - corner_len, oy + cap_offset)],
-                   fill=frame_color, width=outer_width)
-    reconnect.line([(ox + ow - cap_offset, oy + corner_len), (ox + ow - cap_offset, oy + corner_len + cap_len)],
-                   fill=frame_color, width=outer_width)
-    # 左下
-    reconnect.line([(ox + corner_len, oy + oh - cap_offset), (ox + corner_len + cap_len, oy + oh - cap_offset)],
-                   fill=frame_color, width=outer_width)
-    reconnect.line([(ox + cap_offset, oy + oh - corner_len - cap_len), (ox + cap_offset, oy + oh - corner_len)],
-                   fill=frame_color, width=outer_width)
-    # 右下
-    reconnect.line([(ox + ow - corner_len - cap_len, oy + oh - cap_offset), (ox + ow - corner_len, oy + oh - cap_offset)],
-                   fill=frame_color, width=outer_width)
-    reconnect.line([(ox + ow - cap_offset, oy + oh - corner_len - cap_len), (ox + ow - cap_offset, oy + oh - corner_len)],
-                   fill=frame_color, width=outer_width)
+    # 内枠：アーク＋直線（外枠より小さめ）
+    inner_arc_bbox = int(notch_radius * 0.65)
+    li_box = [ix, iy, ix + inner_arc_bbox * 2, iy + inner_arc_bbox * 2]
+    ri_box = [ix + iw - inner_arc_bbox * 2, iy, ix + iw, iy + inner_arc_bbox * 2]
+    br_box = [ix + iw - inner_arc_bbox * 2, iy + ih - inner_arc_bbox * 2, ix + iw, iy + ih]
+    bl_box = [ix, iy + ih - inner_arc_bbox * 2, ix + inner_arc_bbox * 2, iy + ih]
 
-    # 内枠キャップ（inner_color, inner_width） — 短めで控えめに
-    inner_cap_len = max(6, int(inner_notch * 0.6))
-    inner_cap_offset = max(2, int(inner_width / 2))
-    # 内左上
-    reconnect.line([(ix + int(inner_notch * 0.8), iy + inner_cap_offset), (ix + int(inner_notch * 0.8) + inner_cap_len, iy + inner_cap_offset)],
-                   fill=inner_color, width=inner_width)
-    reconnect.line([(ix + inner_cap_offset, iy + int(inner_notch * 0.8)), (ix + inner_cap_offset, iy + int(inner_notch * 0.8) + inner_cap_len)],
-                   fill=inner_color, width=inner_width)
-    # 内右上
-    reconnect.line([(ix + iw - int(inner_notch * 0.8) - inner_cap_len, iy + inner_cap_offset), (ix + iw - int(inner_notch * 0.8), iy + inner_cap_offset)],
-                   fill=inner_color, width=inner_width)
-    reconnect.line([(ix + iw - inner_cap_offset, iy + int(inner_notch * 0.8)), (ix + iw - inner_cap_offset, iy + int(inner_notch * 0.8) + inner_cap_len)],
-                   fill=inner_color, width=inner_width)
-    # 内左下
-    reconnect.line([(ix + int(inner_notch * 0.8), iy + ih - inner_cap_offset), (ix + int(inner_notch * 0.8) + inner_cap_len, iy + ih - inner_cap_offset)],
-                   fill=inner_color, width=inner_width)
-    reconnect.line([(ix + inner_cap_offset, iy + ih - int(inner_notch * 0.8) - inner_cap_len), (ix + inner_cap_offset, iy + ih - int(inner_notch * 0.8))],
-                   fill=inner_color, width=inner_width)
-    # 内右下
-    reconnect.line([(ix + iw - int(inner_notch * 0.8) - inner_cap_len, iy + ih - inner_cap_offset), (ix + iw - int(inner_notch * 0.8), iy + ih - inner_cap_offset)],
-                   fill=inner_color, width=inner_width)
-    reconnect.line([(ix + iw - inner_cap_offset, iy + ih - int(inner_notch * 0.8) - inner_cap_len), (ix + iw - inner_cap_offset, iy + ih - int(inner_notch * 0.8))],
-                   fill=inner_color, width=inner_width)
+    try:
+        draw.arc(li_box, start=90, end=180, fill=inner_color, width=inner_width)
+        draw.arc(ri_box, start=0, end=90, fill=inner_color, width=inner_width)
+        draw.arc(br_box, start=270, end=360, fill=inner_color, width=inner_width)
+        draw.arc(bl_box, start=180, end=270, fill=inner_color, width=inner_width)
+    except Exception:
+        draw.arc(li_box, start=90, end=180, fill=inner_color)
+        draw.arc(ri_box, start=0, end=90, fill=inner_color)
+        draw.arc(br_box, start=270, end=360, fill=inner_color)
+        draw.arc(bl_box, start=180, end=270, fill=inner_color)
 
-    # ルール線（装飾的な横線・バナー矩形）はそのまま上に描画して馴染ませる
-    draw = ImageDraw.Draw(out)
+    top_x1 = li_box[2] - 1
+    top_x2 = ri_box[0] + 1
+    top_y = iy + int(inner_arc_bbox / 2)
+    draw.line([(top_x1, top_y), (top_x2, top_y)], fill=inner_color, width=inner_width)
+
+    bot_x1 = bl_box[2] - 1
+    bot_x2 = br_box[0] + 1
+    bot_y = iy + ih - int(inner_arc_bbox / 2)
+    draw.line([(bot_x1, bot_y), (bot_x2, bot_y)], fill=inner_color, width=inner_width)
+
+    left_x = ix + int(inner_arc_bbox / 2)
+    draw.line([(left_x, li_box[3] - 1), (left_x, bl_box[1] + 1)], fill=inner_color, width=inner_width)
+
+    right_x = ix + iw - int(inner_arc_bbox / 2)
+    draw.line([(right_x, ri_box[3] - 1), (right_x, br_box[1] + 1)], fill=inner_color, width=inner_width)
+
+    # 装飾的ルール線（上・中・左のガイド）を描画
     rule_color = (110, 75, 45, 180)
     y_rule = iy + int(ih * 0.12)
     draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color, width=max(2, inner_width + 2))
@@ -204,8 +201,8 @@ def create_card_background(w: int, h: int,
                            noise_blend: float = 0.30,
                            vignette_blur: int = 80) -> Image.Image:
     """
-    シンプルな紙風背景（ノイズ＋ブラー＋ビネット）に装飾枠を描画して返す。
-    焦げ（burn/scorch）処理はすべて削除しました（ユーザ指示）。
+    紙風背景（ノイズ＋ブラー＋ビネット）に装飾枠を描画して返す。
+    焦げ（burn/scorch）処理は削除済み。
     """
     base = Image.new('RGB', (w, h), BASE_BG_COLOR)
 
@@ -266,10 +263,9 @@ def create_card_background(w: int, h: int,
 
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
     """
-    guild_data は API からのそのままの辞書を想定。
-    banner_renderer は既存の BannerRenderer インスタンスでバナー画像を作る。
+    guild_data は API からの辞書を想定。
+    画像は縦長（幅は CANVAS_WIDTH に固定、高さはオンライン人数で伸縮）。
     戻り値: BytesIO (PNG)
-    （重要）画像は縦長になるよう幅を CANVAS_WIDTH に固定し、高さはオンライン人数に合わせて伸縮します。
     """
     def sg(d, *keys, default="N/A"):
         v = d
@@ -344,12 +340,11 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         logger.warning(f"バナー生成に失敗: {e}")
 
     # 動的高さ計算（オンライン数に応じて縦に伸ばす）
-    base_height = 700  # ヘッダ等の固定領域（縦長の基準を上げた）
+    base_height = 700
     row_height = 48
     online_count = len(online_players)
-    # online プレイヤーリスト領域を伸ばすための余白
     extra_for_online = max(0, online_count) * row_height
-    content_height = base_height + extra_for_online + 220  # フッタ余裕
+    content_height = base_height + extra_for_online + 220
     canvas_w = max_width
     canvas_h = content_height
 
@@ -381,7 +376,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     draw.text((inner_left, inner_top), f"[{prefix}] {name}", font=font_title, fill=TITLE_COLOR)
     draw.text((inner_left, inner_top + 56), f"Owner: {owner}  |  Created: {created}", font=font_sub, fill=SUBTITLE_COLOR)
 
-    # バナー（左上の矩形エリアに入れるレイアウトを維持）
+    # バナー（左上）
     banner_w = int(card_w * 0.18)
     banner_h = int(card_h * 0.20)
     banner_x = inner_left
@@ -393,7 +388,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         except Exception as e:
             logger.warning(f"バナー貼付失敗: {e}")
 
-    # 主要統計（バナーの右）
+    # 主要統計（バナー右）
     stats_x = banner_x + banner_w + 18
     stats_y = banner_y
     draw.text((stats_x, stats_y), f"Level: {level}   ({xpPercent}%)", font=font_stats, fill=SUBTITLE_COLOR)
@@ -446,7 +441,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
                 display_name = display_name + "..."
             draw.text((nx + 6, y + 10), display_name, font=font_table, fill=TITLE_COLOR)
 
-    # rank box
+            # rank box
             rx = nx + col_name_w + 8
             draw.rectangle([rx - 2, y, rx + col_rank_w, y + row_h - 8], outline=LINE_COLOR, width=1)
             draw.text((rx + 6, y + 10), rank, font=font_table, fill=SUBTITLE_COLOR)
