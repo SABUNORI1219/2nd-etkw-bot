@@ -105,36 +105,80 @@ def draw_decorative_frame(img: Image.Image,
     except Exception:
         draw.rectangle([ix, iy, ix + iw, iy + ih], outline=inner_color, width=inner_width)
 
-    # 角の「凹み（concave notch）」を描く
-    # 小さな円弧（BASE_BG_COLOR で塗りつぶし）を枠の内側に重ねて凹ませたように見せる。
+        # 角の「凹み（concave notch）」を描く（改良版）
+    # 小さな円弧（BASE_BG_COLOR で塗りつぶし）で凹ませつつ、
+    # その上から枠線を短い線分で再描画して繋がりを維持する。
     notch_size = max(10, int(min(w, h) * 0.03))
-    # 少しぼかして馴染ませるため、作業レイヤを用いる
+    inner_notch = max(6, int(min(w, h) * 0.02))
+    # 作業レイヤ（凹みを描く）
     notch_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     nd = ImageDraw.Draw(notch_layer)
-    # 外枠の内側を凹ませる（四隅）
-    # 左上
-    nd.ellipse([ox - notch_size // 2, oy - notch_size // 2, ox + notch_size, oy + notch_size], fill=BASE_BG_COLOR + (255,))
-    # 右上
-    nd.ellipse([ox + ow - notch_size, oy - notch_size // 2, ox + ow + notch_size // 2, oy + notch_size], fill=BASE_BG_COLOR + (255,))
-    # 左下
-    nd.ellipse([ox - notch_size // 2, oy + oh - notch_size, ox + notch_size, oy + oh + notch_size // 2], fill=BASE_BG_COLOR + (255,))
-    # 右下
-    nd.ellipse([ox + ow - notch_size, oy + oh - notch_size, ox + ow + notch_size // 2, oy + oh + notch_size // 2], fill=BASE_BG_COLOR + (255,))
+    # 外枠の四隅を背景色でくり抜くように描画（やや内側に寄せる）
+    nd.ellipse([ox - notch_size // 2, oy - notch_size // 2, ox + notch_size, oy + notch_size], fill=BASE_BG_COLOR + (255,))  # 左上
+    nd.ellipse([ox + ow - notch_size, oy - notch_size // 2, ox + ow + notch_size // 2, oy + notch_size], fill=BASE_BG_COLOR + (255,))  # 右上
+    nd.ellipse([ox - notch_size // 2, oy + oh - notch_size, ox + notch_size, oy + oh + notch_size // 2], fill=BASE_BG_COLOR + (255,))  # 左下
+    nd.ellipse([ox + ow - notch_size, oy + oh - notch_size, ox + ow + notch_size // 2, oy + oh + notch_size // 2], fill=BASE_BG_COLOR + (255,))  # 右下
+    # 内枠の四隅も同様に軽くくぼませる
+    nd.ellipse([ix - inner_notch // 2, iy - inner_notch // 2, ix + inner_notch, iy + inner_notch], fill=BASE_BG_COLOR + (255,))  # 内左上
+    nd.ellipse([ix + iw - inner_notch, iy - inner_notch // 2, ix + iw + inner_notch // 2, iy + inner_notch], fill=BASE_BG_COLOR + (255,))  # 内右上
+    nd.ellipse([ix - inner_notch // 2, iy + ih - inner_notch, ix + inner_notch, iy + ih + inner_notch // 2], fill=BASE_BG_COLOR + (255,))  # 内左下
+    nd.ellipse([ix + iw - inner_notch, iy + ih - inner_notch, ix + iw + inner_notch // 2, iy + ih + inner_notch // 2], fill=BASE_BG_COLOR + (255,))  # 内右下
 
-    # 内枠の角も軽く凹ませる（内側に小さい凹み）
-    inner_notch = max(6, int(min(w, h) * 0.02))
-    # 左上（内枠）
-    nd.ellipse([ix - inner_notch // 2, iy - inner_notch // 2, ix + inner_notch, iy + inner_notch], fill=BASE_BG_COLOR + (255,))
-    # 右上
-    nd.ellipse([ix + iw - inner_notch, iy - inner_notch // 2, ix + iw + inner_notch // 2, iy + inner_notch], fill=BASE_BG_COLOR + (255,))
-    # 左下
-    nd.ellipse([ix - inner_notch // 2, iy + ih - inner_notch, ix + inner_notch, iy + ih + inner_notch // 2], fill=BASE_BG_COLOR + (255,))
-    # 右下
-    nd.ellipse([ix + iw - inner_notch, iy + ih - inner_notch, ix + iw + inner_notch // 2, iy + ih + inner_notch // 2], fill=BASE_BG_COLOR + (255,))
-
-    # 軽くブラーして馴染ませ、元画像に合成
+    # ぼかして馴染ませて合成
     notch_layer = notch_layer.filter(ImageFilter.GaussianBlur(1.0))
     out = Image.alpha_composite(out, notch_layer)
+
+    # 凹みで切れた枠線を短いキャップで再接続する（外枠・内枠それぞれ）
+    reconnect = ImageDraw.Draw(out)
+    # キャップ長は notch に合わせて調整
+    cap_len = max(8, int(notch_size * 0.6))
+    cap_offset = max(4, int(outer_width / 2))
+
+    # 外枠キャップ（frame_color, outer_width）
+    # 左上：水平と垂直を少し延ばす
+    reconnect.line([(ox + corner_len, oy + cap_offset), (ox + corner_len + cap_len, oy + cap_offset)],
+                   fill=frame_color, width=outer_width)
+    reconnect.line([(ox + cap_offset, oy + corner_len), (ox + cap_offset, oy + corner_len + cap_len)],
+                   fill=frame_color, width=outer_width)
+    # 右上
+    reconnect.line([(ox + ow - corner_len - cap_len, oy + cap_offset), (ox + ow - corner_len, oy + cap_offset)],
+                   fill=frame_color, width=outer_width)
+    reconnect.line([(ox + ow - cap_offset, oy + corner_len), (ox + ow - cap_offset, oy + corner_len + cap_len)],
+                   fill=frame_color, width=outer_width)
+    # 左下
+    reconnect.line([(ox + corner_len, oy + oh - cap_offset), (ox + corner_len + cap_len, oy + oh - cap_offset)],
+                   fill=frame_color, width=outer_width)
+    reconnect.line([(ox + cap_offset, oy + oh - corner_len - cap_len), (ox + cap_offset, oy + oh - corner_len)],
+                   fill=frame_color, width=outer_width)
+    # 右下
+    reconnect.line([(ox + ow - corner_len - cap_len, oy + oh - cap_offset), (ox + ow - corner_len, oy + oh - cap_offset)],
+                   fill=frame_color, width=outer_width)
+    reconnect.line([(ox + ow - cap_offset, oy + oh - corner_len - cap_len), (ox + ow - cap_offset, oy + oh - corner_len)],
+                   fill=frame_color, width=outer_width)
+
+    # 内枠キャップ（inner_color, inner_width） — 短めで控えめに
+    inner_cap_len = max(6, int(inner_notch * 0.6))
+    inner_cap_offset = max(2, int(inner_width / 2))
+    # 内左上
+    reconnect.line([(ix + int(inner_notch * 0.8), iy + inner_cap_offset), (ix + int(inner_notch * 0.8) + inner_cap_len, iy + inner_cap_offset)],
+                   fill=inner_color, width=inner_width)
+    reconnect.line([(ix + inner_cap_offset, iy + int(inner_notch * 0.8)), (ix + inner_cap_offset, iy + int(inner_notch * 0.8) + inner_cap_len)],
+                   fill=inner_color, width=inner_width)
+    # 内右上
+    reconnect.line([(ix + iw - int(inner_notch * 0.8) - inner_cap_len, iy + inner_cap_offset), (ix + iw - int(inner_notch * 0.8), iy + inner_cap_offset)],
+                   fill=inner_color, width=inner_width)
+    reconnect.line([(ix + iw - inner_cap_offset, iy + int(inner_notch * 0.8)), (ix + iw - inner_cap_offset, iy + int(inner_notch * 0.8) + inner_cap_len)],
+                   fill=inner_color, width=inner_width)
+    # 内左下
+    reconnect.line([(ix + int(inner_notch * 0.8), iy + ih - inner_cap_offset), (ix + int(inner_notch * 0.8) + inner_cap_len, iy + ih - inner_cap_offset)],
+                   fill=inner_color, width=inner_width)
+    reconnect.line([(ix + inner_cap_offset, iy + ih - int(inner_notch * 0.8) - inner_cap_len), (ix + inner_cap_offset, iy + ih - int(inner_notch * 0.8))],
+                   fill=inner_color, width=inner_width)
+    # 内右下
+    reconnect.line([(ix + iw - int(inner_notch * 0.8) - inner_cap_len, iy + ih - inner_cap_offset), (ix + iw - int(inner_notch * 0.8), iy + ih - inner_cap_offset)],
+                   fill=inner_color, width=inner_width)
+    reconnect.line([(ix + iw - inner_cap_offset, iy + ih - int(inner_notch * 0.8) - inner_cap_len), (ix + iw - inner_cap_offset, iy + ih - int(inner_notch * 0.8))],
+                   fill=inner_color, width=inner_width)
 
     # ルール線（装飾的な横線・バナー矩形）はそのまま上に描画して馴染ませる
     draw = ImageDraw.Draw(out)
