@@ -57,37 +57,6 @@ def _text_width(draw_obj: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageF
         return bbox[2] - bbox[0]
 
 
-def _arc_point(bbox, angle_deg):
-    """
-    bbox = [x0,y0,x1,y1] の楕円上の angle_deg (度) に対応する座標を返す。
-    """
-    x0, y0, x1, y1 = bbox
-    cx = (x0 + x1) / 2.0
-    cy = (y0 + y1) / 2.0
-    rx = (x1 - x0) / 2.0
-    ry = (y1 - y0) / 2.0
-    rad = math.radians(angle_deg)
-    x = cx + rx * math.cos(rad)
-    y = cy - ry * math.sin(rad)
-    return (x, y)
-
-
-def _extend_point(p, q, amount):
-    """
-    p -> q の方向に沿って q 側に amount ピクセルだけ伸ばした点を返す。
-    """
-    px, py = p
-    qx, qy = q
-    dx = qx - px
-    dy = qy - py
-    dist = math.hypot(dx, dy)
-    if dist == 0:
-        return qx, qy
-    ux = dx / dist
-    uy = dy / dist
-    return (px + ux * amount, py + uy * amount)
-
-
 def draw_decorative_frame(img: Image.Image,
                           outer_offset: Optional[int] = None,
                           outer_width: int = 8,
@@ -95,175 +64,86 @@ def draw_decorative_frame(img: Image.Image,
                           inner_width: int = 2,
                           frame_color=(85, 50, 30, 255)) -> Image.Image:
     """
-    外枠（太）＋内枠（細）を描画する（スーパーサンプリング方式）。
-    - アークは角の外側に bounding box を置き、適切な角度で描画（内向きの凹みにする）。
-    - 高解像度で描画してから縮小することでアンチエイリアスの隙間を防ぐ。
+    安定的なマスク方式で外枠（太）＋内枠（細）を描画する。
+    - 外側矩形を塗りつぶして中心をくり抜き、四隅を円でくり抜く（内向きの凹み）。
+    - 同様に内枠も別マスクで作る（確実に太線・細線が出るように）。
+    戻り値は RGBA イメージ。
     """
     w, h = img.size
 
-    # 自動オフセット
+    # デフォルトオフセット自動計算
     if outer_offset is None:
         outer_offset = max(12, int(min(w, h) * 0.025))
     if inner_offset is None:
         inner_offset = outer_offset + max(8, int(min(w, h) * 0.02))
 
-    ox = outer_offset
-    oy = outer_offset
-    ow = w - outer_offset * 2
-    oh = h - outer_offset * 2
+    ox = int(outer_offset)
+    oy = int(outer_offset)
+    ow = int(w - outer_offset * 2)
+    oh = int(h - outer_offset * 2)
 
-    ix = inner_offset
-    iy = inner_offset
-    iw = w - inner_offset * 2
-    ih = h - inner_offset * 2
+    ix = int(inner_offset)
+    iy = int(inner_offset)
+    iw = int(w - inner_offset * 2)
+    ih = int(h - inner_offset * 2)
 
-    # 凹みサイズ（調整可能）
+    # 凹み（notch）サイズ（px）
     notch_radius = max(12, int(min(w, h) * 0.035))
     inner_notch = max(6, int(min(w, h) * 0.02))
 
-    # スーパーサンプリング倍率（描画品質向上）
-    SCALE = 4
-    sw = w * SCALE
-    sh = h * SCALE
+    out = img.convert("RGBA")
 
-    # スケールされたパラメータ
-    sox = ox * SCALE
-    soy = oy * SCALE
-    sow = ow * SCALE
-    soh = oh * SCALE
-    six = ix * SCALE
-    siy = iy * SCALE
-    siw = iw * SCALE
-    sih = ih * SCALE
-    snotch = notch_radius * SCALE
-    sinner_notch = inner_notch * SCALE
-    s_outer_w = max(1, int(outer_width * SCALE))
-    s_inner_w = max(1, int(inner_width * SCALE))
+    # ---- 外枠マスク作成 ----
+    # mask_outer: L モード (0..255) — 255 が表示領域、0 が透過（くり抜き）
+    mask_outer = Image.new("L", (w, h), 0)
+    md = ImageDraw.Draw(mask_outer)
 
-    # 作業レイヤ（透明）に描く
-    tmp = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
-    td = ImageDraw.Draw(tmp)
+    # 外側長方形を塗りつぶしてから内側をくり抜く（リング状にする）
+    md.rectangle([ox, oy, ox + ow, oy + oh], fill=255)
+    inner_cut = [ox + outer_width, oy + outer_width, ox + ow - outer_width, oy + oh - outer_width]
+    if inner_cut[2] > inner_cut[0] and inner_cut[3] > inner_cut[1]:
+        md.rectangle(inner_cut, fill=0)
 
-    # アークの bbox を「角の外側」に置くことで、arc を内向き（凹）に見せる
-    # top-left: bbox bottom-right == corner (ox,oy) scaled
-    lt_box = [int(sox - 2 * snotch), int(soy - 2 * snotch), int(sox), int(soy)]
-    rt_box = [int(sox + sow), int(soy - 2 * snotch), int(sox + sow + 2 * snotch), int(soy)]
-    bl_box = [int(sox - 2 * snotch), int(soy + soh), int(sox), int(soy + soh + 2 * snotch)]
-    br_box = [int(sox + sow), int(soy + soh), int(sox + sow + 2 * snotch), int(soy + soh + 2 * snotch)]
+    # 四隅の notch（円）を角の座標に対して「中心を角」に置いてくり抜く
+    # これにより内向きの quarter-arc が現れる（マスクが透明になる）
+    md.ellipse([ox - notch_radius, oy - notch_radius, ox + notch_radius, oy + notch_radius], fill=0)  # 左上
+    md.ellipse([ox + ow - notch_radius, oy - notch_radius, ox + ow + notch_radius, oy + notch_radius], fill=0)  # 右上
+    md.ellipse([ox - notch_radius, oy + oh - notch_radius, ox + notch_radius, oy + oh + notch_radius], fill=0)  # 左下
+    md.ellipse([ox + ow - notch_radius, oy + oh - notch_radius, ox + ow + notch_radius, oy + oh + notch_radius], fill=0)  # 右下
 
-    # 外枠：アーク（内向きに見える角）を描画（角度は bbox に合わせて指定）
-    try:
-        td.arc(lt_box, start=0, end=90, fill=frame_color, width=s_outer_w)      # top-left concave
-        td.arc(rt_box, start=90, end=180, fill=frame_color, width=s_outer_w)    # top-right
-        td.arc(br_box, start=180, end=270, fill=frame_color, width=s_outer_w)   # bottom-right
-        td.arc(bl_box, start=270, end=360, fill=frame_color, width=s_outer_w)   # bottom-left
-    except Exception:
-        # Pillow 環境によっては width 無視される場合があるが、縮小で許容する
-        td.arc(lt_box, start=0, end=90, fill=frame_color)
-        td.arc(rt_box, start=90, end=180, fill=frame_color)
-        td.arc(br_box, start=180, end=270, fill=frame_color)
-        td.arc(bl_box, start=270, end=360, fill=frame_color)
+    # カラー層に alpha としてマスクを設定して合成
+    layer_outer = Image.new("RGBA", (w, h), frame_color)
+    layer_outer.putalpha(mask_outer)
+    out = Image.alpha_composite(out, layer_outer)
 
-    # アークの端点を計算して、直線で繋ぐ（少しオーバーラップして確実に繋ぐ）
-    # top edge
-    p_lt_top = _arc_point([coord / SCALE for coord in lt_box], 90)
-    p_rt_top = _arc_point([coord / SCALE for coord in rt_box], 90)
-    # スケールしてから延長量を掛ける
-    p1 = (p_lt_top[0] * SCALE, p_lt_top[1] * SCALE)
-    p2 = (p_rt_top[0] * SCALE, p_rt_top[1] * SCALE)
-    overlap_px = max(2, int(s_outer_w * 0.25))
-    sstart = _extend_point(p1, p2, -overlap_px)
-    send = _extend_point(p2, p1, -overlap_px)
-    td.line([sstart, send], fill=frame_color, width=s_outer_w)
+    # ---- 内枠マスク作成（外枠より内側） ----
+    mask_inner = Image.new("L", (w, h), 0)
+    md2 = ImageDraw.Draw(mask_inner)
 
-    # bottom edge
-    p_lb_bot = _arc_point([coord / SCALE for coord in bl_box], 270)
-    p_rb_bot = _arc_point([coord / SCALE for coord in br_box], 270)
-    p1b = (p_lb_bot[0] * SCALE, p_lb_bot[1] * SCALE)
-    p2b = (p_rb_bot[0] * SCALE, p_rb_bot[1] * SCALE)
-    sstartb = _extend_point(p1b, p2b, -overlap_px)
-    sendb = _extend_point(p2b, p1b, -overlap_px)
-    td.line([sstartb, sendb], fill=frame_color, width=s_outer_w)
+    md2.rectangle([ix, iy, ix + iw, iy + ih], fill=255)
+    inner2_cut = [ix + inner_width, iy + inner_width, ix + iw - inner_width, iy + ih - inner_width]
+    if inner2_cut[2] > inner2_cut[0] and inner2_cut[3] > inner2_cut[1]:
+        md2.rectangle(inner2_cut, fill=0)
 
-    # left vertical
-    p_lt_l = _arc_point([coord / SCALE for coord in lt_box], 180)
-    p_lb_l = _arc_point([coord / SCALE for coord in bl_box], 180)
-    p1l = (p_lt_l[0] * SCALE, p_lt_l[1] * SCALE)
-    p2l = (p_lb_l[0] * SCALE, p_lb_l[1] * SCALE)
-    sstartl = _extend_point(p1l, p2l, -overlap_px)
-    sendl = _extend_point(p2l, p1l, -overlap_px)
-    td.line([sstartl, sendl], fill=frame_color, width=s_outer_w)
+    md2.ellipse([ix - inner_notch, iy - inner_notch, ix + inner_notch, iy + inner_notch], fill=0)  # 内左上
+    md2.ellipse([ix + iw - inner_notch, iy - inner_notch, ix + iw + inner_notch, iy + inner_notch], fill=0)  # 内右上
+    md2.ellipse([ix - inner_notch, iy + ih - inner_notch, ix + inner_notch, iy + ih + inner_notch], fill=0)  # 内左下
+    md2.ellipse([ix + iw - inner_notch, iy + ih - inner_notch, ix + iw + inner_notch, iy + ih + inner_notch], fill=0)  # 内右下
 
-    # right vertical
-    p_rt_r = _arc_point([coord / SCALE for coord in rt_box], 0)
-    p_rb_r = _arc_point([coord / SCALE for coord in br_box], 0)
-    p1r = (p_rt_r[0] * SCALE, p_rt_r[1] * SCALE)
-    p2r = (p_rb_r[0] * SCALE, p_rb_r[1] * SCALE)
-    sstartr = _extend_point(p1r, p2r, -overlap_px)
-    sendr = _extend_point(p2r, p1r, -overlap_px)
-    td.line([sstartr, sendr], fill=frame_color, width=s_outer_w)
+    inner_color = (95, 60, 35, 220)
+    layer_inner = Image.new("RGBA", (w, h), inner_color)
+    layer_inner.putalpha(mask_inner)
+    out = Image.alpha_composite(out, layer_inner)
 
-    # 内枠（同様に高解像度で描画）
-    # 内枠アーク用ボックス（内側に控えめに置く）
-    inner_arc = int(notch_radius * 0.65)
-    s_inner = inner_arc * SCALE
-    li_box = [int(six - s_inner), int(siy - s_inner), int(six + s_inner), int(siy + s_inner)]
-    ri_box = [int(six + siw - s_inner), int(siy - s_inner), int(six + siw + s_inner), int(siy + s_inner)]
-    bli_box = [int(six - s_inner), int(siy + sih - s_inner), int(six + s_inner), int(siy + sih + s_inner)]
-    bri_box = [int(six + siw - s_inner), int(siy + sih - s_inner), int(six + siw + s_inner), int(siy + sih + s_inner)]
-
-    try:
-        td.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220), width=s_inner_w)
-        td.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220), width=s_inner_w)
-        td.arc(bri_box, start=180, end=270, fill=(95, 60, 35, 220), width=s_inner_w)
-        td.arc(bli_box, start=270, end=360, fill=(95, 60, 35, 220), width=s_inner_w)
-    except Exception:
-        td.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220))
-        td.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220))
-        td.arc(bri_box, start=180, end=270, fill=(95, 60, 35, 220))
-        td.arc(bli_box, start=270, end=360, fill=(95, 60, 35, 220))
-
-    # 内枠の直線接続（同じくオーバーラップ）
-    # top
-    pli_top = _arc_point([coord / SCALE for coord in li_box], 90)
-    pri_top = _arc_point([coord / SCALE for coord in ri_box], 90)
-    p1i = (pli_top[0] * SCALE, pli_top[1] * SCALE)
-    p2i = (pri_top[0] * SCALE, pri_top[1] * SCALE)
-    oi = max(2, int(s_inner_w * 0.25))
-    td.line([_extend_point(p1i, p2i, -oi), _extend_point(p2i, p1i, -oi)], fill=(95, 60, 35, 220), width=s_inner_w)
-    # bottom
-    pli_bot = _arc_point([coord / SCALE for coord in bli_box], 270)
-    pri_bot = _arc_point([coord / SCALE for coord in bri_box], 270)
-    p1ib = (pli_bot[0] * SCALE, pli_bot[1] * SCALE)
-    p2ib = (pri_bot[0] * SCALE, pri_bot[1] * SCALE)
-    td.line([_extend_point(p1ib, p2ib, -oi), _extend_point(p2ib, p1ib, -oi)], fill=(95, 60, 35, 220), width=s_inner_w)
-    # left vertical
-    pli_l = _arc_point([coord / SCALE for coord in li_box], 180)
-    pli_ll = _arc_point([coord / SCALE for coord in bli_box], 180)
-    td.line([_extend_point((pli_l[0]*SCALE, pli_l[1]*SCALE), (pli_ll[0]*SCALE, pli_ll[1]*SCALE), -oi),
-             _extend_point((pli_ll[0]*SCALE, pli_ll[1]*SCALE), (pli_l[0]*SCALE, pli_l[1]*SCALE), -oi)],
-            fill=(95, 60, 35, 220), width=s_inner_w)
-    # right vertical
-    pri_r = _arc_point([coord / SCALE for coord in ri_box], 0)
-    pri_rr = _arc_point([coord / SCALE for coord in bri_box], 0)
-    td.line([_extend_point((pri_r[0]*SCALE, pri_r[1]*SCALE), (pri_rr[0]*SCALE, pri_rr[1]*SCALE), -oi),
-             _extend_point((pri_rr[0]*SCALE, pri_rr[1]*SCALE), (pri_r[0]*SCALE, pri_r[1]*SCALE), -oi)],
-            fill=(95, 60, 35, 220), width=s_inner_w)
-
-    # 縮小して元画像に合成（高品質リサンプル）
-    down = tmp.resize((w, h), resample=Image.LANCZOS)
-    base = img.convert("RGBA")
-    out = Image.alpha_composite(base, down)
-
-    # ルール線等は上に描画
+    # ---- 装飾ルール線・ボックスは最後に上書きで描画 ----
     draw = ImageDraw.Draw(out)
     rule_color = (110, 75, 45, 180)
     y_rule = iy + int(ih * 0.12)
-    draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color,
-              width=max(2, inner_width + 2))
+    draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)],
+              fill=rule_color, width=max(2, inner_width + 2))
     y_rule2 = iy + int(ih * 0.48)
-    draw.line([(ix + int(iw * 0.03), y_rule2), (ix + int(iw * 0.60), y_rule2)], fill=rule_color,
-              width=max(2, inner_width + 2))
+    draw.line([(ix + int(iw * 0.03), y_rule2), (ix + int(iw * 0.60), y_rule2)],
+              fill=rule_color, width=max(2, inner_width + 2))
     box_x = ix + int(iw * 0.04)
     box_y = iy + int(ih * 0.06)
     box_w = int(iw * 0.18)
