@@ -66,6 +66,7 @@ def draw_decorative_frame(img: Image.Image,
     """
     外枠（太）＋内枠（細）＋角飾りを描画する。
     outer_offset/inner_offset を None にすると画像サイズに応じた値を自動計算します。
+    四隅を少し丸く（凹み風）に見せるため、ラウンド＆小さな「くぼみ」を掛け合わせています。
     返り値は RGBA イメージ。
     """
     w, h = img.size
@@ -78,53 +79,70 @@ def draw_decorative_frame(img: Image.Image,
     out = img.convert("RGBA")
     draw = ImageDraw.Draw(out)
 
-    # 外枠（太め）
+    # 外枠（丸角の矩形）
     ox = outer_offset
     oy = outer_offset
     ow = w - outer_offset * 2
     oh = h - outer_offset * 2
-    # 外枠を一発で描く（太線）
-    draw.rectangle([ox, oy, ox + ow, oy + oh], outline=frame_color, width=outer_width)
+    # 外枠の角丸半径（ほどよく丸める）
+    outer_radius = max(8, int(min(w, h) * 0.02))
+    try:
+        # Pillow の rounded_rectangle が使える場合は利用
+        draw.rounded_rectangle([ox, oy, ox + ow, oy + oh], radius=outer_radius, outline=frame_color, width=outer_width)
+    except Exception:
+        # フォールバック：普通の矩形
+        draw.rectangle([ox, oy, ox + ow, oy + oh], outline=frame_color, width=outer_width)
 
-    # 内枠（細め）
+    # 内枠（丸角の細い矩形）
     ix = inner_offset
     iy = inner_offset
     iw = w - inner_offset * 2
     ih = h - inner_offset * 2
     inner_color = (95, 60, 35, 220)
-    draw.rectangle([ix, iy, ix + iw, iy + ih], outline=inner_color, width=inner_width)
+    inner_radius = max(6, int(min(w, h) * 0.015))
+    try:
+        draw.rounded_rectangle([ix, iy, ix + iw, iy + ih], radius=inner_radius, outline=inner_color, width=inner_width)
+    except Exception:
+        draw.rectangle([ix, iy, ix + iw, iy + ih], outline=inner_color, width=inner_width)
 
-    # 角飾り（控えめな切欠き風）
-    corner_len = max(12, int(min(w, h) * 0.03))
-    corner_thick = max(2, outer_width // 3)
+    # 角の「凹み（concave notch）」を描く
+    # 小さな円弧（BASE_BG_COLOR で塗りつぶし）を枠の内側に重ねて凹ませたように見せる。
+    notch_size = max(10, int(min(w, h) * 0.03))
+    # 少しぼかして馴染ませるため、作業レイヤを用いる
+    notch_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    nd = ImageDraw.Draw(notch_layer)
+    # 外枠の内側を凹ませる（四隅）
     # 左上
-    draw.line([(ox + corner_thick // 2, oy + corner_len),
-               (ox + corner_thick // 2, oy + corner_thick // 2),
-               (ox + corner_len, oy + corner_thick // 2)],
-              fill=frame_color, width=corner_thick)
+    nd.ellipse([ox - notch_size // 2, oy - notch_size // 2, ox + notch_size, oy + notch_size], fill=BASE_BG_COLOR + (255,))
     # 右上
-    draw.line([(ox + ow - corner_len, oy + corner_thick // 2),
-               (ox + ow - corner_thick // 2, oy + corner_thick // 2),
-               (ox + ow - corner_thick // 2, oy + corner_len)],
-              fill=frame_color, width=corner_thick)
+    nd.ellipse([ox + ow - notch_size, oy - notch_size // 2, ox + ow + notch_size // 2, oy + notch_size], fill=BASE_BG_COLOR + (255,))
     # 左下
-    draw.line([(ox + corner_thick // 2, oy + oh - corner_len),
-               (ox + corner_thick // 2, oy + oh - corner_thick // 2),
-               (ox + corner_len, oy + oh - corner_thick // 2)],
-              fill=frame_color, width=corner_thick)
+    nd.ellipse([ox - notch_size // 2, oy + oh - notch_size, ox + notch_size, oy + oh + notch_size // 2], fill=BASE_BG_COLOR + (255,))
     # 右下
-    draw.line([(ox + ow - corner_len, oy + oh - corner_thick // 2),
-               (ox + ow - corner_thick // 2, oy + oh - corner_thick // 2),
-               (ox + ow - corner_thick // 2, oy + oh - corner_len)],
-              fill=frame_color, width=corner_thick)
+    nd.ellipse([ox + ow - notch_size, oy + oh - notch_size, ox + ow + notch_size // 2, oy + oh + notch_size // 2], fill=BASE_BG_COLOR + (255,))
 
-    # 任意の内側ルール線（例：上・中・左のガイド線） — 必要に応じて微調整可能
+    # 内枠の角も軽く凹ませる（内側に小さい凹み）
+    inner_notch = max(6, int(min(w, h) * 0.02))
+    # 左上（内枠）
+    nd.ellipse([ix - inner_notch // 2, iy - inner_notch // 2, ix + inner_notch, iy + inner_notch], fill=BASE_BG_COLOR + (255,))
+    # 右上
+    nd.ellipse([ix + iw - inner_notch, iy - inner_notch // 2, ix + iw + inner_notch // 2, iy + inner_notch], fill=BASE_BG_COLOR + (255,))
+    # 左下
+    nd.ellipse([ix - inner_notch // 2, iy + ih - inner_notch, ix + inner_notch, iy + ih + inner_notch // 2], fill=BASE_BG_COLOR + (255,))
+    # 右下
+    nd.ellipse([ix + iw - inner_notch, iy + ih - inner_notch, ix + iw + inner_notch // 2, iy + ih + inner_notch // 2], fill=BASE_BG_COLOR + (255,))
+
+    # 軽くブラーして馴染ませ、元画像に合成
+    notch_layer = notch_layer.filter(ImageFilter.GaussianBlur(1.0))
+    out = Image.alpha_composite(out, notch_layer)
+
+    # ルール線（装飾的な横線・バナー矩形）はそのまま上に描画して馴染ませる
+    draw = ImageDraw.Draw(out)
     rule_color = (110, 75, 45, 180)
     y_rule = iy + int(ih * 0.12)
     draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color, width=max(2, inner_width + 2))
     y_rule2 = iy + int(ih * 0.48)
     draw.line([(ix + int(iw * 0.03), y_rule2), (ix + int(iw * 0.60), y_rule2)], fill=rule_color, width=max(2, inner_width + 2))
-    # バナー矩形（左上付近）
     box_x = ix + int(iw * 0.04)
     box_y = iy + int(ih * 0.06)
     box_w = int(iw * 0.18)
@@ -187,11 +205,11 @@ def create_card_background(w: int, h: int,
     # ==== 装飾枠を描画 ====
     try:
         composed = draw_decorative_frame(composed.convert('RGBA'),
-                                        outer_offset=None,
-                                        outer_width=max(6, int(w * 0.01)),
-                                        inner_offset=None,
-                                        inner_width=max(1, int(w * 0.005)),
-                                        frame_color=(85, 50, 30, 255))
+                                         outer_offset=None,
+                                         outer_width=max(6, int(w * 0.01)),
+                                         inner_offset=None,
+                                         inner_width=max(1, int(w * 0.005)),
+                                         frame_color=(85, 50, 30, 255))
     except Exception as e:
         logger.exception(f"draw_decorative_frame failed: {e}")
         composed = composed.convert('RGBA')
