@@ -57,6 +57,39 @@ def _text_width(draw_obj: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageF
         return bbox[2] - bbox[0]
 
 
+def _arc_point(bbox, angle_deg):
+    """
+    bbox = [x0,y0,x1,y1] の楕円上の angle_deg (度) に対応する座標を返す。
+    Pillow の角度系に合わせ、Y は下方向が正なので計算は y = cy - ry * sin(theta) とする。
+    """
+    x0, y0, x1, y1 = bbox
+    cx = (x0 + x1) / 2.0
+    cy = (y0 + y1) / 2.0
+    rx = (x1 - x0) / 2.0
+    ry = (y1 - y0) / 2.0
+    rad = math.radians(angle_deg)
+    x = cx + rx * math.cos(rad)
+    y = cy - ry * math.sin(rad)
+    return (x, y)
+
+
+def _extend_point(p, q, amount):
+    """
+    p -> q の方向に沿って q 側に amount ピクセルだけ伸ばした点を返す。
+    (p,q) が同一点の場合は q を返す。
+    """
+    px, py = p
+    qx, qy = q
+    dx = qx - px
+    dy = qy - py
+    dist = math.hypot(dx, dy)
+    if dist == 0:
+        return qx, qy
+    ux = dx / dist
+    uy = dy / dist
+    return (px + ux * amount, py + uy * amount)
+
+
 def draw_decorative_frame(img: Image.Image,
                           outer_offset: Optional[int] = None,
                           outer_width: int = 8,
@@ -128,30 +161,37 @@ def draw_decorative_frame(img: Image.Image,
             draw.arc([bottom_left_arc_box[0] - off, bottom_left_arc_box[1] - off, bottom_left_arc_box[2] + off, bottom_left_arc_box[3] + off],
                      start=180, end=270, fill=frame_color)
 
-    # 外枠：アーク終端同士を直線で繋ぐ（途切れないように overlap を使い余裕を持って接続）
-    # top horizontal between left_arc_box.right and right_arc_box.left (overlap で内側へ入る)
-    x1 = left_arc_box[2] - overlap
-    x2 = right_arc_box[0] + overlap
-    y_top = oy + int(arc_bbox_offset / 2)
-    draw.line([(x1, y_top), (x2, y_top)], fill=frame_color, width=outer_width)
+    # ----- ここから：アークの正確な端点を取得して、直線をその端点同士でつなぐ（隙間を無くす） -----
+    # top: 左アークの top-point (angle=90) から 右アークの top-point (angle=90)
+    p_left_top = _arc_point(left_arc_box, 90)
+    p_right_top = _arc_point(right_arc_box, 90)
+    # 端点を確実に重ねるため、start を少し後退、end を少し進める（overlap）
+    start_top = _extend_point(p_left_top, p_right_top, -overlap)
+    end_top = _extend_point(p_right_top, p_left_top, -overlap)  # reverse to get direction
+    draw.line([start_top, end_top], fill=frame_color, width=outer_width)
 
-    # bottom horizontal
-    x1b = bottom_left_arc_box[2] - overlap
-    x2b = bottom_right_arc_box[0] + overlap
-    y_bot = oy + oh - int(arc_bbox_offset / 2)
-    draw.line([(x1b, y_bot), (x2b, y_bot)], fill=frame_color, width=outer_width)
+    # bottom: 左下アーク bottom-point (270) -> 右下アーク bottom-point (270)
+    p_left_bot = _arc_point(bottom_left_arc_box, 270)
+    p_right_bot = _arc_point(bottom_right_arc_box, 270)
+    start_bot = _extend_point(p_left_bot, p_right_bot, -overlap)
+    end_bot = _extend_point(p_right_bot, p_left_bot, -overlap)
+    draw.line([start_bot, end_bot], fill=frame_color, width=outer_width)
 
-    # left vertical
-    y1 = left_arc_box[3] - overlap
-    y2 = bottom_left_arc_box[1] + overlap
-    x_left = ox + int(arc_bbox_offset / 2)
-    draw.line([(x_left, y1), (x_left, y2)], fill=frame_color, width=outer_width)
+    # left vertical: top-left arc left-point (180) -> bottom-left arc left-point (180)
+    p_left_top_left = _arc_point(left_arc_box, 180)
+    p_left_bot_left = _arc_point(bottom_left_arc_box, 180)
+    start_left = _extend_point(p_left_top_left, p_left_bot_left, -overlap)
+    end_left = _extend_point(p_left_bot_left, p_left_top_left, -overlap)
+    draw.line([start_left, end_left], fill=frame_color, width=outer_width)
 
-    # right vertical
-    y1r = right_arc_box[3] - overlap
-    y2r = bottom_right_arc_box[1] + overlap
-    x_right = ox + ow - int(arc_bbox_offset / 2)
-    draw.line([(x_right, y1r), (x_right, y2r)], fill=frame_color, width=outer_width)
+    # right vertical: top-right arc right-point (0) -> bottom-right arc right-point (0)
+    p_right_top_right = _arc_point(right_arc_box, 0)
+    p_right_bot_right = _arc_point(bottom_right_arc_box, 0)
+    start_right = _extend_point(p_right_top_right, p_right_bot_right, -overlap)
+    end_right = _extend_point(p_right_bot_right, p_right_top_right, -overlap)
+    draw.line([start_right, end_right], fill=frame_color, width=outer_width)
+    # ----- 外枠ここまで -----
+
 
     # 内枠：アーク＋直線（外枠より小さめ）
     inner_arc_bbox = int(notch_radius * 0.65)
@@ -180,22 +220,30 @@ def draw_decorative_frame(img: Image.Image,
             draw.arc([bl_box[0] - off, bl_box[1] - off, bl_box[2] + off, bl_box[3] + off],
                      start=180, end=270, fill=inner_color)
 
-    # 内枠：直線を overlap でしっかり繋ぐ
-    top_x1 = li_box[2] - overlap
-    top_x2 = ri_box[0] + overlap
-    top_y = iy + int(inner_arc_bbox / 2)
-    draw.line([(top_x1, top_y), (top_x2, top_y)], fill=inner_color, width=inner_width)
+    # 内枠の直線をアーク端点で接続（overlap を用いて確実に繋ぐ）
+    p_li_top = _arc_point(li_box, 90)
+    p_ri_top = _arc_point(ri_box, 90)
+    start_itop = _extend_point(p_li_top, p_ri_top, -overlap)
+    end_itop = _extend_point(p_ri_top, p_li_top, -overlap)
+    draw.line([start_itop, end_itop], fill=inner_color, width=inner_width)
 
-    bot_x1 = bl_box[2] - overlap
-    bot_x2 = br_box[0] + overlap
-    bot_y = iy + ih - int(inner_arc_bbox / 2)
-    draw.line([(bot_x1, bot_y), (bot_x2, bot_y)], fill=inner_color, width=inner_width)
+    p_li_bot = _arc_point(bl_box, 270)
+    p_ri_bot = _arc_point(br_box, 270)
+    start_ibot = _extend_point(p_li_bot, p_ri_bot, -overlap)
+    end_ibot = _extend_point(p_ri_bot, p_li_bot, -overlap)
+    draw.line([start_ibot, end_ibot], fill=inner_color, width=inner_width)
 
-    left_x = ix + int(inner_arc_bbox / 2)
-    draw.line([(left_x, li_box[3] - overlap), (left_x, bl_box[1] + overlap)], fill=inner_color, width=inner_width)
+    p_li_left = _arc_point(li_box, 180)
+    p_li_bottomleft = _arc_point(bl_box, 180)
+    start_ileft = _extend_point(p_li_left, p_li_bottomleft, -overlap)
+    end_ileft = _extend_point(p_li_bottomleft, p_li_left, -overlap)
+    draw.line([start_ileft, end_ileft], fill=inner_color, width=inner_width)
 
-    right_x = ix + iw - int(inner_arc_bbox / 2)
-    draw.line([(right_x, ri_box[3] - overlap), (right_x, br_box[1] + overlap)], fill=inner_color, width=inner_width)
+    p_ri_right = _arc_point(ri_box, 0)
+    p_ri_bottomright = _arc_point(br_box, 0)
+    start_iright = _extend_point(p_ri_right, p_ri_bottomright, -overlap)
+    end_iright = _extend_point(p_ri_bottomright, p_ri_right, -overlap)
+    draw.line([start_iright, end_iright], fill=inner_color, width=inner_width)
 
     # 装飾的ルール線（上・中・左のガイド）を描画
     rule_color = (110, 75, 45, 180)
@@ -279,7 +327,7 @@ def create_card_background(w: int, h: int,
 
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
     """
-    guild_data は API からの辞書を想定。
+    guild_data は辞書を想定。
     画像は縦長（幅は CANVAS_WIDTH に固定、高さはオンライン人数で伸縮）。
     戻り値: BytesIO (PNG)
     """
