@@ -105,7 +105,10 @@ def draw_decorative_frame(img: Image.Image,
     except Exception:
         draw.rectangle([ix, iy, ix + iw, iy + ih], outline=inner_color, width=inner_width)
 
-        # 角の「凹み（concave notch）」を描く（改良版）
+    # 角飾りの基準長さ（外でも内でも使う）
+    corner_len = max(12, int(min(w, h) * 0.03))
+
+    # 角の「凹み（concave notch）」を描く（改良版）
     # 小さな円弧（BASE_BG_COLOR で塗りつぶし）で凹ませつつ、
     # その上から枠線を短い線分で再描画して繋がりを維持する。
     notch_size = max(10, int(min(w, h) * 0.03))
@@ -443,7 +446,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
                 display_name = display_name + "..."
             draw.text((nx + 6, y + 10), display_name, font=font_table, fill=TITLE_COLOR)
 
-            # rank box
+    # rank box
             rx = nx + col_name_w + 8
             draw.rectangle([rx - 2, y, rx + col_rank_w, y + row_h - 8], outline=LINE_COLOR, width=1)
             draw.text((rx + 6, y + 10), rank, font=font_table, fill=SUBTITLE_COLOR)
