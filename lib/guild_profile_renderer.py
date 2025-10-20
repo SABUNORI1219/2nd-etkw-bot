@@ -60,7 +60,6 @@ def _text_width(draw_obj: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageF
 def _arc_point(bbox, angle_deg):
     """
     bbox = [x0,y0,x1,y1] の楕円上の angle_deg (度) に対応する座標を返す。
-    Pillow の角度系に合わせ、Y は下方向が正なので計算は y = cy - ry * sin(theta) とする。
     """
     x0, y0, x1, y1 = bbox
     cx = (x0 + x1) / 2.0
@@ -76,7 +75,6 @@ def _arc_point(bbox, angle_deg):
 def _extend_point(p, q, amount):
     """
     p -> q の方向に沿って q 側に amount ピクセルだけ伸ばした点を返す。
-    (p,q) が同一点の場合は q を返す。
     """
     px, py = p
     qx, qy = q
@@ -97,13 +95,9 @@ def draw_decorative_frame(img: Image.Image,
                           inner_width: int = 2,
                           frame_color=(85, 50, 30, 255)) -> Image.Image:
     """
-    外枠（太）＋内枠（細）を描画する（改良版）。
-    以前の「背景で消す/丸を置く」方式は線が途切れたり
-    丸が目立ったりしていたため、ここではマスク（アルファ）方式を採用：
-    - 外側の矩形領域を塗り（マスク）、内側をくり抜き（内矩形を0に）、
-      そのマスクから四隅に円でくぼみ（0）を描いて凹ませる。
-    - 同様に内枠も別マスクで作り、アルファ合成で画像に重ねる。
-    これにより「アークが目立つ／線が途切れる」問題が解消されます。
+    外枠（太）＋内枠（細）を描画する（スーパーサンプリング方式）。
+    - アークは角の外側に bounding box を置き、適切な角度で描画（内向きの凹みにする）。
+    - 高解像度で描画してから縮小することでアンチエイリアスの隙間を防ぐ。
     """
     w, h = img.size
 
@@ -123,59 +117,153 @@ def draw_decorative_frame(img: Image.Image,
     iw = w - inner_offset * 2
     ih = h - inner_offset * 2
 
-    # notch（凹み）の半径（見た目調整）
+    # 凹みサイズ（調整可能）
     notch_radius = max(12, int(min(w, h) * 0.035))
     inner_notch = max(6, int(min(w, h) * 0.02))
 
-    out = img.convert("RGBA")
+    # スーパーサンプリング倍率（描画品質向上）
+    SCALE = 4
+    sw = w * SCALE
+    sh = h * SCALE
 
-    # ----- 外枠（マスク作成） -----
-    mask_outer = Image.new("L", (w, h), 0)
-    md = ImageDraw.Draw(mask_outer)
-    # 外側矩形を 255 塗りつぶす
-    md.rectangle([ox, oy, ox + ow, oy + oh], fill=255)
-    # 内側（枠の肉厚分）を 0 でくり抜く（これでリング状になる）
-    inner_cut = [ox + outer_width, oy + outer_width, ox + ow - outer_width, oy + oh - outer_width]
-    if inner_cut[2] > inner_cut[0] and inner_cut[3] > inner_cut[1]:
-        md.rectangle(inner_cut, fill=0)
+    # スケールされたパラメータ
+    sox = ox * SCALE
+    soy = oy * SCALE
+    sow = ow * SCALE
+    soh = oh * SCALE
+    six = ix * SCALE
+    siy = iy * SCALE
+    siw = iw * SCALE
+    sih = ih * SCALE
+    snotch = notch_radius * SCALE
+    sinner_notch = inner_notch * SCALE
+    s_outer_w = max(1, int(outer_width * SCALE))
+    s_inner_w = max(1, int(inner_width * SCALE))
 
-    # 四隅の notch をマスクでくり抜く（背景と同じでなく"透明"にする）
-    md.ellipse([ox - notch_radius, oy - notch_radius, ox + notch_radius, oy + notch_radius], fill=0)  # 左上
-    md.ellipse([ox + ow - notch_radius, oy - notch_radius, ox + ow + notch_radius, oy + notch_radius], fill=0)  # 右上
-    md.ellipse([ox - notch_radius, oy + oh - notch_radius, ox + notch_radius, oy + oh + notch_radius], fill=0)  # 左下
-    md.ellipse([ox + ow - notch_radius, oy + oh - notch_radius, ox + ow + notch_radius, oy + oh + notch_radius], fill=0)  # 右下
+    # 作業レイヤ（透明）に描く
+    tmp = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
+    td = ImageDraw.Draw(tmp)
 
-    # alpha を付けたカラー層を作って合成（frame_color を用いる）
-    layer_outer = Image.new("RGBA", (w, h), frame_color)
-    layer_outer.putalpha(mask_outer)
-    out = Image.alpha_composite(out, layer_outer)
+    # アークの bbox を「角の外側」に置くことで、arc を内向き（凹）に見せる
+    # top-left: bbox bottom-right == corner (ox,oy) scaled
+    lt_box = [int(sox - 2 * snotch), int(soy - 2 * snotch), int(sox), int(soy)]
+    rt_box = [int(sox + sow), int(soy - 2 * snotch), int(sox + sow + 2 * snotch), int(soy)]
+    bl_box = [int(sox - 2 * snotch), int(soy + soh), int(sox), int(soy + soh + 2 * snotch)]
+    br_box = [int(sox + sow), int(soy + soh), int(sox + sow + 2 * snotch), int(soy + soh + 2 * snotch)]
 
-    # ----- 内枠（細線） -----
-    mask_inner = Image.new("L", (w, h), 0)
-    md2 = ImageDraw.Draw(mask_inner)
-    md2.rectangle([ix, iy, ix + iw, iy + ih], fill=255)
-    inner2_cut = [ix + inner_width, iy + inner_width, ix + iw - inner_width, iy + ih - inner_width]
-    if inner2_cut[2] > inner2_cut[0] and inner2_cut[3] > inner2_cut[1]:
-        md2.rectangle(inner2_cut, fill=0)
-    md2.ellipse([ix - inner_notch, iy - inner_notch, ix + inner_notch, iy + inner_notch], fill=0)  # 内左上
-    md2.ellipse([ix + iw - inner_notch, iy - inner_notch, ix + iw + inner_notch, iy + inner_notch], fill=0)  # 内右上
-    md2.ellipse([ix - inner_notch, iy + ih - inner_notch, ix + inner_notch, iy + ih + inner_notch], fill=0)  # 内左下
-    md2.ellipse([ix + iw - inner_notch, iy + ih - inner_notch, ix + iw + inner_notch, iy + ih + inner_notch], fill=0)  # 内右下
+    # 外枠：アーク（内向きに見える角）を描画（角度は bbox に合わせて指定）
+    try:
+        td.arc(lt_box, start=0, end=90, fill=frame_color, width=s_outer_w)      # top-left concave
+        td.arc(rt_box, start=90, end=180, fill=frame_color, width=s_outer_w)    # top-right
+        td.arc(br_box, start=180, end=270, fill=frame_color, width=s_outer_w)   # bottom-right
+        td.arc(bl_box, start=270, end=360, fill=frame_color, width=s_outer_w)   # bottom-left
+    except Exception:
+        # Pillow 環境によっては width 無視される場合があるが、縮小で許容する
+        td.arc(lt_box, start=0, end=90, fill=frame_color)
+        td.arc(rt_box, start=90, end=180, fill=frame_color)
+        td.arc(br_box, start=180, end=270, fill=frame_color)
+        td.arc(bl_box, start=270, end=360, fill=frame_color)
 
-    inner_color = (95, 60, 35, 220)
-    layer_inner = Image.new("RGBA", (w, h), inner_color)
-    layer_inner.putalpha(mask_inner)
-    out = Image.alpha_composite(out, layer_inner)
+    # アークの端点を計算して、直線で繋ぐ（少しオーバーラップして確実に繋ぐ）
+    # top edge
+    p_lt_top = _arc_point([coord / SCALE for coord in lt_box], 90)
+    p_rt_top = _arc_point([coord / SCALE for coord in rt_box], 90)
+    # スケールしてから延長量を掛ける
+    p1 = (p_lt_top[0] * SCALE, p_lt_top[1] * SCALE)
+    p2 = (p_rt_top[0] * SCALE, p_rt_top[1] * SCALE)
+    overlap_px = max(2, int(s_outer_w * 0.25))
+    sstart = _extend_point(p1, p2, -overlap_px)
+    send = _extend_point(p2, p1, -overlap_px)
+    td.line([sstart, send], fill=frame_color, width=s_outer_w)
 
-    # ----- ルール線などの装飾は上に描画 -----
+    # bottom edge
+    p_lb_bot = _arc_point([coord / SCALE for coord in bl_box], 270)
+    p_rb_bot = _arc_point([coord / SCALE for coord in br_box], 270)
+    p1b = (p_lb_bot[0] * SCALE, p_lb_bot[1] * SCALE)
+    p2b = (p_rb_bot[0] * SCALE, p_rb_bot[1] * SCALE)
+    sstartb = _extend_point(p1b, p2b, -overlap_px)
+    sendb = _extend_point(p2b, p1b, -overlap_px)
+    td.line([sstartb, sendb], fill=frame_color, width=s_outer_w)
+
+    # left vertical
+    p_lt_l = _arc_point([coord / SCALE for coord in lt_box], 180)
+    p_lb_l = _arc_point([coord / SCALE for coord in bl_box], 180)
+    p1l = (p_lt_l[0] * SCALE, p_lt_l[1] * SCALE)
+    p2l = (p_lb_l[0] * SCALE, p_lb_l[1] * SCALE)
+    sstartl = _extend_point(p1l, p2l, -overlap_px)
+    sendl = _extend_point(p2l, p1l, -overlap_px)
+    td.line([sstartl, sendl], fill=frame_color, width=s_outer_w)
+
+    # right vertical
+    p_rt_r = _arc_point([coord / SCALE for coord in rt_box], 0)
+    p_rb_r = _arc_point([coord / SCALE for coord in br_box], 0)
+    p1r = (p_rt_r[0] * SCALE, p_rt_r[1] * SCALE)
+    p2r = (p_rb_r[0] * SCALE, p_rb_r[1] * SCALE)
+    sstartr = _extend_point(p1r, p2r, -overlap_px)
+    sendr = _extend_point(p2r, p1r, -overlap_px)
+    td.line([sstartr, sendr], fill=frame_color, width=s_outer_w)
+
+    # 内枠（同様に高解像度で描画）
+    # 内枠アーク用ボックス（内側に控えめに置く）
+    inner_arc = int(notch_radius * 0.65)
+    s_inner = inner_arc * SCALE
+    li_box = [int(six - s_inner), int(siy - s_inner), int(six + s_inner), int(siy + s_inner)]
+    ri_box = [int(six + siw - s_inner), int(siy - s_inner), int(six + siw + s_inner), int(siy + s_inner)]
+    bli_box = [int(six - s_inner), int(siy + sih - s_inner), int(six + s_inner), int(siy + sih + s_inner)]
+    bri_box = [int(six + siw - s_inner), int(siy + sih - s_inner), int(six + siw + s_inner), int(siy + sih + s_inner)]
+
+    try:
+        td.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220), width=s_inner_w)
+        td.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220), width=s_inner_w)
+        td.arc(bri_box, start=180, end=270, fill=(95, 60, 35, 220), width=s_inner_w)
+        td.arc(bli_box, start=270, end=360, fill=(95, 60, 35, 220), width=s_inner_w)
+    except Exception:
+        td.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220))
+        td.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220))
+        td.arc(bri_box, start=180, end=270, fill=(95, 60, 35, 220))
+        td.arc(bli_box, start=270, end=360, fill=(95, 60, 35, 220))
+
+    # 内枠の直線接続（同じくオーバーラップ）
+    # top
+    pli_top = _arc_point([coord / SCALE for coord in li_box], 90)
+    pri_top = _arc_point([coord / SCALE for coord in ri_box], 90)
+    p1i = (pli_top[0] * SCALE, pli_top[1] * SCALE)
+    p2i = (pri_top[0] * SCALE, pri_top[1] * SCALE)
+    oi = max(2, int(s_inner_w * 0.25))
+    td.line([_extend_point(p1i, p2i, -oi), _extend_point(p2i, p1i, -oi)], fill=(95, 60, 35, 220), width=s_inner_w)
+    # bottom
+    pli_bot = _arc_point([coord / SCALE for coord in bli_box], 270)
+    pri_bot = _arc_point([coord / SCALE for coord in bri_box], 270)
+    p1ib = (pli_bot[0] * SCALE, pli_bot[1] * SCALE)
+    p2ib = (pri_bot[0] * SCALE, pri_bot[1] * SCALE)
+    td.line([_extend_point(p1ib, p2ib, -oi), _extend_point(p2ib, p1ib, -oi)], fill=(95, 60, 35, 220), width=s_inner_w)
+    # left vertical
+    pli_l = _arc_point([coord / SCALE for coord in li_box], 180)
+    pli_ll = _arc_point([coord / SCALE for coord in bli_box], 180)
+    td.line([_extend_point((pli_l[0]*SCALE, pli_l[1]*SCALE), (pli_ll[0]*SCALE, pli_ll[1]*SCALE), -oi),
+             _extend_point((pli_ll[0]*SCALE, pli_ll[1]*SCALE), (pli_l[0]*SCALE, pli_l[1]*SCALE), -oi)],
+            fill=(95, 60, 35, 220), width=s_inner_w)
+    # right vertical
+    pri_r = _arc_point([coord / SCALE for coord in ri_box], 0)
+    pri_rr = _arc_point([coord / SCALE for coord in bri_box], 0)
+    td.line([_extend_point((pri_r[0]*SCALE, pri_r[1]*SCALE), (pri_rr[0]*SCALE, pri_rr[1]*SCALE), -oi),
+             _extend_point((pri_rr[0]*SCALE, pri_rr[1]*SCALE), (pri_r[0]*SCALE, pri_r[1]*SCALE), -oi)],
+            fill=(95, 60, 35, 220), width=s_inner_w)
+
+    # 縮小して元画像に合成（高品質リサンプル）
+    down = tmp.resize((w, h), resample=Image.LANCZOS)
+    base = img.convert("RGBA")
+    out = Image.alpha_composite(base, down)
+
+    # ルール線等は上に描画
     draw = ImageDraw.Draw(out)
     rule_color = (110, 75, 45, 180)
-    # 横ルール
     y_rule = iy + int(ih * 0.12)
-    draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color, width=max(2, inner_width + 2))
+    draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color,
+              width=max(2, inner_width + 2))
     y_rule2 = iy + int(ih * 0.48)
-    draw.line([(ix + int(iw * 0.03), y_rule2), (ix + int(iw * 0.60), y_rule2)], fill=rule_color, width=max(2, inner_width + 2))
-    # バナー矩形（左上）
+    draw.line([(ix + int(iw * 0.03), y_rule2), (ix + int(iw * 0.60), y_rule2)], fill=rule_color,
+              width=max(2, inner_width + 2))
     box_x = ix + int(iw * 0.04)
     box_y = iy + int(ih * 0.06)
     box_w = int(iw * 0.18)
@@ -191,7 +279,6 @@ def create_card_background(w: int, h: int,
                            vignette_blur: int = 80) -> Image.Image:
     """
     紙風背景（ノイズ＋ブラー＋ビネット）に装飾枠を描画して返す。
-    焦げ（burn/scorch）処理は削除済み。
     """
     base = Image.new('RGB', (w, h), BASE_BG_COLOR)
 
@@ -216,8 +303,6 @@ def create_card_background(w: int, h: int,
                 nd.point((x, y), fill=(tone, tone, tone))
 
     img = Image.blend(base, noise_img, noise_blend)
-
-    # 軽くぼかして紙感
     img = img.filter(ImageFilter.GaussianBlur(1))
 
     # ==== ビネット（端の暗化）====
@@ -266,7 +351,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
                 return default
         return v
 
-    # オンラインプレイヤー解析
     members = guild_data.get("members", {}) or {}
     online_players: List[Dict[str, str]] = []
     rank_to_stars = {
@@ -290,7 +374,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
                         "rank_stars": rank_to_stars.get(rank_name.upper(), "")
                     })
 
-    # 基本データ
     prefix = sg(guild_data, "prefix", default="")
     name = sg(guild_data, "name", default="Unknown Guild")
     owner_list = guild_data.get("members", {}).get("owner", {}) or {}
@@ -304,7 +387,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     territories = sg(guild_data, "territories", default=0)
     total_members = sg(guild_data, "members", "total", default=0)
 
-    # シーズンレーティング
     season_ranks = guild_data.get("seasonRanks") or {}
     latest_season = "N/A"
     rating_display = "N/A"
@@ -316,7 +398,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         except Exception:
             latest_season = "N/A"
 
-    # バナー
     banner_img = None
     try:
         banner_bytes = banner_renderer.create_banner_image(guild_data.get("banner")) if banner_renderer is not None else None
@@ -328,7 +409,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     except Exception as e:
         logger.warning(f"バナー生成に失敗: {e}")
 
-    # 動的高さ計算（オンライン数に応じて縦に伸ばす）
     base_height = 700
     row_height = 48
     online_count = len(online_players)
@@ -337,7 +417,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     canvas_w = max_width
     canvas_h = content_height
 
-    # 背景（縦長）作成
     img = create_card_background(canvas_w, canvas_h)
     draw = ImageDraw.Draw(img)
 
@@ -346,7 +425,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     card_w = canvas_w - MARGIN * 2
     card_h = canvas_h - MARGIN * 2
 
-    # フォント設定
     try:
         font_title = ImageFont.truetype(FONT_PATH, 48)
         font_sub = ImageFont.truetype(FONT_PATH, 26)
@@ -361,11 +439,9 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     inner_left = card_x + 36
     inner_top = card_y + 36
 
-    # ヘッダテキスト
     draw.text((inner_left, inner_top), f"[{prefix}] {name}", font=font_title, fill=TITLE_COLOR)
     draw.text((inner_left, inner_top + 56), f"Owner: {owner}  |  Created: {created}", font=font_sub, fill=SUBTITLE_COLOR)
 
-    # バナー（左上）
     banner_w = int(card_w * 0.18)
     banner_h = int(card_h * 0.20)
     banner_x = inner_left
@@ -377,7 +453,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         except Exception as e:
             logger.warning(f"バナー貼付失敗: {e}")
 
-    # 主要統計（バナー右）
     stats_x = banner_x + banner_w + 18
     stats_y = banner_y
     draw.text((stats_x, stats_y), f"Level: {level}   ({xpPercent}%)", font=font_stats, fill=SUBTITLE_COLOR)
@@ -385,13 +460,11 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     draw.text((stats_x, stats_y + 60), f"Members: {_fmt_num(total_members)}   Online: {_fmt_num(online_count)}", font=font_stats, fill=SUBTITLE_COLOR)
     draw.text((stats_x, stats_y + 90), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=SUBTITLE_COLOR)
 
-    # 区切り線（左／右カラム）
     sep_x = card_x + LEFT_COLUMN_WIDTH
     sep_y1 = inner_top + 24
     sep_y2 = card_y + card_h - 40
     draw.line([(sep_x, sep_y1), (sep_x, sep_y2)], fill=LINE_COLOR, width=2)
 
-    # 右側：オンラインテーブルヘッダ
     table_x = sep_x + 18
     table_y = inner_top + 10
     draw.rectangle([table_x, table_y, table_x + RIGHT_COLUMN_WIDTH - 18, table_y + 40], fill=TABLE_HEADER_BG)
@@ -401,7 +474,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     col_name_w = RIGHT_COLUMN_WIDTH - 18 - col_server_w - 60
     col_rank_w = 60
 
-    # オンラインプレイヤー一覧
     row_h = 44
     y = header_bottom + 12
     if online_players:
@@ -410,11 +482,9 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
             pname = p.get("name", "Unknown")
             rank = p.get("rank_stars", "")
 
-            # server box
             draw.rectangle([table_x, y, table_x + col_server_w, y + row_h - 8], outline=LINE_COLOR, width=1)
             draw.text((table_x + 6, y + 10), server, font=font_table, fill=SUBTITLE_COLOR)
 
-            # name box
             nx = table_x + col_server_w + 8
             draw.rectangle([nx - 2, y, nx + col_name_w, y + row_h - 8], outline=LINE_COLOR, width=1)
             try:
@@ -430,7 +500,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
                 display_name = display_name + "..."
             draw.text((nx + 6, y + 10), display_name, font=font_table, fill=TITLE_COLOR)
 
-            # rank box
             rx = nx + col_name_w + 8
             draw.rectangle([rx - 2, y, rx + col_rank_w, y + row_h - 8], outline=LINE_COLOR, width=1)
             draw.text((rx + 6, y + 10), rank, font=font_table, fill=SUBTITLE_COLOR)
@@ -439,7 +508,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     else:
         draw.text((table_x + 8, header_bottom + 18), "No members online right now.", font=font_table, fill=SUBTITLE_COLOR)
 
-    # フッター
     footer_text = "Generated by Minister Chikuwa"
     try:
         fw = _text_width(draw, footer_text, font=font_small)
@@ -448,7 +516,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         fw = bbox[2] - bbox[0]
     draw.text((card_x + card_w - fw - 16, card_y + card_h - 36), footer_text, font=font_small, fill=(120, 110, 100, 255))
 
-    # <-- fixed: use variable name `out` like the rest of the code expects -->
     out = BytesIO()
     img.save(out, format="PNG")
     out.seek(0)
