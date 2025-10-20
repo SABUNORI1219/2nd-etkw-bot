@@ -93,10 +93,12 @@ def draw_decorative_frame(img: Image.Image,
     inner_color = (95, 60, 35, 220)
     inner_radius = max(6, int(min(w, h) * 0.015))
 
-    # まずはアーク+直線方式で外枠・内枠を描画する（四隅の凹みはアーク）
     # notch/arc の半径（見た目調整）
     notch_radius = max(12, int(min(w, h) * 0.035))
     arc_bbox_offset = notch_radius
+
+    # Overlap: アークと直線を確実に被せるための重なり量（ピクセル）
+    overlap = max(3, int(max(1, outer_width * 0.6)))
 
     # 外枠：アーク用ボックス（四隅）
     left_arc_box = [ox, oy, ox + arc_bbox_offset * 2, oy + arc_bbox_offset * 2]
@@ -126,24 +128,28 @@ def draw_decorative_frame(img: Image.Image,
             draw.arc([bottom_left_arc_box[0] - off, bottom_left_arc_box[1] - off, bottom_left_arc_box[2] + off, bottom_left_arc_box[3] + off],
                      start=180, end=270, fill=frame_color)
 
-    # 外枠：アーク終端同士を直線で繋ぐ（途切れない）
-    x1 = left_arc_box[2] - 1
-    x2 = right_arc_box[0] + 1
+    # 外枠：アーク終端同士を直線で繋ぐ（途切れないように overlap を使い余裕を持って接続）
+    # top horizontal between left_arc_box.right and right_arc_box.left (overlap で内側へ入る)
+    x1 = left_arc_box[2] - overlap
+    x2 = right_arc_box[0] + overlap
     y_top = oy + int(arc_bbox_offset / 2)
     draw.line([(x1, y_top), (x2, y_top)], fill=frame_color, width=outer_width)
 
-    x1b = bottom_left_arc_box[2] - 1
-    x2b = bottom_right_arc_box[0] + 1
+    # bottom horizontal
+    x1b = bottom_left_arc_box[2] - overlap
+    x2b = bottom_right_arc_box[0] + overlap
     y_bot = oy + oh - int(arc_bbox_offset / 2)
     draw.line([(x1b, y_bot), (x2b, y_bot)], fill=frame_color, width=outer_width)
 
-    y1 = left_arc_box[3] - 1
-    y2 = bottom_left_arc_box[1] + 1
+    # left vertical
+    y1 = left_arc_box[3] - overlap
+    y2 = bottom_left_arc_box[1] + overlap
     x_left = ox + int(arc_bbox_offset / 2)
     draw.line([(x_left, y1), (x_left, y2)], fill=frame_color, width=outer_width)
 
-    y1r = right_arc_box[3] - 1
-    y2r = bottom_right_arc_box[1] + 1
+    # right vertical
+    y1r = right_arc_box[3] - overlap
+    y2r = bottom_right_arc_box[1] + overlap
     x_right = ox + ow - int(arc_bbox_offset / 2)
     draw.line([(x_right, y1r), (x_right, y2r)], fill=frame_color, width=outer_width)
 
@@ -164,22 +170,32 @@ def draw_decorative_frame(img: Image.Image,
         draw.arc(ri_box, start=0, end=90, fill=inner_color)
         draw.arc(br_box, start=270, end=360, fill=inner_color)
         draw.arc(bl_box, start=180, end=270, fill=inner_color)
+        for off in range(1, max(1, inner_width // 2) + 1):
+            draw.arc([li_box[0] - off, li_box[1] - off, li_box[2] + off, li_box[3] + off],
+                     start=90, end=180, fill=inner_color)
+            draw.arc([ri_box[0] - off, ri_box[1] - off, ri_box[2] + off, ri_box[3] + off],
+                     start=0, end=90, fill=inner_color)
+            draw.arc([br_box[0] - off, br_box[1] - off, br_box[2] + off, br_box[3] + off],
+                     start=270, end=360, fill=inner_color)
+            draw.arc([bl_box[0] - off, bl_box[1] - off, bl_box[2] + off, bl_box[3] + off],
+                     start=180, end=270, fill=inner_color)
 
-    top_x1 = li_box[2] - 1
-    top_x2 = ri_box[0] + 1
+    # 内枠：直線を overlap でしっかり繋ぐ
+    top_x1 = li_box[2] - overlap
+    top_x2 = ri_box[0] + overlap
     top_y = iy + int(inner_arc_bbox / 2)
     draw.line([(top_x1, top_y), (top_x2, top_y)], fill=inner_color, width=inner_width)
 
-    bot_x1 = bl_box[2] - 1
-    bot_x2 = br_box[0] + 1
+    bot_x1 = bl_box[2] - overlap
+    bot_x2 = br_box[0] + overlap
     bot_y = iy + ih - int(inner_arc_bbox / 2)
     draw.line([(bot_x1, bot_y), (bot_x2, bot_y)], fill=inner_color, width=inner_width)
 
     left_x = ix + int(inner_arc_bbox / 2)
-    draw.line([(left_x, li_box[3] - 1), (left_x, bl_box[1] + 1)], fill=inner_color, width=inner_width)
+    draw.line([(left_x, li_box[3] - overlap), (left_x, bl_box[1] + overlap)], fill=inner_color, width=inner_width)
 
     right_x = ix + iw - int(inner_arc_bbox / 2)
-    draw.line([(right_x, ri_box[3] - 1), (right_x, br_box[1] + 1)], fill=inner_color, width=inner_width)
+    draw.line([(right_x, ri_box[3] - overlap), (right_x, br_box[1] + overlap)], fill=inner_color, width=inner_width)
 
     # 装飾的ルール線（上・中・左のガイド）を描画
     rule_color = (110, 75, 45, 180)
