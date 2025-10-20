@@ -60,6 +60,7 @@ def _text_width(draw_obj: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageF
 def _arc_point(bbox, angle_deg):
     """
     bbox = [x0,y0,x1,y1] の楕円上の angle_deg (度) に対応する座標を返す。
+    Pillow の角度系に合わせ、Y は下方向が正なので計算は y = cy - ry * sin(theta) とする。
     """
     x0, y0, x1, y1 = bbox
     cx = (x0 + x1) / 2.0
@@ -75,6 +76,7 @@ def _arc_point(bbox, angle_deg):
 def _extend_point(p, q, amount):
     """
     p -> q の方向に沿って q 側に amount ピクセルだけ伸ばした点を返す。
+    (p,q) が同一点の場合は q を返す。
     """
     px, py = p
     qx, qy = q
@@ -95,175 +97,138 @@ def draw_decorative_frame(img: Image.Image,
                           inner_width: int = 2,
                           frame_color=(85, 50, 30, 255)) -> Image.Image:
     """
-    外枠（太）＋内枠（細）を描画する（スーパーサンプリング方式）。
-    - アークは角の外側に bounding box を置き、適切な角度で描画（内向きの凹みにする）。
-    - 高解像度で描画してから縮小することでアンチエイリアスの隙間を防ぐ。
+    外枠（太）＋内枠（細）を描画。
+    要求どおり「太線が画像外にはみ出さない」ようにオフセットを調整し、
+    アーク（四隅1/4円）が直線と接続される位置で描画する最小限の修正を入れています。
+    - outer_offset/inner_offset を None にすると自動計算。
+    - 重要: outer_offset は notch_radius と outer_width を考慮して最低値を確保します。
     """
     w, h = img.size
 
-    # 自動オフセット
+    # 凹み（notch）サイズ（見た目調整）
+    notch_radius = max(12, int(min(w, h) * 0.035))
+
+    # 自動オフセット（だが太さと凹みを内包できるだけの余裕を確保する）
     if outer_offset is None:
         outer_offset = max(12, int(min(w, h) * 0.025))
+    # outer_offset は arc bbox (notch_radius) と outer_width/2 の分だけ余裕を持たせる
+    outer_offset = max(outer_offset, notch_radius + outer_width // 2 + 2)
+
     if inner_offset is None:
         inner_offset = outer_offset + max(8, int(min(w, h) * 0.02))
+    inner_offset = max(inner_offset, inner_width // 2 + 2)
 
-    ox = outer_offset
-    oy = outer_offset
-    ow = w - outer_offset * 2
-    oh = h - outer_offset * 2
+    ox = int(outer_offset)
+    oy = int(outer_offset)
+    ow = int(w - outer_offset * 2)
+    oh = int(h - outer_offset * 2)
 
-    ix = inner_offset
-    iy = inner_offset
-    iw = w - inner_offset * 2
-    ih = h - inner_offset * 2
+    ix = int(inner_offset)
+    iy = int(inner_offset)
+    iw = int(w - inner_offset * 2)
+    ih = int(h - inner_offset * 2)
 
-    # 凹みサイズ（調整可能）
-    notch_radius = max(12, int(min(w, h) * 0.035))
-    inner_notch = max(6, int(min(w, h) * 0.02))
+    out = img.convert("RGBA")
+    draw = ImageDraw.Draw(out)
 
-    # スーパーサンプリング倍率（描画品質向上）
-    SCALE = 4
-    sw = w * SCALE
-    sh = h * SCALE
+    # アーク用 bbox のオフセット（角の「外側」に bbox を置いてアークが内側に凹む見た目にする）
+    arc_box_r = notch_radius
+    # ここで arc_bbox を整数で作る。bbox がきっちり角に沿うように調整する。
+    left_arc_box = [ox - 2 * arc_box_r, oy - 2 * arc_box_r, ox, oy]
+    right_arc_box = [ox + ow, oy - 2 * arc_box_r, ox + ow + 2 * arc_box_r, oy]
+    bottom_left_arc_box = [ox - 2 * arc_box_r, oy + oh, ox, oy + oh + 2 * arc_box_r]
+    bottom_right_arc_box = [ox + ow, oy + oh, ox + ow + 2 * arc_box_r, oy + oh + 2 * arc_box_r]
 
-    # スケールされたパラメータ
-    sox = ox * SCALE
-    soy = oy * SCALE
-    sow = ow * SCALE
-    soh = oh * SCALE
-    six = ix * SCALE
-    siy = iy * SCALE
-    siw = iw * SCALE
-    sih = ih * SCALE
-    snotch = notch_radius * SCALE
-    sinner_notch = inner_notch * SCALE
-    s_outer_w = max(1, int(outer_width * SCALE))
-    s_inner_w = max(1, int(inner_width * SCALE))
-
-    # 作業レイヤ（透明）に描く
-    tmp = Image.new("RGBA", (sw, sh), (0, 0, 0, 0))
-    td = ImageDraw.Draw(tmp)
-
-    # アークの bbox を「角の外側」に置くことで、arc を内向き（凹）に見せる
-    # top-left: bbox bottom-right == corner (ox,oy) scaled
-    lt_box = [int(sox - 2 * snotch), int(soy - 2 * snotch), int(sox), int(soy)]
-    rt_box = [int(sox + sow), int(soy - 2 * snotch), int(sox + sow + 2 * snotch), int(soy)]
-    bl_box = [int(sox - 2 * snotch), int(soy + soh), int(sox), int(soy + soh + 2 * snotch)]
-    br_box = [int(sox + sow), int(soy + soh), int(sox + sow + 2 * snotch), int(soy + soh + 2 * snotch)]
-
-    # 外枠：アーク（内向きに見える角）を描画（角度は bbox に合わせて指定）
+    # 外枠：アーク（四隅）を描画（内向きに見える quarter arcs）
     try:
-        td.arc(lt_box, start=0, end=90, fill=frame_color, width=s_outer_w)      # top-left concave
-        td.arc(rt_box, start=90, end=180, fill=frame_color, width=s_outer_w)    # top-right
-        td.arc(br_box, start=180, end=270, fill=frame_color, width=s_outer_w)   # bottom-right
-        td.arc(bl_box, start=270, end=360, fill=frame_color, width=s_outer_w)   # bottom-left
+        draw.arc(left_arc_box, start=0, end=90, fill=frame_color, width=outer_width)
+        draw.arc(right_arc_box, start=90, end=180, fill=frame_color, width=outer_width)
+        draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color, width=outer_width)
+        draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color, width=outer_width)
     except Exception:
-        # Pillow 環境によっては width 無視される場合があるが、縮小で許容する
-        td.arc(lt_box, start=0, end=90, fill=frame_color)
-        td.arc(rt_box, start=90, end=180, fill=frame_color)
-        td.arc(br_box, start=180, end=270, fill=frame_color)
-        td.arc(bl_box, start=270, end=360, fill=frame_color)
+        # Pillow が width を効かせない環境なら単純に描画して、あとで直線で被せる
+        draw.arc(left_arc_box, start=0, end=90, fill=frame_color)
+        draw.arc(right_arc_box, start=90, end=180, fill=frame_color)
+        draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color)
+        draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
 
-    # アークの端点を計算して、直線で繋ぐ（少しオーバーラップして確実に繋ぐ）
-    # top edge
-    p_lt_top = _arc_point([coord / SCALE for coord in lt_box], 90)
-    p_rt_top = _arc_point([coord / SCALE for coord in rt_box], 90)
-    # スケールしてから延長量を掛ける
-    p1 = (p_lt_top[0] * SCALE, p_lt_top[1] * SCALE)
-    p2 = (p_rt_top[0] * SCALE, p_rt_top[1] * SCALE)
-    overlap_px = max(2, int(s_outer_w * 0.25))
-    sstart = _extend_point(p1, p2, -overlap_px)
-    send = _extend_point(p2, p1, -overlap_px)
-    td.line([sstart, send], fill=frame_color, width=s_outer_w)
+    # 外枠直線をアークの端点で繋ぐ（端点を正確に計算してオーバーラップ）
+    overlap = max(2, int(outer_width * 0.6))
+
+    # top edge: 左アーク top-point (angle=90) -> 右アーク top-point (90)
+    p_left_top = _arc_point(left_arc_box, 90)
+    p_right_top = _arc_point(right_arc_box, 90)
+    start_top = _extend_point(p_left_top, p_right_top, -overlap)
+    end_top = _extend_point(p_right_top, p_left_top, -overlap)
+    draw.line([start_top, end_top], fill=frame_color, width=outer_width)
 
     # bottom edge
-    p_lb_bot = _arc_point([coord / SCALE for coord in bl_box], 270)
-    p_rb_bot = _arc_point([coord / SCALE for coord in br_box], 270)
-    p1b = (p_lb_bot[0] * SCALE, p_lb_bot[1] * SCALE)
-    p2b = (p_rb_bot[0] * SCALE, p_rb_bot[1] * SCALE)
-    sstartb = _extend_point(p1b, p2b, -overlap_px)
-    sendb = _extend_point(p2b, p1b, -overlap_px)
-    td.line([sstartb, sendb], fill=frame_color, width=s_outer_w)
+    p_left_bot = _arc_point(bottom_left_arc_box, 270)
+    p_right_bot = _arc_point(bottom_right_arc_box, 270)
+    start_bot = _extend_point(p_left_bot, p_right_bot, -overlap)
+    end_bot = _extend_point(p_right_bot, p_left_bot, -overlap)
+    draw.line([start_bot, end_bot], fill=frame_color, width=outer_width)
 
     # left vertical
-    p_lt_l = _arc_point([coord / SCALE for coord in lt_box], 180)
-    p_lb_l = _arc_point([coord / SCALE for coord in bl_box], 180)
-    p1l = (p_lt_l[0] * SCALE, p_lt_l[1] * SCALE)
-    p2l = (p_lb_l[0] * SCALE, p_lb_l[1] * SCALE)
-    sstartl = _extend_point(p1l, p2l, -overlap_px)
-    sendl = _extend_point(p2l, p1l, -overlap_px)
-    td.line([sstartl, sendl], fill=frame_color, width=s_outer_w)
+    p_left_top_left = _arc_point(left_arc_box, 180)
+    p_left_bot_left = _arc_point(bottom_left_arc_box, 180)
+    start_left = _extend_point(p_left_top_left, p_left_bot_left, -overlap)
+    end_left = _extend_point(p_left_bot_left, p_left_top_left, -overlap)
+    draw.line([start_left, end_left], fill=frame_color, width=outer_width)
 
     # right vertical
-    p_rt_r = _arc_point([coord / SCALE for coord in rt_box], 0)
-    p_rb_r = _arc_point([coord / SCALE for coord in br_box], 0)
-    p1r = (p_rt_r[0] * SCALE, p_rt_r[1] * SCALE)
-    p2r = (p_rb_r[0] * SCALE, p_rb_r[1] * SCALE)
-    sstartr = _extend_point(p1r, p2r, -overlap_px)
-    sendr = _extend_point(p2r, p1r, -overlap_px)
-    td.line([sstartr, sendr], fill=frame_color, width=s_outer_w)
+    p_right_top_right = _arc_point(right_arc_box, 0)
+    p_right_bot_right = _arc_point(bottom_right_arc_box, 0)
+    start_right = _extend_point(p_right_top_right, p_right_bot_right, -overlap)
+    end_right = _extend_point(p_right_bot_right, p_right_top_right, -overlap)
+    draw.line([start_right, end_right], fill=frame_color, width=outer_width)
 
-    # 内枠（同様に高解像度で描画）
-    # 内枠アーク用ボックス（内側に控えめに置く）
-    inner_arc = int(notch_radius * 0.65)
-    s_inner = inner_arc * SCALE
-    li_box = [int(six - s_inner), int(siy - s_inner), int(six + s_inner), int(siy + s_inner)]
-    ri_box = [int(six + siw - s_inner), int(siy - s_inner), int(six + siw + s_inner), int(siy + s_inner)]
-    bli_box = [int(six - s_inner), int(siy + sih - s_inner), int(six + s_inner), int(siy + sih + s_inner)]
-    bri_box = [int(six + siw - s_inner), int(siy + sih - s_inner), int(six + siw + s_inner), int(siy + sih + s_inner)]
+    # ----- 内枠（細線） -----
+    inner_arc_bbox = int(notch_radius * 0.65)
+    li_box = [ix - inner_arc_bbox, iy - inner_arc_bbox, ix + inner_arc_bbox, iy + inner_arc_bbox]
+    ri_box = [ix + iw - inner_arc_bbox, iy - inner_arc_bbox, ix + iw + inner_arc_bbox, iy + inner_arc_bbox]
+    br_box = [ix + iw - inner_arc_bbox, iy + ih - inner_arc_bbox, ix + iw + inner_arc_bbox, iy + ih + inner_arc_bbox]
+    bl_box = [ix - inner_arc_bbox, iy + ih - inner_arc_bbox, ix + inner_arc_bbox, iy + ih + inner_arc_bbox]
 
     try:
-        td.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220), width=s_inner_w)
-        td.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220), width=s_inner_w)
-        td.arc(bri_box, start=180, end=270, fill=(95, 60, 35, 220), width=s_inner_w)
-        td.arc(bli_box, start=270, end=360, fill=(95, 60, 35, 220), width=s_inner_w)
+        draw.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220), width=inner_width)
+        draw.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220), width=inner_width)
+        draw.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220), width=inner_width)
+        draw.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220), width=inner_width)
     except Exception:
-        td.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220))
-        td.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220))
-        td.arc(bri_box, start=180, end=270, fill=(95, 60, 35, 220))
-        td.arc(bli_box, start=270, end=360, fill=(95, 60, 35, 220))
+        draw.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220))
+        draw.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220))
+        draw.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220))
+        draw.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220))
 
-    # 内枠の直線接続（同じくオーバーラップ）
-    # top
-    pli_top = _arc_point([coord / SCALE for coord in li_box], 90)
-    pri_top = _arc_point([coord / SCALE for coord in ri_box], 90)
-    p1i = (pli_top[0] * SCALE, pli_top[1] * SCALE)
-    p2i = (pri_top[0] * SCALE, pri_top[1] * SCALE)
-    oi = max(2, int(s_inner_w * 0.25))
-    td.line([_extend_point(p1i, p2i, -oi), _extend_point(p2i, p1i, -oi)], fill=(95, 60, 35, 220), width=s_inner_w)
-    # bottom
-    pli_bot = _arc_point([coord / SCALE for coord in bli_box], 270)
-    pri_bot = _arc_point([coord / SCALE for coord in bri_box], 270)
-    p1ib = (pli_bot[0] * SCALE, pli_bot[1] * SCALE)
-    p2ib = (pri_bot[0] * SCALE, pri_bot[1] * SCALE)
-    td.line([_extend_point(p1ib, p2ib, -oi), _extend_point(p2ib, p1ib, -oi)], fill=(95, 60, 35, 220), width=s_inner_w)
-    # left vertical
-    pli_l = _arc_point([coord / SCALE for coord in li_box], 180)
-    pli_ll = _arc_point([coord / SCALE for coord in bli_box], 180)
-    td.line([_extend_point((pli_l[0]*SCALE, pli_l[1]*SCALE), (pli_ll[0]*SCALE, pli_ll[1]*SCALE), -oi),
-             _extend_point((pli_ll[0]*SCALE, pli_ll[1]*SCALE), (pli_l[0]*SCALE, pli_l[1]*SCALE), -oi)],
-            fill=(95, 60, 35, 220), width=s_inner_w)
-    # right vertical
-    pri_r = _arc_point([coord / SCALE for coord in ri_box], 0)
-    pri_rr = _arc_point([coord / SCALE for coord in bri_box], 0)
-    td.line([_extend_point((pri_r[0]*SCALE, pri_r[1]*SCALE), (pri_rr[0]*SCALE, pri_rr[1]*SCALE), -oi),
-             _extend_point((pri_rr[0]*SCALE, pri_rr[1]*SCALE), (pri_r[0]*SCALE, pri_r[1]*SCALE), -oi)],
-            fill=(95, 60, 35, 220), width=s_inner_w)
+    # 内枠の直線接続
+    in_overlap = max(1, int(inner_width * 0.6))
+    p_li_top = _arc_point(li_box, 90)
+    p_ri_top = _arc_point(ri_box, 90)
+    draw.line([_extend_point(p_li_top, p_ri_top, -in_overlap), _extend_point(p_ri_top, p_li_top, -in_overlap)],
+              fill=(95, 60, 35, 220), width=inner_width)
 
-    # 縮小して元画像に合成（高品質リサンプル）
-    down = tmp.resize((w, h), resample=Image.LANCZOS)
-    base = img.convert("RGBA")
-    out = Image.alpha_composite(base, down)
+    p_li_bot = _arc_point(bl_box, 270)
+    p_ri_bot = _arc_point(br_box, 270)
+    draw.line([_extend_point(p_li_bot, p_ri_bot, -in_overlap), _extend_point(p_ri_bot, p_li_bot, -in_overlap)],
+              fill=(95, 60, 35, 220), width=inner_width)
 
-    # ルール線等は上に描画
-    draw = ImageDraw.Draw(out)
+    p_li_left = _arc_point(li_box, 180)
+    p_li_bottomleft = _arc_point(bl_box, 180)
+    draw.line([_extend_point(p_li_left, p_li_bottomleft, -in_overlap), _extend_point(p_li_bottomleft, p_li_left, -in_overlap)],
+              fill=(95, 60, 35, 220), width=inner_width)
+
+    p_ri_right = _arc_point(ri_box, 0)
+    p_ri_bottomright = _arc_point(br_box, 0)
+    draw.line([_extend_point(p_ri_right, p_ri_bottomright, -in_overlap), _extend_point(p_ri_bottomright, p_ri_right, -in_overlap)],
+              fill=(95, 60, 35, 220), width=inner_width)
+
+    # 装飾的ルール線（上・中・左のガイド）を最後に描画
     rule_color = (110, 75, 45, 180)
     y_rule = iy + int(ih * 0.12)
-    draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color,
-              width=max(2, inner_width + 2))
+    draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color, width=max(2, inner_width + 2))
     y_rule2 = iy + int(ih * 0.48)
-    draw.line([(ix + int(iw * 0.03), y_rule2), (ix + int(iw * 0.60), y_rule2)], fill=rule_color,
-              width=max(2, inner_width + 2))
+    draw.line([(ix + int(iw * 0.03), y_rule2), (ix + int(iw * 0.60), y_rule2)], fill=rule_color, width=max(2, inner_width + 2))
     box_x = ix + int(iw * 0.04)
     box_y = iy + int(ih * 0.06)
     box_w = int(iw * 0.18)
