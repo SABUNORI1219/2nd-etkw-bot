@@ -98,25 +98,28 @@ def draw_decorative_frame(img: Image.Image,
                           frame_color=(85, 50, 30, 255)) -> Image.Image:
     """
     外枠（太）＋内枠（細）を描画。
-    要求どおり「太線が画像外にはみ出さない」ようにオフセットを調整し、
-    アーク（四隅1/4円）が直線と接続される位置で描画する最小限の修正を入れています。
-    - outer_offset/inner_offset を None にすると自動計算。
-    - 重要: outer_offset は notch_radius と outer_width を考慮して最低値を確保します。
+    最小変更で「太線が画像外にはみ出さない」「アークが線と繋がる位置に配置」
+    を実現するよう outer_offset を厳密に調整しています。
     """
     w, h = img.size
 
-    # 凹み（notch）サイズ（見た目調整）
+    # notch/arc の半径（見た目調整）
     notch_radius = max(12, int(min(w, h) * 0.035))
+    arc_diameter = notch_radius * 2  # アーク用 bbox の幅（ピクセル）
 
-    # 自動オフセット（だが太さと凹みを内包できるだけの余裕を確保する）
+    # 外側オフセットの自動計算。太線幅やアーク bbox が画像外にはみ出ないように最低値を確保する。
     if outer_offset is None:
         outer_offset = max(12, int(min(w, h) * 0.025))
-    # outer_offset は arc bbox (notch_radius) と outer_width/2 の分だけ余裕を持たせる
-    outer_offset = max(outer_offset, notch_radius + outer_width // 2 + 2)
+    # outer_offset must be large enough so that an arc bbox placed with its corner at (ox,oy)
+    # does not have negative coordinates. We therefore require ox >= arc_diameter + half_line.
+    min_outer_offset = arc_diameter + (outer_width // 2) + 1
+    outer_offset = max(outer_offset, min_outer_offset)
 
+    # 内枠オフセット（外枠の内側）。内枠も端が画像外れしないよう最低値を確保
     if inner_offset is None:
         inner_offset = outer_offset + max(8, int(min(w, h) * 0.02))
-    inner_offset = max(inner_offset, inner_width // 2 + 2)
+    min_inner_offset = (inner_width // 2) + 1
+    inner_offset = max(inner_offset, min_inner_offset)
 
     ox = int(outer_offset)
     oy = int(outer_offset)
@@ -131,31 +134,30 @@ def draw_decorative_frame(img: Image.Image,
     out = img.convert("RGBA")
     draw = ImageDraw.Draw(out)
 
-    # アーク用 bbox のオフセット（角の「外側」に bbox を置いてアークが内側に凹む見た目にする）
-    arc_box_r = notch_radius
-    # ここで arc_bbox を整数で作る。bbox がきっちり角に沿うように調整する。
-    left_arc_box = [ox - 2 * arc_box_r, oy - 2 * arc_box_r, ox, oy]
-    right_arc_box = [ox + ow, oy - 2 * arc_box_r, ox + ow + 2 * arc_box_r, oy]
-    bottom_left_arc_box = [ox - 2 * arc_box_r, oy + oh, ox, oy + oh + 2 * arc_box_r]
-    bottom_right_arc_box = [ox + ow, oy + oh, ox + ow + 2 * arc_box_r, oy + oh + 2 * arc_box_r]
+    # アーク用 bbox（角の「外側」に配置して内向きに見える quarter-arc を作る）
+    # bbox のサイズは arc_diameter (= notch_radius*2)
+    left_arc_box = [ox - arc_diameter, oy - arc_diameter, ox, oy]
+    right_arc_box = [ox + ow, oy - arc_diameter, ox + ow + arc_diameter, oy]
+    bottom_left_arc_box = [ox - arc_diameter, oy + oh, ox, oy + oh + arc_diameter]
+    bottom_right_arc_box = [ox + ow, oy + oh, ox + ow + arc_diameter, oy + oh + arc_diameter]
 
-    # 外枠：アーク（四隅）を描画（内向きに見える quarter arcs）
+    # 外枠：アーク描画（内向きの凹み）
     try:
         draw.arc(left_arc_box, start=0, end=90, fill=frame_color, width=outer_width)
         draw.arc(right_arc_box, start=90, end=180, fill=frame_color, width=outer_width)
         draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color, width=outer_width)
         draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color, width=outer_width)
     except Exception:
-        # Pillow が width を効かせない環境なら単純に描画して、あとで直線で被せる
+        # 幅指定が効かない環境のフォールバック
         draw.arc(left_arc_box, start=0, end=90, fill=frame_color)
         draw.arc(right_arc_box, start=90, end=180, fill=frame_color)
         draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color)
         draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
 
-    # 外枠直線をアークの端点で繋ぐ（端点を正確に計算してオーバーラップ）
+    # 直線はアーク端点同士を繋ぐ（overlap による確実な接続）
     overlap = max(2, int(outer_width * 0.6))
 
-    # top edge: 左アーク top-point (angle=90) -> 右アーク top-point (90)
+    # top edge
     p_left_top = _arc_point(left_arc_box, 90)
     p_right_top = _arc_point(right_arc_box, 90)
     start_top = _extend_point(p_left_top, p_right_top, -overlap)
@@ -201,7 +203,7 @@ def draw_decorative_frame(img: Image.Image,
         draw.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220))
         draw.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220))
 
-    # 内枠の直線接続
+    # 内枠直線接続
     in_overlap = max(1, int(inner_width * 0.6))
     p_li_top = _arc_point(li_box, 90)
     p_ri_top = _arc_point(ri_box, 90)
