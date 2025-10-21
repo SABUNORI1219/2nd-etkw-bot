@@ -99,8 +99,9 @@ def draw_decorative_frame(img: Image.Image,
     inner_arc_diameter = inner_notch_radius * 2
 
     # explicit pixel pads (make arcs move outward reliably)
-    arc_pad = max(12, int(notch_radius * 0.9))        # increase to move outer arcs further out
-    inner_pad = max(8, int(inner_notch_radius * 0.9))# increase to move inner arcs similarly
+    # ここを調整することでアーチ全体を外側に移動できます
+    arc_pad = max(12, int(notch_radius * 0.9))
+    inner_pad = max(8, int(inner_notch_radius * 0.9))
 
     # safe outer_offset calculation (consider arc_pad)
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
@@ -110,12 +111,10 @@ def draw_decorative_frame(img: Image.Image,
         outer_offset = int(max(0, outer_offset))
 
     # default inner_offset: prefer explicit inner_offset if user passed, but ensure sane minimum
-    # NOTE: prefer caller value; if caller passed smaller than (outer_offset + 4), YOU SHOULD PASS correct inner_offset from caller.
     min_spacing = 4
     if inner_offset is None:
         inner_offset = outer_offset + min_spacing
     else:
-        # Respect explicit inner_offset but ensure non-trivial minimum
         inner_offset = int(max(inner_offset, (inner_width // 2) + 1))
 
     ox = int(outer_offset)
@@ -131,14 +130,19 @@ def draw_decorative_frame(img: Image.Image,
     out = img.convert("RGBA")
     draw = ImageDraw.Draw(out)
 
-    # --- define arc bboxes using corner-style boxes (outer) with arc_pad ---
-    left_arc_box = [ox - arc_diameter - arc_pad, oy - arc_diameter - arc_pad, ox, oy]
-    right_arc_box = [ox + ow, oy - arc_diameter - arc_pad, ox + ow + arc_diameter + arc_pad, oy]
-    bottom_left_arc_box = [ox - arc_diameter - arc_pad, oy + oh, ox, oy + oh + arc_diameter + arc_pad]
-    bottom_right_arc_box = [ox + ow, oy + oh, ox + ow + arc_diameter + arc_pad, oy + oh + arc_diameter + arc_pad]
+    # --- define arc bboxes using corner-style boxes (outer) with arc_pad shifted on both edges ---
+    # 左上アーチ（左方向へ移動するため、右端も ox - arc_pad にしている点に注目）
+    left_arc_box = [ox - arc_diameter - arc_pad, oy - arc_diameter - arc_pad, ox - arc_pad, oy - arc_pad]
+    # 右上アーチ（左端 / 右端 を外側へ +arc_pad）
+    right_arc_box = [ox + ow + arc_pad, oy - arc_diameter - arc_pad, ox + ow + arc_diameter + arc_pad, oy - arc_pad]
+    # 左下アーチ
+    bottom_left_arc_box = [ox - arc_diameter - arc_pad, oy + oh + arc_pad, ox - arc_pad, oy + oh + arc_diameter + arc_pad]
+    # 右下アーチ
+    bottom_right_arc_box = [ox + ow + arc_pad, oy + oh + arc_pad, ox + ow + arc_diameter + arc_pad, oy + oh + arc_diameter + arc_pad]
 
     # --- compute and draw straight outer lines FIRST (so arcs can be drawn on top afterwards) ---
     overlap = max(4, int(outer_width * 1.0))  # outer line extension (px)
+
     def _clamp_center(pt, stroke_w):
         half = stroke_w / 2.0
         x = max(half, min(w - half, pt[0]))
@@ -186,11 +190,11 @@ def draw_decorative_frame(img: Image.Image,
         draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
 
     # ----- inner frame (thin) -----
-    # inner arcs: use corner-style bbox like outer, with inner_pad
-    li_box = [ix - inner_arc_diameter - inner_pad, iy - inner_arc_diameter - inner_pad, ix, iy]
-    ri_box = [ix + iw, iy - inner_arc_diameter - inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy]
-    br_box = [ix + iw, iy + ih, ix + iw + inner_arc_diameter + inner_pad, iy + ih + inner_arc_diameter + inner_pad]
-    bl_box = [ix - inner_arc_diameter - inner_pad, iy + ih, ix, iy + ih + inner_arc_diameter + inner_pad]
+    # inner arcs: use corner-style bbox like outer, with inner_pad shifted on both edges
+    li_box = [ix - inner_arc_diameter - inner_pad, iy - inner_arc_diameter - inner_pad, ix - inner_pad, iy - inner_pad]
+    ri_box = [ix + iw + inner_pad, iy - inner_arc_diameter - inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy - inner_pad]
+    br_box = [ix + iw + inner_pad, iy + ih + inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy + ih + inner_arc_diameter + inner_pad]
+    bl_box = [ix - inner_arc_diameter - inner_pad, iy + ih + inner_pad, ix - inner_pad, iy + ih + inner_arc_diameter + inner_pad]
 
     # draw inner straight lines FIRST
     in_overlap = 10  # adjust 6..12 as needed; bigger => longer inner straight lines
@@ -229,38 +233,6 @@ def draw_decorative_frame(img: Image.Image,
         draw.arc(ri_box, start=90, end=180, fill=(95,60,35,220))
         draw.arc(br_box, start=180, end=270, fill=(95,60,35,220))
         draw.arc(bl_box, start=270, end=360, fill=(95,60,35,220))
-
-    p_li_top = _arc_point(li_box, 90)
-    p_ri_top = _arc_point(ri_box, 90)
-    start_in_top = _extend_point(p_li_top, p_ri_top, -in_overlap)
-    end_in_top = _extend_point(p_ri_top, p_li_top, -in_overlap)
-    start_in_top = _clamp_center(start_in_top, inner_width)
-    end_in_top = _clamp_center(end_in_top, inner_width)
-    draw.line([start_in_top, end_in_top], fill=(95, 60, 35, 220), width=inner_width)
-
-    p_li_bot = _arc_point(bl_box, 270)
-    p_ri_bot = _arc_point(br_box, 270)
-    start_in_bot = _extend_point(p_li_bot, p_ri_bot, -in_overlap)
-    end_in_bot = _extend_point(p_ri_bot, p_li_bot, -in_overlap)
-    start_in_bot = _clamp_center(start_in_bot, inner_width)
-    end_in_bot = _clamp_center(end_in_bot, inner_width)
-    draw.line([start_in_bot, end_in_bot], fill=(95, 60, 35, 220), width=inner_width)
-
-    p_li_left = _arc_point(li_box, 180)
-    p_li_bottomleft = _arc_point(bl_box, 180)
-    start_in_left = _extend_point(p_li_left, p_li_bottomleft, -in_overlap)
-    end_in_left = _extend_point(p_li_bottomleft, p_li_left, -in_overlap)
-    start_in_left = _clamp_center(start_in_left, inner_width)
-    end_in_left = _clamp_center(end_in_left, inner_width)
-    draw.line([start_in_left, end_in_left], fill=(95, 60, 35, 220), width=inner_width)
-
-    p_ri_right = _arc_point(ri_box, 0)
-    p_ri_bottomright = _arc_point(br_box, 0)
-    start_in_right = _extend_point(p_ri_right, p_ri_bottomright, -in_overlap)
-    end_in_right = _extend_point(p_ri_bottomright, p_ri_right, -in_overlap)
-    start_in_right = _clamp_center(start_in_right, inner_width)
-    end_in_right = _clamp_center(end_in_right, inner_width)
-    draw.line([start_in_right, end_in_right], fill=(95, 60, 35, 220), width=inner_width)
 
     # 装飾的ルール線・ボックス
     rule_color = (110, 75, 45, 180)
