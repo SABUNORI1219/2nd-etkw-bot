@@ -99,8 +99,8 @@ def draw_decorative_frame(img: Image.Image,
     inner_arc_diameter = inner_notch_radius * 2
 
     # explicit pixel pads (make arcs move outward reliably)
-    arc_pad = max(8, int(notch_radius * 0.6))        # increase to move outer arcs further out
-    inner_pad = max(6, int(inner_notch_radius * 0.6))# increase to move inner arcs similarly
+    arc_pad = max(12, int(notch_radius * 0.9))        # increase to move outer arcs further out
+    inner_pad = max(8, int(inner_notch_radius * 0.9))# increase to move inner arcs similarly
 
     # safe outer_offset calculation (consider arc_pad)
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
