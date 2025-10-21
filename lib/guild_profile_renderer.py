@@ -8,12 +8,12 @@ from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# フォント・アセットパス（profile_renderer と合わせておく）
+# フォント・アセットパス
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia-Regular.ttf")
-BANNER_PLACEHOLDER = None  # もしアセットのバナー用画像があれば設定
+BANNER_PLACEHOLDER = None
 
-# レイアウト定数 — 縦長に変更（横長から縦長へ）
-CANVAS_WIDTH = 700   # 縦長の幅に固定（高さはオンライン人数に応じて伸縮）
+# レイアウト定数
+CANVAS_WIDTH = 700
 MARGIN = 28
 LEFT_COLUMN_WIDTH = 460
 RIGHT_COLUMN_WIDTH = CANVAS_WIDTH - LEFT_COLUMN_WIDTH - MARGIN * 2
@@ -24,8 +24,6 @@ BASE_BG_COLOR = (218, 179, 99)
 TITLE_COLOR = (40, 30, 20, 255)
 SUBTITLE_COLOR = (80, 60, 40, 255)
 TABLE_HEADER_BG = (230, 230, 230, 255)
-ONLINE_BADGE = (60, 200, 60, 255)
-OFFLINE_BADGE = (200, 60, 60, 255)
 
 # NumPy availability (optional for noise)
 try:
@@ -47,9 +45,6 @@ def _fmt_num(v):
 
 
 def _text_width(draw_obj: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> int:
-    """
-    draw オブジェクトと font を使ってテキスト幅を安全に取得するユーティリティ。
-    """
     try:
         return int(draw_obj.textlength(text, font=font))
     except Exception:
@@ -58,10 +53,6 @@ def _text_width(draw_obj: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageF
 
 
 def _arc_point(bbox, angle_deg):
-    """
-    bbox = [x0,y0,x1,y1] の楕円上の angle_deg (度) に対応する座標を返す。
-    Pillow の角度系に合わせ、Y は下方向が正なので計算は y = cy - ry * sin(theta) とする。
-    """
     x0, y0, x1, y1 = bbox
     cx = (x0 + x1) / 2.0
     cy = (y0 + y1) / 2.0
@@ -74,10 +65,6 @@ def _arc_point(bbox, angle_deg):
 
 
 def _extend_point(p, q, amount):
-    """
-    p -> q の方向に沿って q 側に amount ピクセルだけ伸ばした点を返す。
-    (p,q) が同一点の場合は q を返す。
-    """
     px, py = p
     qx, qy = q
     dx = qx - px
@@ -97,28 +84,35 @@ def draw_decorative_frame(img: Image.Image,
                           inner_width: int = 2,
                           frame_color=(85, 50, 30, 255)) -> Image.Image:
     """
-    外枠（太）＋内枠（細）を描画。
-    直線はアーチ端点同士を繋ぐ方式（元の自動調整あり）で描画します。
+    外枠（太）＋内枠（細）を描画。各枠は四隅に内向きのアーチを持ち、
+    アーチ端点同士を直線で繋いでいます（自動で端点を合わせる方式）。
+    outer_offset / inner_offset を明示するとその値を優先します。
     """
     w, h = img.size
 
-    # notch/arc の半径（見た目調整）
+    # 外アーチの半径（外枠の "notch"）
     notch_radius = max(12, int(min(w, h) * 0.035))
-    arc_diameter = notch_radius * 2  # アーク用 bbox の幅（ピクセル）
+    arc_diameter = notch_radius * 2
 
-    # 外側オフセットの自動計算。太線幅やアーク bbox が画像外にはみ出ないように最低値を確保する。
+    # 内アーチは外アーチより小さめ
+    inner_notch_radius = max(8, int(notch_radius * 0.65))
+    inner_arc_diameter = inner_notch_radius * 2
+
+    # 最小安全オフセット（アーチ bbox が負座標にならないように）
+    min_outer_offset = int(arc_diameter + (outer_width / 2) + 1)
     if outer_offset is None:
-        outer_offset = max(12, int(min(w, h) * 0.025))
-    # outer_offset must be large enough so that an arc bbox placed with its corner at (ox,oy)
-    # does not have negative coordinates. We therefore require ox >= arc_diameter + half_line.
-    min_outer_offset = arc_diameter + (outer_width // 2) + 1
-    outer_offset = max(outer_offset, min_outer_offset)
+        # デフォルトは画像端からアーチがはみ出さない最小値か、少し控えめな値
+        outer_offset = max(12, min_outer_offset)
+    else:
+        outer_offset = int(max(0, outer_offset))
 
-    # 内枠オフセット（外枠の内側）。既存の自動寄せロジック（外枠に近づける）
+    # inner_offset のデフォルトは「太線のすぐ内側」に配置する
     if inner_offset is None:
-        inner_offset = max((inner_width // 2) + 1, outer_offset - 8)
-    min_inner_offset = (inner_width // 2) + 1
-    inner_offset = max(inner_offset, min_inner_offset)
+        # spacing は太線幅 + 内線幅 + 小さな余裕
+        spacing = max(6, outer_width + inner_width + 4)
+        inner_offset = outer_offset + spacing
+    else:
+        inner_offset = int(max((inner_width // 2) + 1, inner_offset))
 
     ox = int(outer_offset)
     oy = int(outer_offset)
@@ -133,34 +127,42 @@ def draw_decorative_frame(img: Image.Image,
     out = img.convert("RGBA")
     draw = ImageDraw.Draw(out)
 
-    # アーク用 bbox（角の「外側」に配置して内向きに見える quarter-arc を作る）
-    # bbox のサイズは arc_diameter (= notch_radius*2)
+    # 外枠アーチ bbox（角の外側に配置して内向きアーチ）
     left_arc_box = [ox - arc_diameter, oy - arc_diameter, ox, oy]
     right_arc_box = [ox + ow, oy - arc_diameter, ox + ow + arc_diameter, oy]
     bottom_left_arc_box = [ox - arc_diameter, oy + oh, ox, oy + oh + arc_diameter]
     bottom_right_arc_box = [ox + ow, oy + oh, ox + ow + arc_diameter, oy + oh + arc_diameter]
 
-    # 外枠：アーク描画（内向きの凹み）
+    # 外枠アーチ描画
     try:
         draw.arc(left_arc_box, start=0, end=90, fill=frame_color, width=outer_width)
         draw.arc(right_arc_box, start=90, end=180, fill=frame_color, width=outer_width)
         draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color, width=outer_width)
         draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color, width=outer_width)
     except Exception:
-        # 幅指定が効かない環境のフォールバック
+        # Pillow 環境で幅指定不可なら幅なしで
         draw.arc(left_arc_box, start=0, end=90, fill=frame_color)
         draw.arc(right_arc_box, start=90, end=180, fill=frame_color)
         draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color)
         draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
 
-    # 直線はアーク端点同士を繋ぐ（overlap による確実な接続）
+    # 直線はアーチ端点から算出して接続（線の端がアーチに自然に繋がるようにする）
     overlap = max(2, int(outer_width * 0.6))
+
+    # helper: clamp center point so stroke doesn't go out of canvas
+    def _clamp_center(pt, stroke_w):
+        half = stroke_w / 2.0
+        x = max(half, min(w - half, pt[0]))
+        y = max(half, min(h - half, pt[1]))
+        return (x, y)
 
     # top edge
     p_left_top = _arc_point(left_arc_box, 90)
     p_right_top = _arc_point(right_arc_box, 90)
     start_top = _extend_point(p_left_top, p_right_top, -overlap)
     end_top = _extend_point(p_right_top, p_left_top, -overlap)
+    start_top = _clamp_center(start_top, outer_width)
+    end_top = _clamp_center(end_top, outer_width)
     draw.line([start_top, end_top], fill=frame_color, width=outer_width)
 
     # bottom edge
@@ -168,6 +170,8 @@ def draw_decorative_frame(img: Image.Image,
     p_right_bot = _arc_point(bottom_right_arc_box, 270)
     start_bot = _extend_point(p_left_bot, p_right_bot, -overlap)
     end_bot = _extend_point(p_right_bot, p_left_bot, -overlap)
+    start_bot = _clamp_center(start_bot, outer_width)
+    end_bot = _clamp_center(end_bot, outer_width)
     draw.line([start_bot, end_bot], fill=frame_color, width=outer_width)
 
     # left vertical
@@ -175,6 +179,8 @@ def draw_decorative_frame(img: Image.Image,
     p_left_bot_left = _arc_point(bottom_left_arc_box, 180)
     start_left = _extend_point(p_left_top_left, p_left_bot_left, -overlap)
     end_left = _extend_point(p_left_bot_left, p_left_top_left, -overlap)
+    start_left = _clamp_center(start_left, outer_width)
+    end_left = _clamp_center(end_left, outer_width)
     draw.line([start_left, end_left], fill=frame_color, width=outer_width)
 
     # right vertical
@@ -182,14 +188,16 @@ def draw_decorative_frame(img: Image.Image,
     p_right_bot_right = _arc_point(bottom_right_arc_box, 0)
     start_right = _extend_point(p_right_top_right, p_right_bot_right, -overlap)
     end_right = _extend_point(p_right_bot_right, p_right_top_right, -overlap)
+    start_right = _clamp_center(start_right, outer_width)
+    end_right = _clamp_center(end_right, outer_width)
     draw.line([start_right, end_right], fill=frame_color, width=outer_width)
 
     # ----- 内枠（細線） -----
-    inner_arc_bbox = int(notch_radius * 0.65)
-    li_box = [ix - inner_arc_bbox, iy - inner_arc_bbox, ix + inner_arc_bbox, iy + inner_arc_bbox]
-    ri_box = [ix + iw - inner_arc_bbox, iy - inner_arc_bbox, ix + iw + inner_arc_bbox, iy + inner_arc_bbox]
-    br_box = [ix + iw - inner_arc_bbox, iy + ih - inner_arc_bbox, ix + iw + inner_arc_bbox, iy + ih + inner_arc_bbox]
-    bl_box = [ix - inner_arc_bbox, iy + ih - inner_arc_bbox, ix + inner_arc_bbox, iy + ih + inner_arc_bbox]
+    # 内アーチ bbox（内枠に合わせて）
+    li_box = [ix - inner_arc_diameter, iy - inner_arc_diameter, ix + inner_arc_diameter, iy + inner_arc_diameter]
+    ri_box = [ix + iw - inner_arc_diameter, iy - inner_arc_diameter, ix + iw + inner_arc_diameter, iy + inner_arc_diameter]
+    br_box = [ix + iw - inner_arc_diameter, iy + ih - inner_arc_diameter, ix + iw + inner_arc_diameter, iy + ih + inner_arc_diameter]
+    bl_box = [ix - inner_arc_diameter, iy + ih - inner_arc_diameter, ix + inner_arc_diameter, iy + ih + inner_arc_diameter]
 
     try:
         draw.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220), width=inner_width)
@@ -202,29 +210,42 @@ def draw_decorative_frame(img: Image.Image,
         draw.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220))
         draw.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220))
 
-    # 内枠直線接続
+    # 内枠直線接続（内線用 overlap）
     in_overlap = max(1, int(inner_width * 0.6))
+
     p_li_top = _arc_point(li_box, 90)
     p_ri_top = _arc_point(ri_box, 90)
-    draw.line([_extend_point(p_li_top, p_ri_top, -in_overlap), _extend_point(p_ri_top, p_li_top, -in_overlap)],
-              fill=(95, 60, 35, 220), width=inner_width)
+    start_in_top = _extend_point(p_li_top, p_ri_top, -in_overlap)
+    end_in_top = _extend_point(p_ri_top, p_li_top, -in_overlap)
+    start_in_top = _clamp_center(start_in_top, inner_width)
+    end_in_top = _clamp_center(end_in_top, inner_width)
+    draw.line([start_in_top, end_in_top], fill=(95, 60, 35, 220), width=inner_width)
 
     p_li_bot = _arc_point(bl_box, 270)
     p_ri_bot = _arc_point(br_box, 270)
-    draw.line([_extend_point(p_li_bot, p_ri_bot, -in_overlap), _extend_point(p_ri_bot, p_li_bot, -in_overlap)],
-              fill=(95, 60, 35, 220), width=inner_width)
+    start_in_bot = _extend_point(p_li_bot, p_ri_bot, -in_overlap)
+    end_in_bot = _extend_point(p_ri_bot, p_li_bot, -in_overlap)
+    start_in_bot = _clamp_center(start_in_bot, inner_width)
+    end_in_bot = _clamp_center(end_in_bot, inner_width)
+    draw.line([start_in_bot, end_in_bot], fill=(95, 60, 35, 220), width=inner_width)
 
     p_li_left = _arc_point(li_box, 180)
     p_li_bottomleft = _arc_point(bl_box, 180)
-    draw.line([_extend_point(p_li_left, p_li_bottomleft, -in_overlap), _extend_point(p_li_bottomleft, p_li_left, -in_overlap)],
-              fill=(95, 60, 35, 220), width=inner_width)
+    start_in_left = _extend_point(p_li_left, p_li_bottomleft, -in_overlap)
+    end_in_left = _extend_point(p_li_bottomleft, p_li_left, -in_overlap)
+    start_in_left = _clamp_center(start_in_left, inner_width)
+    end_in_left = _clamp_center(end_in_left, inner_width)
+    draw.line([start_in_left, end_in_left], fill=(95, 60, 35, 220), width=inner_width)
 
     p_ri_right = _arc_point(ri_box, 0)
     p_ri_bottomright = _arc_point(br_box, 0)
-    draw.line([_extend_point(p_ri_right, p_ri_bottomright, -in_overlap), _extend_point(p_ri_bottomright, p_ri_right, -in_overlap)],
-              fill=(95, 60, 35, 220), width=inner_width)
+    start_in_right = _extend_point(p_ri_right, p_ri_bottomright, -in_overlap)
+    end_in_right = _extend_point(p_ri_bottomright, p_ri_right, -in_overlap)
+    start_in_right = _clamp_center(start_in_right, inner_width)
+    end_in_right = _clamp_center(end_in_right, inner_width)
+    draw.line([start_in_right, end_in_right], fill=(95, 60, 35, 220), width=inner_width)
 
-    # 装飾的ルール線（上・中・左のガイド）を最後に描画
+    # 装飾的ルール線・ボックス
     rule_color = (110, 75, 45, 180)
     y_rule = iy + int(ih * 0.12)
     draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color, width=max(2, inner_width + 2))
@@ -243,12 +264,9 @@ def create_card_background(w: int, h: int,
                            noise_std: float = 30.0,
                            noise_blend: float = 0.30,
                            vignette_blur: int = 80) -> Image.Image:
-    """
-    紙風背景（ノイズ＋ブラー＋ビネット）に装飾枠を描画して返す。
-    """
     base = Image.new('RGB', (w, h), BASE_BG_COLOR)
 
-    # ==== ノイズ生成 ====
+    # ノイズ生成（省略可能）
     if _HAS_NUMPY:
         try:
             noise = np.random.normal(128, noise_std, (h, w))
@@ -271,7 +289,7 @@ def create_card_background(w: int, h: int,
     img = Image.blend(base, noise_img, noise_blend)
     img = img.filter(ImageFilter.GaussianBlur(1))
 
-    # ==== ビネット（端の暗化）====
+    # ビネット
     vignette = Image.new('L', (w, h), 0)
     dv = ImageDraw.Draw(vignette)
     max_r = int(max(w, h) * 0.75)
@@ -286,12 +304,12 @@ def create_card_background(w: int, h: int,
     dark_img = Image.new('RGB', (w, h), dark_color)
     composed = Image.composite(img, dark_img, vignette)
 
-    # ==== 装飾枠を描画 ====
+    # 装飾枠を描画（必要なら outer_offset/inner_offset を明示指定）
     try:
         composed = draw_decorative_frame(composed.convert('RGBA'),
-                                         outer_offset=None,
+                                         outer_offset=40,
                                          outer_width=max(6, int(w * 0.01)),
-                                         inner_offset=None,
+                                         inner_offset=30,
                                          inner_width=max(1, int(w * 0.005)),
                                          frame_color=(85, 50, 30, 255))
     except Exception as e:
@@ -302,11 +320,6 @@ def create_card_background(w: int, h: int,
 
 
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
-    """
-    guild_data は辞書を想定。
-    画像は縦長（幅は CANVAS_WIDTH に固定、高さはオンライン人数で伸縮）。
-    戻り値: BytesIO (PNG)
-    """
     def sg(d, *keys, default="N/A"):
         v = d
         for k in keys:
