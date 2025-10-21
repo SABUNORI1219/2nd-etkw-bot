@@ -95,11 +95,11 @@ def draw_decorative_frame(img: Image.Image,
     arc_diameter = notch_radius * 2
 
     # 内アーチは外アーチより小さめ
-    inner_notch_radius = max(8, int(notch_radius * 0.65))
+    inner_notch_radius = max(8, int(notch_radius * 0.90))  # 0.85-0.95 を試して好みの丸さに
     inner_arc_diameter = inner_notch_radius * 2
 
-    arc_pad = max(4, int(notch_radius * 0.35))       # 外アーチを外へ寄せる量（px）。調整はここだけ
-    inner_pad = max(3, int(inner_notch_radius * 0.30))  # 内アーチを外へ寄せる量（px）
+    arc_pad = max(4, int(notch_radius * 0.5))       # 外アーチを外へ寄せる量（px）。調整はここだけ
+    inner_pad = max(3, int(inner_notch_radius * 0.45))  # 内アーチを外へ寄せる量（px）
 
     # min_outer_offset は arc_pad を考慮して算出（外へ寄せても描画領域からはみ出さない余裕）
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
@@ -150,7 +150,7 @@ def draw_decorative_frame(img: Image.Image,
         draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
 
     # 直線はアーチ端点から算出して接続（線の端がアーチに自然に繋がるようにする）
-    overlap = max(2, int(outer_width * 0.6))
+    overlap = max(2, int(outer_width * 1.0))
 
     # helper: clamp center point so stroke doesn't go out of canvas
     def _clamp_center(pt, stroke_w):
@@ -218,7 +218,7 @@ def draw_decorative_frame(img: Image.Image,
         draw.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220))
 
     # 内枠直線接続（内線用 overlap）
-    in_overlap = 4
+    in_overlap = 8
 
     p_li_top = _arc_point(li_box, 90)
     p_ri_top = _arc_point(ri_box, 90)
