@@ -339,3 +339,191 @@ def create_card_background(w: int, h: int,
         composed = composed.convert('RGBA')
 
     return composed
+
+def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
+    def sg(d, *keys, default="N/A"):
+        v = d
+        for k in keys:
+            if not isinstance(v, dict):
+                return default
+            v = v.get(k)
+            if v is None:
+                return default
+        return v
+
+    members = guild_data.get("members", {}) or {}
+    online_players: List[Dict[str, str]] = []
+    rank_to_stars = {
+        "OWNER": "★★★★★",
+        "CHIEF": "★★★★",
+        "STRATEGIST": "★★★",
+        "CAPTAIN": "★★",
+        "RECRUITER": "★",
+        "RECRUIT": ""
+    }
+    for rank_name, rank_group in members.items():
+        if not isinstance(rank_group, dict):
+            continue
+        for player_name, payload in rank_group.items():
+            if isinstance(payload, dict):
+                player_data = payload
+                if player_data.get("online"):
+                    online_players.append({
+                        "name": player_name,
+                        "server": player_data.get("server", "N/A"),
+                        "rank_stars": rank_to_stars.get(rank_name.upper(), "")
+                    })
+
+    prefix = sg(guild_data, "prefix", default="")
+    name = sg(guild_data, "name", default="Unknown Guild")
+    owner_list = guild_data.get("members", {}).get("owner", {}) or {}
+    owner = list(owner_list.keys())[0] if owner_list else "N/A"
+    created = sg(guild_data, "created", default="N/A")
+    if isinstance(created, str) and "T" in created:
+        created = created.split("T")[0]
+    level = sg(guild_data, "level", default=0)
+    xpPercent = sg(guild_data, "xpPercent", default=0)
+    wars = sg(guild_data, "wars", default=0)
+    territories = sg(guild_data, "territories", default=0)
+    total_members = sg(guild_data, "members", "total", default=0)
+
+    season_ranks = guild_data.get("seasonRanks") or {}
+    latest_season = "N/A"
+    rating_display = "N/A"
+    if isinstance(season_ranks, dict) and season_ranks:
+        try:
+            latest_season = str(max(int(k) for k in season_ranks.keys()))
+            rating = season_ranks.get(latest_season, {}).get("rating", "N/A")
+            rating_display = f"{rating:,}" if isinstance(rating, int) else rating
+        except Exception:
+            latest_season = "N/A"
+
+    banner_img = None
+    try:
+        banner_bytes = banner_renderer.create_banner_image(guild_data.get("banner")) if banner_renderer is not None else None
+        if banner_bytes:
+            if isinstance(banner_bytes, (bytes, bytearray)):
+                banner_img = Image.open(BytesIO(banner_bytes)).convert("RGBA")
+            elif hasattr(banner_bytes, "read"):
+                banner_img = Image.open(banner_bytes).convert("RGBA")
+    except Exception as e:
+        logger.warning(f"バナー生成に失敗: {e}")
+
+    base_height = 700
+    row_height = 48
+    online_count = len(online_players)
+    extra_for_online = max(0, online_count) * row_height
+    content_height = base_height + extra_for_online + 220
+    canvas_w = max_width
+    canvas_h = content_height
+
+    img = create_card_background(canvas_w, canvas_h)
+    draw = ImageDraw.Draw(img)
+
+    card_x = MARGIN
+    card_y = MARGIN
+    card_w = canvas_w - MARGIN * 2
+    card_h = canvas_h - MARGIN * 2
+
+    try:
+        font_title = ImageFont.truetype(FONT_PATH, 48)
+        font_sub = ImageFont.truetype(FONT_PATH, 26)
+        font_stats = ImageFont.truetype(FONT_PATH, 22)
+        font_table_header = ImageFont.truetype(FONT_PATH, 20)
+        font_table = ImageFont.truetype(FONT_PATH, 18)
+        font_small = ImageFont.truetype(FONT_PATH, 16)
+    except Exception as e:
+        logger.error(f"FONT_PATH 読み込み失敗: {e}")
+        font_title = font_sub = font_stats = font_table_header = font_table = font_small = ImageFont.load_default()
+
+    inner_left = card_x + 36
+    inner_top = card_y + 36
+
+    draw.text((inner_left, inner_top), f"[{prefix}] {name}", font=font_title, fill=TITLE_COLOR)
+    draw.text((inner_left, inner_top + 56), f"Owner: {owner}  |  Created: {created}", font=font_sub, fill=SUBTITLE_COLOR)
+
+    banner_w = int(card_w * 0.18)
+    banner_h = int(card_h * 0.20)
+    banner_x = inner_left
+    banner_y = inner_top + 110
+    if banner_img:
+        try:
+            banner_resized = banner_img.resize((banner_w, banner_h), Image.LANCZOS)
+            img.paste(banner_resized, (banner_x, banner_y), mask=banner_resized)
+        except Exception as e:
+            logger.warning(f"バナー貼付失敗: {e}")
+
+    stats_x = banner_x + banner_w + 18
+    stats_y = banner_y
+    draw.text((stats_x, stats_y), f"Level: {level}   ({xpPercent}%)", font=font_stats, fill=SUBTITLE_COLOR)
+    draw.text((stats_x, stats_y + 30), f"Wars: {_fmt_num(wars)}   Territories: {_fmt_num(territories)}", font=font_stats, fill=SUBTITLE_COLOR)
+    draw.text((stats_x, stats_y + 60), f"Members: {_fmt_num(total_members)}   Online: {_fmt_num(online_count)}", font=font_stats, fill=SUBTITLE_COLOR)
+    draw.text((stats_x, stats_y + 90), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=SUBTITLE_COLOR)
+
+    sep_x = card_x + LEFT_COLUMN_WIDTH
+    sep_y1 = inner_top + 24
+    sep_y2 = card_y + card_h - 40
+    draw.line([(sep_x, sep_y1), (sep_x, sep_y2)], fill=LINE_COLOR, width=2)
+
+    table_x = sep_x + 18
+    table_y = inner_top + 10
+    draw.rectangle([table_x, table_y, table_x + RIGHT_COLUMN_WIDTH - 18, table_y + 40], fill=TABLE_HEADER_BG)
+    draw.text((table_x + 8, table_y + 8), "Online Players", font=font_table_header, fill=TITLE_COLOR)
+    header_bottom = table_y + 40
+    col_server_w = 56
+    col_name_w = RIGHT_COLUMN_WIDTH - 18 - col_server_w - 60
+    col_rank_w = 60
+
+    row_h = 44
+    y = header_bottom + 12
+    if online_players:
+        for p in online_players:
+            server = p.get("server", "N/A")
+            pname = p.get("name", "Unknown")
+            rank = p.get("rank_stars", "")
+
+            draw.rectangle([table_x, y, table_x + col_server_w, y + row_h - 8], outline=LINE_COLOR, width=1)
+            draw.text((table_x + 6, y + 10), server, font=font_table, fill=SUBTITLE_COLOR)
+
+            nx = table_x + col_server_w + 8
+            draw.rectangle([nx - 2, y, nx + col_name_w, y + row_h - 8], outline=LINE_COLOR, width=1)
+            try:
+                name_w = _text_width(draw, pname, font=font_table)
+            except Exception:
+                bbox = draw.textbbox((0, 0), pname, font=font_table)
+                name_w = bbox[2] - bbox[0]
+            display_name = pname
+            max_name_w = col_name_w - 12
+            if name_w > max_name_w:
+                while display_name and (_text_width(draw, display_name + "...", font=font_table) > max_name_w):
+                    display_name = display_name[:-1]
+                display_name = display_name + "..."
+            draw.text((nx + 6, y + 10), display_name, font=font_table, fill=TITLE_COLOR)
+
+            rx = nx + col_name_w + 8
+            draw.rectangle([rx - 2, y, rx + col_rank_w, y + row_h - 8], outline=LINE_COLOR, width=1)
+            draw.text((rx + 6, y + 10), rank, font=font_table, fill=SUBTITLE_COLOR)
+
+            y += row_h
+    else:
+        draw.text((table_x + 8, header_bottom + 18), "No members online right now.", font=font_table, fill=SUBTITLE_COLOR)
+
+    footer_text = "Generated by Minister Chikuwa"
+    try:
+        fw = _text_width(draw, footer_text, font=font_small)
+    except Exception:
+        bbox = draw.textbbox((0, 0), footer_text, font=font_small)
+        fw = bbox[2] - bbox[0]
+    draw.text((card_x + card_w - fw - 16, card_y + card_h - 36), footer_text, font=font_small, fill=(120, 110, 100, 255))
+
+    out = BytesIO()
+    img.save(out, format="PNG")
+    out.seek(0)
+
+    try:
+        if banner_img:
+            banner_img.close()
+    except Exception:
+        pass
+
+    return out
