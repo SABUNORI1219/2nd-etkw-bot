@@ -131,10 +131,10 @@ def draw_decorative_frame(img: Image.Image,
 
     # 外枠アーチ bbox（角の外側に配置して内向きアーチ）
     mult = 1.20
-    left_arc_box = [int(ox - int(arc_diameter * mult)), int(oy - int(arc_diameter * mult)), int(ox), int(oy)]
-    right_arc_box = [int(ox + ow), int(oy - int(arc_diameter * mult)), int(ox + ow + int(arc_diameter * mult)), int(oy)]
-    bottom_left_arc_box = [int(ox - int(arc_diameter * mult)), int(oy + oh), int(ox), int(oy + oh + int(arc_diameter * mult))]
-    bottom_right_arc_box = [int(ox + ow), int(oy + oh), int(ox + ow + int(arc_diameter * mult)), int(oy + oh + int(arc_diameter * mult))]
+    left_arc_box = [ox - arc_diameter - arc_pad, oy - arc_diameter - arc_pad, ox, oy]
+    right_arc_box = [ox + ow, oy - arc_diameter - arc_pad, ox + ow + arc_diameter + arc_pad, oy]
+    bottom_left_arc_box = [ox - arc_diameter - arc_pad, oy + oh, ox, oy + oh + arc_diameter + arc_pad]
+    bottom_right_arc_box = [ox + ow, oy + oh, ox + ow + arc_diameter + arc_pad, oy + oh + arc_diameter + arc_pad]
 
     # 外枠アーチ描画
     try:
@@ -198,13 +198,13 @@ def draw_decorative_frame(img: Image.Image,
     # ----- 内枠（細線） -----
     # 内アーチ bbox（内枠に合わせて）
     inner_mult = 1.20
-    li_box = [int(ix - int(inner_arc_diameter * inner_mult)), int(iy - int(inner_arc_diameter * inner_mult)),
-              int(ix + int(inner_arc_diameter * inner_mult)), int(iy + int(inner_arc_diameter * inner_mult))]
-    ri_box = [int(ix + iw), int(iy - int(inner_arc_diameter * inner_mult)),
-              int(ix + iw + int(inner_arc_diameter * inner_mult)), int(iy + int(inner_arc_diameter * inner_mult))]
-    br_box = [int(ix + iw), int(iy + ih), int(ix + iw + int(inner_arc_diameter * inner_mult)), int(iy + ih + int(inner_arc_diameter * inner_mult))]
-    bl_box = [int(ix - int(inner_arc_diameter * inner_mult)), int(iy + ih),
-              int(ix + int(inner_arc_diameter * inner_mult)), int(iy + ih + int(inner_arc_diameter * inner_mult))]
+    li_box = [ix - inner_arc_diameter - inner_pad, iy - inner_arc_diameter - inner_pad,
+              ix + inner_arc_diameter + inner_pad, iy + inner_arc_diameter + inner_pad]
+    ri_box = [ix + iw, iy - inner_arc_diameter - inner_pad,
+              ix + iw + inner_arc_diameter + inner_pad, iy + inner_arc_diameter + inner_pad]
+    br_box = [ix + iw, iy + ih, ix + iw + inner_arc_diameter + inner_pad, iy + ih + inner_arc_diameter + inner_pad]
+    bl_box = [ix - inner_arc_diameter - inner_pad, iy + ih,
+              ix + inner_arc_diameter + inner_pad, iy + ih + inner_arc_diameter + inner_pad]
 
     try:
         draw.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220), width=inner_width)
@@ -218,7 +218,7 @@ def draw_decorative_frame(img: Image.Image,
         draw.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220))
 
     # 内枠直線接続（内線用 overlap）
-    in_overlap = 0
+    in_overlap = 4
 
     p_li_top = _arc_point(li_box, 90)
     p_ri_top = _arc_point(ri_box, 90)
