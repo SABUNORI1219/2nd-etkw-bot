@@ -109,7 +109,7 @@ def draw_decorative_frame(img: Image.Image,
 
     # 外側オフセットの自動計算。太線幅やアーク bbox が画像外にはみ出ないように最低値を確保する。
     if outer_offset is None:
-        outer_offset = max(12, int(min(w, h) * 0.025)) + 32
+        outer_offset = max(12, int(min(w, h) * 0.025))
     # outer_offset must be large enough so that an arc bbox placed with its corner at (ox,oy)
     # does not have negative coordinates. We therefore require ox >= arc_diameter + half_line.
     min_outer_offset = arc_diameter + (outer_width // 2) + 1
@@ -117,7 +117,7 @@ def draw_decorative_frame(img: Image.Image,
 
     # 内枠オフセット（外枠の内側）。内枠も端が画像外れしないよう最低値を確保
     if inner_offset is None:
-        inner_offset = max(outer_offset - 4, outer_offset)  # 外枠との距離を小さくする（=外側寄せ）
+        inner_offset = max((inner_width // 2) + 1, outer_offset - 8)
     min_inner_offset = (inner_width // 2) + 1
     inner_offset = max(inner_offset, min_inner_offset)
 
@@ -289,10 +289,11 @@ def create_card_background(w: int, h: int,
 
     # ==== 装飾枠を描画 ====
     try:
+        # 例：外枠を画像内側へ寄せる = outer_offset=36、内枠を外側に寄せる = inner_offset=28
         composed = draw_decorative_frame(composed.convert('RGBA'),
-                                         outer_offset=None,
+                                         outer_offset=36,
                                          outer_width=max(6, int(w * 0.01)),
-                                         inner_offset=None,
+                                         inner_offset=28,
                                          inner_width=max(1, int(w * 0.005)),
                                          frame_color=(85, 50, 30, 255))
     except Exception as e:
