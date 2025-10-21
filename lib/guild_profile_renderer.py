@@ -98,21 +98,22 @@ def draw_decorative_frame(img: Image.Image,
     inner_notch_radius = max(8, int(notch_radius * 0.65))
     inner_arc_diameter = inner_notch_radius * 2
 
-    # 最小安全オフセット（アーチ bbox が負座標にならないように）
-    min_outer_offset = int(arc_diameter + (outer_width / 2) + 1)
+    arc_pad = max(4, int(notch_radius * 0.35))       # 外アーチを外へ寄せる量（px）。調整はここだけ
+    inner_pad = max(3, int(inner_notch_radius * 0.30))  # 内アーチを外へ寄せる量（px）
+
+    # min_outer_offset は arc_pad を考慮して算出（外へ寄せても描画領域からはみ出さない余裕）
+    min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
     if outer_offset is None:
-        # デフォルトは画像端からアーチがはみ出さない最小値か、少し控えめな値
         outer_offset = max(12, min_outer_offset)
     else:
         outer_offset = int(max(0, outer_offset))
 
-    # inner_offset のデフォルトは「太線のすぐ内側」に配置する
+    min_spacing = max(6, outer_width + inner_width + 4)
     if inner_offset is None:
-        # spacing は太線幅 + 内線幅 + 小さな余裕
-        spacing = max(6, outer_width + inner_width + 4)
-        inner_offset = outer_offset + spacing
+        inner_offset = outer_offset + min_spacing
     else:
-        inner_offset = int(max((inner_width // 2) + 1, inner_offset))
+        # ここで inner_offset が outer_offset より小さくなるのを防ぐ
+        inner_offset = int(max(inner_offset, outer_offset + min_spacing))
 
     ox = int(outer_offset)
     oy = int(outer_offset)
