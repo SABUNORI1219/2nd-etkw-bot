@@ -108,13 +108,14 @@ def draw_decorative_frame(img: Image.Image,
     else:
         outer_offset = int(max(0, outer_offset))
 
-    min_spacing = max(6, outer_width + inner_width + 4)
+   min_spacing = max(4, 4)  # デフォルトで4px差を許容（必要ならここを変えてください）
     if inner_offset is None:
+        # 内枠未指定 → outer_offset の内側に配置（デフォルト差を適用）
         inner_offset = outer_offset + min_spacing
     else:
-        # ここで inner_offset が outer_offset より小さくなるのを防ぐ
-        inner_offset = int(max(inner_offset, outer_offset + min_spacing))
-
+        # 明示値がある場合はそれを尊重。ただし最低限の半線幅は確保する
+        inner_offset = int(max(inner_offset, (inner_width // 2) + 1))
+        
     ox = int(outer_offset)
     oy = int(outer_offset)
     ow = int(w - outer_offset * 2)
@@ -315,7 +316,7 @@ def create_card_background(w: int, h: int,
         composed = draw_decorative_frame(composed.convert('RGBA'),
                                          outer_offset=72,
                                          outer_width=max(6, int(w * 0.01)),
-                                         inner_offset=80,
+                                         inner_offset=68,
                                          inner_width=max(1, int(w * 0.005)),
                                          frame_color=(85, 50, 30, 255))
     except Exception as e:
