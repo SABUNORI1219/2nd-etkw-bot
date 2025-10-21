@@ -84,36 +84,44 @@ def draw_decorative_frame(img: Image.Image,
                           inner_width: int = 2,
                           frame_color=(85, 50, 30, 255)) -> Image.Image:
     """
-    外枠（太）＋内枠（細）を描画。各枠は四隅に内向きのアーチを持ち、
-    アーチ端点同士を直線で繋いでいます（自動で端点を合わせる方式）。
-    outer_offset / inner_offset を明示するとその値を優先します。
+    外枠（太）＋内枠（細）を描画します。
+    重要: アーチ (arc) と直線 (line) は相互連動しない（独立）にしました。
+    - アーチの位置は arc_pad / inner_pad でコントロール
+    - 直線の位置は outer_offset/inner_offset と line_inset_* でコントロール
+    これにより「アーチをいじったら直線が勝手に動く」問題を排除します。
     """
     w, h = img.size
 
-    # arc radii (保持)
+    # アーチ半径
     notch_radius = max(12, int(min(w, h) * 0.035))
     arc_diameter = notch_radius * 2
 
-    # make inner arc curvature closer to outer
+    # 内アーチの半径（外アーチに近づけることで形を揃える）
     inner_notch_radius = max(8, int(notch_radius * 0.90))
     inner_arc_diameter = inner_notch_radius * 2
 
-    # explicit pixel pads (make arcs move outward reliably)
-    # ここを調整することでアーチ全体を外側に移動できます
-    arc_pad = max(16, int(notch_radius * 1.2))
-    inner_pad = max(10, int(inner_notch_radius * 1.15))
+    # --- 調整可能なパラメータ（ここをいじれば見た目が変わります） ---
+    # arc_pad: アーチ全体を外側にどれだけ寄せるか（px）
+    # inner_pad: 内アーチの外寄せ
+    # line_inset_outer / line_inset_inner: 直線が枠端からどれだけ内側に入るか（px）
+    # これらを変更すればアーチと直線の相対位置を簡単に調整できます
+    arc_pad = max(8, int(notch_radius * 0.8))        # default: 0.8 * notch_radius
+    inner_pad = max(6, int(inner_notch_radius * 0.7))  # default: 0.7 * inner_notch_radius
 
-    # safe outer_offset calculation (consider arc_pad)
+    # 直線の内寄せ量（大きいほど直線は内側に寄る）
+    # 直線位置を固定化するため arc の形状に依存しない値とします
+    line_inset_outer = max(6, outer_width + 2)
+    line_inset_inner = max(4, inner_width + 1)
+
+    # --- offset の安全化 ---
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
     if outer_offset is None:
         outer_offset = max(12, min_outer_offset)
     else:
         outer_offset = int(max(0, outer_offset))
 
-    # default inner_offset: prefer explicit inner_offset if user passed, but ensure sane minimum
-    min_spacing = 4
     if inner_offset is None:
-        inner_offset = outer_offset + min_spacing
+        inner_offset = outer_offset + max(6, outer_width + inner_width + 4)
     else:
         inner_offset = int(max(inner_offset, (inner_width // 2) + 1))
 
@@ -130,121 +138,120 @@ def draw_decorative_frame(img: Image.Image,
     out = img.convert("RGBA")
     draw = ImageDraw.Draw(out)
 
-    # --- define arc bboxes using corner-style boxes (outer) with arc_pad shifted on both edges ---
-    # 左上アーチ（左方向へ移動するため、右端も ox - arc_pad にしている点に注目）
-    left_arc_box = [ox - arc_diameter - arc_pad, oy - arc_diameter - arc_pad, ox - arc_pad, oy - arc_pad]
-    # 右上アーチ（左端 / 右端 を外側へ +arc_pad）
-    right_arc_box = [ox + ow + arc_pad, oy - arc_diameter - arc_pad, ox + ow + arc_diameter + arc_pad, oy - arc_pad]
-    # 左下アーチ
-    bottom_left_arc_box = [ox - arc_diameter - arc_pad, oy + oh + arc_pad, ox - arc_pad, oy + oh + arc_diameter + arc_pad]
-    # 右下アーチ
-    bottom_right_arc_box = [ox + ow + arc_pad, oy + oh + arc_pad, ox + ow + arc_diameter + arc_pad, oy + oh + arc_diameter + arc_pad]
-
-    # --- compute and draw straight outer lines FIRST (so arcs can be drawn on top afterwards) ---
-    overlap = -6
-
+    # clamp helper
     def _clamp_center(pt, stroke_w):
         half = stroke_w / 2.0
         x = max(half, min(w - half, pt[0]))
         y = max(half, min(h - half, pt[1]))
         return (x, y)
 
-    # top edge (straight line)
-    p_left_top = _arc_point(left_arc_box, 90)
-    p_right_top = _arc_point(right_arc_box, 90)
-    start_top = _extend_point(p_left_top, p_right_top, -overlap)
-    end_top = _extend_point(p_right_top, p_left_top, -overlap)
-    draw.line([_clamp_center(start_top, outer_width), _clamp_center(end_top, outer_width)], fill=frame_color, width=outer_width)
+    # ----------------------------
+    # 1) 直線（outer）: 固定座標ベースで描画（アーチとは独立）
+    # ----------------------------
+    # outer horizontals
+    top_y = oy + int(outer_width / 2) + line_inset_outer // 3
+    bot_y = oy + oh - int(outer_width / 2) - line_inset_outer // 3
+    start_top = (ox + line_inset_outer, top_y)
+    end_top = (ox + ow - line_inset_outer, top_y)
+    draw.line([_clamp_center(start_top, outer_width), _clamp_center(end_top, outer_width)],
+              fill=frame_color, width=outer_width)
 
-    # bottom edge
-    p_left_bot = _arc_point(bottom_left_arc_box, 270)
-    p_right_bot = _arc_point(bottom_right_arc_box, 270)
-    start_bot = _extend_point(p_left_bot, p_right_bot, -overlap)
-    end_bot = _extend_point(p_right_bot, p_left_bot, -overlap)
-    draw.line([_clamp_center(start_bot, outer_width), _clamp_center(end_bot, outer_width)], fill=frame_color, width=outer_width)
+    start_bot = (ox + line_inset_outer, bot_y)
+    end_bot = (ox + ow - line_inset_outer, bot_y)
+    draw.line([_clamp_center(start_bot, outer_width), _clamp_center(end_bot, outer_width)],
+              fill=frame_color, width=outer_width)
 
-    # left vertical
-    p_left_top_left = _arc_point(left_arc_box, 180)
-    p_left_bot_left = _arc_point(bottom_left_arc_box, 180)
-    start_left = _extend_point(p_left_top_left, p_left_bot_left, -overlap)
-    end_left = _extend_point(p_left_bot_left, p_left_top_left, -overlap)
-    draw.line([_clamp_center(start_left, outer_width), _clamp_center(end_left, outer_width)], fill=frame_color, width=outer_width)
+    # outer verticals
+    left_x = ox + int(outer_width / 2) + line_inset_outer // 3
+    right_x = ox + ow - int(outer_width / 2) - line_inset_outer // 3
+    start_left = (left_x, oy + line_inset_outer)
+    end_left = (left_x, oy + oh - line_inset_outer)
+    draw.line([_clamp_center(start_left, outer_width), _clamp_center(end_left, outer_width)],
+              fill=frame_color, width=outer_width)
 
-    # right vertical
-    p_right_top_right = _arc_point(right_arc_box, 0)
-    p_right_bot_right = _arc_point(bottom_right_arc_box, 0)
-    start_right = _extend_point(p_right_top_right, p_right_bot_right, -overlap)
-    end_right = _extend_point(p_right_bot_right, p_right_top_right, -overlap)
-    draw.line([_clamp_center(start_right, outer_width), _clamp_center(end_right, outer_width)], fill=frame_color, width=outer_width)
+    start_right = (right_x, oy + line_inset_outer)
+    end_right = (right_x, oy + oh - line_inset_outer)
+    draw.line([_clamp_center(start_right, outer_width), _clamp_center(end_right, outer_width)],
+              fill=frame_color, width=outer_width)
 
-    # --- draw outer arcs ON TOP of straight lines so arcs are visible ---
+    # ----------------------------
+    # 2) アーチ（outer arcs）: arc_pad によって移動（アーチは線の上に描く）
+    # ----------------------------
+    # corner-style bboxes with pad applied to both sides so arc shifts outward clearly
+    left_arc_box = [ox - arc_diameter - arc_pad, oy - arc_diameter - arc_pad, ox - arc_pad, oy - arc_pad]
+    right_arc_box = [ox + ow + arc_pad, oy - arc_diameter - arc_pad, ox + ow + arc_diameter + arc_pad, oy - arc_pad]
+    bottom_left_arc_box = [ox - arc_diameter - arc_pad, oy + oh + arc_pad, ox - arc_pad, oy + oh + arc_diameter + arc_pad]
+    bottom_right_arc_box = [ox + ow + arc_pad, oy + oh + arc_pad, ox + ow + arc_diameter + arc_pad, oy + oh + arc_diameter + arc_pad]
+
     try:
         draw.arc(left_arc_box, start=0, end=90, fill=frame_color, width=outer_width)
         draw.arc(right_arc_box, start=90, end=180, fill=frame_color, width=outer_width)
         draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color, width=outer_width)
         draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color, width=outer_width)
     except Exception:
+        # fallback: draw without width param
         draw.arc(left_arc_box, start=0, end=90, fill=frame_color)
         draw.arc(right_arc_box, start=90, end=180, fill=frame_color)
         draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color)
         draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
 
-    # ----- inner frame (thin) -----
-    # inner arcs: use corner-style bbox like outer, with inner_pad shifted on both edges
+    # ----------------------------
+    # 3) 内枠（直線）: 固定座標ベースで描画（アーチと独立）
+    # ----------------------------
+    inner_top_y = iy + int(inner_width / 2) + line_inset_inner // 3
+    inner_bot_y = iy + ih - int(inner_width / 2) - line_inset_inner // 3
+    start_itop = (ix + line_inset_inner, inner_top_y)
+    end_itop = (ix + iw - line_inset_inner, inner_top_y)
+    draw.line([_clamp_center(start_itop, inner_width), _clamp_center(end_itop, inner_width)],
+              fill=(95, 60, 35, 220), width=inner_width)
+
+    start_ibot = (ix + line_inset_inner, inner_bot_y)
+    end_ibot = (ix + iw - line_inset_inner, inner_bot_y)
+    draw.line([_clamp_center(start_ibot, inner_width), _clamp_center(end_ibot, inner_width)],
+              fill=(95, 60, 35, 220), width=inner_width)
+
+    inner_left_x = ix + int(inner_width / 2) + line_inset_inner // 3
+    inner_right_x = ix + iw - int(inner_width / 2) - line_inset_inner // 3
+    draw.line([_clamp_center((inner_left_x, iy + line_inset_inner), inner_width),
+               _clamp_center((inner_left_x, iy + ih - line_inset_inner), inner_width)],
+              fill=(95, 60, 35, 220), width=inner_width)
+    draw.line([_clamp_center((inner_right_x, iy + line_inset_inner), inner_width),
+               _clamp_center((inner_right_x, iy + ih - line_inset_inner), inner_width)],
+              fill=(95, 60, 35, 220), width=inner_width)
+
+    # ----------------------------
+    # 4) 内アーチ（inner arcs）: inner_pad で外側に寄せる（アーチは直線の上に描く）
+    # ----------------------------
     li_box = [ix - inner_arc_diameter - inner_pad, iy - inner_arc_diameter - inner_pad, ix - inner_pad, iy - inner_pad]
     ri_box = [ix + iw + inner_pad, iy - inner_arc_diameter - inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy - inner_pad]
     br_box = [ix + iw + inner_pad, iy + ih + inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy + ih + inner_arc_diameter + inner_pad]
     bl_box = [ix - inner_arc_diameter - inner_pad, iy + ih + inner_pad, ix - inner_pad, iy + ih + inner_arc_diameter + inner_pad]
 
-    # draw inner straight lines FIRST
-    in_overlap = -6  # adjust 6..12 as needed; bigger => longer inner straight lines
-    p_li_top = _arc_point(li_box, 90)
-    p_ri_top = _arc_point(ri_box, 90)
-    start_in_top = _extend_point(p_li_top, p_ri_top, -in_overlap)
-    end_in_top = _extend_point(p_ri_top, p_li_top, -in_overlap)
-    draw.line([_clamp_center(start_in_top, inner_width), _clamp_center(end_in_top, inner_width)], fill=(95,60,35,220), width=inner_width)
-
-    p_li_bot = _arc_point(bl_box, 270)
-    p_ri_bot = _arc_point(br_box, 270)
-    start_in_bot = _extend_point(p_li_bot, p_ri_bot, -in_overlap)
-    end_in_bot = _extend_point(p_ri_bot, p_li_bot, -in_overlap)
-    draw.line([_clamp_center(start_in_bot, inner_width), _clamp_center(end_in_bot, inner_width)], fill=(95,60,35,220), width=inner_width)
-
-    p_li_left = _arc_point(li_box, 180)
-    p_li_bottomleft = _arc_point(bl_box, 180)
-    start_in_left = _extend_point(p_li_left, p_li_bottomleft, -in_overlap)
-    end_in_left = _extend_point(p_li_bottomleft, p_li_left, -in_overlap)
-    draw.line([_clamp_center(start_in_left, inner_width), _clamp_center(end_in_left, inner_width)], fill=(95,60,35,220), width=inner_width)
-
-    p_ri_right = _arc_point(ri_box, 0)
-    p_ri_bottomright = _arc_point(br_box, 0)
-    start_in_right = _extend_point(p_ri_right, p_ri_bottomright, -in_overlap)
-    end_in_right = _extend_point(p_ri_bottomright, p_ri_right, -in_overlap)
-    draw.line([_clamp_center(start_in_right, inner_width), _clamp_center(end_in_right, inner_width)], fill=(95,60,35,220), width=inner_width)
-
-    # finally draw inner arcs on top
     try:
-        draw.arc(li_box, start=0, end=90, fill=(95,60,35,220), width=inner_width)
-        draw.arc(ri_box, start=90, end=180, fill=(95,60,35,220), width=inner_width)
-        draw.arc(br_box, start=180, end=270, fill=(95,60,35,220), width=inner_width)
-        draw.arc(bl_box, start=270, end=360, fill=(95,60,35,220), width=inner_width)
+        draw.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220), width=inner_width)
+        draw.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220), width=inner_width)
+        draw.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220), width=inner_width)
+        draw.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220), width=inner_width)
     except Exception:
-        draw.arc(li_box, start=0, end=90, fill=(95,60,35,220))
-        draw.arc(ri_box, start=90, end=180, fill=(95,60,35,220))
-        draw.arc(br_box, start=180, end=270, fill=(95,60,35,220))
-        draw.arc(bl_box, start=270, end=360, fill=(95,60,35,220))
+        draw.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220))
+        draw.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220))
+        draw.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220))
+        draw.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220))
 
-    # 装飾的ルール線・ボックス
+    # 装飾的なルール線・ボックス（元実装に近い位置で描画）
     rule_color = (110, 75, 45, 180)
-    y_rule = iy + int(ih * 0.12)
-    draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color, width=max(2, inner_width + 2))
-    y_rule2 = iy + int(ih * 0.48)
-    draw.line([(ix + int(iw * 0.03), y_rule2), (ix + int(iw * 0.60), y_rule2)], fill=rule_color, width=max(2, inner_width + 2))
-    box_x = ix + int(iw * 0.04)
-    box_y = iy + int(ih * 0.06)
-    box_w = int(iw * 0.18)
-    box_h = int(ih * 0.18)
-    draw.rectangle([box_x, box_y, box_x + box_w, box_y + box_h], outline=rule_color, width=max(2, inner_width))
+    try:
+        y_rule = iy + int(ih * 0.12)
+        draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color, width=max(2, inner_width + 2))
+        y_rule2 = iy + int(ih * 0.48)
+        draw.line([(ix + int(iw * 0.03), y_rule2), (ix + int(iw * 0.60), y_rule2)], fill=rule_color, width=max(2, inner_width + 2))
+        box_x = ix + int(iw * 0.04)
+        box_y = iy + int(ih * 0.06)
+        box_w = int(iw * 0.18)
+        box_h = int(ih * 0.18)
+        draw.rectangle([box_x, box_y, box_x + box_w, box_y + box_h], outline=rule_color, width=max(2, inner_width))
+    except Exception:
+        logger.debug("rule/box draw failed, skipping")
 
     return out
 
@@ -293,14 +300,14 @@ def create_card_background(w: int, h: int,
     dark_img = Image.new('RGB', (w, h), dark_color)
     composed = Image.composite(img, dark_img, vignette)
 
-    # 装飾枠を描画（必要なら outer_offset/inner_offset を明示指定）
+    # 装飾枠を描画（outer_offset/inner_offset を明示指定）
     try:
         composed = draw_decorative_frame(composed.convert('RGBA'),
-                                     outer_offset=60,
-                                     outer_width=max(6, int(w * 0.01)),
-                                     inner_offset=64,   # <- outer_offset + 4 (keep inner inside outer)
-                                     inner_width=max(1, int(w * 0.005)),
-                                     frame_color=(85, 50, 30, 255))
+                                         outer_offset=60,
+                                         outer_width=max(6, int(w * 0.01)),
+                                         inner_offset=64,
+                                         inner_width=max(1, int(w * 0.005)),
+                                         frame_color=(85, 50, 30, 255))
     except Exception as e:
         logger.exception(f"draw_decorative_frame failed: {e}")
         composed = composed.convert('RGBA')
