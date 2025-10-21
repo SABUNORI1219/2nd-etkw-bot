@@ -98,28 +98,43 @@ def draw_decorative_frame(img: Image.Image,
                           frame_color=(85, 50, 30, 255)) -> Image.Image:
     """
     外枠（太）＋内枠（細）を描画。
-    最小変更で「太線が画像外にはみ出さない」「アークが線と繋がる位置に配置」
-    を実現するよう outer_offset を厳密に調整しています。
+
+    変更点（今回の実装）:
+    - caller が outer_offset / inner_offset を明示的に渡した場合はその値を尊重する。
+    - outer_offset が None のときのみ、安全な最小値(min_outer_offset) を適用する。
+    - inner_offset のデフォルトは外枠に近づける（外枠寄り）設定を採用しつつ、最小値は確保。
+    これにより「呼び出し側で希望の位置を指定しても無視される」問題を解消しています。
     """
     w, h = img.size
 
     # notch/arc の半径（見た目調整）
-    notch_radius = max(12, int(min(w, h) * 0.04))
-    arc_diameter = notch_radius * 2 / 1.15  # アーク用 bbox の幅（ピクセル）
+    # ここを変えるとアーチ（四隅）の大きさが変わります
+    notch_radius = max(12, int(min(w, h) * 0.035))
+    arc_diameter = int(notch_radius * 2)
 
-    # 外側オフセットの自動計算。太線幅やアーク bbox が画像外にはみ出ないように最低値を確保する。
-    if outer_offset is None:
-        outer_offset = max(12, int(min(w, h) * 0.025))
-    # outer_offset must be large enough so that an arc bbox placed with its corner at (ox,oy)
-    # does not have negative coordinates. We therefore require ox >= arc_diameter + half_line.
-    min_outer_offset = arc_diameter + (outer_width // 2) + 1
-    outer_offset = max(outer_offset, min_outer_offset)
-
-    # 内枠オフセット（外枠の内側）。内枠も端が画像外れしないよう最低値を確保
-    if inner_offset is None:
-        inner_offset = max((inner_width // 2) + 1, outer_offset - 8)
+    # 安全系パラメータ（アーク bbox が画像外に出ないようにするための最小オフセット）
+    min_outer_offset = int(arc_diameter + (outer_width / 2) + 1)
     min_inner_offset = (inner_width // 2) + 1
-    inner_offset = max(inner_offset, min_inner_offset)
+
+    # outer_offset: caller の値を尊重する（明示値がある場合はそのまま採用）
+    if outer_offset is None:
+        outer_offset = max(12, int(min(w, h) * 0.025), min_outer_offset)
+    else:
+        # 明示的な値は整数化してそのまま使う（ただし負の値等を避ける）
+        outer_offset = int(max(0, outer_offset))
+
+    # inner_offset: デフォルトは outer_offset に近づけて「外側寄せ」にするが、
+    # caller が値を渡した場合はそれを尊重する。
+    if inner_offset is None:
+        # 外枠に寄せたい（外枠 - delta）にする。delta を大きくすると内枠が外枠に近付く。
+        delta = max(6, int(min(w, h) * 0.02))
+        inner_offset = max(min_inner_offset, outer_offset - delta)
+    else:
+        inner_offset = int(max(min_inner_offset, inner_offset))
+
+    # 安全のため（念のため） outer_offset >= min_outer_offset if it was computed automatically:
+    # but if caller explicitly set a smaller outer_offset, we respect it (we assume caller knows risks).
+    # We already ensured outer_offset is int above.
 
     ox = int(outer_offset)
     oy = int(outer_offset)
@@ -135,11 +150,10 @@ def draw_decorative_frame(img: Image.Image,
     draw = ImageDraw.Draw(out)
 
     # アーク用 bbox（角の「外側」に配置して内向きに見える quarter-arc を作る）
-    # bbox のサイズは arc_diameter (= notch_radius*2)
-    left_arc_box = [ox - arc_diameter, oy - arc_diameter, ox, oy]
-    right_arc_box = [ox + ow, oy - arc_diameter, ox + ow + arc_diameter, oy]
-    bottom_left_arc_box = [ox - arc_diameter, oy + oh, ox, oy + oh + arc_diameter]
-    bottom_right_arc_box = [ox + ow, oy + oh, ox + ow + arc_diameter, oy + oh + arc_diameter]
+    left_arc_box = [int(ox - arc_diameter), int(oy - arc_diameter), int(ox), int(oy)]
+    right_arc_box = [int(ox + ow), int(oy - arc_diameter), int(ox + ow + arc_diameter), int(oy)]
+    bottom_left_arc_box = [int(ox - arc_diameter), int(oy + oh), int(ox), int(oy + oh + arc_diameter)]
+    bottom_right_arc_box = [int(ox + ow), int(oy + oh), int(ox + ow + arc_diameter), int(oy + oh + arc_diameter)]
 
     # 外枠：アーク描画（内向きの凹み）
     try:
@@ -187,10 +201,10 @@ def draw_decorative_frame(img: Image.Image,
 
     # ----- 内枠（細線） -----
     inner_arc_bbox = int(notch_radius * 0.65)
-    li_box = [ix - inner_arc_bbox, iy - inner_arc_bbox, ix + inner_arc_bbox, iy + inner_arc_bbox]
-    ri_box = [ix + iw - inner_arc_bbox, iy - inner_arc_bbox, ix + iw + inner_arc_bbox, iy + inner_arc_bbox]
-    br_box = [ix + iw - inner_arc_bbox, iy + ih - inner_arc_bbox, ix + iw + inner_arc_bbox, iy + ih + inner_arc_bbox]
-    bl_box = [ix - inner_arc_bbox, iy + ih - inner_arc_bbox, ix + inner_arc_bbox, iy + ih + inner_arc_bbox]
+    li_box = [int(ix - inner_arc_bbox), int(iy - inner_arc_bbox), int(ix + inner_arc_bbox), int(iy + inner_arc_bbox)]
+    ri_box = [int(ix + iw - inner_arc_bbox), int(iy - inner_arc_bbox), int(ix + iw + inner_arc_bbox), int(iy + inner_arc_bbox)]
+    br_box = [int(ix + iw - inner_arc_bbox), int(iy + ih - inner_arc_bbox), int(ix + iw + inner_arc_bbox), int(iy + ih + inner_arc_bbox)]
+    bl_box = [int(ix - inner_arc_bbox), int(iy + ih - inner_arc_bbox), int(ix + inner_arc_bbox), int(iy + ih + inner_arc_bbox)]
 
     try:
         draw.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220), width=inner_width)
