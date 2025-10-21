@@ -99,42 +99,35 @@ def draw_decorative_frame(img: Image.Image,
     """
     外枠（太）＋内枠（細）を描画。
 
-    変更点（今回の実装）:
-    - caller が outer_offset / inner_offset を明示的に渡した場合はその値を尊重する。
-    - outer_offset が None のときのみ、安全な最小値(min_outer_offset) を適用する。
-    - inner_offset のデフォルトは外枠に近づける（外枠寄り）設定を採用しつつ、最小値は確保。
-    これにより「呼び出し側で希望の位置を指定しても無視される」問題を解消しています。
+    変更点：
+    - 直線の端点を arc の端点に合わせる自動調整を廃止しました。
+      直線は outer_offset / inner_offset に基づく固定座標で描かれます。
+    - inner_offset のデフォルトは outer_offset から独立した値（outer_offset + gap）にしました。
+      これにより「内枠が外枠に自動で寄る」機能を無効化しています。
     """
     w, h = img.size
 
-    # notch/arc の半径（見た目調整）
-    # ここを変えるとアーチ（四隅）の大きさが変わります
+    # アーチ（notch）半径 — 小さくするとアーチは内側に寄る
     notch_radius = max(12, int(min(w, h) * 0.03))
     arc_diameter = int(notch_radius * 2)
 
-    # 安全系パラメータ（アーク bbox が画像外に出ないようにするための最小オフセット）
+    # 最小オフセットなど（安全マージン）
     min_outer_offset = int(arc_diameter + (outer_width / 2) + 1)
     min_inner_offset = (inner_width // 2) + 1
 
-    # outer_offset: caller の値を尊重する（明示値がある場合はそのまま採用）
+    # outer_offset: caller の明示値を尊重。None のときは安全最小値を採用
     if outer_offset is None:
         outer_offset = max(12, int(min(w, h) * 0.025), min_outer_offset)
     else:
-        # 明示的な値は整数化してそのまま使う（ただし負の値等を避ける）
         outer_offset = int(max(0, outer_offset))
 
-    # inner_offset: デフォルトは outer_offset に近づけて「外側寄せ」にするが、
-    # caller が値を渡した場合はそれを尊重する。
+    # inner_offset: 「外枠に依存して内側/外側に勝手に寄る」挙動を廃止。
+    # デフォルトは outer_offset + gap （外枠より内側）にして独立化。
     if inner_offset is None:
-        # 外枠に寄せたい（外枠 - delta）にする。delta を大きくすると内枠が外枠に近付く。
-        delta = max(6, int(min(w, h) * 0.02))
-        inner_offset = max(min_inner_offset, outer_offset - delta)
+        gap = max(8, int(min(w, h) * 0.02))  # gap を指定すれば内枠は外枠より内側に固定される
+        inner_offset = max(min_inner_offset, outer_offset + gap)
     else:
         inner_offset = int(max(min_inner_offset, inner_offset))
-
-    # 安全のため（念のため） outer_offset >= min_outer_offset if it was computed automatically:
-    # but if caller explicitly set a smaller outer_offset, we respect it (we assume caller knows risks).
-    # We already ensured outer_offset is int above.
 
     ox = int(outer_offset)
     oy = int(outer_offset)
@@ -149,55 +142,30 @@ def draw_decorative_frame(img: Image.Image,
     out = img.convert("RGBA")
     draw = ImageDraw.Draw(out)
 
-    # アーク用 bbox（角の「外側」に配置して内向きに見える quarter-arc を作る）
+    # アーチ用 bbox（位置は offset に基づいて決定。アーチ自体はここだけで管理）
     left_arc_box = [int(ox - arc_diameter), int(oy - arc_diameter), int(ox), int(oy)]
     right_arc_box = [int(ox + ow), int(oy - arc_diameter), int(ox + ow + arc_diameter), int(oy)]
     bottom_left_arc_box = [int(ox - arc_diameter), int(oy + oh), int(ox), int(oy + oh + arc_diameter)]
     bottom_right_arc_box = [int(ox + ow), int(oy + oh), int(ox + ow + arc_diameter), int(oy + oh + arc_diameter)]
 
-    # 外枠：アーク描画（内向きの凹み）
+    # 外枠アーチ描画（位置は上記 bbox 固定）
     try:
         draw.arc(left_arc_box, start=0, end=90, fill=frame_color, width=outer_width)
         draw.arc(right_arc_box, start=90, end=180, fill=frame_color, width=outer_width)
         draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color, width=outer_width)
         draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color, width=outer_width)
     except Exception:
-        # 幅指定が効かない環境のフォールバック
         draw.arc(left_arc_box, start=0, end=90, fill=frame_color)
         draw.arc(right_arc_box, start=90, end=180, fill=frame_color)
         draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color)
         draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
 
-    # 直線はアーク端点同士を繋ぐ（overlap による確実な接続）
-    overlap = max(2, int(outer_width * 0.6))
-
-    # top edge
-    p_left_top = _arc_point(left_arc_box, 90)
-    p_right_top = _arc_point(right_arc_box, 90)
-    start_top = _extend_point(p_left_top, p_right_top, -overlap)
-    end_top = _extend_point(p_right_top, p_left_top, -overlap)
-    draw.line([start_top, end_top], fill=frame_color, width=outer_width)
-
-    # bottom edge
-    p_left_bot = _arc_point(bottom_left_arc_box, 270)
-    p_right_bot = _arc_point(bottom_right_arc_box, 270)
-    start_bot = _extend_point(p_left_bot, p_right_bot, -overlap)
-    end_bot = _extend_point(p_right_bot, p_left_bot, -overlap)
-    draw.line([start_bot, end_bot], fill=frame_color, width=outer_width)
-
-    # left vertical
-    p_left_top_left = _arc_point(left_arc_box, 180)
-    p_left_bot_left = _arc_point(bottom_left_arc_box, 180)
-    start_left = _extend_point(p_left_top_left, p_left_bot_left, -overlap)
-    end_left = _extend_point(p_left_bot_left, p_left_top_left, -overlap)
-    draw.line([start_left, end_left], fill=frame_color, width=outer_width)
-
-    # right vertical
-    p_right_top_right = _arc_point(right_arc_box, 0)
-    p_right_bot_right = _arc_point(bottom_right_arc_box, 0)
-    start_right = _extend_point(p_right_top_right, p_right_bot_right, -overlap)
-    end_right = _extend_point(p_right_bot_right, p_right_top_right, -overlap)
-    draw.line([start_right, end_right], fill=frame_color, width=outer_width)
+    # 直線（外枠） — アーチ端点に合わせて自動調整しない。offset に基づく固定座標で描く。
+    # (外枠の矩形の辺そのものを線として描画)
+    draw.line([(ox, oy), (ox + ow, oy)], fill=frame_color, width=outer_width)         # top
+    draw.line([(ox, oy + oh), (ox + ow, oy + oh)], fill=frame_color, width=outer_width) # bottom
+    draw.line([(ox, oy), (ox, oy + oh)], fill=frame_color, width=outer_width)         # left
+    draw.line([(ox + ow, oy), (ox + ow, oy + oh)], fill=frame_color, width=outer_width) # right
 
     # ----- 内枠（細線） -----
     inner_arc_bbox = int(notch_radius * 0.65)
@@ -217,29 +185,13 @@ def draw_decorative_frame(img: Image.Image,
         draw.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220))
         draw.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220))
 
-    # 内枠直線接続
-    in_overlap = max(1, int(inner_width * 0.6))
-    p_li_top = _arc_point(li_box, 90)
-    p_ri_top = _arc_point(ri_box, 90)
-    draw.line([_extend_point(p_li_top, p_ri_top, -in_overlap), _extend_point(p_ri_top, p_li_top, -in_overlap)],
-              fill=(95, 60, 35, 220), width=inner_width)
+    # 内枠の直線も offset に基づく固定座標で描画（外枠に合わせて自動で寄せない）
+    draw.line([(ix, iy), (ix + iw, iy)], fill=(95, 60, 35, 220), width=inner_width)         # top
+    draw.line([(ix, iy + ih), (ix + iw, iy + ih)], fill=(95, 60, 35, 220), width=inner_width) # bottom
+    draw.line([(ix, iy), (ix, iy + ih)], fill=(95, 60, 35, 220), width=inner_width)         # left
+    draw.line([(ix + iw, iy), (ix + iw, iy + ih)], fill=(95, 60, 35, 220), width=inner_width) # right
 
-    p_li_bot = _arc_point(bl_box, 270)
-    p_ri_bot = _arc_point(br_box, 270)
-    draw.line([_extend_point(p_li_bot, p_ri_bot, -in_overlap), _extend_point(p_ri_bot, p_li_bot, -in_overlap)],
-              fill=(95, 60, 35, 220), width=inner_width)
-
-    p_li_left = _arc_point(li_box, 180)
-    p_li_bottomleft = _arc_point(bl_box, 180)
-    draw.line([_extend_point(p_li_left, p_li_bottomleft, -in_overlap), _extend_point(p_li_bottomleft, p_li_left, -in_overlap)],
-              fill=(95, 60, 35, 220), width=inner_width)
-
-    p_ri_right = _arc_point(ri_box, 0)
-    p_ri_bottomright = _arc_point(br_box, 0)
-    draw.line([_extend_point(p_ri_right, p_ri_bottomright, -in_overlap), _extend_point(p_ri_bottomright, p_ri_right, -in_overlap)],
-              fill=(95, 60, 35, 220), width=inner_width)
-
-    # 装飾的ルール線（上・中・左のガイド）を最後に描画
+    # 装飾的ルール線・ボックス（そのまま）
     rule_color = (110, 75, 45, 180)
     y_rule = iy + int(ih * 0.12)
     draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color, width=max(2, inner_width + 2))
@@ -252,7 +204,6 @@ def draw_decorative_frame(img: Image.Image,
     draw.rectangle([box_x, box_y, box_x + box_w, box_y + box_h], outline=rule_color, width=max(2, inner_width))
 
     return out
-
 
 def create_card_background(w: int, h: int,
                            noise_std: float = 30.0,
