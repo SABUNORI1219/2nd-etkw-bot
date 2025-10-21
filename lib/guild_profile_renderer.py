@@ -110,8 +110,8 @@ def draw_decorative_frame(img: Image.Image,
 
     # 直線の内寄せ量（大きいほど直線は内側に寄る）
     # 直線位置を固定化するため arc の形状に依存しない値とします
-    line_inset_outer = max(6, outer_width + 2)
-    line_inset_inner = max(4, inner_width + 1)
+    line_inset_outer = max(6, outer_width - 30)
+    line_inset_inner = max(4, inner_width - 26)
 
     # --- offset の安全化 ---
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
