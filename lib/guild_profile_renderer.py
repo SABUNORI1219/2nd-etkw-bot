@@ -110,8 +110,8 @@ def draw_decorative_frame(img: Image.Image,
 
     # 直線の内寄せ量（大きいほど直線は内側に寄る）
     # 直線位置を固定化するため arc の形状に依存しない値とします
-    line_inset_outer = 12  # <- 調整ポイント：増やすと直線は内側へ、減らすと外側へ
-    line_inset_inner = 8   # <- 調整ポイント：内枠の直線を内寄せする値
+    line_inset_outer = -32  # <- 調整ポイント：増やすと直線は内側へ、減らすと外側へ
+    line_inset_inner = -28   # <- 調整ポイント：内枠の直線を内寄せする値
 
     # --- offset の安全化 ---
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
@@ -207,10 +207,7 @@ def draw_decorative_frame(img: Image.Image,
     draw.line([_clamp_center((inner_right_x, iy + line_inset_inner), inner_width),
                _clamp_center((inner_right_x, iy + ih - line_inset_inner), inner_width)],
               fill=(95, 60, 35, 220), width=inner_width)
-
-    # ----------------------------
-    # 4) 内アーチ（inner arcs）: inner_pad で外側に寄せる（アーチは直線の上に描く）
-    # ----------------------------
+                              
     li_box = [ix - inner_arc_diameter - inner_pad, iy - inner_arc_diameter - inner_pad, ix - inner_pad, iy - inner_pad]
     ri_box = [ix + iw + inner_pad, iy - inner_arc_diameter - inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy - inner_pad]
     br_box = [ix + iw + inner_pad, iy + ih + inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy + ih + inner_arc_diameter + inner_pad]
