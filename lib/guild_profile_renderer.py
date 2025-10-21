@@ -305,9 +305,9 @@ def create_card_background(w: int, h: int,
     try:
         # 例：外枠を画像内側へ寄せる = outer_offset=36、内枠を外側に寄せる = inner_offset=28
         composed = draw_decorative_frame(composed.convert('RGBA'),
-                                         outer_offset=36,
+                                         outer_offset=24,
                                          outer_width=max(6, int(w * 0.01)),
-                                         inner_offset=28,
+                                         inner_offset=20,
                                          inner_width=max(1, int(w * 0.005)),
                                          frame_color=(85, 50, 30, 255))
     except Exception as e:
