@@ -108,7 +108,7 @@ def draw_decorative_frame(img: Image.Image,
     else:
         outer_offset = int(max(0, outer_offset))
 
-   min_spacing = max(4, 4)  # デフォルトで4px差を許容（必要ならここを変えてください）
+    min_spacing = max(4, 4)  # デフォルトで4px差を許容（必要ならここを変えてください）
     if inner_offset is None:
         # 内枠未指定 → outer_offset の内側に配置（デフォルト差を適用）
         inner_offset = outer_offset + min_spacing
