@@ -128,7 +128,7 @@ def draw_decorative_frame(img: Image.Image,
     draw = ImageDraw.Draw(out)
 
     # 外枠アーチ bbox（角の外側に配置して内向きアーチ）
-    mult = 1.30
+    mult = 1.20
     left_arc_box = [int(ox - int(arc_diameter * mult)), int(oy - int(arc_diameter * mult)), int(ox), int(oy)]
     right_arc_box = [int(ox + ow), int(oy - int(arc_diameter * mult)), int(ox + ow + int(arc_diameter * mult)), int(oy)]
     bottom_left_arc_box = [int(ox - int(arc_diameter * mult)), int(oy + oh), int(ox), int(oy + oh + int(arc_diameter * mult))]
@@ -195,7 +195,7 @@ def draw_decorative_frame(img: Image.Image,
 
     # ----- 内枠（細線） -----
     # 内アーチ bbox（内枠に合わせて）
-    inner_mult = 1.30
+    inner_mult = 1.20
     li_box = [int(ix - int(inner_arc_diameter * inner_mult)), int(iy - int(inner_arc_diameter * inner_mult)),
               int(ix + int(inner_arc_diameter * inner_mult)), int(iy + int(inner_arc_diameter * inner_mult))]
     ri_box = [int(ix + iw), int(iy - int(inner_arc_diameter * inner_mult)),
@@ -312,9 +312,9 @@ def create_card_background(w: int, h: int,
     # 装飾枠を描画（必要なら outer_offset/inner_offset を明示指定）
     try:
         composed = draw_decorative_frame(composed.convert('RGBA'),
-                                         outer_offset=40,
+                                         outer_offset=64,
                                          outer_width=max(6, int(w * 0.01)),
-                                         inner_offset=36,
+                                         inner_offset=60,
                                          inner_width=max(1, int(w * 0.005)),
                                          frame_color=(85, 50, 30, 255))
     except Exception as e:
