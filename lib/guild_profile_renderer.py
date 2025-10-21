@@ -110,8 +110,8 @@ def draw_decorative_frame(img: Image.Image,
 
     # 直線の内寄せ量（大きいほど直線は内側に寄る）
     # 直線位置を固定化するため arc の形状に依存しない値とします
-    line_inset_outer = max(6, outer_width - 30)
-    line_inset_inner = max(4, inner_width - 26)
+    line_inset_outer = 12  # <- 調整ポイント：増やすと直線は内側へ、減らすと外側へ
+    line_inset_inner = 8   # <- 調整ポイント：内枠の直線を内寄せする値
 
     # --- offset の安全化 ---
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
@@ -144,40 +144,32 @@ def draw_decorative_frame(img: Image.Image,
         x = max(half, min(w - half, pt[0]))
         y = max(half, min(h - half, pt[1]))
         return (x, y)
-
-    # ----------------------------
-    # 1) 直線（outer）: 固定座標ベースで描画（アーチとは独立）
-    # ----------------------------
-    # outer horizontals
-    top_y = oy + int(outer_width / 2) + line_inset_outer // 3
-    bot_y = oy + oh - int(outer_width / 2) - line_inset_outer // 3
+        
+    top_y = oy + int(outer_width / 2) + line_inset_outer
+    bot_y = oy + oh - int(outer_width / 2) - line_inset_outer
     start_top = (ox + line_inset_outer, top_y)
     end_top = (ox + ow - line_inset_outer, top_y)
     draw.line([_clamp_center(start_top, outer_width), _clamp_center(end_top, outer_width)],
               fill=frame_color, width=outer_width)
-
+    
     start_bot = (ox + line_inset_outer, bot_y)
     end_bot = (ox + ow - line_inset_outer, bot_y)
     draw.line([_clamp_center(start_bot, outer_width), _clamp_center(end_bot, outer_width)],
               fill=frame_color, width=outer_width)
-
-    # outer verticals
-    left_x = ox + int(outer_width / 2) + line_inset_outer // 3
-    right_x = ox + ow - int(outer_width / 2) - line_inset_outer // 3
+    
+    # outer verticals (use full inset)
+    left_x = ox + int(outer_width / 2) + line_inset_outer
+    right_x = ox + ow - int(outer_width / 2) - line_inset_outer
     start_left = (left_x, oy + line_inset_outer)
     end_left = (left_x, oy + oh - line_inset_outer)
     draw.line([_clamp_center(start_left, outer_width), _clamp_center(end_left, outer_width)],
               fill=frame_color, width=outer_width)
-
+    
     start_right = (right_x, oy + line_inset_outer)
     end_right = (right_x, oy + oh - line_inset_outer)
     draw.line([_clamp_center(start_right, outer_width), _clamp_center(end_right, outer_width)],
               fill=frame_color, width=outer_width)
 
-    # ----------------------------
-    # 2) アーチ（outer arcs）: arc_pad によって移動（アーチは線の上に描く）
-    # ----------------------------
-    # corner-style bboxes with pad applied to both sides so arc shifts outward clearly
     left_arc_box = [ox - arc_diameter - arc_pad, oy - arc_diameter - arc_pad, ox - arc_pad, oy - arc_pad]
     right_arc_box = [ox + ow + arc_pad, oy - arc_diameter - arc_pad, ox + ow + arc_diameter + arc_pad, oy - arc_pad]
     bottom_left_arc_box = [ox - arc_diameter - arc_pad, oy + oh + arc_pad, ox - arc_pad, oy + oh + arc_diameter + arc_pad]
@@ -195,23 +187,20 @@ def draw_decorative_frame(img: Image.Image,
         draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color)
         draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
 
-    # ----------------------------
-    # 3) 内枠（直線）: 固定座標ベースで描画（アーチと独立）
-    # ----------------------------
-    inner_top_y = iy + int(inner_width / 2) + line_inset_inner // 3
-    inner_bot_y = iy + ih - int(inner_width / 2) - line_inset_inner // 3
+    inner_top_y = iy + int(inner_width / 2) + line_inset_inner
+    inner_bot_y = iy + ih - int(inner_width / 2) - line_inset_inner
     start_itop = (ix + line_inset_inner, inner_top_y)
     end_itop = (ix + iw - line_inset_inner, inner_top_y)
     draw.line([_clamp_center(start_itop, inner_width), _clamp_center(end_itop, inner_width)],
               fill=(95, 60, 35, 220), width=inner_width)
-
+    
     start_ibot = (ix + line_inset_inner, inner_bot_y)
     end_ibot = (ix + iw - line_inset_inner, inner_bot_y)
     draw.line([_clamp_center(start_ibot, inner_width), _clamp_center(end_ibot, inner_width)],
               fill=(95, 60, 35, 220), width=inner_width)
-
-    inner_left_x = ix + int(inner_width / 2) + line_inset_inner // 3
-    inner_right_x = ix + iw - int(inner_width / 2) - line_inset_inner // 3
+    
+    inner_left_x = ix + int(inner_width / 2) + line_inset_inner
+    inner_right_x = ix + iw - int(inner_width / 2) - line_inset_inner
     draw.line([_clamp_center((inner_left_x, iy + line_inset_inner), inner_width),
                _clamp_center((inner_left_x, iy + ih - line_inset_inner), inner_width)],
               fill=(95, 60, 35, 220), width=inner_width)
