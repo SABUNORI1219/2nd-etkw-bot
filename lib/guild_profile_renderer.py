@@ -100,8 +100,8 @@ def draw_decorative_frame(img: Image.Image,
 
     # explicit pixel pads (make arcs move outward reliably)
     # ここを調整することでアーチ全体を外側に移動できます
-    arc_pad = max(12, int(notch_radius * 0.9))
-    inner_pad = max(8, int(inner_notch_radius * 0.9))
+    arc_pad = max(16, int(notch_radius * 1.2))
+    inner_pad = max(10, int(inner_notch_radius * 1.15))
 
     # safe outer_offset calculation (consider arc_pad)
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
@@ -141,7 +141,7 @@ def draw_decorative_frame(img: Image.Image,
     bottom_right_arc_box = [ox + ow + arc_pad, oy + oh + arc_pad, ox + ow + arc_diameter + arc_pad, oy + oh + arc_diameter + arc_pad]
 
     # --- compute and draw straight outer lines FIRST (so arcs can be drawn on top afterwards) ---
-    overlap = max(4, int(outer_width * 1.0))  # outer line extension (px)
+    overlap = -6
 
     def _clamp_center(pt, stroke_w):
         half = stroke_w / 2.0
@@ -197,7 +197,7 @@ def draw_decorative_frame(img: Image.Image,
     bl_box = [ix - inner_arc_diameter - inner_pad, iy + ih + inner_pad, ix - inner_pad, iy + ih + inner_arc_diameter + inner_pad]
 
     # draw inner straight lines FIRST
-    in_overlap = 10  # adjust 6..12 as needed; bigger => longer inner straight lines
+    in_overlap = -6  # adjust 6..12 as needed; bigger => longer inner straight lines
     p_li_top = _arc_point(li_box, 90)
     p_ri_top = _arc_point(ri_box, 90)
     start_in_top = _extend_point(p_li_top, p_ri_top, -in_overlap)
