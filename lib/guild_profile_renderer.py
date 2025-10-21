@@ -109,7 +109,7 @@ def draw_decorative_frame(img: Image.Image,
 
     # notch/arc の半径（見た目調整）
     # ここを変えるとアーチ（四隅）の大きさが変わります
-    notch_radius = max(12, int(min(w, h) * 0.035))
+    notch_radius = max(12, int(min(w, h) * 0.03))
     arc_diameter = int(notch_radius * 2)
 
     # 安全系パラメータ（アーク bbox が画像外に出ないようにするための最小オフセット）
@@ -305,9 +305,9 @@ def create_card_background(w: int, h: int,
     try:
         # 例：外枠を画像内側へ寄せる = outer_offset=36、内枠を外側に寄せる = inner_offset=28
         composed = draw_decorative_frame(composed.convert('RGBA'),
-                                         outer_offset=24,
+                                         outer_offset=48,
                                          outer_width=max(6, int(w * 0.01)),
-                                         inner_offset=20,
+                                         inner_offset=40,
                                          inner_width=max(1, int(w * 0.005)),
                                          frame_color=(85, 50, 30, 255))
     except Exception as e:
