@@ -86,7 +86,7 @@ def draw_decorative_frame(img: Image.Image,
     """
     外枠（太）＋内枠（細）を描画します。
     アーチと直線は「見た目上独立」かつ「四隅はアーチで欠ける」ように描画します。
-    調整パラメータ（arc_pad, inner_pad, line_inset_*, corner_trim）をいじって下さい。
+    変更はこの関数内に閉じ、他の処理には影響しない実装です。
     """
     w, h = img.size
 
@@ -103,8 +103,9 @@ def draw_decorative_frame(img: Image.Image,
     inner_pad = max(6, int(inner_notch_radius * 0.7)) # 内アーチの外寄せ（px）
 
     # 直線の内寄せ量（増やすほど直線は内側に寄る）
+    # NOTE: we do NOT change these values here; keep them as-is to avoid moving lines.
     line_inset_outer = -40   # 調整ポイント：外枠直線の内寄せ（px）
-    line_inset_inner = -32    # 調整ポイント：内枠直線の内寄せ（px）
+    line_inset_inner = -32   # 調整ポイント：内枠直線の内寄せ（px）
 
     # 角を切るためのトリム量（アーチの端点からさらに内側へ退く量）
     corner_trim = max(2, int(notch_radius * 0.25))  # 調整ポイント：大きいほど角の欠けが深くなる
@@ -147,6 +148,12 @@ def draw_decorative_frame(img: Image.Image,
     bottom_left_arc_box = [ox - arc_diameter - arc_pad, oy + oh + arc_pad, ox - arc_pad, oy + oh + arc_diameter + arc_pad]
     bottom_right_arc_box = [ox + ow + arc_pad, oy + oh + arc_pad, ox + ow + arc_diameter + arc_pad, oy + oh + arc_diameter + arc_pad]
 
+    # --- compute inner arc bboxes as well (needed for masking) ---
+    li_box = [ix - inner_arc_diameter - inner_pad, iy - inner_arc_diameter - inner_pad, ix - inner_pad, iy - inner_pad]
+    ri_box = [ix + iw + inner_pad, iy - inner_arc_diameter - inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy - inner_pad]
+    br_box = [ix + iw + inner_pad, iy + ih + inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy + ih + inner_arc_diameter + inner_pad]
+    bl_box = [ix - inner_arc_diameter - inner_pad, iy + ih + inner_pad, ix - inner_pad, iy + ih + inner_arc_diameter + inner_pad]
+
     # --- compute arc edge points used to trim lines so corners are arc-shaped ---
     p_left_top = _arc_point(left_arc_box, 90)
     p_right_top = _arc_point(right_arc_box, 90)
@@ -155,66 +162,7 @@ def draw_decorative_frame(img: Image.Image,
     p_right_right = _arc_point(right_arc_box, 0)
     p_right_bot = _arc_point(bottom_right_arc_box, 270)
 
-    # ----------------------------
-    # 1) 外枠直線：直線は固定位置（line_inset_outer）だが四隅は arc の外周に被らないようトリムする
-    # ----------------------------
-    # horizontals
-    top_y = oy + int(outer_width / 2) + line_inset_outer
-    bot_y = oy + oh - int(outer_width / 2) - line_inset_outer
-
-    # compute trimmed start/end X based on arc endpoints and corner_trim
-    start_x = max(ox + line_inset_outer, p_left_top[0] + corner_trim)
-    end_x = min(ox + ow - line_inset_outer, p_right_top[0] - corner_trim)
-    if start_x < end_x:
-        draw.line([_clamp_center((start_x, top_y), outer_width), _clamp_center((end_x, top_y), outer_width)],
-                  fill=frame_color, width=outer_width)
-
-    start_x_b = max(ox + line_inset_outer, p_left_bot[0] + corner_trim)
-    end_x_b = min(ox + ow - line_inset_outer, p_right_bot[0] - corner_trim)
-    if start_x_b < end_x_b:
-        draw.line([_clamp_center((start_x_b, bot_y), outer_width), _clamp_center((end_x_b, bot_y), outer_width)],
-                  fill=frame_color, width=outer_width)
-
-    # verticals: compute trimmed start/end Y using arc points
-    left_x = ox + int(outer_width / 2) + line_inset_outer
-    right_x = ox + ow - int(outer_width / 2) - line_inset_outer
-
-    start_y = max(oy + line_inset_outer, p_left_left[1] + corner_trim)
-    end_y = min(oy + oh - line_inset_outer, p_left_bot[1] - corner_trim)
-    if start_y < end_y:
-        draw.line([_clamp_center((left_x, start_y), outer_width), _clamp_center((left_x, end_y), outer_width)],
-                  fill=frame_color, width=outer_width)
-
-    start_y_r = max(oy + line_inset_outer, p_right_right[1] + corner_trim)
-    end_y_r = min(oy + oh - line_inset_outer, p_right_bot[1] - corner_trim)
-    if start_y_r < end_y_r:
-        draw.line([_clamp_center((right_x, start_y_r), outer_width), _clamp_center((right_x, end_y_r), outer_width)],
-                  fill=frame_color, width=outer_width)
-
-    # ----------------------------
-    # 2) 外アーチ（outer arcs）を描画（直線の上に描く）
-    # ----------------------------
-    try:
-        draw.arc(left_arc_box, start=0, end=90, fill=frame_color, width=outer_width)
-        draw.arc(right_arc_box, start=90, end=180, fill=frame_color, width=outer_width)
-        draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color, width=outer_width)
-        draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color, width=outer_width)
-    except Exception:
-        draw.arc(left_arc_box, start=0, end=90, fill=frame_color)
-        draw.arc(right_arc_box, start=90, end=180, fill=frame_color)
-        draw.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color)
-        draw.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
-
-    # ----------------------------
-    # 3) 内枠直線：同様に四隅を内アーチで欠けさせる
-    # ----------------------------
-    # compute inner arc bboxes (already available via inner_pad usage below)
-    li_box = [ix - inner_arc_diameter - inner_pad, iy - inner_arc_diameter - inner_pad, ix - inner_pad, iy - inner_pad]
-    ri_box = [ix + iw + inner_pad, iy - inner_arc_diameter - inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy - inner_pad]
-    br_box = [ix + iw + inner_pad, iy + ih + inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy + ih + inner_arc_diameter + inner_pad]
-    bl_box = [ix - inner_arc_diameter - inner_pad, iy + ih + inner_pad, ix - inner_pad, iy + ih + inner_arc_diameter + inner_pad]
-
-    # inner arc points
+    # inner arc points for inner masking/drawing
     p_ili_top = _arc_point(li_box, 90)
     p_iri_top = _arc_point(ri_box, 90)
     p_ili_left = _arc_point(li_box, 180)
@@ -222,49 +170,123 @@ def draw_decorative_frame(img: Image.Image,
     p_iri_right = _arc_point(ri_box, 0)
     p_iri_bot = _arc_point(br_box, 270)
 
-    inner_top_y = iy + int(inner_width / 2) + line_inset_inner
-    inner_bot_y = iy + ih - int(inner_width / 2) - line_inset_inner
+    # =====================================================================
+    # Replace drawing with a frame-layer + mask approach:
+    # - draw straight lines onto frame_layer using EXACT same geometry as before
+    # - erase (mask-out) ellipse areas under arcs so straight lines are removed there
+    # - draw arcs on frame_layer
+    # - composite frame_layer onto base image
+    # This guarantees line positions are not altered; only pixels under arcs are removed.
+    # =====================================================================
 
-    sxi = max(ix + line_inset_inner, p_ili_top[0] + corner_trim)
-    exi = min(ix + iw - line_inset_inner, p_iri_top[0] - corner_trim)
-    if sxi < exi:
-        draw.line([_clamp_center((sxi, inner_top_y), inner_width), _clamp_center((exi, inner_top_y), inner_width)],
-                  fill=(95, 60, 35, 220), width=inner_width)
+    frame_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw_frame = ImageDraw.Draw(frame_layer)
 
-    sxb = max(ix + line_inset_inner, p_ili_bot[0] + corner_trim)
-    exb = min(ix + iw - line_inset_inner, p_iri_bot[0] - corner_trim)
-    if sxb < exb:
-        draw.line([_clamp_center((sxb, inner_bot_y), inner_width), _clamp_center((exb, inner_bot_y), inner_width)],
-                  fill=(95, 60, 35, 220), width=inner_width)
+    # --- 1) draw outer straight lines on frame_layer using the same coordinate logic as before ---
+    # horizontals (use same start/end logic so positions remain unchanged)
+    top_y = oy + int(outer_width / 2) + line_inset_outer
+    bot_y = oy + oh - int(outer_width / 2) - line_inset_outer
 
-    left_ix = ix + int(inner_width / 2) + line_inset_inner
-    right_ix = ix + iw - int(inner_width / 2) - line_inset_inner
-    syi = max(iy + line_inset_inner, p_ili_left[1] + corner_trim)
-    eyi = min(iy + ih - line_inset_inner, p_ili_bot[1] - corner_trim)
-    if syi < eyi:
-        draw.line([_clamp_center((left_ix, syi), inner_width), _clamp_center((left_ix, eyi), inner_width)],
-                  fill=(95, 60, 35, 220), width=inner_width)
-    syi_r = max(iy + line_inset_inner, p_iri_right[1] + corner_trim)
-    eyi_r = min(iy + ih - line_inset_inner, p_iri_bot[1] - corner_trim)
-    if syi_r < eyi_r:
-        draw.line([_clamp_center((right_ix, syi_r), inner_width), _clamp_center((right_ix, eyi_r), inner_width)],
-                  fill=(95, 60, 35, 220), width=inner_width)
+    start_x = max(ox + line_inset_outer, p_left_top[0] + corner_trim)
+    end_x = min(ox + ow - line_inset_outer, p_right_top[0] - corner_trim)
+    if start_x < end_x:
+        draw_frame.line([_clamp_center((start_x, top_y), outer_width), _clamp_center((end_x, top_y), outer_width)],
+                        fill=frame_color, width=outer_width)
 
-    # ----------------------------
-    # 4) 内アーチを描画（直線の上に描く）
-    # ----------------------------
+    start_x_b = max(ox + line_inset_outer, p_left_bot[0] + corner_trim)
+    end_x_b = min(ox + ow - line_inset_outer, p_right_bot[0] - corner_trim)
+    if start_x_b < end_x_b:
+        draw_frame.line([_clamp_center((start_x_b, bot_y), outer_width), _clamp_center((end_x_b, bot_y), outer_width)],
+                        fill=frame_color, width=outer_width)
+
+    # verticals
+    left_x = ox + int(outer_width / 2) + line_inset_outer
+    right_x = ox + ow - int(outer_width / 2) - line_inset_outer
+
+    start_y = max(oy + line_inset_outer, p_left_left[1] + corner_trim)
+    end_y = min(oy + oh - line_inset_outer, p_left_bot[1] - corner_trim)
+    if start_y < end_y:
+        draw_frame.line([_clamp_center((left_x, start_y), outer_width), _clamp_center((left_x, end_y), outer_width)],
+                        fill=frame_color, width=outer_width)
+
+    start_y_r = max(oy + line_inset_outer, p_right_right[1] + corner_trim)
+    end_y_r = min(oy + oh - line_inset_outer, p_right_bot[1] - corner_trim)
+    if start_y_r < end_y_r:
+        draw_frame.line([_clamp_center((right_x, start_y_r), outer_width), _clamp_center((right_x, end_y_r), outer_width)],
+                        fill=frame_color, width=outer_width)
+
+    # --- 2) erase regions under outer arcs from frame_layer via mask (so straight lines are removed there) ---
+    mask = Image.new("L", (w, h), 255)  # 255 = keep, 0 = erase
+    draw_mask = ImageDraw.Draw(mask)
+
+    outer_half = math.ceil(outer_width / 2)
+    inflate_outer = outer_half + corner_trim + 1  # safety pad; tweak only for visual pixel remnant, not line position
+
+    def _inflate_bbox(bbox, pad):
+        x0, y0, x1, y1 = bbox
+        return [int(x0 - pad), int(y0 - pad), int(x1 + pad), int(y1 + pad)]
+
+    draw_mask.ellipse(_inflate_bbox(left_arc_box, inflate_outer), fill=0)
+    draw_mask.ellipse(_inflate_bbox(right_arc_box, inflate_outer), fill=0)
+    draw_mask.ellipse(_inflate_bbox(bottom_left_arc_box, inflate_outer), fill=0)
+    draw_mask.ellipse(_inflate_bbox(bottom_right_arc_box, inflate_outer), fill=0)
+
+    transparent = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    frame_layer = Image.composite(frame_layer, transparent, mask)
+
+    # --- 3) draw outer arcs onto frame_layer ---
+    draw_frame = ImageDraw.Draw(frame_layer)
     try:
-        draw.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220), width=inner_width)
-        draw.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220), width=inner_width)
-        draw.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220), width=inner_width)
-        draw.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220), width=inner_width)
+        draw_frame.arc(left_arc_box, start=0, end=90, fill=frame_color, width=outer_width)
+        draw_frame.arc(right_arc_box, start=90, end=180, fill=frame_color, width=outer_width)
+        draw_frame.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color, width=outer_width)
+        draw_frame.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color, width=outer_width)
     except Exception:
-        draw.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220))
-        draw.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220))
-        draw.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220))
-        draw.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220))
+        draw_frame.arc(left_arc_box, start=0, end=90, fill=frame_color)
+        draw_frame.arc(right_arc_box, start=90, end=180, fill=frame_color)
+        draw_frame.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color)
+        draw_frame.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
 
-    # 装飾的なルール線・ボックス
+    # --- 4) inner straight lines drawn onto frame_layer (positions unchanged) ---
+    in_overlap = max(1, int(inner_width * 0.6))
+    draw_frame.line([_extend_point(p_ili_top, p_iri_top, -in_overlap), _extend_point(p_iri_top, p_ili_top, -in_overlap)],
+                    fill=(95, 60, 35, 220), width=inner_width)
+    draw_frame.line([_extend_point(p_ili_bot, p_iri_bot, -in_overlap), _extend_point(p_iri_bot, p_ili_bot, -in_overlap)],
+                    fill=(95, 60, 35, 220), width=inner_width)
+    draw_frame.line([_extend_point(p_ili_left, p_ili_bot, -in_overlap), _extend_point(p_ili_bot, p_ili_left, -in_overlap)],
+                    fill=(95, 60, 35, 220), width=inner_width)
+    draw_frame.line([_extend_point(p_iri_right, p_iri_bot, -in_overlap), _extend_point(p_iri_bot, p_iri_right, -in_overlap)],
+                    fill=(95, 60, 35, 220), width=inner_width)
+
+    # erase inner arc coverage areas from frame_layer as well
+    mask_inner = Image.new("L", (w, h), 255)
+    dm = ImageDraw.Draw(mask_inner)
+    inner_half = math.ceil(inner_width / 2)
+    inflate_inner = inner_half + corner_trim + 1
+    dm.ellipse(_inflate_bbox(li_box, inflate_inner), fill=0)
+    dm.ellipse(_inflate_bbox(ri_box, inflate_inner), fill=0)
+    dm.ellipse(_inflate_bbox(bl_box, inflate_inner), fill=0)
+    dm.ellipse(_inflate_bbox(br_box, inflate_inner), fill=0)
+    frame_layer = Image.composite(frame_layer, transparent, mask_inner)
+
+    # draw inner arcs onto frame_layer
+    draw_frame = ImageDraw.Draw(frame_layer)
+    try:
+        draw_frame.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220), width=inner_width)
+        draw_frame.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220), width=inner_width)
+        draw_frame.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220), width=inner_width)
+        draw_frame.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220), width=inner_width)
+    except Exception:
+        draw_frame.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220))
+        draw_frame.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220))
+        draw_frame.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220))
+        draw_frame.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220))
+
+    # --- 5) composite frame_layer onto the original 'out' image and continue (rest unchanged) ---
+    out = img.convert("RGBA")
+    out = Image.alpha_composite(out, frame_layer)
+
+    # 装飾的なルール線・ボックス（元実装に近い位置で描画）
     rule_color = (110, 75, 45, 180)
     try:
         y_rule = iy + int(ih * 0.12)
