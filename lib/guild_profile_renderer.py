@@ -331,6 +331,9 @@ def draw_decorative_frame(img: Image.Image,
     # composite inner lines
     out = Image.alpha_composite(out, inner_layer)
 
+    # ← ここが原因：out を再代入したので、draw_out を再作成する必要がある
+    draw_out = ImageDraw.Draw(out)
+
     # draw inner arcs on out
     stroke_pad_i = math.ceil(inner_width / 2)
     li_bbox = _expand_and_clamp_bbox(li_box, stroke_pad_i)
