@@ -148,11 +148,26 @@ def draw_decorative_frame(img: Image.Image,
     bottom_left_arc_box = [ox - arc_diameter - arc_pad, oy + oh + arc_pad, ox - arc_pad, oy + oh + arc_diameter + arc_pad]
     bottom_right_arc_box = [ox + ow + arc_pad, oy + oh + arc_pad, ox + ow + arc_diameter + arc_pad, oy + oh + arc_diameter + arc_pad]
 
+    # --- DEBUG: log arc bbox values (insert immediately after left_arc_box/right_arc_box/... definitions)
+    logger.debug(f"[FRAME DEBUG] w={w} h={h} ox={ox} oy={oy} ow={ow} oh={oh}")
+    logger.debug(f"[FRAME DEBUG] notch_radius={notch_radius} arc_diameter={arc_diameter} arc_pad={arc_pad}")
+    logger.debug(f"[FRAME DEBUG] left_arc_box={left_arc_box}")
+    logger.debug(f"[FRAME DEBUG] right_arc_box={right_arc_box}")
+    logger.debug(f"[FRAME DEBUG] bottom_left_arc_box={bottom_left_arc_box}")
+    logger.debug(f"[FRAME DEBUG] bottom_right_arc_box={bottom_right_arc_box}")
+
     # --- compute inner arc bboxes as well (needed for masking) ---
     li_box = [ix - inner_arc_diameter - inner_pad, iy - inner_arc_diameter - inner_pad, ix - inner_pad, iy - inner_pad]
     ri_box = [ix + iw + inner_pad, iy - inner_arc_diameter - inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy - inner_pad]
     br_box = [ix + iw + inner_pad, iy + ih + inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy + ih + inner_arc_diameter + inner_pad]
     bl_box = [ix - inner_arc_diameter - inner_pad, iy + ih + inner_pad, ix - inner_pad, iy + ih + inner_arc_diameter + inner_pad]
+
+    # --- DEBUG: log inner arc bbox / inner pad values ---
+    logger.debug(f"[FRAME DEBUG] inner_notch_radius={inner_notch_radius} inner_arc_diameter={inner_arc_diameter} inner_pad={inner_pad}")
+    logger.debug(f"[FRAME DEBUG] li_box={li_box}")
+    logger.debug(f"[FRAME DEBUG] ri_box={ri_box}")
+    logger.debug(f"[FRAME DEBUG] bl_box={bl_box}")
+    logger.debug(f"[FRAME DEBUG] br_box={br_box}")
 
     # --- compute arc edge points used to trim lines so corners are arc-shaped ---
     p_left_top = _arc_point(left_arc_box, 90)
@@ -161,6 +176,13 @@ def draw_decorative_frame(img: Image.Image,
     p_left_bot = _arc_point(bottom_left_arc_box, 270)
     p_right_right = _arc_point(right_arc_box, 0)
     p_right_bot = _arc_point(bottom_right_arc_box, 270)
+
+    # --- DEBUG: log arc edge points used for trimming ---
+    logger.debug(f"[FRAME DEBUG] p_left_top={p_left_top} p_right_top={p_right_top}")
+    logger.debug(f"[FRAME DEBUG] p_left_left={p_left_left} p_left_bot={p_left_bot}")
+    logger.debug(f"[FRAME DEBUG] p_right_right={p_right_right} p_right_bot={p_right_bot}")
+    # inner arc points
+    logger.debug(f"[FRAME DEBUG] p_ili_top={p_ili_top} p_iri_top={p_iri_top} p_ili_bot={p_ili_bot} p_iri_bot={p_iri_bot}")
 
     # inner arc points for inner masking/drawing
     p_ili_top = _arc_point(li_box, 90)
@@ -180,6 +202,23 @@ def draw_decorative_frame(img: Image.Image,
     # =====================================================================
 
     frame_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+
+    # --- DEBUG (visual): draw bbox outlines on frame_layer so we can see where arcs will be ---
+    dbg_col = (255, 0, 0, 180)
+    draw_frame.rectangle([int(left_arc_box[0]), int(left_arc_box[1]), int(left_arc_box[2]), int(left_arc_box[3])],
+                         outline=dbg_col, width=1)
+    draw_frame.rectangle([int(right_arc_box[0]), int(right_arc_box[1]), int(right_arc_box[2]), int(right_arc_box[3])],
+                         outline=dbg_col, width=1)
+    draw_frame.rectangle([int(bottom_left_arc_box[0]), int(bottom_left_arc_box[1]), int(bottom_left_arc_box[2]), int(bottom_left_arc_box[3])],
+                         outline=dbg_col, width=1)
+    draw_frame.rectangle([int(bottom_right_arc_box[0]), int(bottom_right_arc_box[1]), int(bottom_right_arc_box[2]), int(bottom_right_arc_box[3])],
+                         outline=dbg_col, width=1)
+    # inner boxes too
+    draw_frame.rectangle([int(li_box[0]), int(li_box[1]), int(li_box[2]), int(li_box[3])], outline=dbg_col, width=1)
+    draw_frame.rectangle([int(ri_box[0]), int(ri_box[1]), int(ri_box[2]), int(ri_box[3])], outline=dbg_col, width=1)
+    draw_frame.rectangle([int(bl_box[0]), int(bl_box[1]), int(bl_box[2]), int(bl_box[3])], outline=dbg_col, width=1)
+    draw_frame.rectangle([int(br_box[0]), int(br_box[1]), int(br_box[2]), int(br_box[3])], outline=dbg_col, width=1)
+
     draw_frame = ImageDraw.Draw(frame_layer)
 
     # --- 1) draw outer straight lines on frame_layer using the same coordinate logic as before ---
@@ -222,6 +261,9 @@ def draw_decorative_frame(img: Image.Image,
     outer_half = math.ceil(outer_width / 2)
     inflate_outer = outer_half + corner_trim + 1  # safety pad; tweak only for visual pixel remnant, not line position
 
+    # --- DEBUG: mask inflate values ---
+    logger.debug(f"[FRAME DEBUG] outer_half={outer_half} inflate_outer={inflate_outer} inner_half={inner_half} inflate_inner={inflate_inner}")
+
     def _inflate_bbox(bbox, pad):
         x0, y0, x1, y1 = bbox
         return [int(x0 - pad), int(y0 - pad), int(x1 + pad), int(y1 + pad)]
@@ -233,6 +275,12 @@ def draw_decorative_frame(img: Image.Image,
 
     transparent = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     frame_layer = Image.composite(frame_layer, transparent, mask)
+
+    # --- DEBUG: quick check — sample pixel inside left arc bbox center after mask applied ---
+    cx = int((left_arc_box[0] + left_arc_box[2]) / 2)
+    cy = int((left_arc_box[1] + left_arc_box[3]) / 2)
+    pix = frame_layer.getpixel((max(0,min(w-1,cx)), max(0,min(h-1,cy))))
+    logger.debug(f"[FRAME DEBUG] sample_pixel_after_mask_left_arc at ({cx},{cy}) = {pix}")
 
     # --- 3) draw outer arcs onto frame_layer ---
     draw_frame = ImageDraw.Draw(frame_layer)
@@ -246,6 +294,21 @@ def draw_decorative_frame(img: Image.Image,
         draw_frame.arc(right_arc_box, start=90, end=180, fill=frame_color)
         draw_frame.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color)
         draw_frame.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
+
+    # --- DEBUG: test draw arcs directly (red thick) for visibility check; remove after testing ---
+    test_layer = Image.new("RGBA", (w, h), (0,0,0,0))
+    td = ImageDraw.Draw(test_layer)
+    td.arc(left_arc_box, start=0, end=90, fill=(255,0,0,255), width=max(12, outer_width+6))
+    td.arc(right_arc_box, start=90, end=180, fill=(255,0,0,255), width=max(12, outer_width+6))
+    td.arc(bottom_right_arc_box, start=180, end=270, fill=(255,0,0,255), width=max(12, outer_width+6))
+    td.arc(bottom_left_arc_box, start=270, end=360, fill=(255,0,0,255), width=max(12, outer_width+6))
+    # composite and save to /tmp for inspection (if your runtime allows file writes):
+    try:
+        test_img = Image.alpha_composite(img.convert("RGBA"), test_layer)
+        test_img.save("/tmp/guild_frame_debug_arcs.png")
+        logger.debug("[FRAME DEBUG] saved test arc overlay to /tmp/guild_frame_debug_arcs.png")
+    except Exception as e:
+        logger.debug(f"[FRAME DEBUG] failed to save test image: {e}")
 
     # --- 4) inner straight lines drawn onto frame_layer (positions unchanged) ---
     in_overlap = 0
