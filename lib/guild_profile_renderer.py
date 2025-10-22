@@ -77,42 +77,66 @@ def _extend_point(p, q, amount):
     return (px + ux * amount, py + uy * amount)
 
 
+# Replace the existing draw_decorative_frame(...) implementation in lib/guild_profile_renderer.py with the function below.
+
 def draw_decorative_frame(img: Image.Image,
                           outer_offset: Optional[int] = None,
                           outer_width: int = 8,
                           inner_offset: Optional[int] = None,
                           inner_width: int = 2,
-                          frame_color=(85, 50, 30, 255)) -> Image.Image:
+                          frame_color=(85, 50, 30, 255),
+                          # --- 新オプション（可搬・省略可） ---
+                          # これらを与えなければ既存のデフォルト振る舞い（かつ柔軟）になります。
+                          corner_trim_override: Optional[int] = None,
+                          line_inset_outer_override: Optional[int] = None,
+                          line_inset_inner_override: Optional[int] = None,
+                          arc_nudge_outer_x: int = 0,
+                          arc_nudge_outer_y: int = 0,
+                          arc_nudge_inner_x: int = 0,
+                          arc_nudge_inner_y: int = 0) -> Image.Image:
     """
     外枠（太）＋内枠（細）を描画します。
-    仕様（あなたの要望）:
-      - 現在のコードの直線位置をそのまま使う（直線は良好）
-      - 以前のコードのアーチ位置の考えを取り入れ、直線アンカーにアーチを合わせる
-      - 直線は frame_layer に描画し、アーチ領域は mask で消す（直線とアーチを独立）
-      - アーチは最終 out に直接描画して消えないようにする
-    変数名は既存のまま維持しています。
+
+    変更点（目的：ハードな上限・下限をなくして柔軟に調整できるように）
+    - corner_trim 等の「固定下限・上限」を取り除き、override パラメータで明示的に指定できるようにしました。
+    - デフォルトは過去の挙動を踏襲しつつ、outer_width に応じて合理的に負の値を許容する自動計算を行います（過剰な -64 などは不要）。
+    - アーチ位置を個別に微調整する arc_nudge_* 引数を追加（直線の位置は変更しないでアーチだけ移動できます）。
+    - 変数名は既存のまま維持しています（left_arc_box, p_left_top, outer_width 等）。
     """
     w, h = img.size
 
-    # アーチ半径
+    # アーチ半径（既存）
     notch_radius = max(12, int(min(w, h) * 0.035))
     arc_diameter = notch_radius * 2
 
-    # 内アーチの半径
+    # 内アーチ半径（既存）
     inner_notch_radius = max(8, int(notch_radius * 0.90))
     inner_arc_diameter = inner_notch_radius * 2
 
-    # --- 調整可能なパラメータ ---
+    # 既存の「パラメータ群」
     arc_pad = max(8, int(notch_radius * 0.35))
     inner_pad = max(6, int(inner_notch_radius * 0.30))
 
-    # 直線の内寄せ量（変更不可）
-    line_inset_outer = -40
-    line_inset_inner = -32
+    # line_inset は override があればそれを使う（柔軟化）
+    if line_inset_outer_override is not None:
+        line_inset_outer = int(line_inset_outer_override)
+    else:
+        line_inset_outer = -40
 
-    corner_trim = max(2, int(notch_radius * 0.25) - 64)
+    if line_inset_inner_override is not None:
+        line_inset_inner = int(line_inset_inner_override)
+    else:
+        line_inset_inner = -32
 
-    # --- offset の安全化 ---
+    # corner_trim: override があればそのまま使う
+    if corner_trim_override is not None:
+        corner_trim = int(corner_trim_override)
+    else:
+        # 自動値 = アーチサイズに基づくベース値 － 太線幅/2（これにより太線と直線が自然に接合する）
+        # ここで負値も許容する（直線を伸ばすために必要な最小値と整合）
+        corner_trim = int(notch_radius * 0.25) - math.ceil(outer_width / 2)
+
+    # --- offset の安全化（既存のロジックを維持。ただし override による柔軟性を残す） ---
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
     if outer_offset is None:
         outer_offset = max(12, min_outer_offset)
@@ -134,22 +158,19 @@ def draw_decorative_frame(img: Image.Image,
     iw = int(w - inner_offset * 2)
     ih = int(h - inner_offset * 2)
 
-    # base out image
     out = img.convert("RGBA")
 
-    # clamp helper (既存のまま)
     def _clamp_center(pt, stroke_w):
+        # safety: ここは画像のピクセル境界外描画を防ぐ最低限のクランプです（削除しないこと推奨）
         half = stroke_w / 2.0
         x = max(half, min(w - half, pt[0]))
         y = max(half, min(h - half, pt[1]))
         return (x, y)
 
-    # 小ヘルパー: inflate bbox
     def _inflate_bbox(bbox, pad):
         x0, y0, x1, y1 = bbox
         return [int(x0 - pad), int(y0 - pad), int(x1 + pad), int(y1 + pad)]
 
-    # 小ヘルパー: expand+clamp bbox（描画時に使用）
     def _expand_and_clamp_bbox(bbox, pad):
         x0, y0, x1, y1 = bbox
         x0e = max(0, int(math.floor(x0 - pad)))
@@ -163,32 +184,32 @@ def draw_decorative_frame(img: Image.Image,
         return [x0e, y0e, x1e, y1e]
 
     # -------------------------
-    # straight-line anchors（"直線が良い" 現在のロジックをそのまま使う）
+    # straight-line anchors（既存）
     # -------------------------
     top_y = oy + int(outer_width / 2) + line_inset_outer
     bot_y = oy + oh - int(outer_width / 2) - line_inset_outer
     left_x = ox + int(outer_width / 2) + line_inset_outer
     right_x = ox + ow - int(outer_width / 2) - line_inset_outer
 
-    # アーチ bbox は直線アンカーに揃える（以前のコードの意図）
+    # アーチ bbox（arc_nudge_* を反映してアーチだけ個別に動かせる）
     r = arc_diameter / 2.0
-    left_arc_box = [left_x - r, top_y, left_x + r, top_y + 2 * r]
-    right_arc_box = [right_x - r, top_y, right_x + r, top_y + 2 * r]
-    bottom_left_arc_box = [left_x - r, bot_y - 2 * r, left_x + r, bot_y]
-    bottom_right_arc_box = [right_x - r, bot_y - 2 * r, right_x + r, bot_y]
+    left_arc_box = [left_x - r + arc_nudge_outer_x, top_y + arc_nudge_outer_y, left_x + r + arc_nudge_outer_x, top_y + 2 * r + arc_nudge_outer_y]
+    right_arc_box = [right_x - r + arc_nudge_outer_x, top_y + arc_nudge_outer_y, right_x + r + arc_nudge_outer_x, top_y + 2 * r + arc_nudge_outer_y]
+    bottom_left_arc_box = [left_x - r + arc_nudge_outer_x, bot_y - 2 * r + arc_nudge_outer_y, left_x + r + arc_nudge_outer_x, bot_y + arc_nudge_outer_y]
+    bottom_right_arc_box = [right_x - r + arc_nudge_outer_x, bot_y - 2 * r + arc_nudge_outer_y, right_x + r + arc_nudge_outer_x, bot_y + arc_nudge_outer_y]
 
-    # inner anchors and boxes
+    # inner arc bboxes（inner 用の nudge）
     inner_top_y = iy + int(inner_width / 2) + line_inset_inner
     inner_bot_y = iy + ih - int(inner_width / 2) - line_inset_inner
     left_ix = ix + int(inner_width / 2) + line_inset_inner
     right_ix = ix + iw - int(inner_width / 2) - line_inset_inner
     r_i = inner_arc_diameter / 2.0
-    li_box = [left_ix - r_i, inner_top_y, left_ix + r_i, inner_top_y + 2 * r_i]
-    ri_box = [right_ix - r_i, inner_top_y, right_ix + r_i, inner_top_y + 2 * r_i]
-    bl_box = [left_ix - r_i, inner_bot_y - 2 * r_i, left_ix + r_i, inner_bot_y]
-    br_box = [right_ix - r_i, inner_bot_y - 2 * r_i, right_ix + r_i, inner_bot_y]
+    li_box = [left_ix - r_i + arc_nudge_inner_x, inner_top_y + arc_nudge_inner_y, left_ix + r_i + arc_nudge_inner_x, inner_top_y + 2 * r_i + arc_nudge_inner_y]
+    ri_box = [right_ix - r_i + arc_nudge_inner_x, inner_top_y + arc_nudge_inner_y, right_ix + r_i + arc_nudge_inner_x, inner_top_y + 2 * r_i + arc_nudge_inner_y]
+    bl_box = [left_ix - r_i + arc_nudge_inner_x, inner_bot_y - 2 * r_i + arc_nudge_inner_y, left_ix + r_i + arc_nudge_inner_x, inner_bot_y + arc_nudge_inner_y]
+    br_box = [right_ix - r_i + arc_nudge_inner_x, inner_bot_y - 2 * r_i + arc_nudge_inner_y, right_ix + r_i + arc_nudge_inner_x, inner_bot_y + arc_nudge_inner_y]
 
-    # arc edge points（直線トリミングに利用）
+    # arc edge points
     p_left_top = _arc_point(left_arc_box, 90)
     p_right_top = _arc_point(right_arc_box, 90)
     p_left_left = _arc_point(left_arc_box, 180)
@@ -203,11 +224,13 @@ def draw_decorative_frame(img: Image.Image,
     p_iri_right = _arc_point(ri_box, 0)
     p_iri_bot = _arc_point(br_box, 270)
 
-    # --- FRAME LAYER: 直線をここに描画し、後でアーチ領域をマスクで消す ---
+    # -------------------------------------------------------------------
+    # frame_layer に直線を描画 → mask で穴あけ → 合成 → out に直接アーチを描画
+    # -------------------------------------------------------------------
     frame_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw_frame = ImageDraw.Draw(frame_layer)
 
-    # 外枠直線（horizontals）
+    # 外枠 horizontals
     start_x = max(ox + line_inset_outer, p_left_top[0] + corner_trim)
     end_x = min(ox + ow - line_inset_outer, p_right_top[0] - corner_trim)
     if start_x < end_x:
@@ -220,39 +243,37 @@ def draw_decorative_frame(img: Image.Image,
         draw_frame.line([_clamp_center((start_x_b, bot_y), outer_width), _clamp_center((end_x_b, bot_y), outer_width)],
                         fill=frame_color, width=outer_width)
 
-    # 外枠縦線
-    left_x_center = left_x
-    right_x_center = right_x
+    # 外枠 verticals
+    left_xc = left_x
+    right_xc = right_x
     start_y = max(oy + line_inset_outer, p_left_left[1] + corner_trim)
     end_y = min(oy + oh - line_inset_outer, p_left_bot[1] - corner_trim)
     if start_y < end_y:
-        draw_frame.line([_clamp_center((left_x_center, start_y), outer_width), _clamp_center((left_x_center, end_y), outer_width)],
+        draw_frame.line([_clamp_center((left_xc, start_y), outer_width), _clamp_center((left_xc, end_y), outer_width)],
                         fill=frame_color, width=outer_width)
 
     start_y_r = max(oy + line_inset_outer, p_right_right[1] + corner_trim)
     end_y_r = min(oy + oh - line_inset_outer, p_right_bot[1] - corner_trim)
     if start_y_r < end_y_r:
-        draw_frame.line([_clamp_center((right_x_center, start_y_r), outer_width), _clamp_center((right_x_center, end_y_r), outer_width)],
+        draw_frame.line([_clamp_center((right_xc, start_y_r), outer_width), _clamp_center((right_xc, end_y_r), outer_width)],
                         fill=frame_color, width=outer_width)
 
-    # --- outer arc 領域を消すためのマスク（直線がアーチの下に残らないように） ---
+    # mask で外アーチ領域を消す（inflate は corner_trim に応じて自動調整）
     mask = Image.new("L", (w, h), 255)
     draw_mask = ImageDraw.Draw(mask)
     outer_half = math.ceil(outer_width / 2)
-    inflate_outer = outer_half + corner_trim + 1
+    inflate_outer = outer_half + abs(corner_trim) + 1
     draw_mask.ellipse(_inflate_bbox(left_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(right_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(bottom_left_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(bottom_right_arc_box, inflate_outer), fill=0)
     frame_layer = Image.composite(frame_layer, Image.new("RGBA", (w, h), (0, 0, 0, 0)), mask)
 
-    # --- frame_layer を out に合成（直線はここで確定） ---
     out = Image.alpha_composite(out, frame_layer)
 
-    # --- ここでアーチを out に直接描画（mask の影響を受けない） ---
+    # out にアーチを直接描画（stroke が bbox 辺で切れないよう pad を少し余裕を持たせる）
     draw_out = ImageDraw.Draw(out)
-    stroke_pad = math.ceil(outer_width / 2)
-
+    stroke_pad = math.ceil(outer_width / 2) + 1
     left_bbox = _expand_and_clamp_bbox(left_arc_box, stroke_pad)
     right_bbox = _expand_and_clamp_bbox(right_arc_box, stroke_pad)
     bl_bbox = _expand_and_clamp_bbox(bottom_left_arc_box, stroke_pad)
@@ -264,7 +285,6 @@ def draw_decorative_frame(img: Image.Image,
         draw_out.arc(br_bbox, start=180, end=270, fill=frame_color, width=outer_width)
         draw_out.arc(bl_bbox, start=270, end=360, fill=frame_color, width=outer_width)
     except Exception:
-        # arc stroke が効かない環境向けの最小フォールバック（見た目崩れ最小限）
         try:
             draw_out.pieslice(left_bbox, start=0, end=90, fill=frame_color)
             inner_left = [left_bbox[0] + outer_width, left_bbox[1] + outer_width, left_bbox[2] - outer_width, left_bbox[3] - outer_width]
@@ -285,9 +305,7 @@ def draw_decorative_frame(img: Image.Image,
         except Exception:
             logger.debug("Outer arc fallback failed; skipping outer arcs")
 
-    # ------------------------
-    # inner lines & arcs（同様の流れで、直線はレイヤー、アーチは最終 out で描画）
-    # ------------------------
+    # --- inner lines/arcs (同様に) ---
     inner_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw_inner_layer = ImageDraw.Draw(inner_layer)
 
@@ -317,25 +335,21 @@ def draw_decorative_frame(img: Image.Image,
         draw_inner_layer.line([_clamp_center((right_ix_center, syi_r), inner_width), _clamp_center((right_ix_center, eyi_r), inner_width)],
                               fill=(95, 60, 35, 220), width=inner_width)
 
-    # erase inner arc coverage areas from inner_layer
     mask_inner = Image.new("L", (w, h), 255)
     dm = ImageDraw.Draw(mask_inner)
     inner_half = math.ceil(inner_width / 2)
-    inflate_inner = inner_half + corner_trim + 1
+    inflate_inner = inner_half + abs(corner_trim) + 1
     dm.ellipse(_inflate_bbox(li_box, inflate_inner), fill=0)
     dm.ellipse(_inflate_bbox(ri_box, inflate_inner), fill=0)
     dm.ellipse(_inflate_bbox(bl_box, inflate_inner), fill=0)
     dm.ellipse(_inflate_bbox(br_box, inflate_inner), fill=0)
     inner_layer = Image.composite(inner_layer, Image.new("RGBA", (w, h), (0, 0, 0, 0)), mask_inner)
 
-    # composite inner lines
     out = Image.alpha_composite(out, inner_layer)
 
-    # ← ここが原因：out を再代入したので、draw_out を再作成する必要がある
+    # draw inner arcs on up-to-date out
     draw_out = ImageDraw.Draw(out)
-
-    # draw inner arcs on out
-    stroke_pad_i = math.ceil(inner_width / 2)
+    stroke_pad_i = math.ceil(inner_width / 2) + 1
     li_bbox = _expand_and_clamp_bbox(li_box, stroke_pad_i)
     ri_bbox = _expand_and_clamp_bbox(ri_box, stroke_pad_i)
     bli_bbox = _expand_and_clamp_bbox(bl_box, stroke_pad_i)
