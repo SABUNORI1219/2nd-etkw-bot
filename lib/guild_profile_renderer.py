@@ -602,7 +602,8 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     draw.text((card_x + card_w - fw - 16, card_y + card_h - 36), footer_text, font=font_small, fill=(120, 110, 100, 255))
 
     out_bytes = BytesIO()
-    out.save(out_bytes, format="PNG")
+    # 修正: 正しい変数 img を保存する（以前のバグは out を参照していたため NameError が発生）
+    img.save(out_bytes, format="PNG")
     out_bytes.seek(0)
 
     try:
