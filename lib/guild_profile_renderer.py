@@ -621,4 +621,4 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     except Exception:
         pass
 
-    return out
+    return out_bytes
