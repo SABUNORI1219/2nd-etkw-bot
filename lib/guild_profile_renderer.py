@@ -110,7 +110,7 @@ def draw_decorative_frame(img: Image.Image,
     line_inset_outer = -40
     line_inset_inner = -32
 
-    corner_trim = max(2, int(notch_radius * 0.25))
+    corner_trim = max(2, int(notch_radius * 0.25) - 12)
 
     # --- offset の安全化 ---
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
