@@ -99,8 +99,8 @@ def draw_decorative_frame(img: Image.Image,
     inner_arc_diameter = inner_notch_radius * 2
 
     # --- 調整可能なパラメータ ---
-    arc_pad = max(8, int(notch_radius * 0.8))         # アーチ全体を外側に寄せる量（px）
-    inner_pad = max(6, int(inner_notch_radius * 0.7)) # 内アーチの外寄せ（px）
+    arc_pad = max(8, int(notch_radius * 0.6))         # アーチ全体を外側に寄せる量（px）
+    inner_pad = max(6, int(inner_notch_radius * 0.5)) # 内アーチの外寄せ（px）
 
     # 直線の内寄せ量（増やすほど直線は内側に寄る）
     # NOTE: we do NOT change these values here; keep them as-is to avoid moving lines.
@@ -248,7 +248,7 @@ def draw_decorative_frame(img: Image.Image,
         draw_frame.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
 
     # --- 4) inner straight lines drawn onto frame_layer (positions unchanged) ---
-    in_overlap = max(1, int(inner_width * 0.6))
+    in_overlap = 0
     draw_frame.line([_extend_point(p_ili_top, p_iri_top, -in_overlap), _extend_point(p_iri_top, p_ili_top, -in_overlap)],
                     fill=(95, 60, 35, 220), width=inner_width)
     draw_frame.line([_extend_point(p_ili_bot, p_iri_bot, -in_overlap), _extend_point(p_iri_bot, p_ili_bot, -in_overlap)],
