@@ -99,8 +99,8 @@ def draw_decorative_frame(img: Image.Image,
     inner_arc_diameter = inner_notch_radius * 2
 
     # --- 調整可能なパラメータ ---
-    arc_pad = max(8, int(notch_radius * 0.6))         # アーチ全体を外側に寄せる量（px）
-    inner_pad = max(6, int(inner_notch_radius * 0.5)) # 内アーチの外寄せ（px）
+    arc_pad = max(8, int(notch_radius * 0.35))         # アーチ全体を外側に寄せる量（px）
+    inner_pad = max(6, int(inner_notch_radius * 0.30)) # 内アーチの外寄せ（px）
 
     # 直線の内寄せ量（増やすほど直線は内側に寄る）
     # NOTE: we do NOT change these values here; keep them as-is to avoid moving lines.
@@ -249,14 +249,30 @@ def draw_decorative_frame(img: Image.Image,
 
     # --- 4) inner straight lines drawn onto frame_layer (positions unchanged) ---
     in_overlap = 0
-    draw_frame.line([_extend_point(p_ili_top, p_iri_top, -in_overlap), _extend_point(p_iri_top, p_ili_top, -in_overlap)],
-                    fill=(95, 60, 35, 220), width=inner_width)
-    draw_frame.line([_extend_point(p_ili_bot, p_iri_bot, -in_overlap), _extend_point(p_iri_bot, p_ili_bot, -in_overlap)],
-                    fill=(95, 60, 35, 220), width=inner_width)
-    draw_frame.line([_extend_point(p_ili_left, p_ili_bot, -in_overlap), _extend_point(p_ili_bot, p_ili_left, -in_overlap)],
-                    fill=(95, 60, 35, 220), width=inner_width)
-    draw_frame.line([_extend_point(p_iri_right, p_iri_bot, -in_overlap), _extend_point(p_iri_bot, p_iri_right, -in_overlap)],
-                    fill=(95, 60, 35, 220), width=inner_width)
+                              
+    inner_top_y = iy + int(inner_width / 2) + line_inset_inner
+    inner_bot_y = iy + ih - int(inner_width / 2) - line_inset_inner
+    
+    start_in_top = (int(p_ili_top[0]), inner_top_y)
+    end_in_top   = (int(p_iri_top[0]), inner_top_y)
+    if start_in_top[0] < end_in_top[0]:
+        draw_frame.line([_clamp_center(start_in_top, inner_width), _clamp_center(end_in_top, inner_width)],
+                        fill=(95, 60, 35, 220), width=inner_width)
+    
+    start_in_bot = (int(p_ili_bot[0]), inner_bot_y)
+    end_in_bot   = (int(p_iri_bot[0]), inner_bot_y)
+    if start_in_bot[0] < end_in_bot[0]:
+        draw_frame.line([_clamp_center(start_in_bot, inner_width), _clamp_center(end_in_bot, inner_width)],
+                        fill=(95, 60, 35, 220), width=inner_width)
+    
+    # inner verticals: use fixed x positions (as before) and inner_top_y/inner_bot_y for y endpoints
+    left_ix = ix + int(inner_width / 2) + line_inset_inner
+    right_ix = ix + iw - int(inner_width / 2) - line_inset_inner
+    if inner_top_y < inner_bot_y:
+        draw_frame.line([_clamp_center((left_ix, inner_top_y), inner_width), _clamp_center((left_ix, inner_bot_y), inner_width)],
+                        fill=(95, 60, 35, 220), width=inner_width)
+        draw_frame.line([_clamp_center((right_ix, inner_top_y), inner_width), _clamp_center((right_ix, inner_bot_y), inner_width)],
+                        fill=(95, 60, 35, 220), width=inner_width)
 
     # erase inner arc coverage areas from frame_layer as well
     mask_inner = Image.new("L", (w, h), 255)
