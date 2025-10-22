@@ -84,38 +84,35 @@ def draw_decorative_frame(img: Image.Image,
                           inner_width: int = 2,
                           frame_color=(85, 50, 30, 255)) -> Image.Image:
     """
-    Draw decorative outer + inner frames.
-    Approach:
-      - Keep straight-line geometry used by the current (working) code.
-      - Use arc bbox geometry aligned to those anchors.
-      - Draw straight lines on a frame_layer, erase arc areas from that layer (mask),
-        composite frame_layer onto base image, then draw arcs directly onto the final image.
-      - Drawing arcs on the final image (not on frame_layer) avoids accidental erasure
-        from mask/composite ordering and ensures visibility across Pillow versions.
-    This keeps straight lines and arcs independent while ensuring arcs visually
-    clip the lines.
+    外枠（太）＋内枠（細）を描画します。
+    仕様（あなたの要望）:
+      - 現在のコードの直線位置をそのまま使う（直線は良好）
+      - 以前のコードのアーチ位置の考えを取り入れ、直線アンカーにアーチを合わせる
+      - 直線は frame_layer に描画し、アーチ領域は mask で消す（直線とアーチを独立）
+      - アーチは最終 out に直接描画して消えないようにする
+    変数名は既存のまま維持しています。
     """
     w, h = img.size
 
-    # arc radii
+    # アーチ半径
     notch_radius = max(12, int(min(w, h) * 0.035))
     arc_diameter = notch_radius * 2
 
-    # inner arc radius
+    # 内アーチの半径
     inner_notch_radius = max(8, int(notch_radius * 0.90))
     inner_arc_diameter = inner_notch_radius * 2
 
-    # adjustable params
+    # --- 調整可能なパラメータ ---
     arc_pad = max(8, int(notch_radius * 0.35))
     inner_pad = max(6, int(inner_notch_radius * 0.30))
 
-    # line insets (do not change these here)
+    # 直線の内寄せ量（変更不可）
     line_inset_outer = -40
     line_inset_inner = -32
 
     corner_trim = max(2, int(notch_radius * 0.25))
 
-    # offset safety
+    # --- offset の安全化 ---
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
     if outer_offset is None:
         outer_offset = max(12, min_outer_offset)
@@ -137,47 +134,50 @@ def draw_decorative_frame(img: Image.Image,
     iw = int(w - inner_offset * 2)
     ih = int(h - inner_offset * 2)
 
+    # base out image
     out = img.convert("RGBA")
-    # We'll draw straight lines on frame_layer, then composite,
-    # then draw arcs directly on 'out' so arcs are never accidentally erased.
-    frame_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    draw_frame = ImageDraw.Draw(frame_layer)
 
-    # clamp helper for line centers
+    # clamp helper (既存のまま)
     def _clamp_center(pt, stroke_w):
         half = stroke_w / 2.0
         x = max(half, min(w - half, pt[0]))
         y = max(half, min(h - half, pt[1]))
         return (x, y)
 
-    # helper to safely expand/clamp bboxes when actually drawing arcs on the final image
+    # 小ヘルパー: inflate bbox
+    def _inflate_bbox(bbox, pad):
+        x0, y0, x1, y1 = bbox
+        return [int(x0 - pad), int(y0 - pad), int(x1 + pad), int(y1 + pad)]
+
+    # 小ヘルパー: expand+clamp bbox（描画時に使用）
     def _expand_and_clamp_bbox(bbox, pad):
         x0, y0, x1, y1 = bbox
         x0e = max(0, int(math.floor(x0 - pad)))
         y0e = max(0, int(math.floor(y0 - pad)))
         x1e = min(w, int(math.ceil(x1 + pad)))
         y1e = min(h, int(math.ceil(y1 + pad)))
-        # ensure non-degenerate
         if x1e <= x0e:
             x1e = min(w, x0e + 1)
         if y1e <= y0e:
             y1e = min(h, y0e + 1)
         return [x0e, y0e, x1e, y1e]
 
-    # compute straight-line anchors FIRST (preserve the current working geometry)
+    # -------------------------
+    # straight-line anchors（"直線が良い" 現在のロジックをそのまま使う）
+    # -------------------------
     top_y = oy + int(outer_width / 2) + line_inset_outer
     bot_y = oy + oh - int(outer_width / 2) - line_inset_outer
     left_x = ox + int(outer_width / 2) + line_inset_outer
     right_x = ox + ow - int(outer_width / 2) - line_inset_outer
 
-    # Build arc bboxes aligned to those anchors (so arc endpoints line up with straight lines)
+    # アーチ bbox は直線アンカーに揃える（以前のコードの意図）
     r = arc_diameter / 2.0
     left_arc_box = [left_x - r, top_y, left_x + r, top_y + 2 * r]
     right_arc_box = [right_x - r, top_y, right_x + r, top_y + 2 * r]
     bottom_left_arc_box = [left_x - r, bot_y - 2 * r, left_x + r, bot_y]
     bottom_right_arc_box = [right_x - r, bot_y - 2 * r, right_x + r, bot_y]
 
-    # inner anchors and boxes (aligned with inner straight lines)
+    # inner anchors and boxes
     inner_top_y = iy + int(inner_width / 2) + line_inset_inner
     inner_bot_y = iy + ih - int(inner_width / 2) - line_inset_inner
     left_ix = ix + int(inner_width / 2) + line_inset_inner
@@ -188,7 +188,7 @@ def draw_decorative_frame(img: Image.Image,
     bl_box = [left_ix - r_i, inner_bot_y - 2 * r_i, left_ix + r_i, inner_bot_y]
     br_box = [right_ix - r_i, inner_bot_y - 2 * r_i, right_ix + r_i, inner_bot_y]
 
-    # compute arc edge points (used to trim straight lines)
+    # arc edge points（直線トリミングに利用）
     p_left_top = _arc_point(left_arc_box, 90)
     p_right_top = _arc_point(right_arc_box, 90)
     p_left_left = _arc_point(left_arc_box, 180)
@@ -203,8 +203,11 @@ def draw_decorative_frame(img: Image.Image,
     p_iri_right = _arc_point(ri_box, 0)
     p_iri_bot = _arc_point(br_box, 270)
 
-    # --- 1) draw outer straight trimmed lines onto frame_layer using the same logic as current code ---
-    # horizontals
+    # --- FRAME LAYER: 直線をここに描画し、後でアーチ領域をマスクで消す ---
+    frame_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw_frame = ImageDraw.Draw(frame_layer)
+
+    # 外枠直線（horizontals）
     start_x = max(ox + line_inset_outer, p_left_top[0] + corner_trim)
     end_x = min(ox + ow - line_inset_outer, p_right_top[0] - corner_trim)
     if start_x < end_x:
@@ -217,7 +220,7 @@ def draw_decorative_frame(img: Image.Image,
         draw_frame.line([_clamp_center((start_x_b, bot_y), outer_width), _clamp_center((end_x_b, bot_y), outer_width)],
                         fill=frame_color, width=outer_width)
 
-    # verticals
+    # 外枠縦線
     left_x_center = left_x
     right_x_center = right_x
     start_y = max(oy + line_inset_outer, p_left_left[1] + corner_trim)
@@ -232,28 +235,24 @@ def draw_decorative_frame(img: Image.Image,
         draw_frame.line([_clamp_center((right_x_center, start_y_r), outer_width), _clamp_center((right_x_center, end_y_r), outer_width)],
                         fill=frame_color, width=outer_width)
 
-    # --- erase outer arc regions from frame_layer via mask so straight lines are removed under arcs ---
+    # --- outer arc 領域を消すためのマスク（直線がアーチの下に残らないように） ---
     mask = Image.new("L", (w, h), 255)
     draw_mask = ImageDraw.Draw(mask)
     outer_half = math.ceil(outer_width / 2)
     inflate_outer = outer_half + corner_trim + 1
-    def _inflate_bbox(bbox, pad):
-        x0, y0, x1, y1 = bbox
-        return [int(x0 - pad), int(y0 - pad), int(x1 + pad), int(y1 + pad)]
     draw_mask.ellipse(_inflate_bbox(left_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(right_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(bottom_left_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(bottom_right_arc_box, inflate_outer), fill=0)
     frame_layer = Image.composite(frame_layer, Image.new("RGBA", (w, h), (0, 0, 0, 0)), mask)
 
-    # Composite frame_layer (lines with holes) onto the base image
+    # --- frame_layer を out に合成（直線はここで確定） ---
     out = Image.alpha_composite(out, frame_layer)
 
-    # --- 2) draw outer arcs directly onto 'out' so arcs are always visible (independent of mask ordering) ---
+    # --- ここでアーチを out に直接描画（mask の影響を受けない） ---
     draw_out = ImageDraw.Draw(out)
     stroke_pad = math.ceil(outer_width / 2)
 
-    # expand arc bbox slightly so stroke isn't clipped at bbox edge (Pillow draws stroke centered on path)
     left_bbox = _expand_and_clamp_bbox(left_arc_box, stroke_pad)
     right_bbox = _expand_and_clamp_bbox(right_arc_box, stroke_pad)
     bl_bbox = _expand_and_clamp_bbox(bottom_left_arc_box, stroke_pad)
@@ -265,36 +264,33 @@ def draw_decorative_frame(img: Image.Image,
         draw_out.arc(br_bbox, start=180, end=270, fill=frame_color, width=outer_width)
         draw_out.arc(bl_bbox, start=270, end=360, fill=frame_color, width=outer_width)
     except Exception:
-        # fallback: draw filled pieslice then cut inner area (best-effort fallback)
+        # arc stroke が効かない環境向けの最小フォールバック（見た目崩れ最小限）
         try:
-            # left
             draw_out.pieslice(left_bbox, start=0, end=90, fill=frame_color)
             inner_left = [left_bbox[0] + outer_width, left_bbox[1] + outer_width, left_bbox[2] - outer_width, left_bbox[3] - outer_width]
             if inner_left[2] > inner_left[0] and inner_left[3] > inner_left[1]:
                 draw_out.pieslice(inner_left, start=0, end=90, fill=(0, 0, 0, 0))
-            # right
             draw_out.pieslice(right_bbox, start=90, end=180, fill=frame_color)
             inner_right = [right_bbox[0] + outer_width, right_bbox[1] + outer_width, right_bbox[2] - outer_width, right_bbox[3] - outer_width]
             if inner_right[2] > inner_right[0] and inner_right[3] > inner_right[1]:
                 draw_out.pieslice(inner_right, start=90, end=180, fill=(0, 0, 0, 0))
-            # bottom-right
             draw_out.pieslice(br_bbox, start=180, end=270, fill=frame_color)
             inner_br = [br_bbox[0] + outer_width, br_bbox[1] + outer_width, br_bbox[2] - outer_width, br_bbox[3] - outer_width]
             if inner_br[2] > inner_br[0] and inner_br[3] > inner_br[1]:
                 draw_out.pieslice(inner_br, start=180, end=270, fill=(0, 0, 0, 0))
-            # bottom-left
             draw_out.pieslice(bl_bbox, start=270, end=360, fill=frame_color)
             inner_bl = [bl_bbox[0] + outer_width, bl_bbox[1] + outer_width, bl_bbox[2] - outer_width, bl_bbox[3] - outer_width]
             if inner_bl[2] > inner_bl[0] and inner_bl[3] > inner_bl[1]:
                 draw_out.pieslice(inner_bl, start=270, end=360, fill=(0, 0, 0, 0))
         except Exception:
-            logger.debug("Arc fallback drawing failed; skipping outer arcs")
+            logger.debug("Outer arc fallback failed; skipping outer arcs")
 
-    # --- 3) draw inner straight lines onto a new small layer so we can erase inner arc areas similarly ---
+    # ------------------------
+    # inner lines & arcs（同様の流れで、直線はレイヤー、アーチは最終 out で描画）
+    # ------------------------
     inner_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw_inner_layer = ImageDraw.Draw(inner_layer)
 
-    # inner horizontals
     sxi = max(ix + line_inset_inner, p_ili_top[0] + corner_trim)
     exi = min(ix + iw - line_inset_inner, p_iri_top[0] - corner_trim)
     if sxi < exi:
@@ -307,7 +303,6 @@ def draw_decorative_frame(img: Image.Image,
         draw_inner_layer.line([_clamp_center((sxb, inner_bot_y), inner_width), _clamp_center((exb, inner_bot_y), inner_width)],
                               fill=(95, 60, 35, 220), width=inner_width)
 
-    # inner verticals
     left_ix_center = left_ix
     right_ix_center = right_ix
     syi = max(iy + line_inset_inner, p_ili_left[1] + corner_trim)
@@ -333,10 +328,10 @@ def draw_decorative_frame(img: Image.Image,
     dm.ellipse(_inflate_bbox(br_box, inflate_inner), fill=0)
     inner_layer = Image.composite(inner_layer, Image.new("RGBA", (w, h), (0, 0, 0, 0)), mask_inner)
 
-    # composite inner lines onto out
+    # composite inner lines
     out = Image.alpha_composite(out, inner_layer)
 
-    # --- 4) draw inner arcs directly onto 'out' (same approach as outer arcs) ---
+    # draw inner arcs on out
     stroke_pad_i = math.ceil(inner_width / 2)
     li_bbox = _expand_and_clamp_bbox(li_box, stroke_pad_i)
     ri_bbox = _expand_and_clamp_bbox(ri_box, stroke_pad_i)
@@ -349,32 +344,27 @@ def draw_decorative_frame(img: Image.Image,
         draw_out.arc(bri_bbox, start=180, end=270, fill=(95, 60, 35, 220), width=inner_width)
         draw_out.arc(bli_bbox, start=270, end=360, fill=(95, 60, 35, 220), width=inner_width)
     except Exception:
-        # fallback to pieslice carve method
         try:
             draw_out.pieslice(li_bbox, start=0, end=90, fill=(95, 60, 35, 220))
             inner_li = [li_bbox[0] + inner_width, li_bbox[1] + inner_width, li_bbox[2] - inner_width, li_bbox[3] - inner_width]
             if inner_li[2] > inner_li[0] and inner_li[3] > inner_li[1]:
                 draw_out.pieslice(inner_li, start=0, end=90, fill=(0, 0, 0, 0))
-            # ri
             draw_out.pieslice(ri_bbox, start=90, end=180, fill=(95, 60, 35, 220))
             inner_ri = [ri_bbox[0] + inner_width, ri_bbox[1] + inner_width, ri_bbox[2] - inner_width, ri_bbox[3] - inner_width]
             if inner_ri[2] > inner_ri[0] and inner_ri[3] > inner_ri[1]:
                 draw_out.pieslice(inner_ri, start=90, end=180, fill=(0, 0, 0, 0))
-            # br
             draw_out.pieslice(bri_bbox, start=180, end=270, fill=(95, 60, 35, 220))
             inner_br = [bri_bbox[0] + inner_width, bri_bbox[1] + inner_width, bri_bbox[2] - inner_width, bri_bbox[3] - inner_width]
             if inner_br[2] > inner_br[0] and inner_br[3] > inner_br[1]:
                 draw_out.pieslice(inner_br, start=180, end=270, fill=(0, 0, 0, 0))
-            # bl
             draw_out.pieslice(bli_bbox, start=270, end=360, fill=(95, 60, 35, 220))
             inner_bl = [bli_bbox[0] + inner_width, bli_bbox[1] + inner_width, bli_bbox[2] - inner_width, bli_bbox[3] - inner_width]
             if inner_bl[2] > inner_bl[0] and inner_bl[3] > inner_bl[1]:
                 draw_out.pieslice(inner_bl, start=270, end=360, fill=(0, 0, 0, 0))
         except Exception:
-            logger.debug("Inner arc fallback drawing failed; skipping inner arcs")
+            logger.debug("Inner arc fallback failed; skipping inner arcs")
 
     return out
-
 
 def create_card_background(w: int, h: int,
                            noise_std: float = 30.0,
