@@ -84,33 +84,38 @@ def draw_decorative_frame(img: Image.Image,
                           inner_width: int = 2,
                           frame_color=(85, 50, 30, 255)) -> Image.Image:
     """
-    外枠（太）＋内枠（細）を描画します。
-    アーチと直線は「見た目上独立」かつ「四隅はアーチで欠ける」ように描画します。
-    変更はこの関数内に閉じ、他の処理には影響しない実装です。
+    Draw decorative outer + inner frames.
+    Approach:
+      - Keep straight-line geometry used by the current (working) code.
+      - Use arc bbox geometry aligned to those anchors.
+      - Draw straight lines on a frame_layer, erase arc areas from that layer (mask),
+        composite frame_layer onto base image, then draw arcs directly onto the final image.
+      - Drawing arcs on the final image (not on frame_layer) avoids accidental erasure
+        from mask/composite ordering and ensures visibility across Pillow versions.
+    This keeps straight lines and arcs independent while ensuring arcs visually
+    clip the lines.
     """
     w, h = img.size
 
-    # アーチ半径
+    # arc radii
     notch_radius = max(12, int(min(w, h) * 0.035))
     arc_diameter = notch_radius * 2
 
-    # 内アーチの半径（外アーチに近づけることで形を揃える）
+    # inner arc radius
     inner_notch_radius = max(8, int(notch_radius * 0.90))
     inner_arc_diameter = inner_notch_radius * 2
 
-    # --- 調整可能なパラメータ ---
-    arc_pad = max(8, int(notch_radius * 0.35))         # アーチ全体を外側に寄せる量（px）
-    inner_pad = max(6, int(inner_notch_radius * 0.30)) # 内アーチの外寄せ（px）
+    # adjustable params
+    arc_pad = max(8, int(notch_radius * 0.35))
+    inner_pad = max(6, int(inner_notch_radius * 0.30))
 
-    # 直線の内寄せ量（増やすほど直線は内側に寄る）
-    # NOTE: we do NOT change these values here; keep them as-is to avoid moving lines.
-    line_inset_outer = -40   # 調整ポイント：外枠直線の内寄せ（px）
-    line_inset_inner = -32   # 調整ポイント：内枠直線の内寄せ（px）
+    # line insets (do not change these here)
+    line_inset_outer = -40
+    line_inset_inner = -32
 
-    # 角を切るためのトリム量（アーチの端点からさらに内側へ退く量）
-    corner_trim = max(2, int(notch_radius * 0.25))  # 調整ポイント：大きいほど角の欠けが深くなる
+    corner_trim = max(2, int(notch_radius * 0.25))
 
-    # --- offset の安全化 ---
+    # offset safety
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
     if outer_offset is None:
         outer_offset = max(12, min_outer_offset)
@@ -133,86 +138,57 @@ def draw_decorative_frame(img: Image.Image,
     ih = int(h - inner_offset * 2)
 
     out = img.convert("RGBA")
-    draw = ImageDraw.Draw(out)
+    # We'll draw straight lines on frame_layer, then composite,
+    # then draw arcs directly on 'out' so arcs are never accidentally erased.
+    frame_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw_frame = ImageDraw.Draw(frame_layer)
 
-    # clamp helper
+    # clamp helper for line centers
     def _clamp_center(pt, stroke_w):
         half = stroke_w / 2.0
         x = max(half, min(w - half, pt[0]))
         y = max(half, min(h - half, pt[1]))
         return (x, y)
 
-    # compute straight-line anchors first (these exist later too; compute here to build arc bboxes)
+    # helper to safely expand/clamp bboxes when actually drawing arcs on the final image
+    def _expand_and_clamp_bbox(bbox, pad):
+        x0, y0, x1, y1 = bbox
+        x0e = max(0, int(math.floor(x0 - pad)))
+        y0e = max(0, int(math.floor(y0 - pad)))
+        x1e = min(w, int(math.ceil(x1 + pad)))
+        y1e = min(h, int(math.ceil(y1 + pad)))
+        # ensure non-degenerate
+        if x1e <= x0e:
+            x1e = min(w, x0e + 1)
+        if y1e <= y0e:
+            y1e = min(h, y0e + 1)
+        return [x0e, y0e, x1e, y1e]
+
+    # compute straight-line anchors FIRST (preserve the current working geometry)
     top_y = oy + int(outer_width / 2) + line_inset_outer
     bot_y = oy + oh - int(outer_width / 2) - line_inset_outer
     left_x = ox + int(outer_width / 2) + line_inset_outer
     right_x = ox + ow - int(outer_width / 2) - line_inset_outer
-    
-    # Use arc_diameter as width/height of each corner ellipse (rx = ry = arc_diameter/2)
+
+    # Build arc bboxes aligned to those anchors (so arc endpoints line up with straight lines)
     r = arc_diameter / 2.0
-    
-    # Left-top arc: we want its top point (angle 90°) to be at y = top_y and its center x to be left_x
-    # bbox y0 = top_y  (because p_left_top.y == bbox.y0), bbox x center = left_x
-    left_arc_box = [
-        int(math.floor(left_x - r)),   # x0
-        int(math.floor(top_y)),        # y0
-        int(math.ceil(left_x + r)),    # x1
-        int(math.ceil(top_y + 2 * r))  # y1
-    ]
-    
-    # Right-top arc: center x = right_x, top aligned to top_y
-    right_arc_box = [
-        int(math.floor(right_x - r)),
-        int(math.floor(top_y)),
-        int(math.ceil(right_x + r)),
-        int(math.ceil(top_y + 2 * r))
-    ]
-    
-    # Left-bottom arc: bottom point (angle 270°) should be at y = bot_y => bbox y1 = bot_y
-    bottom_left_arc_box = [
-        int(math.floor(left_x - r)),
-        int(math.floor(bot_y - 2 * r)),
-        int(math.ceil(left_x + r)),
-        int(math.ceil(bot_y))
-    ]
-    
-    # Right-bottom arc: center x = right_x, bottom aligned to bot_y
-    bottom_right_arc_box = [
-        int(math.floor(right_x - r)),
-        int(math.floor(bot_y - 2 * r)),
-        int(math.ceil(right_x + r)),
-        int(math.ceil(bot_y))
-    ]
+    left_arc_box = [left_x - r, top_y, left_x + r, top_y + 2 * r]
+    right_arc_box = [right_x - r, top_y, right_x + r, top_y + 2 * r]
+    bottom_left_arc_box = [left_x - r, bot_y - 2 * r, left_x + r, bot_y]
+    bottom_right_arc_box = [right_x - r, bot_y - 2 * r, right_x + r, bot_y]
 
-    # --- DEBUG: log arc bbox values (insert immediately after left_arc_box/right_arc_box/... definitions)
-    logger.info(f"[FRAME DEBUG] w={w} h={h} ox={ox} oy={oy} ow={ow} oh={oh}")
-    logger.info(f"[FRAME DEBUG] notch_radius={notch_radius} arc_diameter={arc_diameter} arc_pad={arc_pad}")
-    logger.info(f"[FRAME DEBUG] left_arc_box={left_arc_box}")
-    logger.info(f"[FRAME DEBUG] right_arc_box={right_arc_box}")
-    logger.info(f"[FRAME DEBUG] bottom_left_arc_box={bottom_left_arc_box}")
-    logger.info(f"[FRAME DEBUG] bottom_right_arc_box={bottom_right_arc_box}")
-
-    # inner anchors (reuse inner_top_y/inner_bot_y, left_ix/right_ix which used later)
+    # inner anchors and boxes (aligned with inner straight lines)
     inner_top_y = iy + int(inner_width / 2) + line_inset_inner
     inner_bot_y = iy + ih - int(inner_width / 2) - line_inset_inner
     left_ix = ix + int(inner_width / 2) + line_inset_inner
     right_ix = ix + iw - int(inner_width / 2) - line_inset_inner
-    
     r_i = inner_arc_diameter / 2.0
-    
-    li_box = [int(math.floor(left_ix - r_i)), int(math.floor(inner_top_y)), int(math.ceil(left_ix + r_i)), int(math.ceil(inner_top_y + 2 * r_i))]
-    ri_box = [int(math.floor(right_ix - r_i)), int(math.floor(inner_top_y)), int(math.ceil(right_ix + r_i)), int(math.ceil(inner_top_y + 2 * r_i))]
-    bl_box = [int(math.floor(left_ix - r_i)), int(math.floor(inner_bot_y - 2 * r_i)), int(math.ceil(left_ix + r_i)), int(math.ceil(inner_bot_y))]
-    br_box = [int(math.floor(right_ix - r_i)), int(math.floor(inner_bot_y - 2 * r_i)), int(math.ceil(right_ix + r_i)), int(math.ceil(inner_bot_y))]
+    li_box = [left_ix - r_i, inner_top_y, left_ix + r_i, inner_top_y + 2 * r_i]
+    ri_box = [right_ix - r_i, inner_top_y, right_ix + r_i, inner_top_y + 2 * r_i]
+    bl_box = [left_ix - r_i, inner_bot_y - 2 * r_i, left_ix + r_i, inner_bot_y]
+    br_box = [right_ix - r_i, inner_bot_y - 2 * r_i, right_ix + r_i, inner_bot_y]
 
-    # --- DEBUG: log inner arc bbox / inner pad values ---
-    logger.info(f"[FRAME DEBUG] inner_notch_radius={inner_notch_radius} inner_arc_diameter={inner_arc_diameter} inner_pad={inner_pad}")
-    logger.info(f"[FRAME DEBUG] li_box={li_box}")
-    logger.info(f"[FRAME DEBUG] ri_box={ri_box}")
-    logger.info(f"[FRAME DEBUG] bl_box={bl_box}")
-    logger.info(f"[FRAME DEBUG] br_box={br_box}")
-
-    # --- compute arc edge points used to trim lines so corners are arc-shaped ---
+    # compute arc edge points (used to trim straight lines)
     p_left_top = _arc_point(left_arc_box, 90)
     p_right_top = _arc_point(right_arc_box, 90)
     p_left_left = _arc_point(left_arc_box, 180)
@@ -220,7 +196,6 @@ def draw_decorative_frame(img: Image.Image,
     p_right_right = _arc_point(right_arc_box, 0)
     p_right_bot = _arc_point(bottom_right_arc_box, 270)
 
-    # inner arc points for inner masking/drawing
     p_ili_top = _arc_point(li_box, 90)
     p_iri_top = _arc_point(ri_box, 90)
     p_ili_left = _arc_point(li_box, 180)
@@ -228,48 +203,8 @@ def draw_decorative_frame(img: Image.Image,
     p_iri_right = _arc_point(ri_box, 0)
     p_iri_bot = _arc_point(br_box, 270)
 
-    # --- DEBUG: log arc edge points used for trimming (after computing inner pts) ---
-    logger.info(f"[FRAME DEBUG] p_left_top={p_left_top} p_right_top={p_right_top}")
-    logger.info(f"[FRAME DEBUG] p_left_left={p_left_left} p_left_bot={p_left_bot}")
-    logger.info(f"[FRAME DEBUG] p_right_right={p_right_right} p_right_bot={p_right_bot}")
-    logger.info(f"[FRAME DEBUG] p_ili_top={p_ili_top} p_iri_top={p_iri_top} p_ili_bot={p_ili_bot} p_iri_bot={p_iri_bot}")
-
-    # =====================================================================
-    # Replace drawing with a frame-layer + mask approach:
-    # - draw straight lines onto frame_layer using EXACT same geometry as before
-    # - erase (mask-out) ellipse areas under arcs so straight lines are removed there
-    # - draw arcs on frame_layer
-    # - composite frame_layer onto base image
-    # This guarantees line positions are not altered; only pixels under arcs are removed.
-    # =====================================================================
-
-    frame_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    draw_frame = ImageDraw.Draw(frame_layer)
-
-    # --- DEBUG (visual): draw bbox outlines on frame_layer so we can see where arcs will be ---
-    try:
-        dbg_col = (255, 0, 0, 180)
-        draw_frame.rectangle([int(left_arc_box[0]), int(left_arc_box[1]), int(left_arc_box[2]), int(left_arc_box[3])],
-                             outline=dbg_col, width=1)
-        draw_frame.rectangle([int(right_arc_box[0]), int(right_arc_box[1]), int(right_arc_box[2]), int(right_arc_box[3])],
-                             outline=dbg_col, width=1)
-        draw_frame.rectangle([int(bottom_left_arc_box[0]), int(bottom_left_arc_box[1]), int(bottom_left_arc_box[2]), int(bottom_left_arc_box[3])],
-                             outline=dbg_col, width=1)
-        draw_frame.rectangle([int(bottom_right_arc_box[0]), int(bottom_right_arc_box[1]), int(bottom_right_arc_box[2]), int(bottom_right_arc_box[3])],
-                             outline=dbg_col, width=1)
-        # inner boxes too
-        draw_frame.rectangle([int(li_box[0]), int(li_box[1]), int(li_box[2]), int(li_box[3])], outline=dbg_col, width=1)
-        draw_frame.rectangle([int(ri_box[0]), int(ri_box[1]), int(ri_box[2]), int(ri_box[3])], outline=dbg_col, width=1)
-        draw_frame.rectangle([int(bl_box[0]), int(bl_box[1]), int(bl_box[2]), int(bl_box[3])], outline=dbg_col, width=1)
-        draw_frame.rectangle([int(br_box[0]), int(br_box[1]), int(br_box[2]), int(br_box[3])], outline=dbg_col, width=1)
-    except Exception:
-        logger.info("FRAME DEBUG: visual bbox draw failed, continuing")
-
-    # --- 1) draw outer straight lines on frame_layer using the same coordinate logic as before ---
-    # horizontals (use same start/end logic so positions remain unchanged)
-    top_y = oy + int(outer_width / 2) + line_inset_outer
-    bot_y = oy + oh - int(outer_width / 2) - line_inset_outer
-
+    # --- 1) draw outer straight trimmed lines onto frame_layer using the same logic as current code ---
+    # horizontals
     start_x = max(ox + line_inset_outer, p_left_top[0] + corner_trim)
     end_x = min(ox + ow - line_inset_outer, p_right_top[0] - corner_trim)
     if start_x < end_x:
@@ -283,189 +218,163 @@ def draw_decorative_frame(img: Image.Image,
                         fill=frame_color, width=outer_width)
 
     # verticals
-    left_x = ox + int(outer_width / 2) + line_inset_outer
-    right_x = ox + ow - int(outer_width / 2) - line_inset_outer
-
+    left_x_center = left_x
+    right_x_center = right_x
     start_y = max(oy + line_inset_outer, p_left_left[1] + corner_trim)
     end_y = min(oy + oh - line_inset_outer, p_left_bot[1] - corner_trim)
     if start_y < end_y:
-        draw_frame.line([_clamp_center((left_x, start_y), outer_width), _clamp_center((left_x, end_y), outer_width)],
+        draw_frame.line([_clamp_center((left_x_center, start_y), outer_width), _clamp_center((left_x_center, end_y), outer_width)],
                         fill=frame_color, width=outer_width)
 
     start_y_r = max(oy + line_inset_outer, p_right_right[1] + corner_trim)
     end_y_r = min(oy + oh - line_inset_outer, p_right_bot[1] - corner_trim)
     if start_y_r < end_y_r:
-        draw_frame.line([_clamp_center((right_x, start_y_r), outer_width), _clamp_center((right_x, end_y_r), outer_width)],
+        draw_frame.line([_clamp_center((right_x_center, start_y_r), outer_width), _clamp_center((right_x_center, end_y_r), outer_width)],
                         fill=frame_color, width=outer_width)
 
-    # --- 2) erase regions under outer arcs from frame_layer via mask (so straight lines are removed there) ---
-    mask = Image.new("L", (w, h), 255)  # 255 = keep, 0 = erase
+    # --- erase outer arc regions from frame_layer via mask so straight lines are removed under arcs ---
+    mask = Image.new("L", (w, h), 255)
     draw_mask = ImageDraw.Draw(mask)
-
     outer_half = math.ceil(outer_width / 2)
-    inflate_outer = outer_half + corner_trim + 1  # safety pad; tweak only for visual pixel remnant, not line position
-
-    # log outer inflate (inner inflate logged later when defined)
-    logger.info(f"[FRAME DEBUG] outer_half={outer_half} inflate_outer={inflate_outer}")
-
+    inflate_outer = outer_half + corner_trim + 1
     def _inflate_bbox(bbox, pad):
         x0, y0, x1, y1 = bbox
         return [int(x0 - pad), int(y0 - pad), int(x1 + pad), int(y1 + pad)]
-
     draw_mask.ellipse(_inflate_bbox(left_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(right_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(bottom_left_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(bottom_right_arc_box, inflate_outer), fill=0)
+    frame_layer = Image.composite(frame_layer, Image.new("RGBA", (w, h), (0, 0, 0, 0)), mask)
 
-    transparent = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    frame_layer = Image.composite(frame_layer, transparent, mask)
+    # Composite frame_layer (lines with holes) onto the base image
+    out = Image.alpha_composite(out, frame_layer)
 
-    # --- DEBUG: quick check — sample pixel inside left arc bbox center after mask applied ---
+    # --- 2) draw outer arcs directly onto 'out' so arcs are always visible (independent of mask ordering) ---
+    draw_out = ImageDraw.Draw(out)
+    stroke_pad = math.ceil(outer_width / 2)
+
+    # expand arc bbox slightly so stroke isn't clipped at bbox edge (Pillow draws stroke centered on path)
+    left_bbox = _expand_and_clamp_bbox(left_arc_box, stroke_pad)
+    right_bbox = _expand_and_clamp_bbox(right_arc_box, stroke_pad)
+    bl_bbox = _expand_and_clamp_bbox(bottom_left_arc_box, stroke_pad)
+    br_bbox = _expand_and_clamp_bbox(bottom_right_arc_box, stroke_pad)
+
     try:
-        cx = int((left_arc_box[0] + left_arc_box[2]) / 2)
-        cy = int((left_arc_box[1] + left_arc_box[3]) / 2)
-        pix = frame_layer.getpixel((max(0, min(w-1, cx)), max(0, min(h-1, cy))))
-        logger.info(f"[FRAME DEBUG] sample_pixel_after_mask_left_arc at ({cx},{cy}) = {pix}")
-    except Exception as e:
-        logger.info(f"[FRAME DEBUG] sample pixel check failed: {e}")
-
-    # --- 3) draw outer arcs onto frame_layer ---
-    draw_frame = ImageDraw.Draw(frame_layer)
-    try:
-        draw_frame.arc(left_arc_box, start=0, end=90, fill=frame_color, width=outer_width)
-        draw_frame.arc(right_arc_box, start=90, end=180, fill=frame_color, width=outer_width)
-        draw_frame.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color, width=outer_width)
-        draw_frame.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color, width=outer_width)
+        draw_out.arc(left_bbox, start=0, end=90, fill=frame_color, width=outer_width)
+        draw_out.arc(right_bbox, start=90, end=180, fill=frame_color, width=outer_width)
+        draw_out.arc(br_bbox, start=180, end=270, fill=frame_color, width=outer_width)
+        draw_out.arc(bl_bbox, start=270, end=360, fill=frame_color, width=outer_width)
     except Exception:
-        draw_frame.arc(left_arc_box, start=0, end=90, fill=frame_color)
-        draw_frame.arc(right_arc_box, start=90, end=180, fill=frame_color)
-        draw_frame.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color)
-        draw_frame.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
-
-    # === DEBUG: verify arcs actually drew onto frame_layer ===
-    try:
-        # sample a few test coords near each corner arc (a few px inside the stroke)
-        # left-top arc point: slightly down-right from top point
-        sx = int(p_left_top[0])
-        sy = int(p_left_top[1] + max(3, outer_width//2))
-        a = frame_layer.getpixel((max(0, min(w-1, sx)), max(0, min(h-1, sy))))
-        logger.info(f"[FRAME DEBUG] after outer arc draw sample left-top at ({sx},{sy}) = {a}")
-    
-        # right-top sample
-        sx2 = int(p_right_top[0])
-        sy2 = int(p_right_top[1] + max(3, outer_width//2))
-        b = frame_layer.getpixel((max(0, min(w-1, sx2)), max(0, min(h-1, sy2))))
-        logger.info(f"[FRAME DEBUG] after outer arc draw sample right-top at ({sx2},{sy2}) = {b}")
-    
-        # save frame_layer to disk for visual inspection (if permitted)
+        # fallback: draw filled pieslice then cut inner area (best-effort fallback)
         try:
-            frame_layer.save("/tmp/guild_frame_layer.png")
-            logger.info("[FRAME DEBUG] saved frame_layer to /tmp/guild_frame_layer.png")
-        except Exception as e:
-            logger.info(f"[FRAME DEBUG] saving frame_layer failed: {e}")
-    
-        # composite onto base and save out image to inspect final pixels
-        try:
-            out_test = Image.alpha_composite(img.convert("RGBA"), frame_layer)
-            out_test.save("/tmp/guild_frame_combined.png")
-            logger.info("[FRAME DEBUG] saved combined image to /tmp/guild_frame_combined.png")
-        except Exception as e:
-            logger.info(f"[FRAME DEBUG] saving combined image failed: {e}")
-    except Exception as e:
-        logger.info(f"[FRAME DEBUG] verification after arc draw failed: {e}")
+            # left
+            draw_out.pieslice(left_bbox, start=0, end=90, fill=frame_color)
+            inner_left = [left_bbox[0] + outer_width, left_bbox[1] + outer_width, left_bbox[2] - outer_width, left_bbox[3] - outer_width]
+            if inner_left[2] > inner_left[0] and inner_left[3] > inner_left[1]:
+                draw_out.pieslice(inner_left, start=0, end=90, fill=(0, 0, 0, 0))
+            # right
+            draw_out.pieslice(right_bbox, start=90, end=180, fill=frame_color)
+            inner_right = [right_bbox[0] + outer_width, right_bbox[1] + outer_width, right_bbox[2] - outer_width, right_bbox[3] - outer_width]
+            if inner_right[2] > inner_right[0] and inner_right[3] > inner_right[1]:
+                draw_out.pieslice(inner_right, start=90, end=180, fill=(0, 0, 0, 0))
+            # bottom-right
+            draw_out.pieslice(br_bbox, start=180, end=270, fill=frame_color)
+            inner_br = [br_bbox[0] + outer_width, br_bbox[1] + outer_width, br_bbox[2] - outer_width, br_bbox[3] - outer_width]
+            if inner_br[2] > inner_br[0] and inner_br[3] > inner_br[1]:
+                draw_out.pieslice(inner_br, start=180, end=270, fill=(0, 0, 0, 0))
+            # bottom-left
+            draw_out.pieslice(bl_bbox, start=270, end=360, fill=frame_color)
+            inner_bl = [bl_bbox[0] + outer_width, bl_bbox[1] + outer_width, bl_bbox[2] - outer_width, bl_bbox[3] - outer_width]
+            if inner_bl[2] > inner_bl[0] and inner_bl[3] > inner_bl[1]:
+                draw_out.pieslice(inner_bl, start=270, end=360, fill=(0, 0, 0, 0))
+        except Exception:
+            logger.debug("Arc fallback drawing failed; skipping outer arcs")
 
-    # --- DEBUG: test draw arcs directly (red thick) for visibility check; remove after testing ---
-    try:
-        test_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        td = ImageDraw.Draw(test_layer)
-        td.arc(left_arc_box, start=0, end=90, fill=(255, 0, 0, 255), width=max(12, outer_width + 6))
-        td.arc(right_arc_box, start=90, end=180, fill=(255, 0, 0, 255), width=max(12, outer_width + 6))
-        td.arc(bottom_right_arc_box, start=180, end=270, fill=(255, 0, 0, 255), width=max(12, outer_width + 6))
-        td.arc(bottom_left_arc_box, start=270, end=360, fill=(255, 0, 0, 255), width=max(12, outer_width + 6))
-        try:
-            test_img = Image.alpha_composite(img.convert("RGBA"), test_layer)
-            test_img.save("/tmp/guild_frame_debug_arcs.png")
-            logger.debug("[FRAME DEBUG] saved test arc overlay to /tmp/guild_frame_debug_arcs.png")
-        except Exception as e:
-            logger.info(f"[FRAME DEBUG] failed to save test image: {e}")
-    except Exception:
-        logger.info("FRAME DEBUG: test arc overlay failed, continuing")
+    # --- 3) draw inner straight lines onto a new small layer so we can erase inner arc areas similarly ---
+    inner_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw_inner_layer = ImageDraw.Draw(inner_layer)
 
-    # --- 4) inner straight lines drawn onto frame_layer (positions unchanged) ---
-    in_overlap = 0
+    # inner horizontals
+    sxi = max(ix + line_inset_inner, p_ili_top[0] + corner_trim)
+    exi = min(ix + iw - line_inset_inner, p_iri_top[0] - corner_trim)
+    if sxi < exi:
+        draw_inner_layer.line([_clamp_center((sxi, inner_top_y), inner_width), _clamp_center((exi, inner_top_y), inner_width)],
+                              fill=(95, 60, 35, 220), width=inner_width)
 
-    inner_top_y = iy + int(inner_width / 2) + line_inset_inner
-    inner_bot_y = iy + ih - int(inner_width / 2) - line_inset_inner
+    sxb = max(ix + line_inset_inner, p_ili_bot[0] + corner_trim)
+    exb = min(ix + iw - line_inset_inner, p_iri_bot[0] - corner_trim)
+    if sxb < exb:
+        draw_inner_layer.line([_clamp_center((sxb, inner_bot_y), inner_width), _clamp_center((exb, inner_bot_y), inner_width)],
+                              fill=(95, 60, 35, 220), width=inner_width)
 
-    start_in_top = (int(p_ili_top[0]), inner_top_y)
-    end_in_top = (int(p_iri_top[0]), inner_top_y)
-    if start_in_top[0] < end_in_top[0]:
-        draw_frame.line([_clamp_center(start_in_top, inner_width), _clamp_center(end_in_top, inner_width)],
-                        fill=(95, 60, 35, 220), width=inner_width)
+    # inner verticals
+    left_ix_center = left_ix
+    right_ix_center = right_ix
+    syi = max(iy + line_inset_inner, p_ili_left[1] + corner_trim)
+    eyi = min(iy + ih - line_inset_inner, p_ili_bot[1] - corner_trim)
+    if syi < eyi:
+        draw_inner_layer.line([_clamp_center((left_ix_center, syi), inner_width), _clamp_center((left_ix_center, eyi), inner_width)],
+                              fill=(95, 60, 35, 220), width=inner_width)
 
-    start_in_bot = (int(p_ili_bot[0]), inner_bot_y)
-    end_in_bot = (int(p_iri_bot[0]), inner_bot_y)
-    if start_in_bot[0] < end_in_bot[0]:
-        draw_frame.line([_clamp_center(start_in_bot, inner_width), _clamp_center(end_in_bot, inner_width)],
-                        fill=(95, 60, 35, 220), width=inner_width)
+    syi_r = max(iy + line_inset_inner, p_iri_right[1] + corner_trim)
+    eyi_r = min(iy + ih - line_inset_inner, p_iri_bot[1] - corner_trim)
+    if syi_r < eyi_r:
+        draw_inner_layer.line([_clamp_center((right_ix_center, syi_r), inner_width), _clamp_center((right_ix_center, eyi_r), inner_width)],
+                              fill=(95, 60, 35, 220), width=inner_width)
 
-    # inner verticals: use fixed x positions (as before) and inner_top_y/inner_bot_y for y endpoints
-    left_ix = ix + int(inner_width / 2) + line_inset_inner
-    right_ix = ix + iw - int(inner_width / 2) - line_inset_inner
-    if inner_top_y < inner_bot_y:
-        draw_frame.line([_clamp_center((left_ix, inner_top_y), inner_width), _clamp_center((left_ix, inner_bot_y), inner_width)],
-                        fill=(95, 60, 35, 220), width=inner_width)
-        draw_frame.line([_clamp_center((right_ix, inner_top_y), inner_width), _clamp_center((right_ix, inner_bot_y), inner_width)],
-                        fill=(95, 60, 35, 220), width=inner_width)
-
-    # erase inner arc coverage areas from frame_layer as well
+    # erase inner arc coverage areas from inner_layer
     mask_inner = Image.new("L", (w, h), 255)
     dm = ImageDraw.Draw(mask_inner)
     inner_half = math.ceil(inner_width / 2)
     inflate_inner = inner_half + corner_trim + 1
-
-    # log inner inflate now that it's defined
-    logger.info(f"[FRAME DEBUG] inner_half={inner_half} inflate_inner={inflate_inner}")
-
     dm.ellipse(_inflate_bbox(li_box, inflate_inner), fill=0)
     dm.ellipse(_inflate_bbox(ri_box, inflate_inner), fill=0)
     dm.ellipse(_inflate_bbox(bl_box, inflate_inner), fill=0)
     dm.ellipse(_inflate_bbox(br_box, inflate_inner), fill=0)
-    frame_layer = Image.composite(frame_layer, transparent, mask_inner)
+    inner_layer = Image.composite(inner_layer, Image.new("RGBA", (w, h), (0, 0, 0, 0)), mask_inner)
 
-    # draw inner arcs onto frame_layer
-    draw_frame = ImageDraw.Draw(frame_layer)
+    # composite inner lines onto out
+    out = Image.alpha_composite(out, inner_layer)
+
+    # --- 4) draw inner arcs directly onto 'out' (same approach as outer arcs) ---
+    stroke_pad_i = math.ceil(inner_width / 2)
+    li_bbox = _expand_and_clamp_bbox(li_box, stroke_pad_i)
+    ri_bbox = _expand_and_clamp_bbox(ri_box, stroke_pad_i)
+    bli_bbox = _expand_and_clamp_bbox(bl_box, stroke_pad_i)
+    bri_bbox = _expand_and_clamp_bbox(br_box, stroke_pad_i)
+
     try:
-        draw_frame.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220), width=inner_width)
-        draw_frame.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220), width=inner_width)
-        draw_frame.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220), width=inner_width)
-        draw_frame.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220), width=inner_width)
+        draw_out.arc(li_bbox, start=0, end=90, fill=(95, 60, 35, 220), width=inner_width)
+        draw_out.arc(ri_bbox, start=90, end=180, fill=(95, 60, 35, 220), width=inner_width)
+        draw_out.arc(bri_bbox, start=180, end=270, fill=(95, 60, 35, 220), width=inner_width)
+        draw_out.arc(bli_bbox, start=270, end=360, fill=(95, 60, 35, 220), width=inner_width)
     except Exception:
-        draw_frame.arc(li_box, start=0, end=90, fill=(95, 60, 35, 220))
-        draw_frame.arc(ri_box, start=90, end=180, fill=(95, 60, 35, 220))
-        draw_frame.arc(br_box, start=180, end=270, fill=(95, 60, 35, 220))
-        draw_frame.arc(bl_box, start=270, end=360, fill=(95, 60, 35, 220))
-
-    # --- 5) composite frame_layer onto the original 'out' image and continue (rest unchanged) ---
-    out = img.convert("RGBA")
-    out = Image.alpha_composite(out, frame_layer)
-
-    # 装飾的なルール線・ボックス（元実装に近い位置で描画）
-    rule_color = (110, 75, 45, 180)
-    try:
-        y_rule = iy + int(ih * 0.12)
-        draw.line([(ix + int(iw * 0.03), y_rule), (ix + iw - int(iw * 0.03), y_rule)], fill=rule_color, width=max(2, inner_width + 2))
-        y_rule2 = iy + int(ih * 0.48)
-        draw.line([(ix + int(iw * 0.03), y_rule2), (ix + int(iw * 0.60), y_rule2)], fill=rule_color, width=max(2, inner_width + 2))
-        box_x = ix + int(iw * 0.04)
-        box_y = iy + int(ih * 0.06)
-        box_w = int(iw * 0.18)
-        box_h = int(ih * 0.18)
-        draw.rectangle([box_x, box_y, box_x + box_w, box_y + box_h], outline=rule_color, width=max(2, inner_width))
-    except Exception:
-        logger.info("rule/box draw failed, skipping")
+        # fallback to pieslice carve method
+        try:
+            draw_out.pieslice(li_bbox, start=0, end=90, fill=(95, 60, 35, 220))
+            inner_li = [li_bbox[0] + inner_width, li_bbox[1] + inner_width, li_bbox[2] - inner_width, li_bbox[3] - inner_width]
+            if inner_li[2] > inner_li[0] and inner_li[3] > inner_li[1]:
+                draw_out.pieslice(inner_li, start=0, end=90, fill=(0, 0, 0, 0))
+            # ri
+            draw_out.pieslice(ri_bbox, start=90, end=180, fill=(95, 60, 35, 220))
+            inner_ri = [ri_bbox[0] + inner_width, ri_bbox[1] + inner_width, ri_bbox[2] - inner_width, ri_bbox[3] - inner_width]
+            if inner_ri[2] > inner_ri[0] and inner_ri[3] > inner_ri[1]:
+                draw_out.pieslice(inner_ri, start=90, end=180, fill=(0, 0, 0, 0))
+            # br
+            draw_out.pieslice(bri_bbox, start=180, end=270, fill=(95, 60, 35, 220))
+            inner_br = [bri_bbox[0] + inner_width, bri_bbox[1] + inner_width, bri_bbox[2] - inner_width, bri_bbox[3] - inner_width]
+            if inner_br[2] > inner_br[0] and inner_br[3] > inner_br[1]:
+                draw_out.pieslice(inner_br, start=180, end=270, fill=(0, 0, 0, 0))
+            # bl
+            draw_out.pieslice(bli_bbox, start=270, end=360, fill=(95, 60, 35, 220))
+            inner_bl = [bli_bbox[0] + inner_width, bli_bbox[1] + inner_width, bli_bbox[2] - inner_width, bli_bbox[3] - inner_width]
+            if inner_bl[2] > inner_bl[0] and inner_bl[3] > inner_bl[1]:
+                draw_out.pieslice(inner_bl, start=270, end=360, fill=(0, 0, 0, 0))
+        except Exception:
+            logger.debug("Inner arc fallback drawing failed; skipping inner arcs")
 
     return out
+
 
 def create_card_background(w: int, h: int,
                            noise_std: float = 30.0,
@@ -524,6 +433,7 @@ def create_card_background(w: int, h: int,
         composed = composed.convert('RGBA')
 
     return composed
+
 
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
     def sg(d, *keys, default="N/A"):
@@ -701,12 +611,12 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         fw = bbox[2] - bbox[0]
     draw.text((card_x + card_w - fw - 16, card_y + card_h - 36), footer_text, font=font_small, fill=(120, 110, 100, 255))
 
-    out = BytesIO()
-    img.save(out, format="PNG")
-    out.seek(0)
+    out_bytes = BytesIO()
+    out.save(out_bytes, format="PNG")
+    out_bytes.seek(0)
 
     try:
-        if banner_img:
+        if isinstance(banner_img, Image.Image):
             banner_img.close()
     except Exception:
         pass
