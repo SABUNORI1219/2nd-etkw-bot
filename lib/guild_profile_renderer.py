@@ -142,11 +142,47 @@ def draw_decorative_frame(img: Image.Image,
         y = max(half, min(h - half, pt[1]))
         return (x, y)
 
-    # --- arc bboxes (計算は先に行う) ---
-    left_arc_box = [ox - arc_diameter - arc_pad, oy - arc_diameter - arc_pad, ox - arc_pad, oy - arc_pad]
-    right_arc_box = [ox + ow + arc_pad, oy - arc_diameter - arc_pad, ox + ow + arc_diameter + arc_pad, oy - arc_pad]
-    bottom_left_arc_box = [ox - arc_diameter - arc_pad, oy + oh + arc_pad, ox - arc_pad, oy + oh + arc_diameter + arc_pad]
-    bottom_right_arc_box = [ox + ow + arc_pad, oy + oh + arc_pad, ox + ow + arc_diameter + arc_pad, oy + oh + arc_diameter + arc_pad]
+    # compute straight-line anchors first (these exist later too; compute here to build arc bboxes)
+    top_y = oy + int(outer_width / 2) + line_inset_outer
+    bot_y = oy + oh - int(outer_width / 2) - line_inset_outer
+    left_x = ox + int(outer_width / 2) + line_inset_outer
+    right_x = ox + ow - int(outer_width / 2) - line_inset_outer
+    
+    # Use arc_diameter as width/height of each corner ellipse (rx = ry = arc_diameter/2)
+    r = arc_diameter / 2.0
+    
+    # Left-top arc: we want its top point (angle 90°) to be at y = top_y and its center x to be left_x
+    # bbox y0 = top_y  (because p_left_top.y == bbox.y0), bbox x center = left_x
+    left_arc_box = [
+        int(math.floor(left_x - r)),   # x0
+        int(math.floor(top_y)),        # y0
+        int(math.ceil(left_x + r)),    # x1
+        int(math.ceil(top_y + 2 * r))  # y1
+    ]
+    
+    # Right-top arc: center x = right_x, top aligned to top_y
+    right_arc_box = [
+        int(math.floor(right_x - r)),
+        int(math.floor(top_y)),
+        int(math.ceil(right_x + r)),
+        int(math.ceil(top_y + 2 * r))
+    ]
+    
+    # Left-bottom arc: bottom point (angle 270°) should be at y = bot_y => bbox y1 = bot_y
+    bottom_left_arc_box = [
+        int(math.floor(left_x - r)),
+        int(math.floor(bot_y - 2 * r)),
+        int(math.ceil(left_x + r)),
+        int(math.ceil(bot_y))
+    ]
+    
+    # Right-bottom arc: center x = right_x, bottom aligned to bot_y
+    bottom_right_arc_box = [
+        int(math.floor(right_x - r)),
+        int(math.floor(bot_y - 2 * r)),
+        int(math.ceil(right_x + r)),
+        int(math.ceil(bot_y))
+    ]
 
     # --- DEBUG: log arc bbox values (insert immediately after left_arc_box/right_arc_box/... definitions)
     logger.info(f"[FRAME DEBUG] w={w} h={h} ox={ox} oy={oy} ow={ow} oh={oh}")
@@ -156,11 +192,18 @@ def draw_decorative_frame(img: Image.Image,
     logger.info(f"[FRAME DEBUG] bottom_left_arc_box={bottom_left_arc_box}")
     logger.info(f"[FRAME DEBUG] bottom_right_arc_box={bottom_right_arc_box}")
 
-    # --- compute inner arc bboxes as well (needed for masking) ---
-    li_box = [ix - inner_arc_diameter - inner_pad, iy - inner_arc_diameter - inner_pad, ix - inner_pad, iy - inner_pad]
-    ri_box = [ix + iw + inner_pad, iy - inner_arc_diameter - inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy - inner_pad]
-    br_box = [ix + iw + inner_pad, iy + ih + inner_pad, ix + iw + inner_arc_diameter + inner_pad, iy + ih + inner_arc_diameter + inner_pad]
-    bl_box = [ix - inner_arc_diameter - inner_pad, iy + ih + inner_pad, ix - inner_pad, iy + ih + inner_arc_diameter + inner_pad]
+    # inner anchors (reuse inner_top_y/inner_bot_y, left_ix/right_ix which used later)
+    inner_top_y = iy + int(inner_width / 2) + line_inset_inner
+    inner_bot_y = iy + ih - int(inner_width / 2) - line_inset_inner
+    left_ix = ix + int(inner_width / 2) + line_inset_inner
+    right_ix = ix + iw - int(inner_width / 2) - line_inset_inner
+    
+    r_i = inner_arc_diameter / 2.0
+    
+    li_box = [int(math.floor(left_ix - r_i)), int(math.floor(inner_top_y)), int(math.ceil(left_ix + r_i)), int(math.ceil(inner_top_y + 2 * r_i))]
+    ri_box = [int(math.floor(right_ix - r_i)), int(math.floor(inner_top_y)), int(math.ceil(right_ix + r_i)), int(math.ceil(inner_top_y + 2 * r_i))]
+    bl_box = [int(math.floor(left_ix - r_i)), int(math.floor(inner_bot_y - 2 * r_i)), int(math.ceil(left_ix + r_i)), int(math.ceil(inner_bot_y))]
+    br_box = [int(math.floor(right_ix - r_i)), int(math.floor(inner_bot_y - 2 * r_i)), int(math.ceil(right_ix + r_i)), int(math.ceil(inner_bot_y))]
 
     # --- DEBUG: log inner arc bbox / inner pad values ---
     logger.info(f"[FRAME DEBUG] inner_notch_radius={inner_notch_radius} inner_arc_diameter={inner_arc_diameter} inner_pad={inner_pad}")
