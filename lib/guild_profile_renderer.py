@@ -86,7 +86,6 @@ def draw_decorative_frame(img: Image.Image,
                           inner_width: int = 2,
                           frame_color=(85, 50, 30, 255),
                           # --- 新オプション（可搬・省略可） ---
-                          # これらを与えなければ既存のデフォルト振る舞い（かつ柔軟）になります。
                           corner_trim_override: Optional[int] = -20,
                           line_inset_outer_override: Optional[int] = None,
                           line_inset_inner_override: Optional[int] = None,
@@ -97,11 +96,8 @@ def draw_decorative_frame(img: Image.Image,
     """
     外枠（太）＋内枠（細）を描画します。
 
-    変更点（目的：ハードな上限・下限をなくして柔軟に調整できるように）
-    - corner_trim 等の「固定下限・上限」を取り除き、override パラメータで明示的に指定できるようにしました。
-    - デフォルトは過去の挙動を踏襲しつつ、outer_width に応じて合理的に負の値を許容する自動計算を行います（過剰な -64 などは不要）。
-    - アーチ位置を個別に微調整する arc_nudge_* 引数を追加（直線の位置は変更しないでアーチだけ移動できます）。
-    - 変数名は既存のまま維持しています（left_arc_box, p_left_top, outer_width 等）。
+    目的：ハードな上限・下限をなくして柔軟に調整できるようにしつつ、
+    mask が直線の伸長を打ち消さないようにする最小修正版。
     """
     w, h = img.size
 
@@ -132,11 +128,9 @@ def draw_decorative_frame(img: Image.Image,
     if corner_trim_override is not None:
         corner_trim = int(corner_trim_override)
     else:
-        # 自動値 = アーチサイズに基づくベース値 － 太線幅/2（これにより太線と直線が自然に接合する）
-        # ここで負値も許容する（直線を伸ばすために必要な最小値と整合）
         corner_trim = int(notch_radius * 0.25) - math.ceil(outer_width / 2)
 
-    # --- offset の安全化（既存のロジックを維持。ただし override による柔軟性を残す） ---
+    # --- offset の安全化（既存のロジックを維持） ---
     min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
     if outer_offset is None:
         outer_offset = max(12, min_outer_offset)
@@ -161,7 +155,6 @@ def draw_decorative_frame(img: Image.Image,
     out = img.convert("RGBA")
 
     def _clamp_center(pt, stroke_w):
-        # safety: ここは画像のピクセル境界外描画を防ぐ最低限のクランプです（削除しないこと推奨）
         half = stroke_w / 2.0
         x = max(half, min(w - half, pt[0]))
         y = max(half, min(h - half, pt[1]))
@@ -191,7 +184,7 @@ def draw_decorative_frame(img: Image.Image,
     left_x = ox + int(outer_width / 2) + line_inset_outer
     right_x = ox + ow - int(outer_width / 2) - line_inset_outer
 
-    # アーチ bbox（arc_nudge_* を反映してアーチだけ個別に動かせる）
+    # アーチ bbox（arc_nudge_* を反映）
     r = arc_diameter / 2.0
     left_arc_box = [left_x - r + arc_nudge_outer_x, top_y + arc_nudge_outer_y, left_x + r + arc_nudge_outer_x, top_y + 2 * r + arc_nudge_outer_y]
     right_arc_box = [right_x - r + arc_nudge_outer_x, top_y + arc_nudge_outer_y, right_x + r + arc_nudge_outer_x, top_y + 2 * r + arc_nudge_outer_y]
@@ -258,11 +251,12 @@ def draw_decorative_frame(img: Image.Image,
         draw_frame.line([_clamp_center((right_xc, start_y_r), outer_width), _clamp_center((right_xc, end_y_r), outer_width)],
                         fill=frame_color, width=outer_width)
 
-    # mask で外アーチ領域を消す（inflate は corner_trim に応じて自動調整）
+    # mask で外アーチ領域を消す（負の corner_trim の場合は膨らませない）
     mask = Image.new("L", (w, h), 255)
     draw_mask = ImageDraw.Draw(mask)
     outer_half = math.ceil(outer_width / 2)
-    inflate_outer = outer_half + abs(corner_trim) + 1
+    # ここが重要な修正点：abs を使わず、corner_trim が正のときのみ inflate を増やす
+    inflate_outer = outer_half + max(0, corner_trim) + 1
     draw_mask.ellipse(_inflate_bbox(left_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(right_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(bottom_left_arc_box, inflate_outer), fill=0)
@@ -338,7 +332,8 @@ def draw_decorative_frame(img: Image.Image,
     mask_inner = Image.new("L", (w, h), 255)
     dm = ImageDraw.Draw(mask_inner)
     inner_half = math.ceil(inner_width / 2)
-    inflate_inner = inner_half + abs(corner_trim) + 1
+    # 同様に、負の corner_trim のときは inflate を増やさない
+    inflate_inner = inner_half + max(0, corner_trim) + 1
     dm.ellipse(_inflate_bbox(li_box, inflate_inner), fill=0)
     dm.ellipse(_inflate_bbox(ri_box, inflate_inner), fill=0)
     dm.ellipse(_inflate_bbox(bl_box, inflate_inner), fill=0)
