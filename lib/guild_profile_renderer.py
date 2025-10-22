@@ -87,13 +87,13 @@ def draw_decorative_frame(img: Image.Image,
                           frame_color=(85, 50, 30, 255),
                           # --- 新オプション（可搬・省略可） ---
                           # これらを与えなければ既存のデフォルト振る舞い（かつ柔軟）になります。
-                          corner_trim_override: Optional[int] = -8,
+                          corner_trim_override: Optional[int] = -20,
                           line_inset_outer_override: Optional[int] = None,
                           line_inset_inner_override: Optional[int] = None,
                           arc_nudge_outer_x: int = 0,
-                          arc_nudge_outer_y: int = 2,
+                          arc_nudge_outer_y: int = 4,
                           arc_nudge_inner_x: int = 0,
-                          arc_nudge_inner_y: int = 2) -> Image.Image:
+                          arc_nudge_inner_y: int = 4) -> Image.Image:
     """
     外枠（太）＋内枠（細）を描画します。
 
