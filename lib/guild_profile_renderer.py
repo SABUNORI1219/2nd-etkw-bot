@@ -342,6 +342,38 @@ def draw_decorative_frame(img: Image.Image,
         draw_frame.arc(bottom_right_arc_box, start=180, end=270, fill=frame_color)
         draw_frame.arc(bottom_left_arc_box, start=270, end=360, fill=frame_color)
 
+    # === DEBUG: verify arcs actually drew onto frame_layer ===
+    try:
+        # sample a few test coords near each corner arc (a few px inside the stroke)
+        # left-top arc point: slightly down-right from top point
+        sx = int(p_left_top[0])
+        sy = int(p_left_top[1] + max(3, outer_width//2))
+        a = frame_layer.getpixel((max(0, min(w-1, sx)), max(0, min(h-1, sy))))
+        logger.info(f"[FRAME DEBUG] after outer arc draw sample left-top at ({sx},{sy}) = {a}")
+    
+        # right-top sample
+        sx2 = int(p_right_top[0])
+        sy2 = int(p_right_top[1] + max(3, outer_width//2))
+        b = frame_layer.getpixel((max(0, min(w-1, sx2)), max(0, min(h-1, sy2))))
+        logger.info(f"[FRAME DEBUG] after outer arc draw sample right-top at ({sx2},{sy2}) = {b}")
+    
+        # save frame_layer to disk for visual inspection (if permitted)
+        try:
+            frame_layer.save("/tmp/guild_frame_layer.png")
+            logger.info("[FRAME DEBUG] saved frame_layer to /tmp/guild_frame_layer.png")
+        except Exception as e:
+            logger.info(f"[FRAME DEBUG] saving frame_layer failed: {e}")
+    
+        # composite onto base and save out image to inspect final pixels
+        try:
+            out_test = Image.alpha_composite(img.convert("RGBA"), frame_layer)
+            out_test.save("/tmp/guild_frame_combined.png")
+            logger.info("[FRAME DEBUG] saved combined image to /tmp/guild_frame_combined.png")
+        except Exception as e:
+            logger.info(f"[FRAME DEBUG] saving combined image failed: {e}")
+    except Exception as e:
+        logger.info(f"[FRAME DEBUG] verification after arc draw failed: {e}")
+
     # --- DEBUG: test draw arcs directly (red thick) for visibility check; remove after testing ---
     try:
         test_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
