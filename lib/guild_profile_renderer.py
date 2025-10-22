@@ -149,12 +149,12 @@ def draw_decorative_frame(img: Image.Image,
     bottom_right_arc_box = [ox + ow + arc_pad, oy + oh + arc_pad, ox + ow + arc_diameter + arc_pad, oy + oh + arc_diameter + arc_pad]
 
     # --- DEBUG: log arc bbox values (insert immediately after left_arc_box/right_arc_box/... definitions)
-    logger.debug(f"[FRAME DEBUG] w={w} h={h} ox={ox} oy={oy} ow={ow} oh={oh}")
-    logger.debug(f"[FRAME DEBUG] notch_radius={notch_radius} arc_diameter={arc_diameter} arc_pad={arc_pad}")
-    logger.debug(f"[FRAME DEBUG] left_arc_box={left_arc_box}")
-    logger.debug(f"[FRAME DEBUG] right_arc_box={right_arc_box}")
-    logger.debug(f"[FRAME DEBUG] bottom_left_arc_box={bottom_left_arc_box}")
-    logger.debug(f"[FRAME DEBUG] bottom_right_arc_box={bottom_right_arc_box}")
+    logger.info(f"[FRAME DEBUG] w={w} h={h} ox={ox} oy={oy} ow={ow} oh={oh}")
+    logger.info(f"[FRAME DEBUG] notch_radius={notch_radius} arc_diameter={arc_diameter} arc_pad={arc_pad}")
+    logger.info(f"[FRAME DEBUG] left_arc_box={left_arc_box}")
+    logger.info(f"[FRAME DEBUG] right_arc_box={right_arc_box}")
+    logger.info(f"[FRAME DEBUG] bottom_left_arc_box={bottom_left_arc_box}")
+    logger.info(f"[FRAME DEBUG] bottom_right_arc_box={bottom_right_arc_box}")
 
     # --- compute inner arc bboxes as well (needed for masking) ---
     li_box = [ix - inner_arc_diameter - inner_pad, iy - inner_arc_diameter - inner_pad, ix - inner_pad, iy - inner_pad]
@@ -163,11 +163,11 @@ def draw_decorative_frame(img: Image.Image,
     bl_box = [ix - inner_arc_diameter - inner_pad, iy + ih + inner_pad, ix - inner_pad, iy + ih + inner_arc_diameter + inner_pad]
 
     # --- DEBUG: log inner arc bbox / inner pad values ---
-    logger.debug(f"[FRAME DEBUG] inner_notch_radius={inner_notch_radius} inner_arc_diameter={inner_arc_diameter} inner_pad={inner_pad}")
-    logger.debug(f"[FRAME DEBUG] li_box={li_box}")
-    logger.debug(f"[FRAME DEBUG] ri_box={ri_box}")
-    logger.debug(f"[FRAME DEBUG] bl_box={bl_box}")
-    logger.debug(f"[FRAME DEBUG] br_box={br_box}")
+    logger.info(f"[FRAME DEBUG] inner_notch_radius={inner_notch_radius} inner_arc_diameter={inner_arc_diameter} inner_pad={inner_pad}")
+    logger.info(f"[FRAME DEBUG] li_box={li_box}")
+    logger.info(f"[FRAME DEBUG] ri_box={ri_box}")
+    logger.info(f"[FRAME DEBUG] bl_box={bl_box}")
+    logger.info(f"[FRAME DEBUG] br_box={br_box}")
 
     # --- compute arc edge points used to trim lines so corners are arc-shaped ---
     p_left_top = _arc_point(left_arc_box, 90)
@@ -186,10 +186,10 @@ def draw_decorative_frame(img: Image.Image,
     p_iri_bot = _arc_point(br_box, 270)
 
     # --- DEBUG: log arc edge points used for trimming (after computing inner pts) ---
-    logger.debug(f"[FRAME DEBUG] p_left_top={p_left_top} p_right_top={p_right_top}")
-    logger.debug(f"[FRAME DEBUG] p_left_left={p_left_left} p_left_bot={p_left_bot}")
-    logger.debug(f"[FRAME DEBUG] p_right_right={p_right_right} p_right_bot={p_right_bot}")
-    logger.debug(f"[FRAME DEBUG] p_ili_top={p_ili_top} p_iri_top={p_iri_top} p_ili_bot={p_ili_bot} p_iri_bot={p_iri_bot}")
+    logger.info(f"[FRAME DEBUG] p_left_top={p_left_top} p_right_top={p_right_top}")
+    logger.info(f"[FRAME DEBUG] p_left_left={p_left_left} p_left_bot={p_left_bot}")
+    logger.info(f"[FRAME DEBUG] p_right_right={p_right_right} p_right_bot={p_right_bot}")
+    logger.info(f"[FRAME DEBUG] p_ili_top={p_ili_top} p_iri_top={p_iri_top} p_ili_bot={p_ili_bot} p_iri_bot={p_iri_bot}")
 
     # =====================================================================
     # Replace drawing with a frame-layer + mask approach:
@@ -220,7 +220,7 @@ def draw_decorative_frame(img: Image.Image,
         draw_frame.rectangle([int(bl_box[0]), int(bl_box[1]), int(bl_box[2]), int(bl_box[3])], outline=dbg_col, width=1)
         draw_frame.rectangle([int(br_box[0]), int(br_box[1]), int(br_box[2]), int(br_box[3])], outline=dbg_col, width=1)
     except Exception:
-        logger.debug("FRAME DEBUG: visual bbox draw failed, continuing")
+        logger.info("FRAME DEBUG: visual bbox draw failed, continuing")
 
     # --- 1) draw outer straight lines on frame_layer using the same coordinate logic as before ---
     # horizontals (use same start/end logic so positions remain unchanged)
@@ -263,7 +263,7 @@ def draw_decorative_frame(img: Image.Image,
     inflate_outer = outer_half + corner_trim + 1  # safety pad; tweak only for visual pixel remnant, not line position
 
     # log outer inflate (inner inflate logged later when defined)
-    logger.debug(f"[FRAME DEBUG] outer_half={outer_half} inflate_outer={inflate_outer}")
+    logger.info(f"[FRAME DEBUG] outer_half={outer_half} inflate_outer={inflate_outer}")
 
     def _inflate_bbox(bbox, pad):
         x0, y0, x1, y1 = bbox
@@ -282,9 +282,9 @@ def draw_decorative_frame(img: Image.Image,
         cx = int((left_arc_box[0] + left_arc_box[2]) / 2)
         cy = int((left_arc_box[1] + left_arc_box[3]) / 2)
         pix = frame_layer.getpixel((max(0, min(w-1, cx)), max(0, min(h-1, cy))))
-        logger.debug(f"[FRAME DEBUG] sample_pixel_after_mask_left_arc at ({cx},{cy}) = {pix}")
+        logger.info(f"[FRAME DEBUG] sample_pixel_after_mask_left_arc at ({cx},{cy}) = {pix}")
     except Exception as e:
-        logger.debug(f"[FRAME DEBUG] sample pixel check failed: {e}")
+        logger.info(f"[FRAME DEBUG] sample pixel check failed: {e}")
 
     # --- 3) draw outer arcs onto frame_layer ---
     draw_frame = ImageDraw.Draw(frame_layer)
@@ -312,9 +312,9 @@ def draw_decorative_frame(img: Image.Image,
             test_img.save("/tmp/guild_frame_debug_arcs.png")
             logger.debug("[FRAME DEBUG] saved test arc overlay to /tmp/guild_frame_debug_arcs.png")
         except Exception as e:
-            logger.debug(f"[FRAME DEBUG] failed to save test image: {e}")
+            logger.info(f"[FRAME DEBUG] failed to save test image: {e}")
     except Exception:
-        logger.debug("FRAME DEBUG: test arc overlay failed, continuing")
+        logger.info("FRAME DEBUG: test arc overlay failed, continuing")
 
     # --- 4) inner straight lines drawn onto frame_layer (positions unchanged) ---
     in_overlap = 0
@@ -350,7 +350,7 @@ def draw_decorative_frame(img: Image.Image,
     inflate_inner = inner_half + corner_trim + 1
 
     # log inner inflate now that it's defined
-    logger.debug(f"[FRAME DEBUG] inner_half={inner_half} inflate_inner={inflate_inner}")
+    logger.info(f"[FRAME DEBUG] inner_half={inner_half} inflate_inner={inflate_inner}")
 
     dm.ellipse(_inflate_bbox(li_box, inflate_inner), fill=0)
     dm.ellipse(_inflate_bbox(ri_box, inflate_inner), fill=0)
@@ -388,7 +388,7 @@ def draw_decorative_frame(img: Image.Image,
         box_h = int(ih * 0.18)
         draw.rectangle([box_x, box_y, box_x + box_w, box_y + box_h], outline=rule_color, width=max(2, inner_width))
     except Exception:
-        logger.debug("rule/box draw failed, skipping")
+        logger.info("rule/box draw failed, skipping")
 
     return out
 
