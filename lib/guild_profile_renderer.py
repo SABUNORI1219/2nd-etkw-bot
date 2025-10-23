@@ -73,24 +73,50 @@ def _extend_point(p, q, amount):
     return (px + ux * amount, py + uy * amount)
 
 
-def draw_decorative_frame(img: Image.Image,
-                          outer_offset: Optional[int] = None,
-                          outer_width: int = 8,
-                          inner_offset: Optional[int] = None,
-                          inner_width: int = 2,
-                          frame_color=(85, 50, 30, 255),
-                          corner_trim_override: Optional[int] = -25,
-                          line_inset_outer_override: Optional[int] = None,
-                          line_inset_inner_override: Optional[int] = None,
-                          arc_nudge_outer_x: int = -3,
-                          arc_nudge_outer_y: int = 12,
-                          arc_nudge_inner_x: int = -3,
-                          arc_nudge_inner_y: int = 12) -> Image.Image:
+def draw_decorative_frame(
+    img: Image.Image,
+    outer_offset: Optional[int] = None,
+    outer_width: int = 8,
+    inner_offset: Optional[int] = None,
+    inner_width: int = 2,
+    frame_color=(85, 50, 30, 255),
+    # 個別調整用（直線）
+    line_inset_outer_top: Optional[int] = None,
+    line_inset_outer_bottom: Optional[int] = None,
+    line_inset_outer_left: Optional[int] = None,
+    line_inset_outer_right: Optional[int] = None,
+    line_inset_inner_top: Optional[int] = None,
+    line_inset_inner_bottom: Optional[int] = None,
+    line_inset_inner_left: Optional[int] = None,
+    line_inset_inner_right: Optional[int] = None,
+    # 個別調整用（アーチ位置）
+    arc_nudge_outer_topleft_x: int = 0,
+    arc_nudge_outer_topleft_y: int = 0,
+    arc_nudge_outer_topright_x: int = 0,
+    arc_nudge_outer_topright_y: int = 0,
+    arc_nudge_outer_bottomleft_x: int = 0,
+    arc_nudge_outer_bottomleft_y: int = 0,
+    arc_nudge_outer_bottomright_x: int = 0,
+    arc_nudge_outer_bottomright_y: int = 0,
+    arc_nudge_inner_topleft_x: int = 0,
+    arc_nudge_inner_topleft_y: int = 0,
+    arc_nudge_inner_topright_x: int = 0,
+    arc_nudge_inner_topright_y: int = 0,
+    arc_nudge_inner_bottomleft_x: int = 0,
+    arc_nudge_inner_bottomleft_y: int = 0,
+    arc_nudge_inner_bottomright_x: int = 0,
+    arc_nudge_inner_bottomright_y: int = 0,
+    # 個別corner_trim
+    corner_trim_top: Optional[int] = None,
+    corner_trim_bottom: Optional[int] = None,
+    corner_trim_left: Optional[int] = None,
+    corner_trim_right: Optional[int] = None,
+    # 共通corner_trim（個別指定なければ使う）
+    corner_trim: Optional[int] = None,
+) -> Image.Image:
     """
-    上限値/下限値を完全に撤廃したバージョン。
-    - 数値の最大/最小チェック（max/min）は一切なし。
-    - 直線もアーチも、パラメータを渡した分だけピクセル単位で動く。
-    - 画像端に突き抜けても描画される。Pillowが例外出さない限りそのまま描かれる。
+    四辺の太線/細線直線長さと、四隅のアーチ位置を完全個別調整できるバージョン。
+    余計な上限/下限なし。
     """
     w, h = img.size
 
@@ -102,10 +128,23 @@ def draw_decorative_frame(img: Image.Image,
     arc_pad = int(notch_radius * 0.35)
     inner_pad = int(inner_notch_radius * 0.30)
 
-    line_inset_outer = line_inset_outer_override if line_inset_outer_override is not None else -40
-    line_inset_inner = line_inset_inner_override if line_inset_inner_override is not None else -32
-    corner_trim = corner_trim_override if corner_trim_override is not None else int(notch_radius * 0.25) - math.ceil(outer_width / 2)
+    # 直線inset 個別値
+    lo_top = line_inset_outer_top if line_inset_outer_top is not None else -40
+    lo_bottom = line_inset_outer_bottom if line_inset_outer_bottom is not None else -40
+    lo_left = line_inset_outer_left if line_inset_outer_left is not None else -40
+    lo_right = line_inset_outer_right if line_inset_outer_right is not None else -40
+    li_top = line_inset_inner_top if line_inset_inner_top is not None else -32
+    li_bottom = line_inset_inner_bottom if line_inset_inner_bottom is not None else -32
+    li_left = line_inset_inner_left if line_inset_inner_left is not None else -32
+    li_right = line_inset_inner_right if line_inset_inner_right is not None else -32
 
+    # corner_trim 個別値
+    ct_top = corner_trim_top if corner_trim_top is not None else (corner_trim if corner_trim is not None else int(notch_radius * 0.25) - math.ceil(outer_width / 2))
+    ct_bottom = corner_trim_bottom if corner_trim_bottom is not None else (corner_trim if corner_trim is not None else int(notch_radius * 0.25) - math.ceil(outer_width / 2))
+    ct_left = corner_trim_left if corner_trim_left is not None else (corner_trim if corner_trim is not None else int(notch_radius * 0.25) - math.ceil(outer_width / 2))
+    ct_right = corner_trim_right if corner_trim_right is not None else (corner_trim if corner_trim is not None else int(notch_radius * 0.25) - math.ceil(outer_width / 2))
+
+    # offset
     if outer_offset is None:
         outer_offset = 12
     else:
@@ -128,40 +167,39 @@ def draw_decorative_frame(img: Image.Image,
     out = img.convert("RGBA")
 
     def _clamp_center(pt, stroke_w):
-        # 画像端に突き抜けることを許容（clampしない設計）
-        return pt
+        return pt  # clampなし
 
     def _inflate_bbox(bbox, pad):
         x0, y0, x1, y1 = bbox
-        # 画像端をはみ出してもそのまま
         return [x0 - pad, y0 - pad, x1 + pad, y1 + pad]
 
     def _expand_and_clamp_bbox(bbox, pad):
-        # 画像端をはみ出してもそのまま
         x0, y0, x1, y1 = bbox
         return [x0 - pad, y0 - pad, x1 + pad, y1 + pad]
 
-    # 直線アンカー
-    top_y = oy + outer_width / 2 + line_inset_outer
-    bot_y = oy + oh - outer_width / 2 - line_inset_outer
-    left_x = ox + outer_width / 2 + line_inset_outer
-    right_x = ox + ow - outer_width / 2 - line_inset_outer
+    # 各辺anchor 個別指定
+    top_y = oy + outer_width / 2 + lo_top
+    bot_y = oy + oh - outer_width / 2 - lo_bottom
+    left_x = ox + outer_width / 2 + lo_left
+    right_x = ox + ow - outer_width / 2 - lo_right
 
+    inner_top_y = iy + inner_width / 2 + li_top
+    inner_bot_y = iy + ih - inner_width / 2 - li_bottom
+    left_ix = ix + inner_width / 2 + li_left
+    right_ix = ix + iw - inner_width / 2 - li_right
+
+    # アーチbbox 個別指定
     r = arc_diameter / 2.0
-    left_arc_box = [left_x - r + arc_nudge_outer_x, top_y + arc_nudge_outer_y, left_x + r + arc_nudge_outer_x, top_y + 2 * r + arc_nudge_outer_y]
-    right_arc_box = [right_x - r + arc_nudge_outer_x, top_y + arc_nudge_outer_y, right_x + r + arc_nudge_outer_x, top_y + 2 * r + arc_nudge_outer_y]
-    bottom_left_arc_box = [left_x - r + arc_nudge_outer_x, bot_y - 2 * r + arc_nudge_outer_y, left_x + r + arc_nudge_outer_x, bot_y + arc_nudge_outer_y]
-    bottom_right_arc_box = [right_x - r + arc_nudge_outer_x, bot_y - 2 * r + arc_nudge_outer_y, right_x + r + arc_nudge_outer_x, bot_y + arc_nudge_outer_y]
+    left_arc_box = [left_x - r + arc_nudge_outer_topleft_x, top_y + arc_nudge_outer_topleft_y, left_x + r + arc_nudge_outer_topleft_x, top_y + 2 * r + arc_nudge_outer_topleft_y]
+    right_arc_box = [right_x - r + arc_nudge_outer_topright_x, top_y + arc_nudge_outer_topright_y, right_x + r + arc_nudge_outer_topright_x, top_y + 2 * r + arc_nudge_outer_topright_y]
+    bottom_left_arc_box = [left_x - r + arc_nudge_outer_bottomleft_x, bot_y - 2 * r + arc_nudge_outer_bottomleft_y, left_x + r + arc_nudge_outer_bottomleft_x, bot_y + arc_nudge_outer_bottomleft_y]
+    bottom_right_arc_box = [right_x - r + arc_nudge_outer_bottomright_x, bot_y - 2 * r + arc_nudge_outer_bottomright_y, right_x + r + arc_nudge_outer_bottomright_x, bot_y + arc_nudge_outer_bottomright_y]
 
-    inner_top_y = iy + inner_width / 2 + line_inset_inner
-    inner_bot_y = iy + ih - inner_width / 2 - line_inset_inner
-    left_ix = ix + inner_width / 2 + line_inset_inner
-    right_ix = ix + iw - inner_width / 2 - line_inset_inner
     r_i = inner_arc_diameter / 2.0
-    li_box = [left_ix - r_i + arc_nudge_inner_x, inner_top_y + arc_nudge_inner_y, left_ix + r_i + arc_nudge_inner_x, inner_top_y + 2 * r_i + arc_nudge_inner_y]
-    ri_box = [right_ix - r_i + arc_nudge_inner_x, inner_top_y + arc_nudge_inner_y, right_ix + r_i + arc_nudge_inner_x, inner_top_y + 2 * r_i + arc_nudge_inner_y]
-    bl_box = [left_ix - r_i + arc_nudge_inner_x, inner_bot_y - 2 * r_i + arc_nudge_inner_y, left_ix + r_i + arc_nudge_inner_x, inner_bot_y + arc_nudge_inner_y]
-    br_box = [right_ix - r_i + arc_nudge_inner_x, inner_bot_y - 2 * r_i + arc_nudge_inner_y, right_ix + r_i + arc_nudge_inner_x, inner_bot_y + arc_nudge_inner_y]
+    li_box = [left_ix - r_i + arc_nudge_inner_topleft_x, inner_top_y + arc_nudge_inner_topleft_y, left_ix + r_i + arc_nudge_inner_topleft_x, inner_top_y + 2 * r_i + arc_nudge_inner_topleft_y]
+    ri_box = [right_ix - r_i + arc_nudge_inner_topright_x, inner_top_y + arc_nudge_inner_topright_y, right_ix + r_i + arc_nudge_inner_topright_x, inner_top_y + 2 * r_i + arc_nudge_inner_topright_y]
+    bl_box = [left_ix - r_i + arc_nudge_inner_bottomleft_x, inner_bot_y - 2 * r_i + arc_nudge_inner_bottomleft_y, left_ix + r_i + arc_nudge_inner_bottomleft_x, inner_bot_y + arc_nudge_inner_bottomleft_y]
+    br_box = [right_ix - r_i + arc_nudge_inner_bottomright_x, inner_bot_y - 2 * r_i + arc_nudge_inner_bottomright_y, right_ix + r_i + arc_nudge_inner_bottomright_x, inner_bot_y + arc_nudge_inner_bottomright_y]
 
     p_left_top = _arc_point(left_arc_box, 90)
     p_right_top = _arc_point(right_arc_box, 90)
@@ -180,27 +218,29 @@ def draw_decorative_frame(img: Image.Image,
     frame_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw_frame = ImageDraw.Draw(frame_layer)
 
-    start_x = max(ox + line_inset_outer, p_left_top[0] + corner_trim)
-    end_x = min(ox + ow - line_inset_outer, p_right_top[0] - corner_trim)
+    # 横線（top）太線
+    start_x = max(ox + lo_left, p_left_top[0] + ct_top)
+    end_x = min(ox + ow - lo_right, p_right_top[0] - ct_top)
     if start_x < end_x:
         draw_frame.line([_clamp_center((start_x, top_y), outer_width), _clamp_center((end_x, top_y), outer_width)], fill=frame_color, width=outer_width)
 
-    start_x_b = max(ox + line_inset_outer, p_left_bot[0] + corner_trim)
-    end_x_b = min(ox + ow - line_inset_outer, p_right_bot[0] - corner_trim)
+    # 横線（bottom）太線
+    start_x_b = max(ox + lo_left, p_left_bot[0] + ct_bottom)
+    end_x_b = min(ox + ow - lo_right, p_right_bot[0] - ct_bottom)
     if start_x_b < end_x_b:
         draw_frame.line([_clamp_center((start_x_b, bot_y), outer_width), _clamp_center((end_x_b, bot_y), outer_width)], fill=frame_color, width=outer_width)
 
-    left_xc = left_x
-    right_xc = right_x
-    start_y = max(oy + line_inset_outer, p_left_left[1] + corner_trim)
-    end_y = min(oy + oh - line_inset_outer, p_left_bot[1] - corner_trim)
+    # 縦線（left）太線
+    start_y = max(oy + lo_top, p_left_left[1] + ct_left)
+    end_y = min(oy + oh - lo_bottom, p_left_bot[1] - ct_left)
     if start_y < end_y:
-        draw_frame.line([_clamp_center((left_xc, start_y), outer_width), _clamp_center((left_xc, end_y), outer_width)], fill=frame_color, width=outer_width)
+        draw_frame.line([_clamp_center((left_x, start_y), outer_width), _clamp_center((left_x, end_y), outer_width)], fill=frame_color, width=outer_width)
 
-    start_y_r = max(oy + line_inset_outer, p_right_right[1] + corner_trim)
-    end_y_r = min(oy + oh - line_inset_outer, p_right_bot[1] - corner_trim)
+    # 縦線（right）太線
+    start_y_r = max(oy + lo_top, p_right_right[1] + ct_right)
+    end_y_r = min(oy + oh - lo_bottom, p_right_bot[1] - ct_right)
     if start_y_r < end_y_r:
-        draw_frame.line([_clamp_center((right_xc, start_y_r), outer_width), _clamp_center((right_xc, end_y_r), outer_width)], fill=frame_color, width=outer_width)
+        draw_frame.line([_clamp_center((right_x, start_y_r), outer_width), _clamp_center((right_x, end_y_r), outer_width)], fill=frame_color, width=outer_width)
 
     mask = Image.new("L", (w, h), 255)
     draw_mask = ImageDraw.Draw(mask)
@@ -229,30 +269,33 @@ def draw_decorative_frame(img: Image.Image,
     except Exception:
         pass
 
+    # 細線（inner）も同様に個別パラメータで描画
     inner_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw_inner_layer = ImageDraw.Draw(inner_layer)
 
-    sxi = max(ix + line_inset_inner, p_ili_top[0] + corner_trim)
-    exi = min(ix + iw - line_inset_inner, p_iri_top[0] - corner_trim)
+    # 横線（top）細線
+    sxi = max(ix + li_left, p_ili_top[0] + ct_top)
+    exi = min(ix + iw - li_right, p_iri_top[0] - ct_top)
     if sxi < exi:
         draw_inner_layer.line([_clamp_center((sxi, inner_top_y), inner_width), _clamp_center((exi, inner_top_y), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
 
-    sxb = max(ix + line_inset_inner, p_ili_bot[0] + corner_trim)
-    exb = min(ix + iw - line_inset_inner, p_iri_bot[0] - corner_trim)
+    # 横線（bottom）細線
+    sxb = max(ix + li_left, p_ili_bot[0] + ct_bottom)
+    exb = min(ix + iw - li_right, p_iri_bot[0] - ct_bottom)
     if sxb < exb:
         draw_inner_layer.line([_clamp_center((sxb, inner_bot_y), inner_width), _clamp_center((exb, inner_bot_y), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
 
-    left_ix_center = left_ix
-    right_ix_center = right_ix
-    syi = max(iy + line_inset_inner, p_ili_left[1] + corner_trim)
-    eyi = min(iy + ih - line_inset_inner, p_ili_bot[1] - corner_trim)
+    # 縦線（left）細線
+    syi = max(iy + li_top, p_ili_left[1] + ct_left)
+    eyi = min(iy + ih - li_bottom, p_ili_bot[1] - ct_left)
     if syi < eyi:
-        draw_inner_layer.line([_clamp_center((left_ix_center, syi), inner_width), _clamp_center((left_ix_center, eyi), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
+        draw_inner_layer.line([_clamp_center((left_ix, syi), inner_width), _clamp_center((left_ix, eyi), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
 
-    syi_r = max(iy + line_inset_inner, p_iri_right[1] + corner_trim)
-    eyi_r = min(iy + ih - line_inset_inner, p_iri_bot[1] - corner_trim)
+    # 縦線（right）細線
+    syi_r = max(iy + li_top, p_iri_right[1] + ct_right)
+    eyi_r = min(iy + ih - li_bottom, p_iri_bot[1] - ct_right)
     if syi_r < eyi_r:
-        draw_inner_layer.line([_clamp_center((right_ix_center, syi_r), inner_width), _clamp_center((right_ix_center, eyi_r), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
+        draw_inner_layer.line([_clamp_center((right_ix, syi_r), inner_width), _clamp_center((right_ix, eyi_r), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
 
     mask_inner = Image.new("L", (w, h), 255)
     dm = ImageDraw.Draw(mask_inner)
