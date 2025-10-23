@@ -82,10 +82,10 @@ def draw_decorative_frame(img: Image.Image,
                           corner_trim_override: Optional[int] = -25,
                           line_inset_outer_override: Optional[int] = None,
                           line_inset_inner_override: Optional[int] = None,
-                          arc_nudge_outer_x: int = -1,
-                          arc_nudge_outer_y: int = 6,
-                          arc_nudge_inner_x: int = -1,
-                          arc_nudge_inner_y: int = 6) -> Image.Image:
+                          arc_nudge_outer_x: int = -3,
+                          arc_nudge_outer_y: int = 12,
+                          arc_nudge_inner_x: int = -3,
+                          arc_nudge_inner_y: int = 12) -> Image.Image:
     """
     上限値/下限値を完全に撤廃したバージョン。
     - 数値の最大/最小チェック（max/min）は一切なし。
