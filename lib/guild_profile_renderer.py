@@ -122,7 +122,7 @@ def draw_decorative_frame(
 
     notch_radius = 12 if min(w, h) * 0.035 < 12 else int(min(w, h) * 0.035)
     arc_diameter = notch_radius * 2
-    inner_notch_radius = 8 if notch_radius * 0.7 < 8 else int(notch_radius * 0.70)
+    inner_notch_radius = 8 if notch_radius * 0.9 < 8 else int(notch_radius * 0.90)
     inner_arc_diameter = inner_notch_radius * 2
 
     arc_pad = int(notch_radius * 0.35)
