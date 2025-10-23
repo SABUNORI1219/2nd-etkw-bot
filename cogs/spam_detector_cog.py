@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # スパムと判断する基準
 SPAM_MESSAGE_COUNT = 3
-SPAM_TIME_WINDOW = timedelta(seconds=0.9)
+SPAM_TIME_WINDOW = timedelta(seconds=1.0)
 
 class SpamDetectorCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
