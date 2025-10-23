@@ -90,14 +90,14 @@ def draw_decorative_frame(
     line_inset_inner_left: Optional[int] = None,
     line_inset_inner_right: Optional[int] = None,
     # 個別調整用（アーチ位置）
-    arc_nudge_outer_topleft_x: int = -2,
-    arc_nudge_outer_topleft_y: int = -6,
-    arc_nudge_outer_topright_x: int = 2,
-    arc_nudge_outer_topright_y: int = -6,
-    arc_nudge_outer_bottomleft_x: int = -2,
-    arc_nudge_outer_bottomleft_y: int = 6,
-    arc_nudge_outer_bottomright_x: int = 2,
-    arc_nudge_outer_bottomright_y: int = 6,
+    arc_nudge_outer_topleft_x: int = -3,
+    arc_nudge_outer_topleft_y: int = -12,
+    arc_nudge_outer_topright_x: int = 2.5,
+    arc_nudge_outer_topright_y: int = -12,
+    arc_nudge_outer_bottomleft_x: int = -3,
+    arc_nudge_outer_bottomleft_y: int = 12,
+    arc_nudge_outer_bottomright_x: int = 2.5,
+    arc_nudge_outer_bottomright_y: int = 12,
     arc_nudge_inner_topleft_x: int = -2,
     arc_nudge_inner_topleft_y: int = -6,
     arc_nudge_inner_topright_x: int = 2,
@@ -109,8 +109,8 @@ def draw_decorative_frame(
     # 個別corner_trim
     corner_trim_top: Optional[int] = None,
     corner_trim_bottom: Optional[int] = None,
-    corner_trim_left: Optional[int] = -20,
-    corner_trim_right: Optional[int] = -20,
+    corner_trim_left: Optional[int] = -40,
+    corner_trim_right: Optional[int] = -40,
     # 共通corner_trim（個別指定なければ使う）
     corner_trim: Optional[int] = None,
 ) -> Image.Image:
