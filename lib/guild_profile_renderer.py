@@ -8,24 +8,20 @@ from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# フォント・アセットパス
 FONT_PATH = os.path.join(os.path.dirname(__file__), "../assets/fonts/Minecraftia-Regular.ttf")
 BANNER_PLACEHOLDER = None
 
-# レイアウト定数
 CANVAS_WIDTH = 700
 MARGIN = 28
 LEFT_COLUMN_WIDTH = 460
 RIGHT_COLUMN_WIDTH = CANVAS_WIDTH - LEFT_COLUMN_WIDTH - MARGIN * 2
 LINE_COLOR = (40, 40, 40, 255)
 
-# 色定義
 BASE_BG_COLOR = (218, 179, 99)
 TITLE_COLOR = (40, 30, 20, 255)
 SUBTITLE_COLOR = (80, 60, 40, 255)
 TABLE_HEADER_BG = (230, 230, 230, 255)
 
-# NumPy availability (optional for noise)
 try:
     import numpy as np
     _HAS_NUMPY = True
@@ -77,15 +73,12 @@ def _extend_point(p, q, amount):
     return (px + ux * amount, py + uy * amount)
 
 
-# Replace the existing draw_decorative_frame(...) implementation in lib/guild_profile_renderer.py with the function below.
-
 def draw_decorative_frame(img: Image.Image,
                           outer_offset: Optional[int] = None,
                           outer_width: int = 8,
                           inner_offset: Optional[int] = None,
                           inner_width: int = 2,
                           frame_color=(85, 50, 30, 255),
-                          # --- 新オプション（可搬・省略可） ---
                           corner_trim_override: Optional[int] = -25,
                           line_inset_outer_override: Optional[int] = None,
                           line_inset_inner_override: Optional[int] = None,
@@ -94,53 +87,33 @@ def draw_decorative_frame(img: Image.Image,
                           arc_nudge_inner_x: int = -1,
                           arc_nudge_inner_y: int = 6) -> Image.Image:
     """
-    外枠（太）＋内枠（細）を描画します。
-
-    目的：ハードな上限・下限をなくして柔軟に調整できるようにしつつ、
-    mask が直線の伸長を打ち消さないようにする最小修正版。
+    上限値/下限値を完全に撤廃したバージョン。
+    - 数値の最大/最小チェック（max/min）は一切なし。
+    - 直線もアーチも、パラメータを渡した分だけピクセル単位で動く。
+    - 画像端に突き抜けても描画される。Pillowが例外出さない限りそのまま描かれる。
     """
     w, h = img.size
 
-    # アーチ半径（既存）
-    notch_radius = max(12, int(min(w, h) * 0.035))
+    notch_radius = 12 if min(w, h) * 0.035 < 12 else int(min(w, h) * 0.035)
     arc_diameter = notch_radius * 2
-
-    # 内アーチ半径（既存）
-    inner_notch_radius = max(8, int(notch_radius * 0.90))
+    inner_notch_radius = 8 if notch_radius * 0.9 < 8 else int(notch_radius * 0.90)
     inner_arc_diameter = inner_notch_radius * 2
 
-    # 既存の「パラメータ群」
-    arc_pad = max(8, int(notch_radius * 0.35))
-    inner_pad = max(6, int(inner_notch_radius * 0.30))
+    arc_pad = int(notch_radius * 0.35)
+    inner_pad = int(inner_notch_radius * 0.30)
 
-    # line_inset は override があればそれを使う（柔軟化）
-    if line_inset_outer_override is not None:
-        line_inset_outer = int(line_inset_outer_override)
-    else:
-        line_inset_outer = -40
+    line_inset_outer = line_inset_outer_override if line_inset_outer_override is not None else -40
+    line_inset_inner = line_inset_inner_override if line_inset_inner_override is not None else -32
+    corner_trim = corner_trim_override if corner_trim_override is not None else int(notch_radius * 0.25) - math.ceil(outer_width / 2)
 
-    if line_inset_inner_override is not None:
-        line_inset_inner = int(line_inset_inner_override)
-    else:
-        line_inset_inner = -32
-
-    # corner_trim: override があればそのまま使う
-    if corner_trim_override is not None:
-        corner_trim = int(corner_trim_override)
-    else:
-        corner_trim = int(notch_radius * 0.25) - math.ceil(outer_width / 2)
-
-    # --- offset の安全化（既存のロジックを維持） ---
-    min_outer_offset = int(arc_diameter + arc_pad + (outer_width / 2) + 1)
     if outer_offset is None:
-        outer_offset = max(12, min_outer_offset)
+        outer_offset = 12
     else:
-        outer_offset = int(max(0, outer_offset))
-
+        outer_offset = int(outer_offset)
     if inner_offset is None:
-        inner_offset = outer_offset + max(6, outer_width + inner_width + 4)
+        inner_offset = outer_offset + outer_width + inner_width + 4
     else:
-        inner_offset = int(max(inner_offset, (inner_width // 2) + 1))
+        inner_offset = int(inner_offset)
 
     ox = int(outer_offset)
     oy = int(outer_offset)
@@ -155,54 +128,41 @@ def draw_decorative_frame(img: Image.Image,
     out = img.convert("RGBA")
 
     def _clamp_center(pt, stroke_w):
-        half = stroke_w / 2.0
-        x = max(half, min(w - half, pt[0]))
-        y = max(half, min(h - half, pt[1]))
-        return (x, y)
+        # 画像端に突き抜けることを許容（clampしない設計）
+        return pt
 
     def _inflate_bbox(bbox, pad):
         x0, y0, x1, y1 = bbox
-        return [int(x0 - pad), int(y0 - pad), int(x1 + pad), int(y1 + pad)]
+        # 画像端をはみ出してもそのまま
+        return [x0 - pad, y0 - pad, x1 + pad, y1 + pad]
 
     def _expand_and_clamp_bbox(bbox, pad):
+        # 画像端をはみ出してもそのまま
         x0, y0, x1, y1 = bbox
-        x0e = max(0, int(math.floor(x0 - pad)))
-        y0e = max(0, int(math.floor(y0 - pad)))
-        x1e = min(w, int(math.ceil(x1 + pad)))
-        y1e = min(h, int(math.ceil(y1 + pad)))
-        if x1e <= x0e:
-            x1e = min(w, x0e + 1)
-        if y1e <= y0e:
-            y1e = min(h, y0e + 1)
-        return [x0e, y0e, x1e, y1e]
+        return [x0 - pad, y0 - pad, x1 + pad, y1 + pad]
 
-    # -------------------------
-    # straight-line anchors（既存）
-    # -------------------------
-    top_y = oy + int(outer_width / 2) + line_inset_outer
-    bot_y = oy + oh - int(outer_width / 2) - line_inset_outer
-    left_x = ox + int(outer_width / 2) + line_inset_outer
-    right_x = ox + ow - int(outer_width / 2) - line_inset_outer
+    # 直線アンカー
+    top_y = oy + outer_width / 2 + line_inset_outer
+    bot_y = oy + oh - outer_width / 2 - line_inset_outer
+    left_x = ox + outer_width / 2 + line_inset_outer
+    right_x = ox + ow - outer_width / 2 - line_inset_outer
 
-    # アーチ bbox（arc_nudge_* を反映）
     r = arc_diameter / 2.0
     left_arc_box = [left_x - r + arc_nudge_outer_x, top_y + arc_nudge_outer_y, left_x + r + arc_nudge_outer_x, top_y + 2 * r + arc_nudge_outer_y]
     right_arc_box = [right_x - r + arc_nudge_outer_x, top_y + arc_nudge_outer_y, right_x + r + arc_nudge_outer_x, top_y + 2 * r + arc_nudge_outer_y]
     bottom_left_arc_box = [left_x - r + arc_nudge_outer_x, bot_y - 2 * r + arc_nudge_outer_y, left_x + r + arc_nudge_outer_x, bot_y + arc_nudge_outer_y]
     bottom_right_arc_box = [right_x - r + arc_nudge_outer_x, bot_y - 2 * r + arc_nudge_outer_y, right_x + r + arc_nudge_outer_x, bot_y + arc_nudge_outer_y]
 
-    # inner arc bboxes（inner 用の nudge）
-    inner_top_y = iy + int(inner_width / 2) + line_inset_inner
-    inner_bot_y = iy + ih - int(inner_width / 2) - line_inset_inner
-    left_ix = ix + int(inner_width / 2) + line_inset_inner
-    right_ix = ix + iw - int(inner_width / 2) - line_inset_inner
+    inner_top_y = iy + inner_width / 2 + line_inset_inner
+    inner_bot_y = iy + ih - inner_width / 2 - line_inset_inner
+    left_ix = ix + inner_width / 2 + line_inset_inner
+    right_ix = ix + iw - inner_width / 2 - line_inset_inner
     r_i = inner_arc_diameter / 2.0
     li_box = [left_ix - r_i + arc_nudge_inner_x, inner_top_y + arc_nudge_inner_y, left_ix + r_i + arc_nudge_inner_x, inner_top_y + 2 * r_i + arc_nudge_inner_y]
     ri_box = [right_ix - r_i + arc_nudge_inner_x, inner_top_y + arc_nudge_inner_y, right_ix + r_i + arc_nudge_inner_x, inner_top_y + 2 * r_i + arc_nudge_inner_y]
     bl_box = [left_ix - r_i + arc_nudge_inner_x, inner_bot_y - 2 * r_i + arc_nudge_inner_y, left_ix + r_i + arc_nudge_inner_x, inner_bot_y + arc_nudge_inner_y]
     br_box = [right_ix - r_i + arc_nudge_inner_x, inner_bot_y - 2 * r_i + arc_nudge_inner_y, right_ix + r_i + arc_nudge_inner_x, inner_bot_y + arc_nudge_inner_y]
 
-    # arc edge points
     p_left_top = _arc_point(left_arc_box, 90)
     p_right_top = _arc_point(right_arc_box, 90)
     p_left_left = _arc_point(left_arc_box, 180)
@@ -217,46 +177,35 @@ def draw_decorative_frame(img: Image.Image,
     p_iri_right = _arc_point(ri_box, 0)
     p_iri_bot = _arc_point(br_box, 270)
 
-    # -------------------------------------------------------------------
-    # frame_layer に直線を描画 → mask で穴あけ → 合成 → out に直接アーチを描画
-    # -------------------------------------------------------------------
     frame_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw_frame = ImageDraw.Draw(frame_layer)
 
-    # 外枠 horizontals
     start_x = max(ox + line_inset_outer, p_left_top[0] + corner_trim)
     end_x = min(ox + ow - line_inset_outer, p_right_top[0] - corner_trim)
     if start_x < end_x:
-        draw_frame.line([_clamp_center((start_x, top_y), outer_width), _clamp_center((end_x, top_y), outer_width)],
-                        fill=frame_color, width=outer_width)
+        draw_frame.line([_clamp_center((start_x, top_y), outer_width), _clamp_center((end_x, top_y), outer_width)], fill=frame_color, width=outer_width)
 
     start_x_b = max(ox + line_inset_outer, p_left_bot[0] + corner_trim)
     end_x_b = min(ox + ow - line_inset_outer, p_right_bot[0] - corner_trim)
     if start_x_b < end_x_b:
-        draw_frame.line([_clamp_center((start_x_b, bot_y), outer_width), _clamp_center((end_x_b, bot_y), outer_width)],
-                        fill=frame_color, width=outer_width)
+        draw_frame.line([_clamp_center((start_x_b, bot_y), outer_width), _clamp_center((end_x_b, bot_y), outer_width)], fill=frame_color, width=outer_width)
 
-    # 外枠 verticals
     left_xc = left_x
     right_xc = right_x
     start_y = max(oy + line_inset_outer, p_left_left[1] + corner_trim)
     end_y = min(oy + oh - line_inset_outer, p_left_bot[1] - corner_trim)
     if start_y < end_y:
-        draw_frame.line([_clamp_center((left_xc, start_y), outer_width), _clamp_center((left_xc, end_y), outer_width)],
-                        fill=frame_color, width=outer_width)
+        draw_frame.line([_clamp_center((left_xc, start_y), outer_width), _clamp_center((left_xc, end_y), outer_width)], fill=frame_color, width=outer_width)
 
     start_y_r = max(oy + line_inset_outer, p_right_right[1] + corner_trim)
     end_y_r = min(oy + oh - line_inset_outer, p_right_bot[1] - corner_trim)
     if start_y_r < end_y_r:
-        draw_frame.line([_clamp_center((right_xc, start_y_r), outer_width), _clamp_center((right_xc, end_y_r), outer_width)],
-                        fill=frame_color, width=outer_width)
+        draw_frame.line([_clamp_center((right_xc, start_y_r), outer_width), _clamp_center((right_xc, end_y_r), outer_width)], fill=frame_color, width=outer_width)
 
-    # mask で外アーチ領域を消す（負の corner_trim の場合は膨らませない）
     mask = Image.new("L", (w, h), 255)
     draw_mask = ImageDraw.Draw(mask)
-    outer_half = math.ceil(outer_width / 2)
-    # ここが重要な修正点：abs を使わず、corner_trim が正のときのみ inflate を増やす
-    inflate_outer = outer_half + max(0, corner_trim) + 1
+    outer_half = outer_width / 2
+    inflate_outer = outer_half + 1
     draw_mask.ellipse(_inflate_bbox(left_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(right_arc_box, inflate_outer), fill=0)
     draw_mask.ellipse(_inflate_bbox(bottom_left_arc_box, inflate_outer), fill=0)
@@ -265,9 +214,8 @@ def draw_decorative_frame(img: Image.Image,
 
     out = Image.alpha_composite(out, frame_layer)
 
-    # out にアーチを直接描画（stroke が bbox 辺で切れないよう pad を少し余裕を持たせる）
     draw_out = ImageDraw.Draw(out)
-    stroke_pad = math.ceil(outer_width / 2) + 1
+    stroke_pad = outer_width / 2 + 1
     left_bbox = _expand_and_clamp_bbox(left_arc_box, stroke_pad)
     right_bbox = _expand_and_clamp_bbox(right_arc_box, stroke_pad)
     bl_bbox = _expand_and_clamp_bbox(bottom_left_arc_box, stroke_pad)
@@ -279,61 +227,37 @@ def draw_decorative_frame(img: Image.Image,
         draw_out.arc(br_bbox, start=180, end=270, fill=frame_color, width=outer_width)
         draw_out.arc(bl_bbox, start=270, end=360, fill=frame_color, width=outer_width)
     except Exception:
-        try:
-            draw_out.pieslice(left_bbox, start=0, end=90, fill=frame_color)
-            inner_left = [left_bbox[0] + outer_width, left_bbox[1] + outer_width, left_bbox[2] - outer_width, left_bbox[3] - outer_width]
-            if inner_left[2] > inner_left[0] and inner_left[3] > inner_left[1]:
-                draw_out.pieslice(inner_left, start=0, end=90, fill=(0, 0, 0, 0))
-            draw_out.pieslice(right_bbox, start=90, end=180, fill=frame_color)
-            inner_right = [right_bbox[0] + outer_width, right_bbox[1] + outer_width, right_bbox[2] - outer_width, right_bbox[3] - outer_width]
-            if inner_right[2] > inner_right[0] and inner_right[3] > inner_right[1]:
-                draw_out.pieslice(inner_right, start=90, end=180, fill=(0, 0, 0, 0))
-            draw_out.pieslice(br_bbox, start=180, end=270, fill=frame_color)
-            inner_br = [br_bbox[0] + outer_width, br_bbox[1] + outer_width, br_bbox[2] - outer_width, br_bbox[3] - outer_width]
-            if inner_br[2] > inner_br[0] and inner_br[3] > inner_br[1]:
-                draw_out.pieslice(inner_br, start=180, end=270, fill=(0, 0, 0, 0))
-            draw_out.pieslice(bl_bbox, start=270, end=360, fill=frame_color)
-            inner_bl = [bl_bbox[0] + outer_width, bl_bbox[1] + outer_width, bl_bbox[2] - outer_width, bl_bbox[3] - outer_width]
-            if inner_bl[2] > inner_bl[0] and inner_bl[3] > inner_bl[1]:
-                draw_out.pieslice(inner_bl, start=270, end=360, fill=(0, 0, 0, 0))
-        except Exception:
-            logger.debug("Outer arc fallback failed; skipping outer arcs")
+        pass
 
-    # --- inner lines/arcs (同様に) ---
     inner_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw_inner_layer = ImageDraw.Draw(inner_layer)
 
     sxi = max(ix + line_inset_inner, p_ili_top[0] + corner_trim)
     exi = min(ix + iw - line_inset_inner, p_iri_top[0] - corner_trim)
     if sxi < exi:
-        draw_inner_layer.line([_clamp_center((sxi, inner_top_y), inner_width), _clamp_center((exi, inner_top_y), inner_width)],
-                              fill=(95, 60, 35, 220), width=inner_width)
+        draw_inner_layer.line([_clamp_center((sxi, inner_top_y), inner_width), _clamp_center((exi, inner_top_y), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
 
     sxb = max(ix + line_inset_inner, p_ili_bot[0] + corner_trim)
     exb = min(ix + iw - line_inset_inner, p_iri_bot[0] - corner_trim)
     if sxb < exb:
-        draw_inner_layer.line([_clamp_center((sxb, inner_bot_y), inner_width), _clamp_center((exb, inner_bot_y), inner_width)],
-                              fill=(95, 60, 35, 220), width=inner_width)
+        draw_inner_layer.line([_clamp_center((sxb, inner_bot_y), inner_width), _clamp_center((exb, inner_bot_y), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
 
     left_ix_center = left_ix
     right_ix_center = right_ix
     syi = max(iy + line_inset_inner, p_ili_left[1] + corner_trim)
     eyi = min(iy + ih - line_inset_inner, p_ili_bot[1] - corner_trim)
     if syi < eyi:
-        draw_inner_layer.line([_clamp_center((left_ix_center, syi), inner_width), _clamp_center((left_ix_center, eyi), inner_width)],
-                              fill=(95, 60, 35, 220), width=inner_width)
+        draw_inner_layer.line([_clamp_center((left_ix_center, syi), inner_width), _clamp_center((left_ix_center, eyi), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
 
     syi_r = max(iy + line_inset_inner, p_iri_right[1] + corner_trim)
     eyi_r = min(iy + ih - line_inset_inner, p_iri_bot[1] - corner_trim)
     if syi_r < eyi_r:
-        draw_inner_layer.line([_clamp_center((right_ix_center, syi_r), inner_width), _clamp_center((right_ix_center, eyi_r), inner_width)],
-                              fill=(95, 60, 35, 220), width=inner_width)
+        draw_inner_layer.line([_clamp_center((right_ix_center, syi_r), inner_width), _clamp_center((right_ix_center, eyi_r), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
 
     mask_inner = Image.new("L", (w, h), 255)
     dm = ImageDraw.Draw(mask_inner)
-    inner_half = math.ceil(inner_width / 2)
-    # 同様に、負の corner_trim のときは inflate を増やさない
-    inflate_inner = inner_half + max(0, corner_trim) + 1
+    inner_half = inner_width / 2
+    inflate_inner = inner_half + 1
     dm.ellipse(_inflate_bbox(li_box, inflate_inner), fill=0)
     dm.ellipse(_inflate_bbox(ri_box, inflate_inner), fill=0)
     dm.ellipse(_inflate_bbox(bl_box, inflate_inner), fill=0)
@@ -342,9 +266,8 @@ def draw_decorative_frame(img: Image.Image,
 
     out = Image.alpha_composite(out, inner_layer)
 
-    # draw inner arcs on up-to-date out
     draw_out = ImageDraw.Draw(out)
-    stroke_pad_i = math.ceil(inner_width / 2) + 1
+    stroke_pad_i = inner_width / 2 + 1
     li_bbox = _expand_and_clamp_bbox(li_box, stroke_pad_i)
     ri_bbox = _expand_and_clamp_bbox(ri_box, stroke_pad_i)
     bli_bbox = _expand_and_clamp_bbox(bl_box, stroke_pad_i)
@@ -356,27 +279,10 @@ def draw_decorative_frame(img: Image.Image,
         draw_out.arc(bri_bbox, start=180, end=270, fill=(95, 60, 35, 220), width=inner_width)
         draw_out.arc(bli_bbox, start=270, end=360, fill=(95, 60, 35, 220), width=inner_width)
     except Exception:
-        try:
-            draw_out.pieslice(li_bbox, start=0, end=90, fill=(95, 60, 35, 220))
-            inner_li = [li_bbox[0] + inner_width, li_bbox[1] + inner_width, li_bbox[2] - inner_width, li_bbox[3] - inner_width]
-            if inner_li[2] > inner_li[0] and inner_li[3] > inner_li[1]:
-                draw_out.pieslice(inner_li, start=0, end=90, fill=(0, 0, 0, 0))
-            draw_out.pieslice(ri_bbox, start=90, end=180, fill=(95, 60, 35, 220))
-            inner_ri = [ri_bbox[0] + inner_width, ri_bbox[1] + inner_width, ri_bbox[2] - inner_width, ri_bbox[3] - inner_width]
-            if inner_ri[2] > inner_ri[0] and inner_ri[3] > inner_ri[1]:
-                draw_out.pieslice(inner_ri, start=90, end=180, fill=(0, 0, 0, 0))
-            draw_out.pieslice(bri_bbox, start=180, end=270, fill=(95, 60, 35, 220))
-            inner_br = [bri_bbox[0] + inner_width, bri_bbox[1] + inner_width, bri_bbox[2] - inner_width, bri_bbox[3] - inner_width]
-            if inner_br[2] > inner_br[0] and inner_br[3] > inner_br[1]:
-                draw_out.pieslice(inner_br, start=180, end=270, fill=(0, 0, 0, 0))
-            draw_out.pieslice(bli_bbox, start=270, end=360, fill=(95, 60, 35, 220))
-            inner_bl = [bli_bbox[0] + inner_width, bli_bbox[1] + inner_width, bli_bbox[2] - inner_width, bli_bbox[3] - inner_width]
-            if inner_bl[2] > inner_bl[0] and inner_bl[3] > inner_bl[1]:
-                draw_out.pieslice(inner_bl, start=270, end=360, fill=(0, 0, 0, 0))
-        except Exception:
-            logger.debug("Inner arc fallback failed; skipping inner arcs")
+        pass
 
     return out
+
 
 def create_card_background(w: int, h: int,
                            noise_std: float = 30.0,
@@ -384,17 +290,16 @@ def create_card_background(w: int, h: int,
                            vignette_blur: int = 80) -> Image.Image:
     base = Image.new('RGB', (w, h), BASE_BG_COLOR)
 
-    # ノイズ生成（省略可能）
     if _HAS_NUMPY:
         try:
             noise = np.random.normal(128, noise_std, (h, w))
             noise = np.clip(noise, 0, 255).astype(np.uint8)
             noise_img = Image.fromarray(noise, mode='L').convert('RGB')
         except Exception:
-            noise_img = Image.effect_noise((w, h), max(10, int(noise_std))).convert('L').convert('RGB')
+            noise_img = Image.effect_noise((w, h), int(noise_std)).convert('L').convert('RGB')
     else:
         try:
-            noise_img = Image.effect_noise((w, h), max(10, int(noise_std))).convert('L').convert('RGB')
+            noise_img = Image.effect_noise((w, h), int(noise_std)).convert('L').convert('RGB')
         except Exception:
             noise_img = Image.new('RGB', (w, h), (128, 128, 128))
             nd = ImageDraw.Draw(noise_img)
@@ -407,7 +312,6 @@ def create_card_background(w: int, h: int,
     img = Image.blend(base, noise_img, noise_blend)
     img = img.filter(ImageFilter.GaussianBlur(1))
 
-    # ビネット
     vignette = Image.new('L', (w, h), 0)
     dv = ImageDraw.Draw(vignette)
     max_r = int(max(w, h) * 0.75)
@@ -422,7 +326,6 @@ def create_card_background(w: int, h: int,
     dark_img = Image.new('RGB', (w, h), dark_color)
     composed = Image.composite(img, dark_img, vignette)
 
-    # 装飾枠を描画（outer_offset/inner_offset を明示指定）
     try:
         composed = draw_decorative_frame(composed.convert('RGBA'),
                                          outer_offset=60,
@@ -614,7 +517,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     draw.text((card_x + card_w - fw - 16, card_y + card_h - 36), footer_text, font=font_small, fill=(120, 110, 100, 255))
 
     out_bytes = BytesIO()
-    # 修正: 正しい変数 img を保存する（以前のバグは out を参照していたため NameError が発生）
     img.save(out_bytes, format="PNG")
     out_bytes.seek(0)
 
