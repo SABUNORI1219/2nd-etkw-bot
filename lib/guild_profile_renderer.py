@@ -91,13 +91,13 @@ def draw_decorative_frame(
     line_inset_inner_right: Optional[int] = None,
     # 個別調整用（アーチ位置）
     arc_nudge_outer_topleft_x: int = -4,
-    arc_nudge_outer_topleft_y: int = -25,
+    arc_nudge_outer_topleft_y: int = -27.5,
     arc_nudge_outer_topright_x: int = 3.75,
-    arc_nudge_outer_topright_y: int = -25,
+    arc_nudge_outer_topright_y: int = -27.5,
     arc_nudge_outer_bottomleft_x: int = -4,
-    arc_nudge_outer_bottomleft_y: int = 25,
+    arc_nudge_outer_bottomleft_y: int = 27.5,
     arc_nudge_outer_bottomright_x: int = 3.75,
-    arc_nudge_outer_bottomright_y: int = 25,
+    arc_nudge_outer_bottomright_y: int = 27.5,
     arc_nudge_inner_topleft_x: int = -2,
     arc_nudge_inner_topleft_y: int = -25,
     arc_nudge_inner_topright_x: int = 2,
@@ -122,7 +122,7 @@ def draw_decorative_frame(
 
     notch_radius = 12 if min(w, h) * 0.035 < 12 else int(min(w, h) * 0.035)
     arc_diameter = notch_radius * 2
-    inner_notch_radius = 8 if notch_radius * 0.9 < 8 else int(notch_radius * 0.90)
+    inner_notch_radius = 8 if notch_radius * 0.7 < 8 else int(notch_radius * 0.70)
     inner_arc_diameter = inner_notch_radius * 2
 
     arc_pad = int(notch_radius * 0.35)
