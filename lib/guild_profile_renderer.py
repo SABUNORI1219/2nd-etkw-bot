@@ -590,12 +590,12 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     # 領地数
     if territory_icon:
         img.paste(territory_icon, (stats_x, stats_y2 + 42), mask=territory_icon)
-    draw.text((stats_x3 + icon_size + 8, stats_y2 + 46), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
+    draw.text((stats_x + icon_size + 8, stats_y2 + 46), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
 
     # オーナー
     if owner_icon:
         img.paste(owner_icon, (stats_x2 + 64, stats_y2 + 42), mask=owner_icon)
-    draw.text((stats_x4 + icon_size + 64, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
+    draw.text((stats_x2 + icon_size + 64, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
 
     # 2本目横線
     draw.line([(line_x1, line_y2), (line_x2, line_y2)], fill=LINE_COLOR, width=2)
