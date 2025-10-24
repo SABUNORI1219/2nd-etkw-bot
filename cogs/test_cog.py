@@ -73,7 +73,7 @@ class GuildImageCog(commands.Cog):
             await interaction.followup.send(file=file)
         except Exception as e:
             logger.exception("ギルド画像生成中に例外が発生しました")
-            embed = create_embed(description="画像生成中にエラーが発生しました。ログを確認してください。", title="🔴 エラー", color=discord.Color.red(), footer_text="[...]
+            embed = create_embed(description="画像生成中にエラーが発生しました。ログを確認してください。", title="🔴 エラー", color=discord.Color.red(), footer_text="Guild Test")
             await interaction.followup.send(embed=embed)
 
 async def setup(bot: commands.Bot):
