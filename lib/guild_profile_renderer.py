@@ -487,13 +487,13 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     left_icon_x = margin
 
     # 2本目横線
-    line_y2 = stat_y + 150
+    line_y2 = stat_y + 140
 
     # Created/Season
     info_y = line_y2 + 12
 
     # 3本目横線
-    line_y3 = line_y2 + 85
+    line_y3 = line_y2 + 95
 
     # オンラインメンバー部の高さ動的計算
     role_order = ["CHIEF", "STRATEGIST", "CAPTAIN", "RECRUITER", "RECRUIT"]
@@ -605,12 +605,12 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     season_x = created_x
     if created_icon:
         img.paste(created_icon, (created_x, info_y), mask=created_icon)
-        draw.text((created_x + icon_size + 8, info_y + 4), f"Created on: {created}", font=font_stats, fill=(20, 140, 80, 255))
+        draw.text((created_x + icon_size + 8, info_y + 4), f"Since {created}", font=font_stats, fill=(20, 140, 80, 255))
     else:
         draw.text((created_x, info_y), f"Created on: {created}", font=font_stats, fill=(20, 140, 80, 255))
     if season_icon:
-        img.paste(season_icon, (season_x, info_y + 32), mask=season_icon)
-        draw.text((season_x + icon_size + 8, info_y + 46), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=(44, 180, 90, 255))
+        img.paste(season_icon, (season_x, info_y + 42), mask=season_icon)
+        draw.text((season_x + icon_size + 8, info_y + 46), f"{rating_display} SR (Season {latest_season})", font=font_stats, fill=(44, 180, 90, 255))
     else:
         draw.text((season_x, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=(44, 180, 90, 255))
 
@@ -665,7 +665,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     except Exception:
         bbox = draw.textbbox((0, 0), footer_text, font=font_small)
         fw = bbox[2] - bbox[0]
-    draw.text((img_w - fw - 16, img_h - 4 - 16), footer_text, font=font_small, fill=(120, 110, 100, 255))
+    draw.text((img_w - fw - 10, img_h - 4 - 17), footer_text, font=font_small, fill=(120, 110, 100, 255))
 
     out_bytes = BytesIO()
     img.save(out_bytes, format="PNG")
