@@ -572,10 +572,10 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     draw.text((xpbar_x + xpbar_w + 10, xpbar_y + xpbar_h // 2), f"{xpPercent}%", font=font_stats, fill=TITLE_COLOR, anchor="lm")
 
     # 他ステータスアイコン群（横並び固定座標）
+    stats_gap = 80
     stats_y2 = stat_icon_y + icon_size + 12
     stats_x = margin + 20
     stats_x2 = stats_x + stats_gap
-    stats_gap = 80
 
     # メンバー数
     if member_icon:
