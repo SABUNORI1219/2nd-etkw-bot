@@ -447,18 +447,16 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         logger.warning(f"バナー生成に失敗: {e}")
 
     # ======= レイアウト定義（画像サイズ動的計算）=======
-    # オンラインメンバーだけ役職ごとに分けて数える
     role_order = ["CHIEF", "STRATEGIST", "CAPTAIN", "RECRUITER", "RECRUIT"]
     online_by_role = {role: [] for role in role_order}
     for p in online_players:
         rank = p.get("rank", "")
         if rank in online_by_role:
             online_by_role[rank].append(p)
-
     member_rows = 0
     for role in role_order:
         n = len(online_by_role[role])
-        member_rows += max(1, math.ceil(n / 2)) if n else 1  # 1行は最低用意
+        member_rows += max(1, math.ceil(n / 2)) if n else 1
     base_height = 240
     info_height = 70
     divider_height = 28 * 3
@@ -473,7 +471,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     draw = ImageDraw.Draw(img)
 
     try:
-        font_title = ImageFont.truetype(FONT_PATH, 48)
+        font_title_base = ImageFont.truetype(FONT_PATH, 48)
         font_sub = ImageFont.truetype(FONT_PATH, 24)
         font_stats = ImageFont.truetype(FONT_PATH, 22)
         font_small = ImageFont.truetype(FONT_PATH, 16)
@@ -481,33 +479,45 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         font_rank = ImageFont.truetype(FONT_PATH, 22)
     except Exception as e:
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
-        font_title = font_sub = font_stats = font_small = font_section = font_rank = ImageFont.load_default()
+        font_title_base = font_sub = font_stats = font_small = font_section = font_rank = ImageFont.load_default()
 
     margin = 36
-    x_center = img_w // 2
+    banner_w = 160
+    banner_h = 160
+    banner_x = margin
+    banner_y = margin
 
-    # ギルド名・バナー
-    top_y = margin
-    draw.text((x_center, top_y), name, font=font_title, fill=TITLE_COLOR, anchor="ma")
-    banner_size = 80
-    banner_x = img_w - margin - banner_size
-    banner_y = top_y
+    # バナー画像（リサイズせずに貼る。サイズは仮で banner_w x banner_h）
     if banner_img:
-        try:
-            banner_resized = banner_img.resize((banner_size, banner_size), Image.LANCZOS)
-            img.paste(banner_resized, (banner_x, banner_y), mask=banner_resized)
-        except Exception as e:
-            logger.warning(f"バナー貼付失敗: {e}")
+        img.paste(banner_img, (banner_x, banner_y), mask=banner_img)
+
+    # 横線左端はバナーの右+余白、右端はdecorative_frameから40px離す
+    line_left = banner_x + banner_w + 18
+    line_right = img_w - margin - 40
+    line_y = banner_y + 44
+
+    # ギルド名（左揃え、横線の上。飛び出す場合はフォントサイズを自動調整）
+    guild_name = name
+    font_title = font_title_base
+    max_name_width = line_right - line_left
+    name_w = _text_width(draw, guild_name, font_title)
+    font_size = 48
+    while name_w > max_name_width and font_size > 16:
+        font_size -= 2
+        font_title = ImageFont.truetype(FONT_PATH, font_size)
+        name_w = _text_width(draw, guild_name, font_title)
+    name_x = line_left
+    name_y = banner_y + 2
+    draw.text((name_x, name_y), guild_name, font=font_title, fill=TITLE_COLOR)
 
     # 横線
-    line_y1 = top_y + 60
-    draw.line([(margin, line_y1), (img_w - margin, line_y1)], fill=LINE_COLOR, width=2)
+    draw.line([(line_left, line_y), (line_right, line_y)], fill=LINE_COLOR, width=2)
 
     # ステータス・XPバー
     icon_size = 32
-    stat_y = line_y1 + 18
+    stat_y = line_y + 18
     icon_gap = 8
-    left_icon_x = margin
+    left_icon_x = line_left
     draw.rectangle([left_icon_x, stat_y, left_icon_x + icon_size, stat_y + icon_size], fill=(220,180,80,255), outline=LINE_COLOR)
     draw.text((left_icon_x + icon_size // 2, stat_y + icon_size // 2), str(level), font=font_stats, fill=TITLE_COLOR, anchor="mm")
     xpbar_x = left_icon_x + icon_size + icon_gap
@@ -525,7 +535,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
 
     # ステータスアイコン群
     stats_y2 = stat_y + icon_size + 12
-    stats_x = margin
+    stats_x = left_icon_x
     icon_stats_w = 32
     stats_gap = 80
     draw.rectangle([stats_x, stats_y2, stats_x + icon_stats_w, stats_y2 + icon_stats_w], fill=(200,200,120,255), outline=LINE_COLOR)
@@ -542,22 +552,22 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
 
     # 横線
     line_y2 = stats_y2 + icon_stats_w + 18
-    draw.line([(margin, line_y2), (img_w - margin, line_y2)], fill=LINE_COLOR, width=2)
+    draw.line([(left_icon_x, line_y2), (line_right, line_y2)], fill=LINE_COLOR, width=2)
 
     # Created/Season
     info_y = line_y2 + 16
-    draw.text((margin, info_y), f"Created on: {created}", font=font_small, fill=(20, 140, 80, 255))
-    draw.text((img_w - margin, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_small, fill=(44, 180, 90, 255), anchor="rm")
+    draw.text((left_icon_x, info_y), f"Created on: {created}", font=font_small, fill=(20, 140, 80, 255))
+    draw.text((line_right, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_small, fill=(44, 180, 90, 255), anchor="rm")
 
     # 横線
     line_y3 = info_y + 28
-    draw.line([(margin, line_y3), (img_w - margin, line_y3)], fill=LINE_COLOR, width=2)
+    draw.line([(left_icon_x, line_y3), (line_right, line_y3)], fill=LINE_COLOR, width=2)
 
     # ======= オンラインメンバー（役職ごと・2列表示） =======
     role_header_y = line_y3 + 18
     col_gap = 240
-    role_x1 = margin
-    role_x2 = margin + col_gap
+    role_x1 = left_icon_x
+    role_x2 = left_icon_x + col_gap
     row_h = 30
     member_y = role_header_y
 
