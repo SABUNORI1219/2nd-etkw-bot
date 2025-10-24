@@ -487,10 +487,10 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     left_icon_x = margin
 
     # 2本目横線
-    line_y2 = stat_y + 75
+    line_y2 = stat_y + 200
 
     # Created/Season
-    info_y = line_y2 + icon_size
+    info_y = line_y2 + 12
 
     # 3本目横線
     line_y3 = line_y2 + 75
@@ -605,12 +605,12 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     season_x = created_x
     if created_icon:
         img.paste(created_icon, (created_x, info_y), mask=created_icon)
-        draw.text((created_x + icon_size + 28, info_y + 4), f"Created on: {created}", font=font_stats, fill=(20, 140, 80, 255))
+        draw.text((created_x + icon_size + 8, info_y + 4), f"Created on: {created}", font=font_stats, fill=(20, 140, 80, 255))
     else:
         draw.text((created_x, info_y), f"Created on: {created}", font=font_stats, fill=(20, 140, 80, 255))
     if season_icon:
         img.paste(season_icon, (season_x, info_y + 32), mask=season_icon)
-        draw.text((season_x + icon_size + 28, info_y + 36), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=(44, 180, 90, 255))
+        draw.text((season_x + icon_size + 8, info_y + 46), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=(44, 180, 90, 255))
     else:
         draw.text((season_x, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=(44, 180, 90, 255))
 
