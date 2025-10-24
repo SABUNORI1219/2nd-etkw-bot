@@ -450,8 +450,8 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     # 固定パラメータ
     img_w = max_width
     margin = 36
-    banner_x = img_w - margin - 140   # 右上
-    banner_y = margin
+    banner_x = img_w - margin - 170   # 右上
+    banner_y = margin + 30
     banner_w = 140
     banner_h = 140
 
@@ -459,7 +459,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     name_x = margin
     name_y = margin + 10
     line_x1 = margin
-    line_x2 = img_w - margin - 40
+    line_x2 = banner_x - 18
     line_y = name_y + 48 + 8  # ギルド名の下
 
     # ステータス
