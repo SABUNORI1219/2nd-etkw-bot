@@ -584,7 +584,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
 
     # War数
     if war_icon:
-        img.paste(war_icon, (stats_x2 + 160, stats_y2), mask=war_icon)
+        img.paste(war_icon, (stats_x2 + 140, stats_y2), mask=war_icon)
     draw.text((stats_x2 + icon_size + 8 + 140, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
 
     # 領地数
@@ -594,7 +594,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
 
     # オーナー
     if owner_icon:
-        img.paste(owner_icon, (stats_x2 + 160, stats_y2 + 42), mask=owner_icon)
+        img.paste(owner_icon, (stats_x2 + 140, stats_y2 + 42), mask=owner_icon)
     draw.text((stats_x2 + icon_size + 8 + 140, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
 
     # 2本目横線
