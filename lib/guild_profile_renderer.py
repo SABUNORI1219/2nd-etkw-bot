@@ -468,8 +468,8 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     # 固定パラメータ
     img_w = max_width
     margin = 36
-    banner_x = img_w - margin - 115   # 右上
-    banner_y = margin + 15
+    banner_x = img_w - margin - 118   # 右上
+    banner_y = margin + 12
     banner_w = 120
     banner_h = 120
 
@@ -490,10 +490,10 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     info_y = stat_y + icon_size + 85
 
     # 2本目横線
-    line_y2 = info_y + 45
+    line_y2 = info_y + 55
 
     # 3本目横線
-    line_y3 = line_y2 + 85
+    line_y3 = line_y2 + 95
 
     # オンラインメンバー部の高さ動的計算
     role_order = ["CHIEF", "STRATEGIST", "CAPTAIN", "RECRUITER", "RECRUIT"]
@@ -531,8 +531,8 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     war_icon = _load_icon(ICON_PATHS["war"], icon_size)
     territory_icon = _load_icon(ICON_PATHS["territory"], icon_size)
     owner_icon = _load_icon(ICON_PATHS["owner"], icon_size)
-    created_icon = _load_icon(ICON_PATHS["created"], 24)
-    season_icon = _load_icon(ICON_PATHS["season"], 24)
+    created_icon = _load_icon(ICON_PATHS["created"], icon_size)
+    season_icon = _load_icon(ICON_PATHS["season"], icon_size)
 
     # バナー画像（右上固定座標）
     if banner_img:
@@ -584,8 +584,8 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
 
     # War数
     if war_icon:
-        img.paste(war_icon, (stats_x2 + 320, stats_y2), mask=war_icon)
-    draw.text((stats_x2 + icon_size + 320, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
+        img.paste(war_icon, (stats_x2 + 160, stats_y2), mask=war_icon)
+    draw.text((stats_x2 + icon_size + 3 + 160, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
 
     # 領地数
     if territory_icon:
@@ -594,28 +594,28 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
 
     # オーナー
     if owner_icon:
-        img.paste(owner_icon, (stats_x2 + 320, stats_y2 + 42), mask=owner_icon)
-    draw.text((stats_x2 + icon_size + 320, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
+        img.paste(owner_icon, (stats_x2 + 160, stats_y2 + 42), mask=owner_icon)
+    draw.text((stats_x2 + icon_size + 3 + 160, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
 
     # 2本目横線
-    draw.line([(line_x1, img_w - margin - 8), (line_x2, line_y2)], fill=LINE_COLOR, width=2)
+    draw.line([(line_x1, line_y2), (img_w - margin - 8, line_y2)], fill=LINE_COLOR, width=2)
 
     # Created/Season（アイコン＋テキスト）
     created_x = margin + 20
     season_x = created_x
     if created_icon:
         img.paste(created_icon, (created_x, info_y), mask=created_icon)
-        draw.text((created_x + 28, info_y + 4), f"Created on: {created}", font=font_small, fill=(20, 140, 80, 255))
+        draw.text((created_x + 28, info_y + 4), f"Created on: {created}", font=font_stats, fill=(20, 140, 80, 255))
     else:
-        draw.text((created_x, info_y), f"Created on: {created}", font=font_small, fill=(20, 140, 80, 255))
+        draw.text((created_x, info_y), f"Created on: {created}", font=font_stats, fill=(20, 140, 80, 255))
     if season_icon:
         img.paste(season_icon, (season_x, info_y + 32), mask=season_icon)
-        draw.text((season_x + 28, info_y + 36), f"Latest SR: {rating_display} (Season {latest_season})", font=font_small, fill=(44, 180, 90, 255))
+        draw.text((season_x + 28, info_y + 36), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=(44, 180, 90, 255))
     else:
-        draw.text((season_x, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_small, fill=(44, 180, 90, 255))
+        draw.text((season_x, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=(44, 180, 90, 255))
 
     # 3本目横線
-    draw.line([(line_x1, img_w - margin - 8), (line_x2, line_y3)], fill=LINE_COLOR, width=2)
+    draw.line([(line_x1, line_y3), (img_w - margin - 8, line_y3)], fill=LINE_COLOR, width=2)
 
     # オンラインメンバー（役職ごと・2列表示）
     role_header_y = line_y3 + 18
