@@ -487,13 +487,13 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     left_icon_x = margin
 
     # 2本目横線
-    line_y2 = stat_y + 25
+    line_y2 = stat_y + 75
 
     # Created/Season
-    info_y = line_y2 + icon_size + 12
+    info_y = line_y2 + icon_size
 
     # 3本目横線
-    line_y3 = line_y2 + 65
+    line_y3 = line_y2 + 75
 
     # オンラインメンバー部の高さ動的計算
     role_order = ["CHIEF", "STRATEGIST", "CAPTAIN", "RECRUITER", "RECRUIT"]
