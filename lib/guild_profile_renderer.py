@@ -650,7 +650,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     # インナーフレーム右端
     right_inner_x = img_w - MARGIN - 8
     for role in role_order:
-        draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=frame_color)
+        draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=(85, 50, 30, 255))
         member_y += 32
 
         group_members = online_by_role[role]
