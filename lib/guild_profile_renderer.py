@@ -28,6 +28,25 @@ try:
 except Exception:
     _HAS_NUMPY = False
 
+def _load_icon(icon_path, size=None):
+    try:
+        im = Image.open(icon_path).convert("RGBA")
+        if size:
+            im = im.resize((size, size), Image.LANCZOS)
+        return im
+    except Exception:
+        return None
+
+ICON_DIR = os.path.join(os.path.dirname(__file__), "../assets/guild_profile")
+ICON_PATHS = {
+    "member": os.path.join(ICON_DIR, "Member_Icon.png"),
+    "war": os.path.join(ICON_DIR, "WarCount_Icon.png"),
+    "territory": os.path.join(ICON_DIR, "Territory_Icon.png"),
+    "owner": os.path.join(ICON_DIR, "Owner_Icon.png"),
+    "created": os.path.join(ICON_DIR, "CreatedOn_Icon.png"),
+    "season": os.path.join(ICON_DIR, "SeasonRating_Icon.png"),
+}
+
 def _fmt_num(v):
     try:
         if isinstance(v, int):
@@ -446,6 +465,15 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     except Exception as e:
         logger.warning(f"バナー生成に失敗: {e}")
 
+    # --- アイコン読込 ---
+    icon_size = 32
+    member_icon = _load_icon(ICON_PATHS["member"], icon_size)
+    war_icon = _load_icon(ICON_PATHS["war"], icon_size)
+    territory_icon = _load_icon(ICON_PATHS["territory"], icon_size)
+    owner_icon = _load_icon(ICON_PATHS["owner"], icon_size)
+    created_icon = _load_icon(ICON_PATHS["created"], 24)
+    season_icon = _load_icon(ICON_PATHS["season"], 24)
+
     # ======= 固定座標（数値指定） =======
     # 固定パラメータ
     img_w = max_width
@@ -527,47 +555,48 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     # 横線
     draw.line([(line_x1, line_y), (line_x2, line_y)], fill=LINE_COLOR, width=2)
 
-    # ステータスアイコン・XPバー（固定座標）
-    stat_icon_x = margin
-    stat_icon_y = stat_y
-    draw.rectangle([stat_icon_x, stat_icon_y, stat_icon_x + icon_size, stat_icon_y + icon_size], fill=(220,180,80,255), outline=LINE_COLOR)
-    draw.text((stat_icon_x + icon_size // 2, stat_icon_y + icon_size // 2), str(level), font=font_stats, fill=TITLE_COLOR, anchor="mm")
-    xpbar_x = stat_icon_x + icon_size + icon_gap
-    xpbar_y = stat_icon_y + icon_size // 2 - 12
-    xpbar_w = 220
-    xpbar_h = 24
-    draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], fill=(120, 100, 80, 255))
-    xp_fill = float(xpPercent) / 100.0 if xpPercent else 0
-    fill_w = int(xpbar_w * xp_fill)
-    bar_color = (60, 144, 255, 255) if xp_fill >= 0.8 else (44, 180, 90, 255) if xp_fill >= 0.5 else (220, 160, 52, 255)
-    if fill_w > 0:
-        draw.rectangle([xpbar_x, xpbar_y, xpbar_x + fill_w, xpbar_y + xpbar_h], fill=bar_color)
-    draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], outline=LINE_COLOR)
-    draw.text((xpbar_x + xpbar_w + 10, xpbar_y + xpbar_h // 2), f"{xpPercent}%", font=font_stats, fill=TITLE_COLOR, anchor="lm")
-
-    # 他ステータスアイコン群（横並び固定座標）
-    stats_y2 = stat_icon_y + icon_size + 12
+    # メンバー数アイコン
     stats_x = margin
-    icon_stats_w = 32
-    stats_gap = 80
-    draw.rectangle([stats_x, stats_y2, stats_x + icon_stats_w, stats_y2 + icon_stats_w], fill=(200,200,120,255), outline=LINE_COLOR)
-    draw.text((stats_x + icon_stats_w + 8, stats_y2 + 8), f"{len(online_players)}/{total_members}", font=font_stats, fill=TITLE_COLOR)
+    stats_y2 = stat_icon_y + icon_size + 12
+    if member_icon:
+        img.paste(member_icon, (stats_x, stats_y2), mask=member_icon)
+    draw.text((stats_x + icon_size + 8, stats_y2 + 8), f"{len(online_players)}/{total_members}", font=font_stats, fill=TITLE_COLOR)
+
+    # War数アイコン
     stats_x2 = stats_x + stats_gap
-    draw.rectangle([stats_x2, stats_y2, stats_x2 + icon_stats_w, stats_y2 + icon_stats_w], fill=(180,120,100,255), outline=LINE_COLOR)
-    draw.text((stats_x2 + icon_stats_w + 8, stats_y2 + 8), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
+    if war_icon:
+        img.paste(war_icon, (stats_x2, stats_y2), mask=war_icon)
+    draw.text((stats_x2 + icon_size + 8, stats_y2 + 8), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
+
+    # 領地数アイコン
     stats_x3 = stats_x2 + stats_gap
-    draw.rectangle([stats_x3, stats_y2, stats_x3 + icon_stats_w, stats_y2 + icon_stats_w], fill=(140,140,100,255), outline=LINE_COLOR)
-    draw.text((stats_x3 + icon_stats_w + 8, stats_y2 + 8), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
+    if territory_icon:
+        img.paste(territory_icon, (stats_x3, stats_y2), mask=territory_icon)
+    draw.text((stats_x3 + icon_size + 8, stats_y2 + 8), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
+
+    # オーナーアイコン
     stats_x4 = stats_x3 + stats_gap
-    draw.rectangle([stats_x4, stats_y2, stats_x4 + icon_stats_w, stats_y2 + icon_stats_w], fill=(160,160,180,255), outline=LINE_COLOR)
-    draw.text((stats_x4 + icon_stats_w + 8, stats_y2 + 8), owner, font=font_stats, fill=TITLE_COLOR)
+    if owner_icon:
+        img.paste(owner_icon, (stats_x4, stats_y2), mask=owner_icon)
+    draw.text((stats_x4 + icon_size + 8, stats_y2 + 8), owner, font=font_stats, fill=TITLE_COLOR)
 
     # 2本目横線
     draw.line([(line_x1, line_y2), (line_x2, line_y2)], fill=LINE_COLOR, width=2)
 
-    # Created/Season（固定座標）
-    draw.text((margin, info_y), f"Created on: {created}", font=font_small, fill=(20, 140, 80, 255))
-    draw.text((img_w - margin - 40, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_small, fill=(44, 180, 90, 255), anchor="rm")
+    # ...（Created/Season部分もアイコン追加）...
+    info_y = stat_y + icon_size + 32 + 16
+    created_x = margin
+    season_x = img_w - margin - 240
+    if created_icon:
+        img.paste(created_icon, (created_x, info_y), mask=created_icon)
+        draw.text((created_x + 28, info_y), f"Created on: {created}", font=font_small, fill=(20, 140, 80, 255))
+    else:
+        draw.text((created_x, info_y), f"Created on: {created}", font=font_small, fill=(20, 140, 80, 255))
+    if season_icon:
+        img.paste(season_icon, (season_x, info_y), mask=season_icon)
+        draw.text((season_x + 28, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_small, fill=(44, 180, 90, 255))
+    else:
+        draw.text((season_x, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_small, fill=(44, 180, 90, 255))
 
     # 3本目横線
     draw.line([(line_x1, line_y3), (line_x2, line_y3)], fill=LINE_COLOR, width=2)
