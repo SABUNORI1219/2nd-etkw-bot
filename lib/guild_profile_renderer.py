@@ -410,19 +410,33 @@ def create_card_background(w: int, h: int,
     return composed
 
 def get_player_class(player_name: str) -> Optional[str]:
-    """Wynncraft APIからクラス名を取得する。"""
+    """Wynncraft APIからクラス名を取得する。詳細デバッグ付き"""
     try:
         url = f"https://api.wynncraft.com/v2/player/{player_name}/stats"
         res = requests.get(url, timeout=3)
+        logger.info(f"[DEBUG] API access {url} status={res.status_code}")
         if res.status_code != 200:
+            logger.info(f"[DEBUG] API status not 200: {res.status_code}")
             return None
         data = res.json()
-        active_char_uuid = data.get("data", [{}])[0].get("activeCharacter")
-        if not active_char_uuid:
+        logger.info(f"[DEBUG] API response for {player_name}: {data}")
+        # ここでデータ構造をdump
+        try:
+            active_char_uuid = data.get("data", [{}])[0].get("activeCharacter")
+            logger.info(f"[DEBUG] active_char_uuid for {player_name}: {active_char_uuid}")
+            characters_dict = data.get("data", [{}])[0].get("characters", {})
+            logger.info(f"[DEBUG] characters for {player_name}: {characters_dict}")
+            if not active_char_uuid or active_char_uuid not in characters_dict:
+                logger.info(f"[DEBUG] active_char_uuid missing or not in characters for {player_name}")
+                return None
+            char_obj = characters_dict.get(active_char_uuid, {})
+            logger.info(f"[DEBUG] char_obj for {player_name}: {char_obj}")
+            class_type = char_obj.get("type")
+            logger.info(f"[DEBUG] class_type for {player_name}: {class_type}")
+            return class_type if class_type in CLASS_ICON_MAP else None
+        except Exception as e:
+            logger.error(f"[DEBUG] Exception during player class parse for {player_name}: {e}")
             return None
-        char_obj = data.get("data", [{}])[0].get("characters", {}).get(active_char_uuid, {})
-        class_type = char_obj.get("type")
-        return class_type if class_type in CLASS_ICON_MAP else None
     except Exception as e:
         logger.warning(f"クラス情報取得失敗: {player_name}: {e}")
         return None
