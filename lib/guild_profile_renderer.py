@@ -445,7 +445,7 @@ async def get_player_class(player_name: str) -> Optional[str]:
         logger.warning(f"get_player_class失敗: {player_name}: {e}")
         return None
 
-def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
+async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
     def sg(d, *keys, default="N/A"):
         v = d
         for k in keys:
@@ -520,7 +520,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     except Exception as e:
         logger.warning(f"バナー生成に失敗: {e}")
 
-    # 固定パラメータ
     img_w = max_width
     margin = 36
     banner_x = img_w - margin - 117
@@ -672,6 +671,8 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     world_font = font_rank
     class_icon_size = 28
     right_inner_x = img_w - MARGIN - 8
+
+    # --- クラス取得箇所だけ修正 ---
     for role in role_order:
         draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=(85, 50, 30, 255))
         member_y += 32
@@ -685,7 +686,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
             x_base = role_x1
             y_base = member_y
             logger.info(f"[DEBUG] Getting class for 1st column player: {p1['name']}")
-            class_type1 = get_player_class(p1["name"])
+            class_type1 = await get_player_class(p1["name"])
             logger.info(f"[DEBUG] get_player_class({p1['name']}) -> {class_type1}")
             name_x = x_base
             if class_type1 and class_type1 in class_icons and class_icons[class_type1]:
@@ -713,7 +714,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
                 x_base_2 = role_x2
                 y_base_2 = member_y
                 logger.info(f"[DEBUG] Getting class for 2nd column player: {p2['name']}")
-                class_type2 = get_player_class(p2["name"])
+                class_type2 = await get_player_class(p2["name"])
                 logger.info(f"[DEBUG] get_player_class({p2['name']}) -> {class_type2}")
                 name_x2 = x_base_2
                 if class_type2 and class_type2 in class_icons and class_icons[class_type2]:
