@@ -468,8 +468,8 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     # 固定パラメータ
     img_w = max_width
     margin = 36
-    banner_x = img_w - margin - 120   # 右上
-    banner_y = margin + 10
+    banner_x = img_w - margin - 115   # 右上
+    banner_y = margin + 15
     banner_w = 120
     banner_h = 120
 
@@ -487,13 +487,13 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     left_icon_x = margin
 
     # Created/Season
-    info_y = stat_y + icon_size + 50
+    info_y = stat_y + icon_size + 85
 
     # 2本目横線
-    line_y2 = info_y + 28
+    line_y2 = info_y + 45
 
     # 3本目横線
-    line_y3 = line_y2 + 75
+    line_y3 = line_y2 + 85
 
     # オンラインメンバー部の高さ動的計算
     role_order = ["CHIEF", "STRATEGIST", "CAPTAIN", "RECRUITER", "RECRUIT"]
@@ -584,8 +584,8 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
 
     # War数
     if war_icon:
-        img.paste(war_icon, (stats_x2 + 64, stats_y2), mask=war_icon)
-    draw.text((stats_x2 + icon_size + 64, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
+        img.paste(war_icon, (stats_x2 + 320, stats_y2), mask=war_icon)
+    draw.text((stats_x2 + icon_size + 320, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
 
     # 領地数
     if territory_icon:
@@ -594,11 +594,11 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
 
     # オーナー
     if owner_icon:
-        img.paste(owner_icon, (stats_x2 + 64, stats_y2 + 42), mask=owner_icon)
-    draw.text((stats_x2 + icon_size + 64, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
+        img.paste(owner_icon, (stats_x2 + 320, stats_y2 + 42), mask=owner_icon)
+    draw.text((stats_x2 + icon_size + 320, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
 
     # 2本目横線
-    draw.line([(line_x1, line_y2), (line_x2, line_y2)], fill=LINE_COLOR, width=2)
+    draw.line([(line_x1, img_w - margin - 8), (line_x2, line_y2)], fill=LINE_COLOR, width=2)
 
     # Created/Season（アイコン＋テキスト）
     created_x = margin + 20
@@ -615,22 +615,22 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         draw.text((season_x, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_small, fill=(44, 180, 90, 255))
 
     # 3本目横線
-    draw.line([(line_x1, line_y3), (line_x2, line_y3)], fill=LINE_COLOR, width=2)
+    draw.line([(line_x1, img_w - margin - 8), (line_x2, line_y3)], fill=LINE_COLOR, width=2)
 
     # オンラインメンバー（役職ごと・2列表示）
     role_header_y = line_y3 + 18
     col_gap = 240
-    role_x1 = margin
+    role_x1 = margin + 20
     role_x2 = margin + col_gap
     row_h = 30
     member_y = role_header_y
 
     role_display_map = {
-        "CHIEF": "**CHIEFS**",
-        "STRATEGIST": "**STRATEGISTS**",
-        "CAPTAIN": "*CAPTAINS*",
-        "RECRUITER": "RECRUITERS",
-        "RECRUIT": "RECRUITS"
+        "CHIEF": "****CHIEF",
+        "STRATEGIST": "***STRATEGIST",
+        "CAPTAIN": "**CAPTAIN",
+        "RECRUITER": "*RECRUITER",
+        "RECRUIT": "RECRUIT"
     }
     for role in role_order:
         draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=TITLE_COLOR)
@@ -646,7 +646,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
             server1 = p1.get("server", "")
             draw.text((role_x1, member_y), name1, font=font_rank, fill=TITLE_COLOR)
             if server1:
-                draw.text((role_x1 + 140, member_y), server1, font=font_small, fill=SUBTITLE_COLOR)
+                draw.text((role_x1 + 140, member_y), server1, font=font_rank, fill=SUBTITLE_COLOR)
 
             # 右列
             if p2:
@@ -654,7 +654,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
                 server2 = p2.get("server", "")
                 draw.text((role_x2, member_y), name2, font=font_rank, fill=TITLE_COLOR)
                 if server2:
-                    draw.text((role_x2 + 140, member_y), server2, font=font_small, fill=SUBTITLE_COLOR)
+                    draw.text((role_x2 + 140, member_y), server2, font=font_rank, fill=SUBTITLE_COLOR)
             member_y += row_h
         member_y += 8
 
@@ -665,7 +665,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     except Exception:
         bbox = draw.textbbox((0, 0), footer_text, font=font_small)
         fw = bbox[2] - bbox[0]
-    draw.text((img_w - fw, img_h - 4), footer_text, font=font_small, fill=(120, 110, 100, 255))
+    draw.text((img_w - fw - 32, img_h - 4 + 32), footer_text, font=font_small, fill=(120, 110, 100, 255))
 
     out_bytes = BytesIO()
     img.save(out_bytes, format="PNG")
