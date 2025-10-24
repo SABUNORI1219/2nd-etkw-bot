@@ -28,7 +28,6 @@ try:
 except Exception:
     _HAS_NUMPY = False
 
-
 def _fmt_num(v):
     try:
         if isinstance(v, int):
@@ -39,14 +38,12 @@ def _fmt_num(v):
     except Exception:
         return str(v)
 
-
 def _text_width(draw_obj: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) -> int:
     try:
         return int(draw_obj.textlength(text, font=font))
     except Exception:
         bbox = draw_obj.textbbox((0, 0), text, font=font)
         return bbox[2] - bbox[0]
-
 
 def _arc_point(bbox, angle_deg):
     x0, y0, x1, y1 = bbox
@@ -59,7 +56,6 @@ def _arc_point(bbox, angle_deg):
     y = cy - ry * math.sin(rad)
     return (x, y)
 
-
 def _extend_point(p, q, amount):
     px, py = p
     qx, qy = q
@@ -71,7 +67,6 @@ def _extend_point(p, q, amount):
     ux = dx / dist
     uy = dy / dist
     return (px + ux * amount, py + uy * amount)
-
 
 def draw_decorative_frame(
     img: Image.Image,
@@ -326,7 +321,6 @@ def draw_decorative_frame(
 
     return out
 
-
 def create_card_background(w: int, h: int,
                            noise_std: float = 30.0,
                            noise_blend: float = 0.30,
@@ -381,7 +375,6 @@ def create_card_background(w: int, h: int,
         composed = composed.convert('RGBA')
 
     return composed
-
 
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
     def sg(d, *keys, default="N/A"):
@@ -452,112 +445,168 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     except Exception as e:
         logger.warning(f"バナー生成に失敗: {e}")
 
-    base_height = 700
-    row_height = 48
-    online_count = len(online_players)
-    extra_for_online = max(0, online_count) * row_height
-    content_height = base_height + extra_for_online + 220
-    canvas_w = max_width
-    canvas_h = content_height
+    # ======= レイアウト定義（画像サイズ動的計算）=======
+    # オンラインメンバー表示部の高さ（役職ごとに最大人数取り）
+    role_order = ["CHIEF", "STRATEGIST", "CAPTAIN", "RECRUITER", "RECRUIT"]
+    member_rows = 0
+    for role in role_order:
+        names = list(members.get(role.lower(), {}).keys())
+        member_rows += max(2, math.ceil(len(names)/2)) if names else 2  # 最低2行
 
-    img = create_card_background(canvas_w, canvas_h)
+    # 各セクションごとの高さ
+    base_height = 240  # タイトル・バナー・ステータス・XPバー
+    info_height = 70   # Created/Season
+    divider_height = 28 * 3  # 3本横線
+    role_header_height = 32 * len(role_order)  # 役職名
+    member_height = 30 * member_rows           # メンバー2列分
+    footer_height = 36
+    total_height = base_height + info_height + divider_height + role_header_height + member_height + footer_height + 30
+
+    img_w = max_width
+    img_h = total_height
+    img = create_card_background(img_w, img_h)
     draw = ImageDraw.Draw(img)
 
-    card_x = MARGIN
-    card_y = MARGIN
-    card_w = canvas_w - MARGIN * 2
-    card_h = canvas_h - MARGIN * 2
-
+    # --- フォント準備 ---
     try:
         font_title = ImageFont.truetype(FONT_PATH, 48)
-        font_sub = ImageFont.truetype(FONT_PATH, 26)
+        font_sub = ImageFont.truetype(FONT_PATH, 24)
         font_stats = ImageFont.truetype(FONT_PATH, 22)
-        font_table_header = ImageFont.truetype(FONT_PATH, 20)
-        font_table = ImageFont.truetype(FONT_PATH, 18)
         font_small = ImageFont.truetype(FONT_PATH, 16)
+        font_section = ImageFont.truetype(FONT_PATH, 26)
+        font_rank = ImageFont.truetype(FONT_PATH, 22)
     except Exception as e:
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
-        font_title = font_sub = font_stats = font_table_header = font_table = font_small = ImageFont.load_default()
+        font_title = font_sub = font_stats = font_small = font_section = font_rank = ImageFont.load_default()
 
-    inner_left = card_x + 36
-    inner_top = card_y + 36
+    margin = 36
+    x_center = img_w // 2
 
-    draw.text((inner_left, inner_top), f"[{prefix}] {name}", font=font_title, fill=TITLE_COLOR)
-    draw.text((inner_left, inner_top + 56), f"Owner: {owner}  |  Created: {created}", font=font_sub, fill=SUBTITLE_COLOR)
-
-    banner_w = int(card_w * 0.18)
-    banner_h = int(card_h * 0.20)
-    banner_x = inner_left
-    banner_y = inner_top + 110
+    # ======= 1. ギルド名・バナー =======
+    top_y = margin
+    draw.text((x_center, top_y), name, font=font_title, fill=TITLE_COLOR, anchor="ma")
+    banner_size = 80
+    banner_x = img_w - margin - banner_size
+    banner_y = top_y
     if banner_img:
         try:
-            banner_resized = banner_img.resize((banner_w, banner_h), Image.LANCZOS)
+            banner_resized = banner_img.resize((banner_size, banner_size), Image.LANCZOS)
             img.paste(banner_resized, (banner_x, banner_y), mask=banner_resized)
         except Exception as e:
             logger.warning(f"バナー貼付失敗: {e}")
 
-    stats_x = banner_x + banner_w + 18
-    stats_y = banner_y
-    draw.text((stats_x, stats_y), f"Level: {level}   ({xpPercent}%)", font=font_stats, fill=SUBTITLE_COLOR)
-    draw.text((stats_x, stats_y + 30), f"Wars: {_fmt_num(wars)}   Territories: {_fmt_num(territories)}", font=font_stats, fill=SUBTITLE_COLOR)
-    draw.text((stats_x, stats_y + 60), f"Members: {_fmt_num(total_members)}   Online: {_fmt_num(online_count)}", font=font_stats, fill=SUBTITLE_COLOR)
-    draw.text((stats_x, stats_y + 90), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=SUBTITLE_COLOR)
+    # ======= 2. 横線（アンダーバー） =======
+    line_y1 = top_y + 60
+    draw.line([(margin, line_y1), (img_w - margin, line_y1)], fill=LINE_COLOR, width=2)
 
-    sep_x = card_x + LEFT_COLUMN_WIDTH
-    sep_y1 = inner_top + 24
-    sep_y2 = card_y + card_h - 40
-    draw.line([(sep_x, sep_y1), (sep_x, sep_y2)], fill=LINE_COLOR, width=2)
+    # ======= 3. ステータス（左アイコン群＋XPバー） =======
+    icon_size = 32
+    stat_y = line_y1 + 18
+    icon_gap = 8
 
-    table_x = sep_x + 18
-    table_y = inner_top + 10
-    draw.rectangle([table_x, table_y, table_x + RIGHT_COLUMN_WIDTH - 18, table_y + 40], fill=TABLE_HEADER_BG)
-    draw.text((table_x + 8, table_y + 8), "Online Players", font=font_table_header, fill=TITLE_COLOR)
-    header_bottom = table_y + 40
-    col_server_w = 56
-    col_name_w = RIGHT_COLUMN_WIDTH - 18 - col_server_w - 60
-    col_rank_w = 60
+    # 左側アイコン群
+    left_icon_x = margin
+    # レベルアイコン（仮:四角枠のみ。アイコン追加したい場合はここでimg.paste可）
+    draw.rectangle([left_icon_x, stat_y, left_icon_x + icon_size, stat_y + icon_size], fill=(220,180,80,255), outline=LINE_COLOR)
+    draw.text((left_icon_x + icon_size // 2, stat_y + icon_size // 2), str(level), font=font_stats, fill=TITLE_COLOR, anchor="mm")
 
-    row_h = 44
-    y = header_bottom + 12
-    if online_players:
-        for p in online_players:
-            server = p.get("server", "N/A")
-            pname = p.get("name", "Unknown")
-            rank = p.get("rank_stars", "")
+    # XPバー
+    xpbar_x = left_icon_x + icon_size + icon_gap
+    xpbar_y = stat_y + icon_size // 2 - 12
+    xpbar_w = 220
+    xpbar_h = 24
+    draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], fill=(120, 100, 80, 255))
+    xp_fill = float(xpPercent) / 100.0 if xpPercent else 0
+    fill_w = int(xpbar_w * xp_fill)
+    bar_color = (60, 144, 255, 255) if xp_fill >= 0.8 else (44, 180, 90, 255) if xp_fill >= 0.5 else (220, 160, 52, 255)
+    if fill_w > 0:
+        draw.rectangle([xpbar_x, xpbar_y, xpbar_x + fill_w, xpbar_y + xpbar_h], fill=bar_color)
+    draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], outline=LINE_COLOR)
+    draw.text((xpbar_x + xpbar_w + 10, xpbar_y + xpbar_h // 2), f"{xpPercent}%", font=font_stats, fill=TITLE_COLOR, anchor="lm")
 
-            draw.rectangle([table_x, y, table_x + col_server_w, y + row_h - 8], outline=LINE_COLOR, width=1)
-            draw.text((table_x + 6, y + 10), server, font=font_table, fill=SUBTITLE_COLOR)
+    # ======= 4. ステータスアイコン群（人数・戦争・領土・オーナー） =======
+    stats_y2 = stat_y + icon_size + 12
+    stats_x = margin
+    icon_stats_w = 32
+    stats_gap = 80
+    # 人数
+    draw.rectangle([stats_x, stats_y2, stats_x + icon_stats_w, stats_y2 + icon_stats_w], fill=(200,200,120,255), outline=LINE_COLOR)
+    draw.text((stats_x + icon_stats_w + 8, stats_y2 + 8), f"{len(online_players)}/{total_members}", font=font_stats, fill=TITLE_COLOR)
+    # Wars
+    stats_x2 = stats_x + stats_gap
+    draw.rectangle([stats_x2, stats_y2, stats_x2 + icon_stats_w, stats_y2 + icon_stats_w], fill=(180,120,100,255), outline=LINE_COLOR)
+    draw.text((stats_x2 + icon_stats_w + 8, stats_y2 + 8), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
+    # Territories
+    stats_x3 = stats_x2 + stats_gap
+    draw.rectangle([stats_x3, stats_y2, stats_x3 + icon_stats_w, stats_y2 + icon_stats_w], fill=(140,140,100,255), outline=LINE_COLOR)
+    draw.text((stats_x3 + icon_stats_w + 8, stats_y2 + 8), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
+    # オーナー名
+    stats_x4 = stats_x3 + stats_gap
+    draw.rectangle([stats_x4, stats_y2, stats_x4 + icon_stats_w, stats_y2 + icon_stats_w], fill=(160,160,180,255), outline=LINE_COLOR)
+    draw.text((stats_x4 + icon_stats_w + 8, stats_y2 + 8), owner, font=font_stats, fill=TITLE_COLOR)
 
-            nx = table_x + col_server_w + 8
-            draw.rectangle([nx - 2, y, nx + col_name_w, y + row_h - 8], outline=LINE_COLOR, width=1)
-            try:
-                name_w = _text_width(draw, pname, font=font_table)
-            except Exception:
-                bbox = draw.textbbox((0, 0), pname, font=font_table)
-                name_w = bbox[2] - bbox[0]
-            display_name = pname
-            max_name_w = col_name_w - 12
-            if name_w > max_name_w:
-                while display_name and (_text_width(draw, display_name + "...", font=font_table) > max_name_w):
-                    display_name = display_name[:-1]
-                display_name = display_name + "..."
-            draw.text((nx + 6, y + 10), display_name, font=font_table, fill=TITLE_COLOR)
+    # ======= 5. 横線（2本目） =======
+    line_y2 = stats_y2 + icon_stats_w + 18
+    draw.line([(margin, line_y2), (img_w - margin, line_y2)], fill=LINE_COLOR, width=2)
 
-            rx = nx + col_name_w + 8
-            draw.rectangle([rx - 2, y, rx + col_rank_w, y + row_h - 8], outline=LINE_COLOR, width=1)
-            draw.text((rx + 6, y + 10), rank, font=font_table, fill=SUBTITLE_COLOR)
+    # ======= 6. Created/Season =======
+    info_y = line_y2 + 16
+    draw.text((margin, info_y), f"Created on: {created}", font=font_small, fill=(20, 140, 80, 255))
+    draw.text((img_w - margin, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_small, fill=(44, 180, 90, 255), anchor="rm")
 
-            y += row_h
-    else:
-        draw.text((table_x + 8, header_bottom + 18), "No members online right now.", font=font_table, fill=SUBTITLE_COLOR)
+    # ======= 7. 横線（3本目） =======
+    line_y3 = info_y + 28
+    draw.line([(margin, line_y3), (img_w - margin, line_y3)], fill=LINE_COLOR, width=2)
 
+    # ======= 8. メンバー表（役職ごと2列） =======
+    role_header_y = line_y3 + 18
+    col_gap = 240
+    role_x1 = margin
+    role_x2 = margin + col_gap
+    row_h = 30
+    member_y = role_header_y
+
+    role_display_map = {
+        "CHIEF": "**CHIEFS**",
+        "STRATEGIST": "**STRATEGISTS**",
+        "CAPTAIN": "*CAPTAINS*",
+        "RECRUITER": "RECRUITERS",
+        "RECRUIT": "RECRUITS"
+    }
+    for role in role_order:
+        # section header
+        draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=TITLE_COLOR)
+        member_y += 32
+
+        group_members = members.get(role.lower(), {}) or {}
+        names = list(group_members.keys())
+        for i in range(0, len(names), 2):
+            n1 = names[i]
+            n2 = names[i + 1] if i + 1 < len(names) else None
+
+            # 左列
+            draw.text((role_x1, member_y), n1, font=font_rank, fill=TITLE_COLOR)
+            server1 = group_members[n1].get("server", "")
+            if server1:
+                draw.text((role_x1 + 140, member_y), server1, font=font_small, fill=SUBTITLE_COLOR)
+
+            # 右列
+            if n2:
+                draw.text((role_x2, member_y), n2, font=font_rank, fill=TITLE_COLOR)
+                server2 = group_members[n2].get("server", "")
+                if server2:
+                    draw.text((role_x2 + 140, member_y), server2, font=font_small, fill=SUBTITLE_COLOR)
+            member_y += row_h
+        member_y += 8
+
+    # ======= 9. フッター =======
     footer_text = "Generated by Minister Chikuwa"
     try:
         fw = _text_width(draw, footer_text, font=font_small)
     except Exception:
         bbox = draw.textbbox((0, 0), footer_text, font=font_small)
         fw = bbox[2] - bbox[0]
-    draw.text((card_x + card_w - fw - 16, card_y + card_h - 36), footer_text, font=font_small, fill=(120, 110, 100, 255))
+    draw.text((img_w - fw - margin, img_h - margin - 4), footer_text, font=font_small, fill=(120, 110, 100, 255))
 
     out_bytes = BytesIO()
     img.save(out_bytes, format="PNG")
