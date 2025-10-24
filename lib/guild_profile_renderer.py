@@ -465,16 +465,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     except Exception as e:
         logger.warning(f"バナー生成に失敗: {e}")
 
-    # --- アイコン読込 ---
-    icon_size = 32
-    member_icon = _load_icon(ICON_PATHS["member"], icon_size)
-    war_icon = _load_icon(ICON_PATHS["war"], icon_size)
-    territory_icon = _load_icon(ICON_PATHS["territory"], icon_size)
-    owner_icon = _load_icon(ICON_PATHS["owner"], icon_size)
-    created_icon = _load_icon(ICON_PATHS["created"], 24)
-    season_icon = _load_icon(ICON_PATHS["season"], 24)
-
-    # ======= 固定座標（数値指定） =======
     # 固定パラメータ
     img_w = max_width
     margin = 36
@@ -505,7 +495,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     # 3本目横線
     line_y3 = line_y2 + 30
 
-    # ======= オンラインメンバー部の高さ動的計算 =======
+    # オンラインメンバー部の高さ動的計算
     role_order = ["CHIEF", "STRATEGIST", "CAPTAIN", "RECRUITER", "RECRUIT"]
     online_by_role = {role: [] for role in role_order}
     for p in online_players:
@@ -536,6 +526,14 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title_base = font_sub = font_stats = font_small = font_section = font_rank = ImageFont.load_default()
 
+    # アイコン読込
+    member_icon = _load_icon(ICON_PATHS["member"], icon_size)
+    war_icon = _load_icon(ICON_PATHS["war"], icon_size)
+    territory_icon = _load_icon(ICON_PATHS["territory"], icon_size)
+    owner_icon = _load_icon(ICON_PATHS["owner"], icon_size)
+    created_icon = _load_icon(ICON_PATHS["created"], 24)
+    season_icon = _load_icon(ICON_PATHS["season"], 24)
+
     # バナー画像（右上固定座標）
     if banner_img:
         img.paste(banner_img, (banner_x, banner_y), mask=banner_img)
@@ -555,26 +553,47 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     # 横線
     draw.line([(line_x1, line_y), (line_x2, line_y)], fill=LINE_COLOR, width=2)
 
-    # メンバー数アイコン
-    stats_x = margin
+    # ステータスアイコン・XPバー（固定座標）
+    stat_icon_x = margin
+    stat_icon_y = stat_y
+    draw.rectangle([stat_icon_x, stat_icon_y, stat_icon_x + icon_size, stat_icon_y + icon_size], fill=(220,180,80,255), outline=LINE_COLOR)
+    draw.text((stat_icon_x + icon_size // 2, stat_icon_y + icon_size // 2), str(level), font=font_stats, fill=TITLE_COLOR, anchor="mm")
+    xpbar_x = stat_icon_x + icon_size + icon_gap
+    xpbar_y = stat_icon_y + icon_size // 2 - 12
+    xpbar_w = 220
+    xpbar_h = 24
+    draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], fill=(120, 100, 80, 255))
+    xp_fill = float(xpPercent) / 100.0 if xpPercent else 0
+    fill_w = int(xpbar_w * xp_fill)
+    bar_color = (60, 144, 255, 255) if xp_fill >= 0.8 else (44, 180, 90, 255) if xp_fill >= 0.5 else (220, 160, 52, 255)
+    if fill_w > 0:
+        draw.rectangle([xpbar_x, xpbar_y, xpbar_x + fill_w, xpbar_y + xpbar_h], fill=bar_color)
+    draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], outline=LINE_COLOR)
+    draw.text((xpbar_x + xpbar_w + 10, xpbar_y + xpbar_h // 2), f"{xpPercent}%", font=font_stats, fill=TITLE_COLOR, anchor="lm")
+
+    # 他ステータスアイコン群（横並び固定座標）
     stats_y2 = stat_icon_y + icon_size + 12
+    stats_x = margin
+    stats_gap = 80
+
+    # メンバー数
     if member_icon:
         img.paste(member_icon, (stats_x, stats_y2), mask=member_icon)
     draw.text((stats_x + icon_size + 8, stats_y2 + 8), f"{len(online_players)}/{total_members}", font=font_stats, fill=TITLE_COLOR)
 
-    # War数アイコン
+    # War数
     stats_x2 = stats_x + stats_gap
     if war_icon:
         img.paste(war_icon, (stats_x2, stats_y2), mask=war_icon)
     draw.text((stats_x2 + icon_size + 8, stats_y2 + 8), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
 
-    # 領地数アイコン
+    # 領地数
     stats_x3 = stats_x2 + stats_gap
     if territory_icon:
         img.paste(territory_icon, (stats_x3, stats_y2), mask=territory_icon)
     draw.text((stats_x3 + icon_size + 8, stats_y2 + 8), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
 
-    # オーナーアイコン
+    # オーナー
     stats_x4 = stats_x3 + stats_gap
     if owner_icon:
         img.paste(owner_icon, (stats_x4, stats_y2), mask=owner_icon)
@@ -583,8 +602,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     # 2本目横線
     draw.line([(line_x1, line_y2), (line_x2, line_y2)], fill=LINE_COLOR, width=2)
 
-    # ...（Created/Season部分もアイコン追加）...
-    info_y = stat_y + icon_size + 32 + 16
+    # Created/Season（アイコン＋テキスト）
     created_x = margin
     season_x = img_w - margin - 240
     if created_icon:
@@ -601,7 +619,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     # 3本目横線
     draw.line([(line_x1, line_y3), (line_x2, line_y3)], fill=LINE_COLOR, width=2)
 
-    # ======= オンラインメンバー（役職ごと・2列表示） =======
+    # オンラインメンバー（役職ごと・2列表示）
     role_header_y = line_y3 + 18
     col_gap = 240
     role_x1 = margin
