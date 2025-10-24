@@ -410,7 +410,7 @@ def create_card_background(w: int, h: int,
     return composed
 
 def get_player_class(player_name: str) -> Optional[str]:
-    """Wynncraft APIからクラス名を取得する。reskinは無視"""
+    """Wynncraft APIからクラス名を取得する。"""
     try:
         url = f"https://api.wynncraft.com/v2/player/{player_name}/stats"
         res = requests.get(url, timeout=3)
@@ -647,8 +647,10 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
 
     world_font = font_rank
     class_icon_size = 28
+    # インナーフレーム右端
+    right_inner_x = img_w - MARGIN - 8
     for role in role_order:
-        draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=TITLE_COLOR)
+        draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=frame_color)
         member_y += 32
 
         group_members = online_by_role[role]
@@ -660,10 +662,13 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
             x_base = role_x1
             y_base = member_y
             class_type1 = get_player_class(p1["name"])
+            name_x = x_base
             if class_type1 and class_type1 in class_icons and class_icons[class_type1]:
                 icon_img = class_icons[class_type1]
                 img.paste(icon_img, (x_base, y_base), mask=icon_img)
-                name_x = x_base + class_icon_size + 4
+                # クラス名描画
+                draw.text((x_base + class_icon_size + 8, y_base), class_type1, font=font_rank, fill=SUBTITLE_COLOR)
+                name_x = x_base + class_icon_size + 8 + _text_width(draw, class_type1, font_rank) + 8
             else:
                 name_x = x_base
             name1 = p1.get("name", "Unknown")
@@ -682,21 +687,21 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
                 x_base_2 = role_x2
                 y_base_2 = member_y
                 class_type2 = get_player_class(p2["name"])
+                name_x2 = x_base_2
                 if class_type2 and class_type2 in class_icons and class_icons[class_type2]:
                     icon_img2 = class_icons[class_type2]
                     img.paste(icon_img2, (x_base_2, y_base_2), mask=icon_img2)
-                    name_x2 = x_base_2 + class_icon_size + 4
+                    draw.text((x_base_2 + class_icon_size + 8, y_base_2), class_type2, font=font_rank, fill=SUBTITLE_COLOR)
+                    name_x2 = x_base_2 + class_icon_size + 8 + _text_width(draw, class_type2, font_rank) + 8
                 else:
                     name_x2 = x_base_2
                 name2 = p2.get("name", "Unknown")
                 draw.text((name_x2, y_base_2), name2, font=font_rank, fill=TITLE_COLOR)
                 server2 = p2.get("server", "")
                 if server2:
-                    world_x2 = img_w - margin - 8 - 100
                     world_text_w2 = _text_width(draw, server2, world_font)
-                    max_world_x2 = img_w - margin - 8
-                    if world_x2 + world_text_w2 > max_world_x2:
-                        world_x2 = max_world_x2 - world_text_w2
+                    max_world_x2 = right_inner_x
+                    world_x2 = max_world_x2 - world_text_w2
                     draw.text((world_x2, y_base_2), server2, font=world_font, fill=SUBTITLE_COLOR)
             member_y += row_h
         member_y += 8
@@ -707,7 +712,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     except Exception:
         bbox = draw.textbbox((0, 0), footer_text, font=font_small)
         fw = bbox[2] - bbox[0]
-    draw.text((img_w - fw - 8, img_h - 4 - 17), footer_text, font=font_small, fill=(120, 110, 100, 255))
+    draw.text((img_w - fw - 3, img_h - 4 - 17), footer_text, font=font_small, fill=(120, 110, 100, 255))
 
     out_bytes = BytesIO()
     img.save(out_bytes, format="PNG")
