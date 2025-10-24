@@ -137,7 +137,45 @@ def create_card_background(w: int, h: int,
                            noise_blend: float = 0.30,
                            vignette_blur: int = 80) -> Image.Image:
     base = Image.new('RGB', (w, h), BASE_BG_COLOR)
-    # ...省略...
+
+    # ノイズ生成（省略可能）
+    if _HAS_NUMPY:
+        try:
+            noise = np.random.normal(128, noise_std, (h, w))
+            noise = np.clip(noise, 0, 255).astype(np.uint8)
+            noise_img = Image.fromarray(noise, mode='L').convert('RGB')
+        except Exception:
+            noise_img = Image.effect_noise((w, h), max(10, int(noise_std))).convert('L').convert('RGB')
+    else:
+        try:
+            noise_img = Image.effect_noise((w, h), max(10, int(noise_std))).convert('L').convert('RGB')
+        except Exception:
+            noise_img = Image.new('RGB', (w, h), (128, 128, 128))
+            nd = ImageDraw.Draw(noise_img)
+            for _ in range(max(100, w * h // 1200)):
+                x = random.randrange(0, w)
+                y = random.randrange(0, h)
+                tone = random.randint(90, 180)
+                nd.point((x, y), fill=(tone, tone, tone))
+
+    img = Image.blend(base, noise_img, noise_blend)
+    img = img.filter(ImageFilter.GaussianBlur(1))
+
+    # ビネット
+    vignette = Image.new('L', (w, h), 0)
+    dv = ImageDraw.Draw(vignette)
+    max_r = int(max(w, h) * 0.75)
+    for i in range(0, max_r, max(6, max_r // 60)):
+        val = int(255 * (i / max_r))
+        bbox = (-i, -i, w + i, h + i)
+        dv.ellipse(bbox, fill=val)
+    vignette = vignette.filter(ImageFilter.GaussianBlur(vignette_blur))
+    vignette = vignette.point(lambda p: max(0, min(255, p)))
+
+    dark_color = (50, 30, 10)
+    dark_img = Image.new('RGB', (w, h), dark_color)
+    composed = Image.composite(img, dark_img, vignette)
+
     try:
         composed = draw_decorative_frame(composed.convert('RGBA'),
                                          outer_offset=60,
@@ -147,7 +185,8 @@ def create_card_background(w: int, h: int,
                                          frame_color=(85, 50, 30, 255))
     except Exception as e:
         logger.exception(f"draw_decorative_frame failed: {e}")
-        composed = img.convert('RGBA')
+        # img, composed両方必ず定義されているのでここでどちらでもOK
+        return img.convert('RGBA')
     return composed
 
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
