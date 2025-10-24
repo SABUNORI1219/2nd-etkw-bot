@@ -446,15 +446,38 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     except Exception as e:
         logger.warning(f"バナー生成に失敗: {e}")
 
-    # ======= レイアウト定義（decorative_frame inner準拠） =======
-    # inner枠のパラメータ decorative_frameと揃える
-    inner_offset = 64
-    inner_width = 2
-    margin = 36
-
-    # inner領域のサイズ
+    # ======= 固定座標（数値指定） =======
+    # 固定パラメータ
     img_w = max_width
-    # 動的高さ計算は従来通り
+    margin = 36
+    banner_x = img_w - margin - 140   # 右上
+    banner_y = margin
+    banner_w = 140
+    banner_h = 140
+
+    # ギルド名・横線位置
+    name_x = margin
+    name_y = margin + 10
+    line_x1 = margin
+    line_x2 = img_w - margin - 40
+    line_y = name_y + 48 + 8  # ギルド名の下
+
+    # ステータス
+    stat_y = line_y + 16
+    icon_size = 32
+    icon_gap = 8
+    left_icon_x = margin
+
+    # Created/Season
+    info_y = stat_y + icon_size + 32 + 16
+
+    # 2本目横線
+    line_y2 = info_y + 28
+
+    # 3本目横線
+    line_y3 = line_y2 + 30
+
+    # ======= オンラインメンバー部の高さ動的計算 =======
     role_order = ["CHIEF", "STRATEGIST", "CAPTAIN", "RECRUITER", "RECRUIT"]
     online_by_role = {role: [] for role in role_order}
     for p in online_players:
@@ -465,21 +488,11 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     for role in role_order:
         n = len(online_by_role[role])
         member_rows += max(1, math.ceil(n / 2)) if n else 1
-    base_height = 240
-    info_height = 70
-    divider_height = 28 * 3
     role_header_height = 32 * len(role_order)
     member_height = 30 * member_rows
     footer_height = 36
-    total_height = base_height + info_height + divider_height + role_header_height + member_height + footer_height + 30
-
-    img_h = total_height
-    inner_left = inner_offset
-    inner_top = inner_offset
-    inner_right = img_w - inner_offset
-    inner_bottom = img_h - inner_offset
-    inner_w = inner_right - inner_left
-    inner_h = inner_bottom - inner_top
+    extra_height = 30
+    img_h = line_y3 + 18 + role_header_height + member_height + footer_height + extra_height
 
     img = create_card_background(img_w, img_h)
     draw = ImageDraw.Draw(img)
@@ -495,45 +508,32 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title_base = font_sub = font_stats = font_small = font_section = font_rank = ImageFont.load_default()
 
-    # バナー画像（inner右上、リサイズせず。枠内に収める）
-    banner_w = min(140, inner_w // 4)
-    banner_h = min(140, inner_h // 4)
-    banner_x = inner_right - banner_w
-    banner_y = inner_top
+    # バナー画像（右上固定座標）
     if banner_img:
         img.paste(banner_img, (banner_x, banner_y), mask=banner_img)
 
-    # 横線左端はinner枠左+余白、右端はバナー左手前
-    line_left = inner_left + 8
-    line_right = banner_x - 18
-    line_y = banner_y + 36
-
-    # ギルド名（横線の上、左揃え、フォント自動調整）
+    # ギルド名（左揃え、横線の上。横線を飛び出す場合はフォント自動縮小）
     guild_name = name
     font_title = font_title_base
-    max_name_width = line_right - line_left
+    max_name_width = line_x2 - name_x
     name_w = _text_width(draw, guild_name, font_title)
     font_size = 48
     while name_w > max_name_width and font_size > 16:
         font_size -= 2
         font_title = ImageFont.truetype(FONT_PATH, font_size)
         name_w = _text_width(draw, guild_name, font_title)
-    name_x = line_left
-    name_y = line_y - font_title.size - 6
     draw.text((name_x, name_y), guild_name, font=font_title, fill=TITLE_COLOR)
 
     # 横線
-    draw.line([(line_left, line_y), (line_right, line_y)], fill=LINE_COLOR, width=2)
+    draw.line([(line_x1, line_y), (line_x2, line_y)], fill=LINE_COLOR, width=2)
 
-    # ステータス・XPバー（inner枠左から）
-    icon_size = 32
-    stat_y = line_y + 18
-    icon_gap = 8
-    left_icon_x = line_left
-    draw.rectangle([left_icon_x, stat_y, left_icon_x + icon_size, stat_y + icon_size], fill=(220,180,80,255), outline=LINE_COLOR)
-    draw.text((left_icon_x + icon_size // 2, stat_y + icon_size // 2), str(level), font=font_stats, fill=TITLE_COLOR, anchor="mm")
-    xpbar_x = left_icon_x + icon_size + icon_gap
-    xpbar_y = stat_y + icon_size // 2 - 12
+    # ステータスアイコン・XPバー（固定座標）
+    stat_icon_x = margin
+    stat_icon_y = stat_y
+    draw.rectangle([stat_icon_x, stat_icon_y, stat_icon_x + icon_size, stat_icon_y + icon_size], fill=(220,180,80,255), outline=LINE_COLOR)
+    draw.text((stat_icon_x + icon_size // 2, stat_icon_y + icon_size // 2), str(level), font=font_stats, fill=TITLE_COLOR, anchor="mm")
+    xpbar_x = stat_icon_x + icon_size + icon_gap
+    xpbar_y = stat_icon_y + icon_size // 2 - 12
     xpbar_w = 220
     xpbar_h = 24
     draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], fill=(120, 100, 80, 255))
@@ -545,9 +545,9 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], outline=LINE_COLOR)
     draw.text((xpbar_x + xpbar_w + 10, xpbar_y + xpbar_h // 2), f"{xpPercent}%", font=font_stats, fill=TITLE_COLOR, anchor="lm")
 
-    # ステータスアイコン群
-    stats_y2 = stat_y + icon_size + 12
-    stats_x = left_icon_x
+    # 他ステータスアイコン群（横並び固定座標）
+    stats_y2 = stat_icon_y + icon_size + 12
+    stats_x = margin
     icon_stats_w = 32
     stats_gap = 80
     draw.rectangle([stats_x, stats_y2, stats_x + icon_stats_w, stats_y2 + icon_stats_w], fill=(200,200,120,255), outline=LINE_COLOR)
@@ -562,24 +562,21 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     draw.rectangle([stats_x4, stats_y2, stats_x4 + icon_stats_w, stats_y2 + icon_stats_w], fill=(160,160,180,255), outline=LINE_COLOR)
     draw.text((stats_x4 + icon_stats_w + 8, stats_y2 + 8), owner, font=font_stats, fill=TITLE_COLOR)
 
-    # 横線
-    line_y2 = stats_y2 + icon_stats_w + 18
-    draw.line([(left_icon_x, line_y2), (line_right, line_y2)], fill=LINE_COLOR, width=2)
+    # 2本目横線
+    draw.line([(line_x1, line_y2), (line_x2, line_y2)], fill=LINE_COLOR, width=2)
 
-    # Created/Season
-    info_y = line_y2 + 16
-    draw.text((left_icon_x, info_y), f"Created on: {created}", font=font_small, fill=(20, 140, 80, 255))
-    draw.text((line_right, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_small, fill=(44, 180, 90, 255), anchor="rm")
+    # Created/Season（固定座標）
+    draw.text((margin, info_y), f"Created on: {created}", font=font_small, fill=(20, 140, 80, 255))
+    draw.text((img_w - margin - 40, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_small, fill=(44, 180, 90, 255), anchor="rm")
 
-    # 横線
-    line_y3 = info_y + 28
-    draw.line([(left_icon_x, line_y3), (line_right, line_y3)], fill=LINE_COLOR, width=2)
+    # 3本目横線
+    draw.line([(line_x1, line_y3), (line_x2, line_y3)], fill=LINE_COLOR, width=2)
 
     # ======= オンラインメンバー（役職ごと・2列表示） =======
     role_header_y = line_y3 + 18
     col_gap = 240
-    role_x1 = left_icon_x
-    role_x2 = left_icon_x + col_gap
+    role_x1 = margin
+    role_x2 = margin + col_gap
     row_h = 30
     member_y = role_header_y
 
