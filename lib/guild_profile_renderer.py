@@ -407,7 +407,8 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
                     online_players.append({
                         "name": player_name,
                         "server": player_data.get("server", "N/A"),
-                        "rank_stars": rank_to_stars.get(rank_name.upper(), "")
+                        "rank_stars": rank_to_stars.get(rank_name.upper(), ""),
+                        "rank": rank_name.upper()
                     })
 
     prefix = sg(guild_data, "prefix", default="")
@@ -446,19 +447,23 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         logger.warning(f"バナー生成に失敗: {e}")
 
     # ======= レイアウト定義（画像サイズ動的計算）=======
-    # オンラインメンバー表示部の高さ（役職ごとに最大人数取り）
+    # オンラインメンバーだけ役職ごとに分けて数える
     role_order = ["CHIEF", "STRATEGIST", "CAPTAIN", "RECRUITER", "RECRUIT"]
+    online_by_role = {role: [] for role in role_order}
+    for p in online_players:
+        rank = p.get("rank", "")
+        if rank in online_by_role:
+            online_by_role[rank].append(p)
+
     member_rows = 0
     for role in role_order:
-        names = list(members.get(role.lower(), {}).keys())
-        member_rows += max(2, math.ceil(len(names)/2)) if names else 2  # 最低2行
-
-    # 各セクションごとの高さ
-    base_height = 240  # タイトル・バナー・ステータス・XPバー
-    info_height = 70   # Created/Season
-    divider_height = 28 * 3  # 3本横線
-    role_header_height = 32 * len(role_order)  # 役職名
-    member_height = 30 * member_rows           # メンバー2列分
+        n = len(online_by_role[role])
+        member_rows += max(1, math.ceil(n / 2)) if n else 1  # 1行は最低用意
+    base_height = 240
+    info_height = 70
+    divider_height = 28 * 3
+    role_header_height = 32 * len(role_order)
+    member_height = 30 * member_rows
     footer_height = 36
     total_height = base_height + info_height + divider_height + role_header_height + member_height + footer_height + 30
 
@@ -467,7 +472,6 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     img = create_card_background(img_w, img_h)
     draw = ImageDraw.Draw(img)
 
-    # --- フォント準備 ---
     try:
         font_title = ImageFont.truetype(FONT_PATH, 48)
         font_sub = ImageFont.truetype(FONT_PATH, 24)
@@ -482,7 +486,7 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     margin = 36
     x_center = img_w // 2
 
-    # ======= 1. ギルド名・バナー =======
+    # ギルド名・バナー
     top_y = margin
     draw.text((x_center, top_y), name, font=font_title, fill=TITLE_COLOR, anchor="ma")
     banner_size = 80
@@ -495,22 +499,17 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         except Exception as e:
             logger.warning(f"バナー貼付失敗: {e}")
 
-    # ======= 2. 横線（アンダーバー） =======
+    # 横線
     line_y1 = top_y + 60
     draw.line([(margin, line_y1), (img_w - margin, line_y1)], fill=LINE_COLOR, width=2)
 
-    # ======= 3. ステータス（左アイコン群＋XPバー） =======
+    # ステータス・XPバー
     icon_size = 32
     stat_y = line_y1 + 18
     icon_gap = 8
-
-    # 左側アイコン群
     left_icon_x = margin
-    # レベルアイコン（仮:四角枠のみ。アイコン追加したい場合はここでimg.paste可）
     draw.rectangle([left_icon_x, stat_y, left_icon_x + icon_size, stat_y + icon_size], fill=(220,180,80,255), outline=LINE_COLOR)
     draw.text((left_icon_x + icon_size // 2, stat_y + icon_size // 2), str(level), font=font_stats, fill=TITLE_COLOR, anchor="mm")
-
-    # XPバー
     xpbar_x = left_icon_x + icon_size + icon_gap
     xpbar_y = stat_y + icon_size // 2 - 12
     xpbar_w = 220
@@ -524,75 +523,78 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], outline=LINE_COLOR)
     draw.text((xpbar_x + xpbar_w + 10, xpbar_y + xpbar_h // 2), f"{xpPercent}%", font=font_stats, fill=TITLE_COLOR, anchor="lm")
 
-    # ======= 4. ステータスアイコン群（人数・戦争・領土・オーナー） =======
+    # ステータスアイコン群
     stats_y2 = stat_y + icon_size + 12
     stats_x = margin
     icon_stats_w = 32
     stats_gap = 80
-    # 人数
     draw.rectangle([stats_x, stats_y2, stats_x + icon_stats_w, stats_y2 + icon_stats_w], fill=(200,200,120,255), outline=LINE_COLOR)
     draw.text((stats_x + icon_stats_w + 8, stats_y2 + 8), f"{len(online_players)}/{total_members}", font=font_stats, fill=TITLE_COLOR)
-    # Wars
     stats_x2 = stats_x + stats_gap
     draw.rectangle([stats_x2, stats_y2, stats_x2 + icon_stats_w, stats_y2 + icon_stats_w], fill=(180,120,100,255), outline=LINE_COLOR)
     draw.text((stats_x2 + icon_stats_w + 8, stats_y2 + 8), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
-    # Territories
     stats_x3 = stats_x2 + stats_gap
     draw.rectangle([stats_x3, stats_y2, stats_x3 + icon_stats_w, stats_y2 + icon_stats_w], fill=(140,140,100,255), outline=LINE_COLOR)
     draw.text((stats_x3 + icon_stats_w + 8, stats_y2 + 8), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
-    # オーナー名
     stats_x4 = stats_x3 + stats_gap
     draw.rectangle([stats_x4, stats_y2, stats_x4 + icon_stats_w, stats_y2 + icon_stats_w], fill=(160,160,180,255), outline=LINE_COLOR)
     draw.text((stats_x4 + icon_stats_w + 8, stats_y2 + 8), owner, font=font_stats, fill=TITLE_COLOR)
 
-    # ======= 5. 横線（2本目） =======
+    # 横線
     line_y2 = stats_y2 + icon_stats_w + 18
     draw.line([(margin, line_y2), (img_w - margin, line_y2)], fill=LINE_COLOR, width=2)
 
-    # ======= 6. Created/Season =======
+    # Created/Season
     info_y = line_y2 + 16
     draw.text((margin, info_y), f"Created on: {created}", font=font_small, fill=(20, 140, 80, 255))
     draw.text((img_w - margin, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_small, fill=(44, 180, 90, 255), anchor="rm")
 
-    # ======= 7. 横線（3本目） =======
+    # 横線
     line_y3 = info_y + 28
     draw.line([(margin, line_y3), (img_w - margin, line_y3)], fill=LINE_COLOR, width=2)
 
-    # ======= 8. オンラインメンバーのみ2列表示 =======
-    member_header_y = line_y3 + 18
+    # ======= オンラインメンバー（役職ごと・2列表示） =======
+    role_header_y = line_y3 + 18
     col_gap = 240
-    member_x1 = margin
-    member_x2 = margin + col_gap
+    role_x1 = margin
+    role_x2 = margin + col_gap
     row_h = 30
-    member_y = member_header_y
+    member_y = role_header_y
 
-    # ヘッダー
-    draw.text((member_x1, member_y), "**ONLINE MEMBERS**", font=font_section, fill=TITLE_COLOR)
-    member_y += 32
+    role_display_map = {
+        "CHIEF": "**CHIEFS**",
+        "STRATEGIST": "**STRATEGISTS**",
+        "CAPTAIN": "*CAPTAINS*",
+        "RECRUITER": "RECRUITERS",
+        "RECRUIT": "RECRUITS"
+    }
+    for role in role_order:
+        draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=TITLE_COLOR)
+        member_y += 32
 
-    # オンラインメンバーのみ2列で描画
-    for i in range(0, len(online_players), 2):
-        p1 = online_players[i]
-        p2 = online_players[i + 1] if i + 1 < len(online_players) else None
+        group_members = online_by_role[role]
+        for i in range(0, len(group_members), 2):
+            p1 = group_members[i]
+            p2 = group_members[i + 1] if i + 1 < len(group_members) else None
 
-        # 左列
-        name1 = p1.get("name", "Unknown")
-        server1 = p1.get("server", "")
-        draw.text((member_x1, member_y), name1, font=font_rank, fill=TITLE_COLOR)
-        if server1:
-            draw.text((member_x1 + 140, member_y), server1, font=font_small, fill=SUBTITLE_COLOR)
+            # 左列
+            name1 = p1.get("name", "Unknown")
+            server1 = p1.get("server", "")
+            draw.text((role_x1, member_y), name1, font=font_rank, fill=TITLE_COLOR)
+            if server1:
+                draw.text((role_x1 + 140, member_y), server1, font=font_small, fill=SUBTITLE_COLOR)
 
-        # 右列
-        if p2:
-            name2 = p2.get("name", "Unknown")
-            server2 = p2.get("server", "")
-            draw.text((member_x2, member_y), name2, font=font_rank, fill=TITLE_COLOR)
-            if server2:
-                draw.text((member_x2 + 140, member_y), server2, font=font_small, fill=SUBTITLE_COLOR)
-        member_y += row_h
-    member_y += 8
+            # 右列
+            if p2:
+                name2 = p2.get("name", "Unknown")
+                server2 = p2.get("server", "")
+                draw.text((role_x2, member_y), name2, font=font_rank, fill=TITLE_COLOR)
+                if server2:
+                    draw.text((role_x2 + 140, member_y), server2, font=font_small, fill=SUBTITLE_COLOR)
+            member_y += row_h
+        member_y += 8
 
-    # ======= 9. フッター =======
+    # フッター
     footer_text = "Generated by Minister Chikuwa"
     try:
         fw = _text_width(draw, footer_text, font=font_small)
