@@ -105,6 +105,337 @@ def draw_status_circle(base_img, left_x, center_y, status="online"):
     draw.ellipse([0, 0, 2*circle_radius-1, 2*circle_radius-1], outline=outline_color, width=2)
     base_img.alpha_composite(circle_img, (left_x, center_y - circle_radius))
 
+def _arc_point(bbox, angle_deg):
+    x0, y0, x1, y1 = bbox
+    cx = (x0 + x1) / 2.0
+    cy = (y0 + y1) / 2.0
+    rx = (x1 - x0) / 2.0
+    ry = (y1 - y0) / 2.0
+    rad = math.radians(angle_deg)
+    x = cx + rx * math.cos(rad)
+    y = cy - ry * math.sin(rad)
+    return (x, y)
+
+def _extend_point(p, q, amount):
+    px, py = p
+    qx, qy = q
+    dx = qx - px
+    dy = qy - py
+    dist = math.hypot(dx, dy)
+    if dist == 0:
+        return qx, qy
+    ux = dx / dist
+    uy = dy / dist
+    return (px + ux * amount, py + uy * amount)
+
+def draw_decorative_frame(
+    img: Image.Image,
+    outer_offset: Optional[int] = None,
+    outer_width: int = 8,
+    inner_offset: Optional[int] = None,
+    inner_width: int = 2,
+    frame_color=(85, 50, 30, 255),
+    # 個別調整用（直線）
+    line_inset_outer_top: Optional[int] = None,
+    line_inset_outer_bottom: Optional[int] = None,
+    line_inset_outer_left: Optional[int] = None,
+    line_inset_outer_right: Optional[int] = None,
+    line_inset_inner_top: Optional[int] = None,
+    line_inset_inner_bottom: Optional[int] = None,
+    line_inset_inner_left: Optional[int] = None,
+    line_inset_inner_right: Optional[int] = None,
+    # 個別調整用（アーチ位置）
+    arc_nudge_outer_topleft_x: int = -4,
+    arc_nudge_outer_topleft_y: int = -27.5,
+    arc_nudge_outer_topright_x: int = 3.75,
+    arc_nudge_outer_topright_y: int = -27.5,
+    arc_nudge_outer_bottomleft_x: int = -4,
+    arc_nudge_outer_bottomleft_y: int = 27.5,
+    arc_nudge_outer_bottomright_x: int = 3.75,
+    arc_nudge_outer_bottomright_y: int = 27.5,
+    arc_nudge_inner_topleft_x: int = -2,
+    arc_nudge_inner_topleft_y: int = -25,
+    arc_nudge_inner_topright_x: int = 2,
+    arc_nudge_inner_topright_y: int = -25,
+    arc_nudge_inner_bottomleft_x: int = -2,
+    arc_nudge_inner_bottomleft_y: int = 25,
+    arc_nudge_inner_bottomright_x: int = 2,
+    arc_nudge_inner_bottomright_y: int = 25,
+    # 個別corner_trim
+    corner_trim_top: Optional[int] = -10,
+    corner_trim_bottom: Optional[int] = -10,
+    corner_trim_left: Optional[int] = -45,
+    corner_trim_right: Optional[int] = -45,
+    # 共通corner_trim（個別指定なければ使う）
+    corner_trim: Optional[int] = None,
+) -> Image.Image:
+    """
+    四辺の太線/細線直線長さと、四隅のアーチ位置を完全個別調整できるバージョン。
+    余計な上限/下限なし。
+    """
+    w, h = img.size
+
+    notch_radius = 12 if min(w, h) * 0.035 < 12 else int(min(w, h) * 0.035)
+    arc_diameter = notch_radius * 2
+    inner_notch_radius = 8 if notch_radius * 0.9 < 8 else int(notch_radius * 0.90)
+    inner_arc_diameter = inner_notch_radius * 2
+
+    arc_pad = int(notch_radius * 0.35)
+    inner_pad = int(inner_notch_radius * 0.30)
+
+    # 直線inset 個別値
+    lo_top = line_inset_outer_top if line_inset_outer_top is not None else -40
+    lo_bottom = line_inset_outer_bottom if line_inset_outer_bottom is not None else -40
+    lo_left = line_inset_outer_left if line_inset_outer_left is not None else -40
+    lo_right = line_inset_outer_right if line_inset_outer_right is not None else -40
+    li_top = line_inset_inner_top if line_inset_inner_top is not None else -32
+    li_bottom = line_inset_inner_bottom if line_inset_inner_bottom is not None else -32
+    li_left = line_inset_inner_left if line_inset_inner_left is not None else -32
+    li_right = line_inset_inner_right if line_inset_inner_right is not None else -32
+
+    # corner_trim 個別値
+    ct_top = corner_trim_top if corner_trim_top is not None else (corner_trim if corner_trim is not None else int(notch_radius * 0.25) - math.ceil(outer_width / 2))
+    ct_bottom = corner_trim_bottom if corner_trim_bottom is not None else (corner_trim if corner_trim is not None else int(notch_radius * 0.25) - math.ceil(outer_width / 2))
+    ct_left = corner_trim_left if corner_trim_left is not None else (corner_trim if corner_trim is not None else int(notch_radius * 0.25) - math.ceil(outer_width / 2))
+    ct_right = corner_trim_right if corner_trim_right is not None else (corner_trim if corner_trim is not None else int(notch_radius * 0.25) - math.ceil(outer_width / 2))
+
+    # offset
+    if outer_offset is None:
+        outer_offset = 12
+    else:
+        outer_offset = int(outer_offset)
+    if inner_offset is None:
+        inner_offset = outer_offset + outer_width + inner_width + 4
+    else:
+        inner_offset = int(inner_offset)
+
+    ox = int(outer_offset)
+    oy = int(outer_offset)
+    ow = int(w - outer_offset * 2)
+    oh = int(h - outer_offset * 2)
+
+    ix = int(inner_offset)
+    iy = int(inner_offset)
+    iw = int(w - inner_offset * 2)
+    ih = int(h - inner_offset * 2)
+
+    out = img.convert("RGBA")
+
+    def _clamp_center(pt, stroke_w):
+        return pt  # clampなし
+
+    def _inflate_bbox(bbox, pad):
+        x0, y0, x1, y1 = bbox
+        return [x0 - pad, y0 - pad, x1 + pad, y1 + pad]
+
+    def _expand_and_clamp_bbox(bbox, pad):
+        x0, y0, x1, y1 = bbox
+        return [x0 - pad, y0 - pad, x1 + pad, y1 + pad]
+
+    # 各辺anchor 個別指定
+    top_y = oy + outer_width / 2 + lo_top
+    bot_y = oy + oh - outer_width / 2 - lo_bottom
+    left_x = ox + outer_width / 2 + lo_left
+    right_x = ox + ow - outer_width / 2 - lo_right
+
+    inner_top_y = iy + inner_width / 2 + li_top
+    inner_bot_y = iy + ih - inner_width / 2 - li_bottom
+    left_ix = ix + inner_width / 2 + li_left
+    right_ix = ix + iw - inner_width / 2 - li_right
+
+    # アーチbbox 個別指定
+    r = arc_diameter / 2.0
+    left_arc_box = [left_x - r + arc_nudge_outer_topleft_x, top_y + arc_nudge_outer_topleft_y, left_x + r + arc_nudge_outer_topleft_x, top_y + 2 * r + arc_nudge_outer_topleft_y]
+    right_arc_box = [right_x - r + arc_nudge_outer_topright_x, top_y + arc_nudge_outer_topright_y, right_x + r + arc_nudge_outer_topright_x, top_y + 2 * r + arc_nudge_outer_topright_y]
+    bottom_left_arc_box = [left_x - r + arc_nudge_outer_bottomleft_x, bot_y - 2 * r + arc_nudge_outer_bottomleft_y, left_x + r + arc_nudge_outer_bottomleft_x, bot_y + arc_nudge_outer_bottomleft_y]
+    bottom_right_arc_box = [right_x - r + arc_nudge_outer_bottomright_x, bot_y - 2 * r + arc_nudge_outer_bottomright_y, right_x + r + arc_nudge_outer_bottomright_x, bot_y + arc_nudge_outer_bottomright_y]
+
+    r_i = inner_arc_diameter / 2.0
+    li_box = [left_ix - r_i + arc_nudge_inner_topleft_x, inner_top_y + arc_nudge_inner_topleft_y, left_ix + r_i + arc_nudge_inner_topleft_x, inner_top_y + 2 * r_i + arc_nudge_inner_topleft_y]
+    ri_box = [right_ix - r_i + arc_nudge_inner_topright_x, inner_top_y + arc_nudge_inner_topright_y, right_ix + r_i + arc_nudge_inner_topright_x, inner_top_y + 2 * r_i + arc_nudge_inner_topright_y]
+    bl_box = [left_ix - r_i + arc_nudge_inner_bottomleft_x, inner_bot_y - 2 * r_i + arc_nudge_inner_bottomleft_y, left_ix + r_i + arc_nudge_inner_bottomleft_x, inner_bot_y + arc_nudge_inner_bottomleft_y]
+    br_box = [right_ix - r_i + arc_nudge_inner_bottomright_x, inner_bot_y - 2 * r_i + arc_nudge_inner_bottomright_y, right_ix + r_i + arc_nudge_inner_bottomright_x, inner_bot_y + arc_nudge_inner_bottomright_y]
+
+    p_left_top = _arc_point(left_arc_box, 90)
+    p_right_top = _arc_point(right_arc_box, 90)
+    p_left_left = _arc_point(left_arc_box, 180)
+    p_left_bot = _arc_point(bottom_left_arc_box, 270)
+    p_right_right = _arc_point(right_arc_box, 0)
+    p_right_bot = _arc_point(bottom_right_arc_box, 270)
+
+    p_ili_top = _arc_point(li_box, 90)
+    p_iri_top = _arc_point(ri_box, 90)
+    p_ili_left = _arc_point(li_box, 180)
+    p_ili_bot = _arc_point(bl_box, 270)
+    p_iri_right = _arc_point(ri_box, 0)
+    p_iri_bot = _arc_point(br_box, 270)
+
+    frame_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw_frame = ImageDraw.Draw(frame_layer)
+
+    # 横線（top）太線
+    start_x = max(ox + lo_left, p_left_top[0] + ct_top)
+    end_x = min(ox + ow - lo_right, p_right_top[0] - ct_top)
+    if start_x < end_x:
+        draw_frame.line([_clamp_center((start_x, top_y), outer_width), _clamp_center((end_x, top_y), outer_width)], fill=frame_color, width=outer_width)
+
+    # 横線（bottom）太線
+    start_x_b = max(ox + lo_left, p_left_bot[0] + ct_bottom)
+    end_x_b = min(ox + ow - lo_right, p_right_bot[0] - ct_bottom)
+    if start_x_b < end_x_b:
+        draw_frame.line([_clamp_center((start_x_b, bot_y), outer_width), _clamp_center((end_x_b, bot_y), outer_width)], fill=frame_color, width=outer_width)
+
+    # 縦線（left）太線
+    start_y = max(oy + lo_top, p_left_left[1] + ct_left)
+    end_y = min(oy + oh - lo_bottom, p_left_bot[1] - ct_left)
+    if start_y < end_y:
+        draw_frame.line([_clamp_center((left_x, start_y), outer_width), _clamp_center((left_x, end_y), outer_width)], fill=frame_color, width=outer_width)
+
+    # 縦線（right）太線
+    start_y_r = max(oy + lo_top, p_right_right[1] + ct_right)
+    end_y_r = min(oy + oh - lo_bottom, p_right_bot[1] - ct_right)
+    if start_y_r < end_y_r:
+        draw_frame.line([_clamp_center((right_x, start_y_r), outer_width), _clamp_center((right_x, end_y_r), outer_width)], fill=frame_color, width=outer_width)
+
+    mask = Image.new("L", (w, h), 255)
+    draw_mask = ImageDraw.Draw(mask)
+    outer_half = outer_width / 2
+    inflate_outer = outer_half + 1
+    draw_mask.ellipse(_inflate_bbox(left_arc_box, inflate_outer), fill=0)
+    draw_mask.ellipse(_inflate_bbox(right_arc_box, inflate_outer), fill=0)
+    draw_mask.ellipse(_inflate_bbox(bottom_left_arc_box, inflate_outer), fill=0)
+    draw_mask.ellipse(_inflate_bbox(bottom_right_arc_box, inflate_outer), fill=0)
+    frame_layer = Image.composite(frame_layer, Image.new("RGBA", (w, h), (0, 0, 0, 0)), mask)
+
+    out = Image.alpha_composite(out, frame_layer)
+
+    draw_out = ImageDraw.Draw(out)
+    stroke_pad = outer_width / 2 + 1
+    left_bbox = _expand_and_clamp_bbox(left_arc_box, stroke_pad)
+    right_bbox = _expand_and_clamp_bbox(right_arc_box, stroke_pad)
+    bl_bbox = _expand_and_clamp_bbox(bottom_left_arc_box, stroke_pad)
+    br_bbox = _expand_and_clamp_bbox(bottom_right_arc_box, stroke_pad)
+
+    try:
+        draw_out.arc(left_bbox, start=0, end=90, fill=frame_color, width=outer_width)
+        draw_out.arc(right_bbox, start=90, end=180, fill=frame_color, width=outer_width)
+        draw_out.arc(br_bbox, start=180, end=270, fill=frame_color, width=outer_width)
+        draw_out.arc(bl_bbox, start=270, end=360, fill=frame_color, width=outer_width)
+    except Exception:
+        pass
+
+    # 細線（inner）も同様に個別パラメータで描画
+    inner_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    draw_inner_layer = ImageDraw.Draw(inner_layer)
+
+    # 横線（top）細線
+    sxi = max(ix + li_left, p_ili_top[0] + ct_top)
+    exi = min(ix + iw - li_right, p_iri_top[0] - ct_top)
+    if sxi < exi:
+        draw_inner_layer.line([_clamp_center((sxi, inner_top_y), inner_width), _clamp_center((exi, inner_top_y), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
+
+    # 横線（bottom）細線
+    sxb = max(ix + li_left, p_ili_bot[0] + ct_bottom)
+    exb = min(ix + iw - li_right, p_iri_bot[0] - ct_bottom)
+    if sxb < exb:
+        draw_inner_layer.line([_clamp_center((sxb, inner_bot_y), inner_width), _clamp_center((exb, inner_bot_y), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
+
+    # 縦線（left）細線
+    syi = max(iy + li_top, p_ili_left[1] + ct_left)
+    eyi = min(iy + ih - li_bottom, p_ili_bot[1] - ct_left)
+    if syi < eyi:
+        draw_inner_layer.line([_clamp_center((left_ix, syi), inner_width), _clamp_center((left_ix, eyi), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
+
+    # 縦線（right）細線
+    syi_r = max(iy + li_top, p_iri_right[1] + ct_right)
+    eyi_r = min(iy + ih - li_bottom, p_iri_bot[1] - ct_right)
+    if syi_r < eyi_r:
+        draw_inner_layer.line([_clamp_center((right_ix, syi_r), inner_width), _clamp_center((right_ix, eyi_r), inner_width)], fill=(95, 60, 35, 220), width=inner_width)
+
+    mask_inner = Image.new("L", (w, h), 255)
+    dm = ImageDraw.Draw(mask_inner)
+    inner_half = inner_width / 2
+    inflate_inner = inner_half + 1
+    dm.ellipse(_inflate_bbox(li_box, inflate_inner), fill=0)
+    dm.ellipse(_inflate_bbox(ri_box, inflate_inner), fill=0)
+    dm.ellipse(_inflate_bbox(bl_box, inflate_inner), fill=0)
+    dm.ellipse(_inflate_bbox(br_box, inflate_inner), fill=0)
+    inner_layer = Image.composite(inner_layer, Image.new("RGBA", (w, h), (0, 0, 0, 0)), mask_inner)
+
+    out = Image.alpha_composite(out, inner_layer)
+
+    draw_out = ImageDraw.Draw(out)
+    stroke_pad_i = inner_width / 2 + 1
+    li_bbox = _expand_and_clamp_bbox(li_box, stroke_pad_i)
+    ri_bbox = _expand_and_clamp_bbox(ri_box, stroke_pad_i)
+    bli_bbox = _expand_and_clamp_bbox(bl_box, stroke_pad_i)
+    bri_bbox = _expand_and_clamp_bbox(br_box, stroke_pad_i)
+
+    try:
+        draw_out.arc(li_bbox, start=0, end=90, fill=(95, 60, 35, 220), width=inner_width)
+        draw_out.arc(ri_bbox, start=90, end=180, fill=(95, 60, 35, 220), width=inner_width)
+        draw_out.arc(bri_bbox, start=180, end=270, fill=(95, 60, 35, 220), width=inner_width)
+        draw_out.arc(bli_bbox, start=270, end=360, fill=(95, 60, 35, 220), width=inner_width)
+    except Exception:
+        pass
+
+    return out
+
+def create_card_background(w: int, h: int,
+                           noise_std: float = 30.0,
+                           noise_blend: float = 0.30,
+                           vignette_blur: int = 80) -> Image.Image:
+    base = Image.new('RGB', (w, h), BASE_BG_COLOR)
+
+    if _HAS_NUMPY:
+        try:
+            noise = np.random.normal(128, noise_std, (h, w))
+            noise = np.clip(noise, 0, 255).astype(np.uint8)
+            noise_img = Image.fromarray(noise, mode='L').convert('RGB')
+        except Exception:
+            noise_img = Image.effect_noise((w, h), int(noise_std)).convert('L').convert('RGB')
+    else:
+        try:
+            noise_img = Image.effect_noise((w, h), int(noise_std)).convert('L').convert('RGB')
+        except Exception:
+            noise_img = Image.new('RGB', (w, h), (128, 128, 128))
+            nd = ImageDraw.Draw(noise_img)
+            for _ in range(max(100, w * h // 1200)):
+                x = random.randrange(0, w)
+                y = random.randrange(0, h)
+                tone = random.randint(90, 180)
+                nd.point((x, y), fill=(tone, tone, tone))
+
+    img = Image.blend(base, noise_img, noise_blend)
+    img = img.filter(ImageFilter.GaussianBlur(1))
+
+    vignette = Image.new('L', (w, h), 0)
+    dv = ImageDraw.Draw(vignette)
+    max_r = int(max(w, h) * 0.75)
+    for i in range(0, max_r, max(6, max_r // 60)):
+        val = int(255 * (i / max_r))
+        bbox = (-i, -i, w + i, h + i)
+        dv.ellipse(bbox, fill=val)
+    vignette = vignette.filter(ImageFilter.GaussianBlur(vignette_blur))
+    vignette = vignette.point(lambda p: max(0, min(255, p)))
+
+    dark_color = (50, 30, 10)
+    dark_img = Image.new('RGB', (w, h), dark_color)
+    composed = Image.composite(img, dark_img, vignette)
+
+    try:
+        composed = draw_decorative_frame(composed.convert('RGBA'),
+                                         outer_offset=60,
+                                         outer_width=max(6, int(w * 0.01)),
+                                         inner_offset=64,
+                                         inner_width=max(1, int(w * 0.005)),
+                                         frame_color=(85, 50, 30, 255))
+    except Exception as e:
+        logger.exception(f"draw_decorative_frame failed: {e}")
+        composed = composed.convert('RGBA')
+
+    return composed
+
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
     def sg(d, *keys, default="N/A"):
         v = d
