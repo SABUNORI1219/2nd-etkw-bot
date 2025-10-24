@@ -147,7 +147,7 @@ def create_card_background(w: int, h: int,
                                          frame_color=(85, 50, 30, 255))
     except Exception as e:
         logger.exception(f"draw_decorative_frame failed: {e}")
-        composed = composed.convert('RGBA')
+        composed = img.convert('RGBA')
     return composed
 
 def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
