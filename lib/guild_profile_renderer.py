@@ -446,7 +446,15 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     except Exception as e:
         logger.warning(f"バナー生成に失敗: {e}")
 
-    # ======= レイアウト定義（画像サイズ動的計算）=======
+    # ======= レイアウト定義（decorative_frame inner準拠） =======
+    # inner枠のパラメータ decorative_frameと揃える
+    inner_offset = 64
+    inner_width = 2
+    margin = 36
+
+    # inner領域のサイズ
+    img_w = max_width
+    # 動的高さ計算は従来通り
     role_order = ["CHIEF", "STRATEGIST", "CAPTAIN", "RECRUITER", "RECRUIT"]
     online_by_role = {role: [] for role in role_order}
     for p in online_players:
@@ -465,8 +473,14 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
     footer_height = 36
     total_height = base_height + info_height + divider_height + role_header_height + member_height + footer_height + 30
 
-    img_w = max_width
     img_h = total_height
+    inner_left = inner_offset
+    inner_top = inner_offset
+    inner_right = img_w - inner_offset
+    inner_bottom = img_h - inner_offset
+    inner_w = inner_right - inner_left
+    inner_h = inner_bottom - inner_top
+
     img = create_card_background(img_w, img_h)
     draw = ImageDraw.Draw(img)
 
@@ -481,22 +495,20 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title_base = font_sub = font_stats = font_small = font_section = font_rank = ImageFont.load_default()
 
-    margin = 36
-    banner_w = 160
-    banner_h = 160
-    banner_x = margin
-    banner_y = margin
-
-    # バナー画像（リサイズせずに貼る。サイズは仮で banner_w x banner_h）
+    # バナー画像（inner右上、リサイズせず。枠内に収める）
+    banner_w = min(140, inner_w // 4)
+    banner_h = min(140, inner_h // 4)
+    banner_x = inner_right - banner_w
+    banner_y = inner_top
     if banner_img:
         img.paste(banner_img, (banner_x, banner_y), mask=banner_img)
 
-    # 横線左端はバナーの右+余白、右端はdecorative_frameから40px離す
-    line_left = banner_x + banner_w + 18
-    line_right = img_w - margin - 40
-    line_y = banner_y + 44
+    # 横線左端はinner枠左+余白、右端はバナー左手前
+    line_left = inner_left + 8
+    line_right = banner_x - 18
+    line_y = banner_y + 36
 
-    # ギルド名（左揃え、横線の上。飛び出す場合はフォントサイズを自動調整）
+    # ギルド名（横線の上、左揃え、フォント自動調整）
     guild_name = name
     font_title = font_title_base
     max_name_width = line_right - line_left
@@ -507,13 +519,13 @@ def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: i
         font_title = ImageFont.truetype(FONT_PATH, font_size)
         name_w = _text_width(draw, guild_name, font_title)
     name_x = line_left
-    name_y = banner_y + 2
+    name_y = line_y - font_title.size - 6
     draw.text((name_x, name_y), guild_name, font=font_title, fill=TITLE_COLOR)
 
     # 横線
     draw.line([(line_left, line_y), (line_right, line_y)], fill=LINE_COLOR, width=2)
 
-    # ステータス・XPバー
+    # ステータス・XPバー（inner枠左から）
     icon_size = 32
     stat_y = line_y + 18
     icon_gap = 8
