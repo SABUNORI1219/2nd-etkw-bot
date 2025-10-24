@@ -68,12 +68,12 @@ class GuildImageCog(commands.Cog):
 
         # 画像生成
         try:
-            img_io: BytesIO = create_guild_image(data_to_use, self.banner_renderer)
+            img_io: BytesIO = await create_guild_image(data_to_use, self.banner_renderer)
             file = discord.File(fp=img_io, filename="guild_card.png")
             await interaction.followup.send(file=file)
         except Exception as e:
             logger.exception("ギルド画像生成中に例外が発生しました")
-            embed = create_embed(description="画像生成中にエラーが発生しました。ログを確認してください。", title="🔴 エラー", color=discord.Color.red(), footer_text="Guild Test")
+            embed = create_embed(description="画像生成中にエラーが発生しました。ログを確認してください。", title="🔴 エラー", color=discord.Color.red(), footer_text="[...]
             await interaction.followup.send(embed=embed)
 
 async def setup(bot: commands.Bot):
