@@ -687,23 +687,21 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             class_type1 = await get_player_class(p1["name"])
             icon_x = x_base
             icon_y = y_base
-            name_x = x_base
+            base_name_x = x_base + class_icon_size + 8
             name_y = y_base
-            font_name = font_rank
             name1 = p1.get("name", "Unknown")
             server1 = p1.get("server", "")
+
+            # --- アイコン貼り付け ---
             if class_type1 and class_type1 in class_icons and class_icons[class_type1]:
                 icon_img = class_icons[class_type1]
                 if class_type1 == "MAGE":
                     size = mage_icon_size
                     rot_img = icon_img.rotate(-45, expand=True, resample=Image.BICUBIC)
                     rot_img = rot_img.resize((size, size), Image.LANCZOS)
-                    # 杖はx座標も左寄せ
                     paste_x = icon_x + (class_icon_size // 2) - (rot_img.width // 2) + mage_icon_x_offset
                     paste_y = icon_y + (class_icon_size // 2) - (rot_img.height // 2)
                     img.paste(rot_img, (paste_x, paste_y), mask=rot_img)
-                    name_x = x_base + class_icon_size + 8
-                    name_y = y_base
                 elif class_type1 == "SHAMAN":
                     size = shaman_icon_size
                     rot_img = icon_img.rotate(-45, expand=True, resample=Image.BICUBIC)
@@ -711,37 +709,28 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                     paste_x = icon_x + (class_icon_size // 2) - (rot_img.width // 2)
                     paste_y = icon_y + (class_icon_size // 2) - (rot_img.height // 2) + shaman_icon_y_offset
                     img.paste(rot_img, (paste_x, paste_y), mask=rot_img)
-                    name_x = x_base + class_icon_size + 8
-                    name_y = y_base
                 else:
                     icon_img_rs = icon_img.resize((class_icon_size, class_icon_size), Image.LANCZOS)
-                    paste_x = icon_x
-                    paste_y = icon_y
-                    img.paste(icon_img_rs, (paste_x, paste_y), mask=icon_img_rs)
-                    name_x = x_base + class_icon_size + 8
-                    name_y = y_base
-            else:
-                name_x = x_base
-                name_y = y_base
-
-            # --- ワールド名の衝突を考慮したフォントサイズ調整 ---
+                    img.paste(icon_img_rs, (icon_x, icon_y), mask=icon_img_rs)
+            # --- 名前の自動フォント縮小＆左下基準揃え ---
             world_x = img_w // 2 - 20
             world_text_w = _text_width(draw, server1, font_rank)
-            max_name_width = world_x - name_x - 8 if server1 else img_w - name_x - 36  # 右余白
+            max_name_width = world_x - base_name_x - 8 if server1 else img_w - base_name_x - 36
             font_size = font_rank.size if hasattr(font_rank, 'size') else 22
             min_font_size = 12
             font_name_draw = font_rank
-            name_bbox = draw.textbbox((name_x, name_y), name1, font=font_rank)
-            while _text_width(draw, name1, font_name_draw) > max_name_width and font_size > min_font_size:
+            default_text_width = _text_width(draw, name1, font_rank)
+            current_text_width = default_text_width
+            while current_text_width > max_name_width and font_size > min_font_size:
                 font_size -= 1
                 font_name_draw = ImageFont.truetype(FONT_PATH, font_size)
-                name_bbox = draw.textbbox((name_x, name_y), name1, font=font_name_draw)
-            # 左下基準で描画
-            left, top, right, bottom = name_bbox
-            base_y = name_y + (font_rank.getmetrics()[0] if hasattr(font_rank, 'getmetrics') else 0)  # ascent
-            # Pillowのanchor='ls'が使える場合は以下一行でも良いが、全バージョン対応のためbboxで微調整
-            draw.text((name_x, base_y), name1, font=font_name_draw, fill=TITLE_COLOR, anchor="ls")
-            # --- ワールド名描画 ---
+                current_text_width = _text_width(draw, name1, font_name_draw)
+            # 左下基準でデフォルト幅の位置に補正
+            adjusted_name_x = base_name_x + (default_text_width - current_text_width)
+            ascent = font_rank.getmetrics()[0] if hasattr(font_rank, 'getmetrics') else 0
+            base_y = name_y + ascent
+            draw.text((adjusted_name_x, base_y), name1, font=font_name_draw, fill=TITLE_COLOR, anchor="ls")
+            # --- ワールド名 ---
             if server1:
                 max_world_x = img_w // 2 + 10
                 if world_x + world_text_w > max_world_x:
@@ -755,9 +744,8 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 class_type2 = await get_player_class(p2["name"])
                 icon_x2 = x_base_2
                 icon_y2 = y_base_2
-                name_x2 = x_base_2
+                base_name_x2 = x_base_2 + class_icon_size + 8
                 name_y2 = y_base_2
-                font_name2 = font_rank
                 name2 = p2.get("name", "Unknown")
                 server2 = p2.get("server", "")
                 if class_type2 and class_type2 in class_icons and class_icons[class_type2]:
@@ -769,8 +757,6 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                         paste_x2 = icon_x2 + (class_icon_size // 2) - (rot_img2.width // 2) + mage_icon_x_offset
                         paste_y2 = icon_y2 + (class_icon_size // 2) - (rot_img2.height // 2)
                         img.paste(rot_img2, (paste_x2, paste_y2), mask=rot_img2)
-                        name_x2 = x_base_2 + class_icon_size + 8
-                        name_y2 = y_base_2
                     elif class_type2 == "SHAMAN":
                         size2 = shaman_icon_size
                         rot_img2 = icon_img2.rotate(-45, expand=True, resample=Image.BICUBIC)
@@ -778,34 +764,26 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                         paste_x2 = icon_x2 + (class_icon_size // 2) - (rot_img2.width // 2)
                         paste_y2 = icon_y2 + (class_icon_size // 2) - (rot_img2.height // 2) + shaman_icon_y_offset
                         img.paste(rot_img2, (paste_x2, paste_y2), mask=rot_img2)
-                        name_x2 = x_base_2 + class_icon_size + 8
-                        name_y2 = y_base_2
                     else:
                         icon_img_rs2 = icon_img2.resize((class_icon_size, class_icon_size), Image.LANCZOS)
-                        paste_x2 = icon_x2
-                        paste_y2 = icon_y2
-                        img.paste(icon_img_rs2, (paste_x2, paste_y2), mask=icon_img_rs2)
-                        name_x2 = x_base_2 + class_icon_size + 8
-                        name_y2 = y_base_2
-                else:
-                    name_x2 = x_base_2
-                    name_y2 = y_base_2
-
-                # --- ワールド名の衝突を考慮したフォントサイズ調整(2列目) ---
+                        img.paste(icon_img_rs2, (icon_x2, icon_y2), mask=icon_img_rs2)
+                # 名前自動縮小＆左下基準補正
                 world_x2 = right_inner_x
                 world_text_w2 = _text_width(draw, server2, world_font)
-                max_name_width2 = world_x2 - name_x2 - 8 if server2 else img_w - name_x2 - 36
+                max_name_width2 = world_x2 - base_name_x2 - 8 if server2 else img_w - base_name_x2 - 36
                 font_size2 = font_rank.size if hasattr(font_rank, 'size') else 22
                 min_font_size2 = 12
                 font_name_draw2 = font_rank
-                name_bbox2 = draw.textbbox((name_x2, name_y2), name2, font=font_rank)
-                while _text_width(draw, name2, font_name_draw2) > max_name_width2 and font_size2 > min_font_size2:
+                default_text_width2 = _text_width(draw, name2, font_rank)
+                current_text_width2 = default_text_width2
+                while current_text_width2 > max_name_width2 and font_size2 > min_font_size2:
                     font_size2 -= 1
                     font_name_draw2 = ImageFont.truetype(FONT_PATH, font_size2)
-                    name_bbox2 = draw.textbbox((name_x2, name_y2), name2, font=font_name_draw2)
-                left2, top2, right2, bottom2 = name_bbox2
-                base_y2 = name_y2 + (font_rank.getmetrics()[0] if hasattr(font_rank, 'getmetrics') else 0)
-                draw.text((name_x2, base_y2), name2, font=font_name_draw2, fill=TITLE_COLOR, anchor="ls")
+                    current_text_width2 = _text_width(draw, name2, font_name_draw2)
+                adjusted_name_x2 = base_name_x2 + (default_text_width2 - current_text_width2)
+                ascent2 = font_rank.getmetrics()[0] if hasattr(font_rank, 'getmetrics') else 0
+                base_y2 = name_y2 + ascent2
+                draw.text((adjusted_name_x2, base_y2), name2, font=font_name_draw2, fill=TITLE_COLOR, anchor="ls")
                 if server2:
                     max_world_x2 = right_inner_x
                     world_x2 = max_world_x2 - world_text_w2 - 8
