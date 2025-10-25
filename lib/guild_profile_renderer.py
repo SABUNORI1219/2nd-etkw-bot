@@ -623,16 +623,16 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     draw.text((stats_x + icon_size + 8, stats_y2 + 4), f"{len(online_players)}/{total_members}", font=font_stats, fill=TITLE_COLOR)
     if war_icon:
         war_icon_rs = war_icon.resize((icon_size, icon_size), Image.LANCZOS)
-        img.paste(war_icon_rs, (stats_x2 + 140, stats_y2), mask=war_icon_rs)
-    draw.text((stats_x2 + icon_size + 8 + 140, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
+        img.paste(war_icon_rs, (stats_x2 + 80, stats_y2), mask=war_icon_rs)
+    draw.text((stats_x2 + icon_size + 8 + 80, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
     if territory_icon:
         territory_icon_rs = territory_icon.resize((icon_size, icon_size), Image.LANCZOS)
-        img.paste(territory_icon_rs, (stats_x, stats_y2 + 42), mask=territory_icon_rs)
-    draw.text((stats_x + icon_size + 8, stats_y2 + 46), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
+        img.paste(territory_icon_rs, (stats_x2 + 160, stats_y2), mask=territory_icon_rs)
+    draw.text((stats_x2 + icon_size + 8, stats_y2 + 4), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
     if owner_icon:
         owner_icon_rs = owner_icon.resize((icon_size, icon_size), Image.LANCZOS)
-        img.paste(owner_icon_rs, (stats_x2 + 140, stats_y2 + 42), mask=owner_icon_rs)
-    draw.text((stats_x2 + icon_size + 8 + 140, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
+        img.paste(owner_icon_rs, (stats_x, stats_y2 + 42), mask=owner_icon_rs)
+    draw.text((stats_x + icon_size + 8, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
 
     draw.line([(line_x1, line_y2), (img_w - margin - 8, line_y2)], fill=LINE_COLOR, width=2)
 
@@ -687,13 +687,10 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             class_type1 = await get_player_class(p1["name"])
             icon_x = x_base
             icon_y = y_base
-            base_name_x = x_base + class_icon_size + 8
-            name_y = y_base
-            name1 = p1.get("name", "Unknown")
-            server1 = p1.get("server", "")
-
-            # --- アイコン貼り付け ---
+            # クラス取得できた時はアイコンの右隣、なければアイコンなしで左詰め
             if class_type1 and class_type1 in class_icons and class_icons[class_type1]:
+                base_name_x = x_base + class_icon_size + 8
+                # ---- アイコン貼り付け処理（従来通り） ----
                 icon_img = class_icons[class_type1]
                 if class_type1 == "MAGE":
                     size = mage_icon_size
@@ -712,7 +709,15 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 else:
                     icon_img_rs = icon_img.resize((class_icon_size, class_icon_size), Image.LANCZOS)
                     img.paste(icon_img_rs, (icon_x, icon_y), mask=icon_img_rs)
-            # --- 名前の自動フォント縮小＆左下基準揃え ---
+            else:
+                # クラスなし→完全左詰め
+                base_name_x = x_base
+
+            name_y = y_base
+            name1 = p1.get("name", "Unknown")
+            server1 = p1.get("server", "")
+
+            # --- ワールド名の幅に応じてリサイズ ---
             world_x = img_w // 2 - 20
             world_text_w = _text_width(draw, server1, font_rank)
             max_name_width = world_x - base_name_x - 8 if server1 else img_w - base_name_x - 36
@@ -744,11 +749,8 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 class_type2 = await get_player_class(p2["name"])
                 icon_x2 = x_base_2
                 icon_y2 = y_base_2
-                base_name_x2 = x_base_2 + class_icon_size + 8
-                name_y2 = y_base_2
-                name2 = p2.get("name", "Unknown")
-                server2 = p2.get("server", "")
                 if class_type2 and class_type2 in class_icons and class_icons[class_type2]:
+                    base_name_x2 = x_base_2 + class_icon_size + 8
                     icon_img2 = class_icons[class_type2]
                     if class_type2 == "MAGE":
                         size2 = mage_icon_size
@@ -767,7 +769,14 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                     else:
                         icon_img_rs2 = icon_img2.resize((class_icon_size, class_icon_size), Image.LANCZOS)
                         img.paste(icon_img_rs2, (icon_x2, icon_y2), mask=icon_img_rs2)
-                # 名前自動縮小＆左下基準補正
+                else:
+                    # クラスなし→完全左詰め
+                    base_name_x2 = x_base_2
+
+                name_y2 = y_base_2
+                name2 = p2.get("name", "Unknown")
+                server2 = p2.get("server", "")
+                # ワールド名の幅に応じてリサイズ
                 world_x2 = right_inner_x
                 world_text_w2 = _text_width(draw, server2, world_font)
                 max_name_width2 = world_x2 - base_name_x2 - 8 if server2 else img_w - base_name_x2 - 36
