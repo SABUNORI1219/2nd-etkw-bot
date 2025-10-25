@@ -592,12 +592,33 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
     draw.line([(line_x1, line_y), (line_x2, line_y)], fill=LINE_COLOR, width=2)
 
+    # ----------- xp_bar 復活部分ここから -----------
+    # レベル四角
+    stat_icon_x = margin + 20
+    stat_icon_y = stat_y
+    draw.rectangle([stat_icon_x, stat_icon_y, stat_icon_x + icon_size, stat_icon_y + icon_size], fill=(220,180,80,255), outline=LINE_COLOR)
+    draw.text((stat_icon_x + icon_size // 2, stat_icon_y + icon_size // 2), str(level), font=font_stats, fill=TITLE_COLOR, anchor="mm")
+
+    # XPバー
+    xpbar_x = stat_icon_x + icon_size + icon_gap
+    xpbar_y = stat_icon_y + icon_size // 2 - 12
+    xpbar_w = 220
+    xpbar_h = 24
+    draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], fill=(120, 100, 80, 255))
+    xp_fill = float(xpPercent) / 100.0 if xpPercent else 0
+    fill_w = int(xpbar_w * xp_fill)
+    bar_color = (60, 144, 255, 255) if xp_fill >= 0.8 else (44, 180, 90, 255) if xp_fill >= 0.5 else (220, 160, 52, 255)
+    if fill_w > 0:
+        draw.rectangle([xpbar_x, xpbar_y, xpbar_x + fill_w, xpbar_y + xpbar_h], fill=bar_color)
+    draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], outline=LINE_COLOR)
+    draw.text((xpbar_x + xpbar_w + 10, xpbar_y + xpbar_h // 2), f"{xpPercent}%", font=font_stats, fill=TITLE_COLOR, anchor="lm")
+    # ----------- xp_bar 復活部分ここまで -----------
+
     stats_gap = 80
     stats_y2 = stat_icon_y + icon_size + 12
     stats_x = margin + 20
     stats_x2 = stats_x + stats_gap
 
-    # メンバー/War等アイコンはここでリサイズしてからペースト
     if member_icon:
         member_icon_rs = member_icon.resize((icon_size, icon_size), Image.LANCZOS)
         img.paste(member_icon_rs, (stats_x, stats_y2), mask=member_icon_rs)
