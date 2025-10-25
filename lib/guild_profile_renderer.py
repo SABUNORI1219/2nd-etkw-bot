@@ -563,8 +563,9 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
     # --- すべて同じサイズで読み込む ---
     class_icon_size = 28
-    mage_icon_size = 34
+    mage_icon_size = 36
     shaman_icon_size = 36
+    shaman_icon_y_offset = -3
     class_icons = {}
     for class_name, path in CLASS_ICON_MAP.items():
         class_icons[class_name] = _load_icon(path)
@@ -631,6 +632,8 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         img.paste(owner_icon_rs, (stats_x2 + 140, stats_y2 + 42), mask=owner_icon_rs)
     draw.text((stats_x2 + icon_size + 8 + 140, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
 
+    draw.line([(line_x1, line_y2), (img_w - margin - 8, line_y2)], fill=LINE_COLOR, width=2)
+
     created_x = margin + 20
     season_x = created_x
     if created_icon:
@@ -645,12 +648,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         draw.text((season_x + icon_size + 8, info_y + 46), f"{rating_display} SR (Season {latest_season})", font=font_stats, fill=TITLE_COLOR)
     else:
         draw.text((season_x, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=TITLE_COLOR)
-
-    draw.line([(line_x1, line_y2), (img_w - margin - 8, line_y2)], fill=LINE_COLOR, width=2)
-
-    created_x = margin + 20
-    season_x = created_x
-
+    
     draw.line([(line_x1, line_y3), (img_w - margin - 8, line_y3)], fill=LINE_COLOR, width=2)
 
     role_header_y = line_y3 + 18
@@ -685,26 +683,41 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             x_base = role_x1
             y_base = member_y
             class_type1 = await get_player_class(p1["name"])
+            icon_x = x_base
+            icon_y = y_base
             name_x = x_base
+            name_y = y_base
             if class_type1 and class_type1 in class_icons and class_icons[class_type1]:
                 icon_img = class_icons[class_type1]
-                if class_type1 in ("MAGE", "SHAMAN"):
-                    if class_type1 == "MAGE":
-                        size = mage_icon_size
-                    else:
-                        size = shaman_icon_size
+                if class_type1 == "MAGE":
+                    size = mage_icon_size
                     rot_img = icon_img.rotate(-45, expand=True, resample=Image.BICUBIC)
                     rot_img = rot_img.resize((size, size), Image.LANCZOS)
-                    img.paste(rot_img, (x_base, y_base), mask=rot_img)
-                    name_x = x_base + size + 8
+                    # ペースト位置: アイコンの中心が28x28基準になるよう調整
+                    paste_y = icon_y + (class_icon_size - size) // 2
+                    img.paste(rot_img, (icon_x, paste_y), mask=rot_img)
+                    name_x = x_base + class_icon_size + 8
+                    name_y = y_base
+                elif class_type1 == "SHAMAN":
+                    size = shaman_icon_size
+                    rot_img = icon_img.rotate(-45, expand=True, resample=Image.BICUBIC)
+                    rot_img = rot_img.resize((size, size), Image.LANCZOS)
+                    # RelikはY方向にちょい上げ(例: -3px)
+                    paste_y = icon_y + (class_icon_size - size) // 2 + shaman_icon_y_offset
+                    img.paste(rot_img, (icon_x, paste_y), mask=rot_img)
+                    name_x = x_base + class_icon_size + 8
+                    name_y = y_base
                 else:
                     icon_img_rs = icon_img.resize((class_icon_size, class_icon_size), Image.LANCZOS)
-                    img.paste(icon_img_rs, (x_base, y_base), mask=icon_img_rs)
+                    img.paste(icon_img_rs, (icon_x, icon_y), mask=icon_img_rs)
                     name_x = x_base + class_icon_size + 8
+                    name_y = y_base
             else:
                 name_x = x_base
+                name_y = y_base
             name1 = p1.get("name", "Unknown")
-            draw.text((name_x, y_base), name1, font=font_rank, fill=TITLE_COLOR)
+            # 名前Y座標は全クラスで共通(name_y)に
+            draw.text((name_x, name_y), name1, font=font_rank, fill=TITLE_COLOR)
             server1 = p1.get("server", "")
             if server1:
                 world_x = img_w // 2 - 20
@@ -719,26 +732,38 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 x_base_2 = role_x2
                 y_base_2 = member_y
                 class_type2 = await get_player_class(p2["name"])
+                icon_x2 = x_base_2
+                icon_y2 = y_base_2
                 name_x2 = x_base_2
+                name_y2 = y_base_2
                 if class_type2 and class_type2 in class_icons and class_icons[class_type2]:
                     icon_img2 = class_icons[class_type2]
-                    if class_type2 in ("MAGE", "SHAMAN"):
-                        if class_type2 == "MAGE":
-                            size = mage_icon_size
-                        else:
-                            size = shaman_icon_size
+                    if class_type2 == "MAGE":
+                        size2 = mage_icon_size
                         rot_img2 = icon_img2.rotate(-45, expand=True, resample=Image.BICUBIC)
-                        rot_img2 = rot_img2.resize((size, size), Image.LANCZOS)
-                        img.paste(rot_img2, (x_base_2, y_base_2), mask=rot_img2)
-                        name_x2 = x_base_2 + size + 8
+                        rot_img2 = rot_img2.resize((size2, size2), Image.LANCZOS)
+                        paste_y2 = icon_y2 + (class_icon_size - size2) // 2
+                        img.paste(rot_img2, (icon_x2, paste_y2), mask=rot_img2)
+                        name_x2 = x_base_2 + class_icon_size + 8
+                        name_y2 = y_base_2
+                    elif class_type2 == "SHAMAN":
+                        size2 = shaman_icon_size
+                        rot_img2 = icon_img2.rotate(-45, expand=True, resample=Image.BICUBIC)
+                        rot_img2 = rot_img2.resize((size2, size2), Image.LANCZOS)
+                        paste_y2 = icon_y2 + (class_icon_size - size2) // 2 + shaman_icon_y_offset
+                        img.paste(rot_img2, (icon_x2, paste_y2), mask=rot_img2)
+                        name_x2 = x_base_2 + class_icon_size + 8
+                        name_y2 = y_base_2
                     else:
                         icon_img_rs2 = icon_img2.resize((class_icon_size, class_icon_size), Image.LANCZOS)
-                        img.paste(icon_img_rs2, (x_base_2, y_base_2), mask=icon_img_rs2)
+                        img.paste(icon_img_rs2, (icon_x2, icon_y2), mask=icon_img_rs2)
                         name_x2 = x_base_2 + class_icon_size + 8
+                        name_y2 = y_base_2
                 else:
                     name_x2 = x_base_2
+                    name_y2 = y_base_2
                 name2 = p2.get("name", "Unknown")
-                draw.text((name_x2, y_base_2), name2, font=font_rank, fill=TITLE_COLOR)
+                draw.text((name_x2, name_y2), name2, font=font_rank, fill=TITLE_COLOR)
                 server2 = p2.get("server", "")
                 if server2:
                     world_text_w2 = _text_width(draw, server2, world_font)
