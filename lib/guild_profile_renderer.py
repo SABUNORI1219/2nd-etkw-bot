@@ -592,14 +592,10 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
     draw.line([(line_x1, line_y), (line_x2, line_y)], fill=LINE_COLOR, width=2)
 
-    # ----------- xp_bar 復活部分ここから -----------
-    # レベル四角
     stat_icon_x = margin + 20
     stat_icon_y = stat_y
     draw.rectangle([stat_icon_x, stat_icon_y, stat_icon_x + icon_size, stat_icon_y + icon_size], fill=(220,180,80,255), outline=LINE_COLOR)
     draw.text((stat_icon_x + icon_size // 2, stat_icon_y + icon_size // 2), str(level), font=font_stats, fill=TITLE_COLOR, anchor="mm")
-
-    # XPバー
     xpbar_x = stat_icon_x + icon_size + icon_gap
     xpbar_y = stat_icon_y + icon_size // 2 - 12
     xpbar_w = 220
@@ -612,7 +608,6 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         draw.rectangle([xpbar_x, xpbar_y, xpbar_x + fill_w, xpbar_y + xpbar_h], fill=bar_color)
     draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], outline=LINE_COLOR)
     draw.text((xpbar_x + xpbar_w + 10, xpbar_y + xpbar_h // 2), f"{xpPercent}%", font=font_stats, fill=TITLE_COLOR, anchor="lm")
-    # ----------- xp_bar 復活部分ここまで -----------
 
     stats_gap = 80
     stats_y2 = stat_icon_y + icon_size + 12
@@ -635,6 +630,9 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         owner_icon_rs = owner_icon.resize((icon_size, icon_size), Image.LANCZOS)
         img.paste(owner_icon_rs, (stats_x2 + 140, stats_y2 + 42), mask=owner_icon_rs)
     draw.text((stats_x2 + icon_size + 8 + 140, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
+
+    created_x = margin + 20
+    season_x = created_x
     if created_icon:
         created_icon_rs = created_icon.resize((icon_size, icon_size), Image.LANCZOS)
         img.paste(created_icon_rs, (created_x, info_y), mask=created_icon_rs)
