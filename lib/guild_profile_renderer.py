@@ -623,12 +623,12 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     draw.text((stats_x + icon_size + 8, stats_y2 + 4), f"{len(online_players)}/{total_members}", font=font_stats, fill=TITLE_COLOR)
     if war_icon:
         war_icon_rs = war_icon.resize((icon_size, icon_size), Image.LANCZOS)
-        img.paste(war_icon_rs, (stats_x2 + 80, stats_y2), mask=war_icon_rs)
-    draw.text((stats_x2 + icon_size + 8 + 80, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
+        img.paste(war_icon_rs, (stats_x2 + 120, stats_y2), mask=war_icon_rs)
+    draw.text((stats_x2 + icon_size + 120 + 8, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
     if territory_icon:
         territory_icon_rs = territory_icon.resize((icon_size, icon_size), Image.LANCZOS)
-        img.paste(territory_icon_rs, (stats_x2 + 160, stats_y2), mask=territory_icon_rs)
-    draw.text((stats_x2 + icon_size + 8, stats_y2 + 4), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
+        img.paste(territory_icon_rs, (stats_x2 + 240, stats_y2), mask=territory_icon_rs)
+    draw.text((stats_x2 + icon_size + 240 + 8, stats_y2 + 4), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
     if owner_icon:
         owner_icon_rs = owner_icon.resize((icon_size, icon_size), Image.LANCZOS)
         img.paste(owner_icon_rs, (stats_x, stats_y2 + 42), mask=owner_icon_rs)
