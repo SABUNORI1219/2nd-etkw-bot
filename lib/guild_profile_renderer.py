@@ -522,7 +522,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     line_y = name_y + 48 + 16
 
     stat_y = line_y + 16
-    icon_size = 32
+    icon_size = 30
     icon_gap = 8
     left_icon_x = margin
 
@@ -563,6 +563,8 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
     # --- すべて同じサイズで読み込む ---
     class_icon_size = 28
+    mage_icon_size = 34
+    shaman_icon_size = 36
     class_icons = {}
     for class_name, path in CLASS_ICON_MAP.items():
         class_icons[class_name] = _load_icon(path)
@@ -679,6 +681,10 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 icon_img = class_icons[class_type1]
                 # 必ず28x28に縮小してから（回転→縮小 or 縮小→回転どちらでも画質OKだが、中心揃えのため以下の処理）
                 if class_type1 in ("MAGE", "SHAMAN"):
+                    if class_type1 == "MAGE":
+                        size = mage_icon_size
+                    else:
+                        size = shaman_icon_size
                     # ① 48x48→回転→28x28にリサイズ
                     rot_img = icon_img.rotate(-45, expand=True, resample=Image.BICUBIC)
                     rot_img = rot_img.resize((class_icon_size, class_icon_size), Image.LANCZOS)
@@ -711,6 +717,10 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 if class_type2 and class_type2 in class_icons and class_icons[class_type2]:
                     icon_img2 = class_icons[class_type2]
                     if class_type2 in ("MAGE", "SHAMAN"):
+                        if class_type2 == "MAGE":
+                            size = mage_icon_size
+                        else:
+                            size = shaman_icon_size
                         rot_img2 = icon_img2.rotate(-45, expand=True, resample=Image.BICUBIC)
                         rot_img2 = rot_img2.resize((class_icon_size, class_icon_size), Image.LANCZOS)
                         img.paste(rot_img2, (x_base_2, y_base_2), mask=rot_img2)
@@ -727,7 +737,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 if server2:
                     world_text_w2 = _text_width(draw, server2, world_font)
                     max_world_x2 = right_inner_x
-                    world_x2 = max_world_x2 - world_text_w2
+                    world_x2 = max_world_x2 - world_text_w2 - 8
                     draw.text((world_x2, y_base_2), server2, font=world_font, fill=SUBTITLE_COLOR)
             member_y += row_h
         member_y += 8
