@@ -413,17 +413,11 @@ def create_card_background(w: int, h: int,
     return composed
 
 async def get_player_class(player_name: str) -> Optional[str]:
-    """
-    WynncraftAPIを使い、player_cog.pyと同じやり方でクラス名を取得する
-    """
     api = WynncraftAPI()
     try:
-        # 非同期APIラッパーを使う（player_cog.pyと同じ）
         player_data = await api.get_official_player_data(player_name)
         if not player_data or not isinstance(player_data, dict):
-            logger.info(f"[DEBUG] get_player_class: No API data for {player_name}")
             return None
-        # player_cog.pyのsafe_getを模倣
         def safe_get(d, keys, default=None):
             v = d
             for k in keys:
@@ -435,14 +429,11 @@ async def get_player_class(player_name: str) -> Optional[str]:
             return v
         active_char_uuid = safe_get(player_data, ['activeCharacter'])
         if not active_char_uuid:
-            logger.info(f"[DEBUG] get_player_class: activeCharacter missing for {player_name}")
             return None
         char_obj = safe_get(player_data, ['characters', active_char_uuid], {})
         class_type = safe_get(char_obj, ['type'])
         if class_type in CLASS_ICON_MAP:
-            logger.info(f"[DEBUG] get_player_class({player_name}) -> {class_type}")
             return class_type
-        logger.info(f"[DEBUG] get_player_class({player_name}) -> None (not a known class)")
         return None
     except Exception as e:
         logger.warning(f"get_player_class失敗: {player_name}: {e}")
@@ -458,8 +449,6 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             if v is None:
                 return default
         return v
-
-    logger.info("[DEBUG] Start create_guild_image")
 
     # --- メンバー情報取得 ---
     members = guild_data.get("members", {}) or {}
@@ -485,7 +474,6 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                         "rank_stars": rank_to_stars.get(rank_name.upper(), ""),
                         "rank": rank_name.upper()
                     })
-    logger.info(f"[DEBUG] online_players: {online_players}")
 
     prefix = sg(guild_data, "prefix", default="")
     name = sg(guild_data, "name", default="Unknown Guild")
@@ -510,7 +498,6 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             rating_display = f"{rating:,}" if isinstance(rating, int) else rating
         except Exception:
             latest_season = "N/A"
-    logger.info(f"[DEBUG] guild_name: {name}, owner: {owner}, created: {created}")
 
     banner_img = None
     try:
@@ -551,7 +538,6 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         rank = p.get("rank", "")
         if rank in online_by_role:
             online_by_role[rank].append(p)
-    logger.info(f"[DEBUG] online_by_role: {online_by_role}")
 
     member_rows = 0
     for role in role_order:
@@ -577,16 +563,23 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title_base = font_sub = font_stats = font_small = font_section = font_rank = ImageFont.load_default()
 
+    # --- アイコンサイズ調整 ---
+    class_icons = {}
+    for class_name, path in CLASS_ICON_MAP.items():
+        # Wand, Relikのみ大きめ
+        if class_name == "MAGE":
+            class_icons[class_name] = _load_icon(path, 36)
+        elif class_name == "SHAMAN":
+            class_icons[class_name] = _load_icon(path, 38)
+        else:
+            class_icons[class_name] = _load_icon(path, 28)
+
     member_icon = _load_icon(ICON_PATHS["member"], icon_size)
     war_icon = _load_icon(ICON_PATHS["war"], icon_size)
     territory_icon = _load_icon(ICON_PATHS["territory"], icon_size)
     owner_icon = _load_icon(ICON_PATHS["owner"], icon_size)
     created_icon = _load_icon(ICON_PATHS["created"], icon_size)
     season_icon = _load_icon(ICON_PATHS["season"], icon_size)
-    class_icons = {}
-    for class_name, path in CLASS_ICON_MAP.items():
-        class_icons[class_name] = _load_icon(path, 28)
-    logger.info(f"[DEBUG] class_icons keys: {list(class_icons.keys())}")
 
     if banner_img:
         img.paste(banner_img, (banner_x, banner_y), mask=banner_img)
@@ -672,10 +665,10 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     }
 
     world_font = font_rank
-    class_icon_size = 28
+
     right_inner_x = img_w - MARGIN - 8
 
-    # --- クラス取得箇所だけ修正 ---
+    # --- クラスアイコンのみ（クラス名併記は削除） ---
     for role in role_order:
         draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=(85, 50, 30, 255))
         member_y += 32
@@ -688,18 +681,13 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             # --- 一列目 ---
             x_base = role_x1
             y_base = member_y
-            logger.info(f"[DEBUG] Getting class for 1st column player: {p1['name']}")
             class_type1 = await get_player_class(p1["name"])
-            logger.info(f"[DEBUG] get_player_class({p1['name']}) -> {class_type1}")
             name_x = x_base
             if class_type1 and class_type1 in class_icons and class_icons[class_type1]:
                 icon_img = class_icons[class_type1]
-                logger.info(f"[DEBUG] icon_img for {class_type1}: {icon_img}")
                 img.paste(icon_img, (x_base, y_base), mask=icon_img)
-                draw.text((x_base + class_icon_size + 8, y_base), class_type1, font=font_rank, fill=SUBTITLE_COLOR)
-                name_x = x_base + class_icon_size + 8 + _text_width(draw, class_type1, font_rank) + 8
+                name_x = x_base + icon_img.size[0] + 8
             else:
-                logger.info(f"[DEBUG] No class icon for {p1['name']} ({class_type1})")
                 name_x = x_base
             name1 = p1.get("name", "Unknown")
             draw.text((name_x, y_base), name1, font=font_rank, fill=TITLE_COLOR)
@@ -716,18 +704,13 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             if p2:
                 x_base_2 = role_x2
                 y_base_2 = member_y
-                logger.info(f"[DEBUG] Getting class for 2nd column player: {p2['name']}")
                 class_type2 = await get_player_class(p2["name"])
-                logger.info(f"[DEBUG] get_player_class({p2['name']}) -> {class_type2}")
                 name_x2 = x_base_2
                 if class_type2 and class_type2 in class_icons and class_icons[class_type2]:
                     icon_img2 = class_icons[class_type2]
-                    logger.info(f"[DEBUG] icon_img2 for {class_type2}: {icon_img2}")
                     img.paste(icon_img2, (x_base_2, y_base_2), mask=icon_img2)
-                    draw.text((x_base_2 + class_icon_size + 8, y_base_2), class_type2, font=font_rank, fill=SUBTITLE_COLOR)
-                    name_x2 = x_base_2 + class_icon_size + 8 + _text_width(draw, class_type2, font_rank) + 8
+                    name_x2 = x_base_2 + icon_img2.size[0] + 8
                 else:
-                    logger.info(f"[DEBUG] No class icon for {p2['name']} ({class_type2})")
                     name_x2 = x_base_2
                 name2 = p2.get("name", "Unknown")
                 draw.text((name_x2, y_base_2), name2, font=font_rank, fill=TITLE_COLOR)
@@ -758,5 +741,4 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     except Exception:
         pass
 
-    logger.info("[DEBUG] End create_guild_image")
     return out_bytes
