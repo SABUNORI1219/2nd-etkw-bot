@@ -592,8 +592,11 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
     draw.line([(line_x1, line_y), (line_x2, line_y)], fill=LINE_COLOR, width=2)
 
-    stat_icon_x = margin + 20
-    stat_icon_y = stat_y
+    stats_gap = 80
+    stats_y2 = stat_icon_y + icon_size + 12
+    stats_x = margin + 20
+    stats_x2 = stats_x + stats_gap
+
     # メンバー/War等アイコンはここでリサイズしてからペースト
     if member_icon:
         member_icon_rs = member_icon.resize((icon_size, icon_size), Image.LANCZOS)
@@ -623,11 +626,6 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         draw.text((season_x + icon_size + 8, info_y + 46), f"{rating_display} SR (Season {latest_season})", font=font_stats, fill=TITLE_COLOR)
     else:
         draw.text((season_x, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=TITLE_COLOR)
-
-    stats_gap = 80
-    stats_y2 = stat_icon_y + icon_size + 12
-    stats_x = margin + 20
-    stats_x2 = stats_x + stats_gap
 
     draw.line([(line_x1, line_y2), (img_w - margin - 8, line_y2)], fill=LINE_COLOR, width=2)
 
