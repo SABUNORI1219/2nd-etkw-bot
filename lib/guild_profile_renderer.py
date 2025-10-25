@@ -687,10 +687,8 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             class_type1 = await get_player_class(p1["name"])
             icon_x = x_base
             icon_y = y_base
-            # クラス取得できた時はアイコンの右隣、なければアイコンなしで左詰め
             if class_type1 and class_type1 in class_icons and class_icons[class_type1]:
                 base_name_x = x_base + class_icon_size + 8
-                # ---- アイコン貼り付け処理（従来通り） ----
                 icon_img = class_icons[class_type1]
                 if class_type1 == "MAGE":
                     size = mage_icon_size
@@ -710,14 +708,12 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                     icon_img_rs = icon_img.resize((class_icon_size, class_icon_size), Image.LANCZOS)
                     img.paste(icon_img_rs, (icon_x, icon_y), mask=icon_img_rs)
             else:
-                # クラスなし→完全左詰め
                 base_name_x = x_base
 
             name_y = y_base
             name1 = p1.get("name", "Unknown")
             server1 = p1.get("server", "")
 
-            # --- ワールド名の幅に応じてリサイズ ---
             world_x = img_w // 2 - 20
             world_text_w = _text_width(draw, server1, font_rank)
             max_name_width = world_x - base_name_x - 8 if server1 else img_w - base_name_x - 36
@@ -726,21 +722,28 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             font_name_draw = font_rank
             default_text_width = _text_width(draw, name1, font_rank)
             current_text_width = default_text_width
+
+            logger.info(f"[BEFORE_RESIZE] name={name1} server={server1} font_size={font_size} name_x={base_name_x} name_width={current_text_width} world_x={world_x} max_name_width={max_name_width}")
+
+            # リサイズループ
             while current_text_width > max_name_width and font_size > min_font_size:
                 font_size -= 1
                 font_name_draw = ImageFont.truetype(FONT_PATH, font_size)
                 current_text_width = _text_width(draw, name1, font_name_draw)
-            # 左下基準でデフォルト幅の位置に補正
+                logger.info(f"[RESIZE_LOOP] name={name1} font_size={font_size} name_width={current_text_width} max_name_width={max_name_width}")
+
             adjusted_name_x = base_name_x + (default_text_width - current_text_width)
-            ascent = font_rank.getmetrics()[0] if hasattr(font_rank, 'getmetrics') else 0
+            ascent = font_name_draw.getmetrics()[0] if hasattr(font_name_draw, 'getmetrics') else 0
             base_y = name_y + ascent
+            logger.info(f"[DRAW_NAME] name={name1} font_size={font_size} adjusted_name_x={adjusted_name_x} base_y={base_y} ascent={ascent} anchor=ls")
             draw.text((adjusted_name_x, base_y), name1, font=font_name_draw, fill=TITLE_COLOR, anchor="ls")
-            # --- ワールド名 ---
+
             if server1:
                 max_world_x = img_w // 2 + 10
                 if world_x + world_text_w > max_world_x:
                     world_x = max_world_x - world_text_w
-                draw.text((world_x, y_base), server1, font=world_font, fill=SUBTITLE_COLOR)
+                logger.info(f"[DRAW_WORLD] name={name1} world={server1} world_x={world_x} y_base={y_base}")
+                draw.text((world_x, y_base), server1, font=font_rank, fill=SUBTITLE_COLOR)
 
             # --- 二列目 ---
             if p2:
@@ -770,33 +773,42 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                         icon_img_rs2 = icon_img2.resize((class_icon_size, class_icon_size), Image.LANCZOS)
                         img.paste(icon_img_rs2, (icon_x2, icon_y2), mask=icon_img_rs2)
                 else:
-                    # クラスなし→完全左詰め
                     base_name_x2 = x_base_2
 
                 name_y2 = y_base_2
                 name2 = p2.get("name", "Unknown")
                 server2 = p2.get("server", "")
-                # ワールド名の幅に応じてリサイズ
+
                 world_x2 = right_inner_x
-                world_text_w2 = _text_width(draw, server2, world_font)
+                world_text_w2 = _text_width(draw, server2, font_rank)
                 max_name_width2 = world_x2 - base_name_x2 - 8 if server2 else img_w - base_name_x2 - 36
                 font_size2 = font_rank.size if hasattr(font_rank, 'size') else 22
                 min_font_size2 = 12
                 font_name_draw2 = font_rank
                 default_text_width2 = _text_width(draw, name2, font_rank)
                 current_text_width2 = default_text_width2
+
+                logger.info(f"[BEFORE_RESIZE] name={name2} server={server2} font_size={font_size2} name_x={base_name_x2} name_width={current_text_width2} world_x={world_x2} max_name_width={max_name_width2}")
+
                 while current_text_width2 > max_name_width2 and font_size2 > min_font_size2:
                     font_size2 -= 1
                     font_name_draw2 = ImageFont.truetype(FONT_PATH, font_size2)
                     current_text_width2 = _text_width(draw, name2, font_name_draw2)
+                    logger.info(f"[RESIZE_LOOP] name={name2} font_size={font_size2} name_width={current_text_width2} max_name_width={max_name_width2}")
+
                 adjusted_name_x2 = base_name_x2 + (default_text_width2 - current_text_width2)
-                ascent2 = font_rank.getmetrics()[0] if hasattr(font_rank, 'getmetrics') else 0
+                ascent2 = font_name_draw2.getmetrics()[0] if hasattr(font_name_draw2, 'getmetrics') else 0
                 base_y2 = name_y2 + ascent2
+                logger.info(f"[DRAW_NAME] name={name2} font_size={font_size2} adjusted_name_x={adjusted_name_x2} base_y={base_y2} ascent={ascent2} anchor=ls")
                 draw.text((adjusted_name_x2, base_y2), name2, font=font_name_draw2, fill=TITLE_COLOR, anchor="ls")
+
                 if server2:
                     max_world_x2 = right_inner_x
-                    world_x2 = max_world_x2 - world_text_w2 - 8
-                    draw.text((world_x2, y_base_2), server2, font=world_font, fill=SUBTITLE_COLOR)
+                    if world_x2 + world_text_w2 > max_world_x2:
+                        world_x2 = max_world_x2 - world_text_w2 - 8
+                    logger.info(f"[DRAW_WORLD] name={name2} world={server2} world_x={world_x2} y_base={y_base_2}")
+                    draw.text((world_x2, y_base_2), server2, font=font_rank, fill=SUBTITLE_COLOR)
+
             member_y += row_h
         member_y += 8
 
