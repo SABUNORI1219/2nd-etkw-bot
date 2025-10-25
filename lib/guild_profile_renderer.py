@@ -563,16 +563,11 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
         font_title_base = font_sub = font_stats = font_small = font_section = font_rank = ImageFont.load_default()
 
-    # --- アイコンサイズ調整 ---
+    # --- すべて同じサイズで読み込む ---
+    class_icon_size = 28
     class_icons = {}
     for class_name, path in CLASS_ICON_MAP.items():
-        # Wand, Relikのみ大きめ
-        if class_name == "MAGE":
-            class_icons[class_name] = _load_icon(path, 36)
-        elif class_name == "SHAMAN":
-            class_icons[class_name] = _load_icon(path, 38)
-        else:
-            class_icons[class_name] = _load_icon(path, 28)
+        class_icons[class_name] = _load_icon(path, class_icon_size)
 
     member_icon = _load_icon(ICON_PATHS["member"], icon_size)
     war_icon = _load_icon(ICON_PATHS["war"], icon_size)
@@ -668,7 +663,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
     right_inner_x = img_w - MARGIN - 8
 
-    # --- クラスアイコンのみ（クラス名併記は削除） ---
+    # --- クラスアイコンのみ（Wand, Relikは時計回り45度回転してペースト） ---
     for role in role_order:
         draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=(85, 50, 30, 255))
         member_y += 32
@@ -685,6 +680,9 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             name_x = x_base
             if class_type1 and class_type1 in class_icons and class_icons[class_type1]:
                 icon_img = class_icons[class_type1]
+                # Wand/Relikのみ時計回り45度回転してペースト
+                if class_type1 in ("MAGE", "SHAMAN"):
+                    icon_img = icon_img.rotate(-45, expand=True)
                 img.paste(icon_img, (x_base, y_base), mask=icon_img)
                 name_x = x_base + icon_img.size[0] + 8
             else:
@@ -708,6 +706,8 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 name_x2 = x_base_2
                 if class_type2 and class_type2 in class_icons and class_icons[class_type2]:
                     icon_img2 = class_icons[class_type2]
+                    if class_type2 in ("MAGE", "SHAMAN"):
+                        icon_img2 = icon_img2.rotate(-45, expand=True)
                     img.paste(icon_img2, (x_base_2, y_base_2), mask=icon_img2)
                     name_x2 = x_base_2 + icon_img2.size[0] + 8
                 else:
