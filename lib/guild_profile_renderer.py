@@ -715,24 +715,19 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             server1 = p1.get("server", "")
 
             world_x = img_w // 2 - 20
-            world_text_w = _text_width(draw, server1, font_rank)
-            max_name_width = world_x - base_name_x - 8 if server1 else img_w - base_name_x - 36
+            # ここで右端判定によるリサイズに修正
             font_size = font_rank.size if hasattr(font_rank, 'size') else 22
             min_font_size = 12
             font_name_draw = font_rank
-            default_text_width = _text_width(draw, name1, font_rank)
-            current_text_width = default_text_width
-
-            logger.info(f"[BEFORE_RESIZE] name={name1} server={server1} font_size={font_size} name_x={base_name_x} name_width={current_text_width} world_x={world_x} max_name_width={max_name_width}")
-
-            # リサイズループ
-            while current_text_width > max_name_width and font_size > min_font_size:
+            current_text_width = _text_width(draw, name1, font_name_draw)
+            logger.info(f"[BEFORE_RESIZE] name={name1} server={server1} font_size={font_size} name_x={base_name_x} name_width={current_text_width} world_x={world_x}")
+            # 本質的な「右端＞左端」判定
+            while server1 and (base_name_x + current_text_width) > world_x and font_size > min_font_size:
                 font_size -= 1
                 font_name_draw = ImageFont.truetype(FONT_PATH, font_size)
                 current_text_width = _text_width(draw, name1, font_name_draw)
-                logger.info(f"[RESIZE_LOOP] name={name1} font_size={font_size} name_width={current_text_width} max_name_width={max_name_width}")
-
-            adjusted_name_x = base_name_x + (default_text_width - current_text_width)
+                logger.info(f"[RESIZE_LOOP] name={name1} font_size={font_size} name_x={base_name_x} name_right={base_name_x+current_text_width} world_x={world_x}")
+            adjusted_name_x = base_name_x
             ascent = font_name_draw.getmetrics()[0] if hasattr(font_name_draw, 'getmetrics') else 0
             base_y = name_y + ascent
             logger.info(f"[DRAW_NAME] name={name1} font_size={font_size} adjusted_name_x={adjusted_name_x} base_y={base_y} ascent={ascent} anchor=ls")
@@ -740,6 +735,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
             if server1:
                 max_world_x = img_w // 2 + 10
+                world_text_w = _text_width(draw, server1, font_rank)
                 if world_x + world_text_w > max_world_x:
                     world_x = max_world_x - world_text_w
                 logger.info(f"[DRAW_WORLD] name={name1} world={server1} world_x={world_x} y_base={y_base}")
@@ -780,23 +776,17 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 server2 = p2.get("server", "")
 
                 world_x2 = right_inner_x
-                world_text_w2 = _text_width(draw, server2, font_rank)
-                max_name_width2 = world_x2 - base_name_x2 - 8 if server2 else img_w - base_name_x2 - 36
                 font_size2 = font_rank.size if hasattr(font_rank, 'size') else 22
                 min_font_size2 = 12
                 font_name_draw2 = font_rank
-                default_text_width2 = _text_width(draw, name2, font_rank)
-                current_text_width2 = default_text_width2
-
-                logger.info(f"[BEFORE_RESIZE] name={name2} server={server2} font_size={font_size2} name_x={base_name_x2} name_width={current_text_width2} world_x={world_x2} max_name_width={max_name_width2}")
-
-                while current_text_width2 > max_name_width2 and font_size2 > min_font_size2:
+                current_text_width2 = _text_width(draw, name2, font_name_draw2)
+                logger.info(f"[BEFORE_RESIZE] name={name2} server={server2} font_size={font_size2} name_x={base_name_x2} name_width={current_text_width2} world_x={world_x2}")
+                while server2 and (base_name_x2 + current_text_width2) > world_x2 and font_size2 > min_font_size2:
                     font_size2 -= 1
                     font_name_draw2 = ImageFont.truetype(FONT_PATH, font_size2)
                     current_text_width2 = _text_width(draw, name2, font_name_draw2)
-                    logger.info(f"[RESIZE_LOOP] name={name2} font_size={font_size2} name_width={current_text_width2} max_name_width={max_name_width2}")
-
-                adjusted_name_x2 = base_name_x2 + (default_text_width2 - current_text_width2)
+                    logger.info(f"[RESIZE_LOOP] name={name2} font_size={font_size2} name_x={base_name_x2} name_right={base_name_x2+current_text_width2} world_x={world_x2}")
+                adjusted_name_x2 = base_name_x2
                 ascent2 = font_name_draw2.getmetrics()[0] if hasattr(font_name_draw2, 'getmetrics') else 0
                 base_y2 = name_y2 + ascent2
                 logger.info(f"[DRAW_NAME] name={name2} font_size={font_size2} adjusted_name_x={adjusted_name_x2} base_y={base_y2} ascent={ascent2} anchor=ls")
@@ -804,6 +794,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
                 if server2:
                     max_world_x2 = right_inner_x
+                    world_text_w2 = _text_width(draw, server2, font_rank)
                     if world_x2 + world_text_w2 > max_world_x2:
                         world_x2 = max_world_x2 - world_text_w2 - 8
                     logger.info(f"[DRAW_WORLD] name={name2} world={server2} world_x={world_x2} y_base={y_base_2}")
