@@ -569,12 +569,12 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     for class_name, path in CLASS_ICON_MAP.items():
         class_icons[class_name] = _load_icon(path)
 
-    member_icon = _load_icon(ICON_PATHS["member"], icon_size)
-    war_icon = _load_icon(ICON_PATHS["war"], icon_size)
-    territory_icon = _load_icon(ICON_PATHS["territory"], icon_size)
-    owner_icon = _load_icon(ICON_PATHS["owner"], icon_size)
-    created_icon = _load_icon(ICON_PATHS["created"], icon_size)
-    season_icon = _load_icon(ICON_PATHS["season"], icon_size)
+    member_icon = _load_icon(ICON_PATHS["member"])
+    war_icon = _load_icon(ICON_PATHS["war"])
+    territory_icon = _load_icon(ICON_PATHS["territory"])
+    owner_icon = _load_icon(ICON_PATHS["owner"])
+    created_icon = _load_icon(ICON_PATHS["created"])
+    season_icon = _load_icon(ICON_PATHS["season"])
 
     if banner_img:
         img.paste(banner_img, (banner_x, banner_y), mask=banner_img)
@@ -594,53 +594,45 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
     stat_icon_x = margin + 20
     stat_icon_y = stat_y
-    draw.rectangle([stat_icon_x, stat_icon_y, stat_icon_x + icon_size, stat_icon_y + icon_size], fill=(220,180,80,255), outline=LINE_COLOR)
-    draw.text((stat_icon_x + icon_size // 2, stat_icon_y + icon_size // 2), str(level), font=font_stats, fill=TITLE_COLOR, anchor="mm")
-    xpbar_x = stat_icon_x + icon_size + icon_gap
-    xpbar_y = stat_icon_y + icon_size // 2 - 12
-    xpbar_w = 220
-    xpbar_h = 24
-    draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], fill=(120, 100, 80, 255))
-    xp_fill = float(xpPercent) / 100.0 if xpPercent else 0
-    fill_w = int(xpbar_w * xp_fill)
-    bar_color = (60, 144, 255, 255) if xp_fill >= 0.8 else (44, 180, 90, 255) if xp_fill >= 0.5 else (220, 160, 52, 255)
-    if fill_w > 0:
-        draw.rectangle([xpbar_x, xpbar_y, xpbar_x + fill_w, xpbar_y + xpbar_h], fill=bar_color)
-    draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], outline=LINE_COLOR)
-    draw.text((xpbar_x + xpbar_w + 10, xpbar_y + xpbar_h // 2), f"{xpPercent}%", font=font_stats, fill=TITLE_COLOR, anchor="lm")
+    # メンバー/War等アイコンはここでリサイズしてからペースト
+    if member_icon:
+        member_icon_rs = member_icon.resize((icon_size, icon_size), Image.LANCZOS)
+        img.paste(member_icon_rs, (stats_x, stats_y2), mask=member_icon_rs)
+    draw.text((stats_x + icon_size + 8, stats_y2 + 4), f"{len(online_players)}/{total_members}", font=font_stats, fill=TITLE_COLOR)
+    if war_icon:
+        war_icon_rs = war_icon.resize((icon_size, icon_size), Image.LANCZOS)
+        img.paste(war_icon_rs, (stats_x2 + 140, stats_y2), mask=war_icon_rs)
+    draw.text((stats_x2 + icon_size + 8 + 140, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
+    if territory_icon:
+        territory_icon_rs = territory_icon.resize((icon_size, icon_size), Image.LANCZOS)
+        img.paste(territory_icon_rs, (stats_x, stats_y2 + 42), mask=territory_icon_rs)
+    draw.text((stats_x + icon_size + 8, stats_y2 + 46), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
+    if owner_icon:
+        owner_icon_rs = owner_icon.resize((icon_size, icon_size), Image.LANCZOS)
+        img.paste(owner_icon_rs, (stats_x2 + 140, stats_y2 + 42), mask=owner_icon_rs)
+    draw.text((stats_x2 + icon_size + 8 + 140, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
+    if created_icon:
+        created_icon_rs = created_icon.resize((icon_size, icon_size), Image.LANCZOS)
+        img.paste(created_icon_rs, (created_x, info_y), mask=created_icon_rs)
+        draw.text((created_x + icon_size + 8, info_y + 4), f"Since {created}", font=font_stats, fill=TITLE_COLOR)
+    else:
+        draw.text((created_x, info_y), f"Created on: {created}", font=font_stats, fill=TITLE_COLOR)
+    if season_icon:
+        season_icon_rs = season_icon.resize((icon_size, icon_size), Image.LANCZOS)
+        img.paste(season_icon_rs, (season_x, info_y + 42), mask=season_icon_rs)
+        draw.text((season_x + icon_size + 8, info_y + 46), f"{rating_display} SR (Season {latest_season})", font=font_stats, fill=TITLE_COLOR)
+    else:
+        draw.text((season_x, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=TITLE_COLOR)
 
     stats_gap = 80
     stats_y2 = stat_icon_y + icon_size + 12
     stats_x = margin + 20
     stats_x2 = stats_x + stats_gap
 
-    if member_icon:
-        img.paste(member_icon, (stats_x, stats_y2), mask=member_icon)
-    draw.text((stats_x + icon_size + 8, stats_y2 + 4), f"{len(online_players)}/{total_members}", font=font_stats, fill=TITLE_COLOR)
-    if war_icon:
-        img.paste(war_icon, (stats_x2 + 140, stats_y2), mask=war_icon)
-    draw.text((stats_x2 + icon_size + 8 + 140, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
-    if territory_icon:
-        img.paste(territory_icon, (stats_x, stats_y2 + 42), mask=territory_icon)
-    draw.text((stats_x + icon_size + 8, stats_y2 + 46), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
-    if owner_icon:
-        img.paste(owner_icon, (stats_x2 + 140, stats_y2 + 42), mask=owner_icon)
-    draw.text((stats_x2 + icon_size + 8 + 140, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
-
     draw.line([(line_x1, line_y2), (img_w - margin - 8, line_y2)], fill=LINE_COLOR, width=2)
 
     created_x = margin + 20
     season_x = created_x
-    if created_icon:
-        img.paste(created_icon, (created_x, info_y), mask=created_icon)
-        draw.text((created_x + icon_size + 8, info_y + 4), f"Since {created}", font=font_stats, fill=TITLE_COLOR)
-    else:
-        draw.text((created_x, info_y), f"Created on: {created}", font=font_stats, fill=TITLE_COLOR)
-    if season_icon:
-        img.paste(season_icon, (season_x, info_y + 42), mask=season_icon)
-        draw.text((season_x + icon_size + 8, info_y + 46), f"{rating_display} SR (Season {latest_season})", font=font_stats, fill=TITLE_COLOR)
-    else:
-        draw.text((season_x, info_y), f"Latest SR: {rating_display} (Season {latest_season})", font=font_stats, fill=TITLE_COLOR)
 
     draw.line([(line_x1, line_y3), (img_w - margin - 8, line_y3)], fill=LINE_COLOR, width=2)
 
@@ -679,18 +671,15 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             name_x = x_base
             if class_type1 and class_type1 in class_icons and class_icons[class_type1]:
                 icon_img = class_icons[class_type1]
-                # 必ず28x28に縮小してから（回転→縮小 or 縮小→回転どちらでも画質OKだが、中心揃えのため以下の処理）
                 if class_type1 in ("MAGE", "SHAMAN"):
                     if class_type1 == "MAGE":
                         size = mage_icon_size
                     else:
                         size = shaman_icon_size
-                    # ① 48x48→回転→28x28にリサイズ
                     rot_img = icon_img.rotate(-45, expand=True, resample=Image.BICUBIC)
-                    rot_img = rot_img.resize((class_icon_size, class_icon_size), Image.LANCZOS)
-                    # ペーストはそのまま
+                    rot_img = rot_img.resize((size, size), Image.LANCZOS)
                     img.paste(rot_img, (x_base, y_base), mask=rot_img)
-                    name_x = x_base + class_icon_size + 8
+                    name_x = x_base + size + 8
                 else:
                     icon_img_rs = icon_img.resize((class_icon_size, class_icon_size), Image.LANCZOS)
                     img.paste(icon_img_rs, (x_base, y_base), mask=icon_img_rs)
@@ -722,9 +711,9 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                         else:
                             size = shaman_icon_size
                         rot_img2 = icon_img2.rotate(-45, expand=True, resample=Image.BICUBIC)
-                        rot_img2 = rot_img2.resize((class_icon_size, class_icon_size), Image.LANCZOS)
+                        rot_img2 = rot_img2.resize((size, size), Image.LANCZOS)
                         img.paste(rot_img2, (x_base_2, y_base_2), mask=rot_img2)
-                        name_x2 = x_base_2 + class_icon_size + 8
+                        name_x2 = x_base_2 + size + 8
                     else:
                         icon_img_rs2 = icon_img2.resize((class_icon_size, class_icon_size), Image.LANCZOS)
                         img.paste(icon_img_rs2, (x_base_2, y_base_2), mask=icon_img_rs2)
