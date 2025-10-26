@@ -672,7 +672,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
     right_inner_x = img_w - MARGIN - 8
 
-    for role in role_order:
+        for role in role_order:
         draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=(85, 50, 30, 255))
         member_y += 32
 
@@ -682,74 +682,75 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             p2 = group_members[i + 1] if i + 1 < len(group_members) else None
 
             # --- 一列目 ---
-            x_base = role_x1
-            y_base = member_y
+            x1 = role_x1
+            y1 = member_y
             class_type1 = await get_player_class(p1["name"])
-            icon_x = x_base
-            icon_y = y_base
+            icon_x1 = x1
+            icon_y1 = y1
             if class_type1 and class_type1 in class_icons and class_icons[class_type1]:
-                base_name_x = x_base + class_icon_size + 8
-                icon_img = class_icons[class_type1]
+                name_x1 = x1 + class_icon_size + 8
+                icon_img1 = class_icons[class_type1]
                 if class_type1 == "MAGE":
-                    size = mage_icon_size
-                    rot_img = icon_img.rotate(-45, expand=True, resample=Image.BICUBIC)
-                    rot_img = rot_img.resize((size, size), Image.LANCZOS)
-                    paste_x = icon_x + (class_icon_size // 2) - (rot_img.width // 2) + mage_icon_x_offset
-                    paste_y = icon_y + (class_icon_size // 2) - (rot_img.height // 2)
-                    img.paste(rot_img, (paste_x, paste_y), mask=rot_img)
+                    size1 = mage_icon_size
+                    rot_img1 = icon_img1.rotate(-45, expand=True, resample=Image.BICUBIC)
+                    rot_img1 = rot_img1.resize((size1, size1), Image.LANCZOS)
+                    paste_x1 = icon_x1 + (class_icon_size // 2) - (rot_img1.width // 2) + mage_icon_x_offset
+                    paste_y1 = icon_y1 + (class_icon_size // 2) - (rot_img1.height // 2)
+                    img.paste(rot_img1, (paste_x1, paste_y1), mask=rot_img1)
                 elif class_type1 == "SHAMAN":
-                    size = shaman_icon_size
-                    rot_img = icon_img.rotate(-45, expand=True, resample=Image.BICUBIC)
-                    rot_img = rot_img.resize((size, size), Image.LANCZOS)
-                    paste_x = icon_x + (class_icon_size // 2) - (rot_img.width // 2)
-                    paste_y = icon_y + (class_icon_size // 2) - (rot_img.height // 2) + shaman_icon_y_offset
-                    img.paste(rot_img, (paste_x, paste_y), mask=rot_img)
+                    size1 = shaman_icon_size
+                    rot_img1 = icon_img1.rotate(-45, expand=True, resample=Image.BICUBIC)
+                    rot_img1 = rot_img1.resize((size1, size1), Image.LANCZOS)
+                    paste_x1 = icon_x1 + (class_icon_size // 2) - (rot_img1.width // 2)
+                    paste_y1 = icon_y1 + (class_icon_size // 2) - (rot_img1.height // 2) + shaman_icon_y_offset
+                    img.paste(rot_img1, (paste_x1, paste_y1), mask=rot_img1)
                 else:
-                    icon_img_rs = icon_img.resize((class_icon_size, class_icon_size), Image.LANCZOS)
-                    img.paste(icon_img_rs, (icon_x, icon_y), mask=icon_img_rs)
+                    icon_img_rs1 = icon_img1.resize((class_icon_size, class_icon_size), Image.LANCZOS)
+                    img.paste(icon_img_rs1, (icon_x1, icon_y1), mask=icon_img_rs1)
             else:
-                base_name_x = x_base
+                name_x1 = x1
 
-            name_y = y_base
+            name_y1 = y1
             name1 = p1.get("name", "Unknown")
             server1 = p1.get("server", "")
 
-            world_x = img_w // 2 - 20
-            # ここで右端判定によるリサイズに修正
-            font_size = font_rank.size if hasattr(font_rank, 'size') else 22
-            min_font_size = 12
-            font_name_draw = font_rank
-            current_text_width = _text_width(draw, name1, font_name_draw)
-            logger.info(f"[BEFORE_RESIZE] name={name1} server={server1} font_size={font_size} name_x={base_name_x} name_width={current_text_width} world_x={world_x}")
-            # 本質的な「右端＞左端」判定
-            while server1 and (base_name_x + current_text_width) > world_x and font_size > min_font_size:
-                font_size -= 1
-                font_name_draw = ImageFont.truetype(FONT_PATH, font_size)
-                current_text_width = _text_width(draw, name1, font_name_draw)
-                logger.info(f"[RESIZE_LOOP] name={name1} font_size={font_size} name_x={base_name_x} name_right={base_name_x+current_text_width} world_x={world_x}")
-            adjusted_name_x = base_name_x
-            ascent = font_name_draw.getmetrics()[0] if hasattr(font_name_draw, 'getmetrics') else 0
-            base_y = name_y + ascent
-            logger.info(f"[DRAW_NAME] name={name1} font_size={font_size} adjusted_name_x={adjusted_name_x} base_y={base_y} ascent={ascent} anchor=ls")
-            draw.text((adjusted_name_x, base_y), name1, font=font_name_draw, fill=TITLE_COLOR, anchor="ls")
+            # ワールド名の描画座標決定・補正
+            world_x1 = img_w // 2 - 20
+            world_text_w1 = _text_width(draw, server1, font_rank)
+            max_world_x1 = img_w // 2 + 10
+            if server1 and world_x1 + world_text_w1 > max_world_x1:
+                world_x1 = max_world_x1 - world_text_w1
+
+            # リサイズ判定も「描画時のworld_x1」を使う
+            font_size1 = font_rank.size if hasattr(font_rank, 'size') else 22
+            min_font_size1 = 12
+            font_name_draw1 = font_rank
+            current_text_width1 = _text_width(draw, name1, font_name_draw1)
+            logger.info(f"[BEFORE_RESIZE] name={name1} server={server1} font_size={font_size1} name_x={name_x1} name_width={current_text_width1} world_x={world_x1}")
+            while server1 and (name_x1 + current_text_width1) > world_x1 and font_size1 > min_font_size1:
+                font_size1 -= 1
+                font_name_draw1 = ImageFont.truetype(FONT_PATH, font_size1)
+                current_text_width1 = _text_width(draw, name1, font_name_draw1)
+                logger.info(f"[RESIZE_LOOP] name={name1} font_size={font_size1} name_x={name_x1} name_right={name_x1+current_text_width1} world_x={world_x1}")
+
+            ascent1 = font_name_draw1.getmetrics()[0] if hasattr(font_name_draw1, 'getmetrics') else 0
+            base_y1 = name_y1 + ascent1
+            logger.info(f"[DRAW_NAME] name={name1} font_size={font_size1} adjusted_name_x={name_x1} base_y={base_y1} ascent={ascent1} anchor=ls")
+            draw.text((name_x1, base_y1), name1, font=font_name_draw1, fill=TITLE_COLOR, anchor="ls")
 
             if server1:
-                max_world_x = img_w // 2 + 10
-                world_text_w = _text_width(draw, server1, font_rank)
-                if world_x + world_text_w > max_world_x:
-                    world_x = max_world_x - world_text_w
-                logger.info(f"[DRAW_WORLD] name={name1} world={server1} world_x={world_x} y_base={y_base}")
-                draw.text((world_x, y_base), server1, font=font_rank, fill=SUBTITLE_COLOR)
+                logger.info(f"[DRAW_WORLD] name={name1} world={server1} world_x={world_x1} y_base={y1}")
+                draw.text((world_x1, y1), server1, font=font_rank, fill=SUBTITLE_COLOR)
 
             # --- 二列目 ---
             if p2:
-                x_base_2 = role_x2
-                y_base_2 = member_y
+                x2 = role_x2
+                y2 = member_y
                 class_type2 = await get_player_class(p2["name"])
-                icon_x2 = x_base_2
-                icon_y2 = y_base_2
+                icon_x2 = x2
+                icon_y2 = y2
                 if class_type2 and class_type2 in class_icons and class_icons[class_type2]:
-                    base_name_x2 = x_base_2 + class_icon_size + 8
+                    name_x2 = x2 + class_icon_size + 8
                     icon_img2 = class_icons[class_type2]
                     if class_type2 == "MAGE":
                         size2 = mage_icon_size
@@ -769,36 +770,39 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                         icon_img_rs2 = icon_img2.resize((class_icon_size, class_icon_size), Image.LANCZOS)
                         img.paste(icon_img_rs2, (icon_x2, icon_y2), mask=icon_img_rs2)
                 else:
-                    base_name_x2 = x_base_2
+                    name_x2 = x2
 
-                name_y2 = y_base_2
+                name_y2 = y2
                 name2 = p2.get("name", "Unknown")
                 server2 = p2.get("server", "")
 
+                # ワールド名の描画座標決定・補正
                 world_x2 = right_inner_x
+                world_text_w2 = _text_width(draw, server2, font_rank)
+                max_world_x2 = right_inner_x
+                if server2 and world_x2 + world_text_w2 > max_world_x2:
+                    world_x2 = max_world_x2 - world_text_w2 - 8
+
+                # リサイズ判定も「描画時のworld_x2」を使う
                 font_size2 = font_rank.size if hasattr(font_rank, 'size') else 22
                 min_font_size2 = 12
                 font_name_draw2 = font_rank
                 current_text_width2 = _text_width(draw, name2, font_name_draw2)
-                logger.info(f"[BEFORE_RESIZE] name={name2} server={server2} font_size={font_size2} name_x={base_name_x2} name_width={current_text_width2} world_x={world_x2}")
-                while server2 and (base_name_x2 + current_text_width2) > world_x2 and font_size2 > min_font_size2:
+                logger.info(f"[BEFORE_RESIZE] name={name2} server={server2} font_size={font_size2} name_x={name_x2} name_width={current_text_width2} world_x={world_x2}")
+                while server2 and (name_x2 + current_text_width2) > world_x2 and font_size2 > min_font_size2:
                     font_size2 -= 1
                     font_name_draw2 = ImageFont.truetype(FONT_PATH, font_size2)
                     current_text_width2 = _text_width(draw, name2, font_name_draw2)
-                    logger.info(f"[RESIZE_LOOP] name={name2} font_size={font_size2} name_x={base_name_x2} name_right={base_name_x2+current_text_width2} world_x={world_x2}")
-                adjusted_name_x2 = base_name_x2
+                    logger.info(f"[RESIZE_LOOP] name={name2} font_size={font_size2} name_x={name_x2} name_right={name_x2+current_text_width2} world_x={world_x2}")
+
                 ascent2 = font_name_draw2.getmetrics()[0] if hasattr(font_name_draw2, 'getmetrics') else 0
                 base_y2 = name_y2 + ascent2
-                logger.info(f"[DRAW_NAME] name={name2} font_size={font_size2} adjusted_name_x={adjusted_name_x2} base_y={base_y2} ascent={ascent2} anchor=ls")
-                draw.text((adjusted_name_x2, base_y2), name2, font=font_name_draw2, fill=TITLE_COLOR, anchor="ls")
+                logger.info(f"[DRAW_NAME] name={name2} font_size={font_size2} adjusted_name_x={name_x2} base_y={base_y2} ascent={ascent2} anchor=ls")
+                draw.text((name_x2, base_y2), name2, font=font_name_draw2, fill=TITLE_COLOR, anchor="ls")
 
                 if server2:
-                    max_world_x2 = right_inner_x
-                    world_text_w2 = _text_width(draw, server2, font_rank)
-                    if world_x2 + world_text_w2 > max_world_x2:
-                        world_x2 = max_world_x2 - world_text_w2 - 8
-                    logger.info(f"[DRAW_WORLD] name={name2} world={server2} world_x={world_x2} y_base={y_base_2}")
-                    draw.text((world_x2, y_base_2), server2, font=font_rank, fill=SUBTITLE_COLOR)
+                    logger.info(f"[DRAW_WORLD] name={name2} world={server2} world_x={world_x2} y_base={y2}")
+                    draw.text((world_x2, y2), server2, font=font_rank, fill=SUBTITLE_COLOR)
 
             member_y += row_h
         member_y += 8
