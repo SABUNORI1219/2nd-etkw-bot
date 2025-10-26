@@ -721,25 +721,30 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             if server1 and world_x1 + world_text_w1 > max_world_x1:
                 world_x1 = max_world_x1 - world_text_w1
 
-            # リサイズ判定も「描画時のworld_x1」を使う
             font_size1 = font_rank.size if hasattr(font_rank, 'size') else 22
             min_font_size1 = 12
             font_name_draw1 = font_rank
             current_text_width1 = _text_width(draw, name1, font_name_draw1)
-            logger.info(f"[BEFORE_RESIZE] name={name1} server={server1} font_size={font_size1} name_x={name_x1} name_width={current_text_width1} world_x={world_x1}")
+            resized1 = False
             while server1 and (name_x1 + current_text_width1) > world_x1 and font_size1 > min_font_size1:
                 font_size1 -= 1
                 font_name_draw1 = ImageFont.truetype(FONT_PATH, font_size1)
                 current_text_width1 = _text_width(draw, name1, font_name_draw1)
-                logger.info(f"[RESIZE_LOOP] name={name1} font_size={font_size1} name_x={name_x1} name_right={name_x1+current_text_width1} world_x={world_x1}")
+                resized1 = True
 
-            ascent1 = font_name_draw1.getmetrics()[0] if hasattr(font_name_draw1, 'getmetrics') else 0
-            base_y1 = name_y1 + ascent1
-            logger.info(f"[DRAW_NAME] name={name1} font_size={font_size1} adjusted_name_x={name_x1} base_y={base_y1} ascent={ascent1} anchor=ls")
+            # y補正: リサイズが発動した場合だけワールド名の下端に揃える
+            if resized1 and server1:
+                world_bbox1 = draw.textbbox((world_x1, y1), server1, font=font_rank)
+                name_bbox1 = draw.textbbox((name_x1, 0), name1, font=font_name_draw1)
+                world_bottom1 = world_bbox1[3]
+                name_height1 = name_bbox1[3] - name_bbox1[1]
+                base_y1 = world_bottom1 - name_height1
+            else:
+                ascent1 = font_name_draw1.getmetrics()[0] if hasattr(font_name_draw1, 'getmetrics') else 0
+                base_y1 = name_y1 + ascent1
+
             draw.text((name_x1, base_y1), name1, font=font_name_draw1, fill=TITLE_COLOR, anchor="ls")
-
             if server1:
-                logger.info(f"[DRAW_WORLD] name={name1} world={server1} world_x={world_x1} y_base={y1}")
                 draw.text((world_x1, y1), server1, font=font_rank, fill=SUBTITLE_COLOR)
 
             # --- 二列目 ---
@@ -776,32 +781,35 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 name2 = p2.get("name", "Unknown")
                 server2 = p2.get("server", "")
 
-                # ワールド名の描画座標決定・補正
                 world_x2 = right_inner_x
                 world_text_w2 = _text_width(draw, server2, font_rank)
                 max_world_x2 = right_inner_x
                 if server2 and world_x2 + world_text_w2 > max_world_x2:
                     world_x2 = max_world_x2 - world_text_w2 - 8
 
-                # リサイズ判定も「描画時のworld_x2」を使う
                 font_size2 = font_rank.size if hasattr(font_rank, 'size') else 22
                 min_font_size2 = 12
                 font_name_draw2 = font_rank
                 current_text_width2 = _text_width(draw, name2, font_name_draw2)
-                logger.info(f"[BEFORE_RESIZE] name={name2} server={server2} font_size={font_size2} name_x={name_x2} name_width={current_text_width2} world_x={world_x2}")
+                resized2 = False
                 while server2 and (name_x2 + current_text_width2) > world_x2 and font_size2 > min_font_size2:
                     font_size2 -= 1
                     font_name_draw2 = ImageFont.truetype(FONT_PATH, font_size2)
                     current_text_width2 = _text_width(draw, name2, font_name_draw2)
-                    logger.info(f"[RESIZE_LOOP] name={name2} font_size={font_size2} name_x={name_x2} name_right={name_x2+current_text_width2} world_x={world_x2}")
+                    resized2 = True
 
-                ascent2 = font_name_draw2.getmetrics()[0] if hasattr(font_name_draw2, 'getmetrics') else 0
-                base_y2 = name_y2 + ascent2
-                logger.info(f"[DRAW_NAME] name={name2} font_size={font_size2} adjusted_name_x={name_x2} base_y={base_y2} ascent={ascent2} anchor=ls")
+                if resized2 and server2:
+                    world_bbox2 = draw.textbbox((world_x2, y2), server2, font=font_rank)
+                    name_bbox2 = draw.textbbox((name_x2, 0), name2, font=font_name_draw2)
+                    world_bottom2 = world_bbox2[3]
+                    name_height2 = name_bbox2[3] - name_bbox2[1]
+                    base_y2 = world_bottom2 - name_height2
+                else:
+                    ascent2 = font_name_draw2.getmetrics()[0] if hasattr(font_name_draw2, 'getmetrics') else 0
+                    base_y2 = name_y2 + ascent2
+
                 draw.text((name_x2, base_y2), name2, font=font_name_draw2, fill=TITLE_COLOR, anchor="ls")
-
                 if server2:
-                    logger.info(f"[DRAW_WORLD] name={name2} world={server2} world_x={world_x2} y_base={y2}")
                     draw.text((world_x2, y2), server2, font=font_rank, fill=SUBTITLE_COLOR)
 
             member_y += row_h
