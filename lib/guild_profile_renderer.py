@@ -97,10 +97,27 @@ def _extend_point(p, q, amount):
     dy = qy - py
     dist = math.hypot(dx, dy)
     if dist == 0:
-        return qx, qy
+        return
     ux = dx / dist
     uy = dy / dist
     return (px + ux * amount, py + uy * amount)
+
+def gradient_rect(size, color_top, color_bottom, radius):
+    """グラデーション付きの角丸矩形を生成"""
+    w, h = size
+    base = Image.new("RGBA", (w, h), (0,0,0,0))
+    for y in range(h):
+        ratio = y / h
+        r = int(color_top[0] * (1-ratio) + color_bottom[0] * ratio)
+        g = int(color_top[1] * (1-ratio) + color_bottom[1] * ratio)
+        b = int(color_top[2] * (1-ratio) + color_bottom[2] * ratio)
+        a = int(color_top[3] * (1-ratio) + color_bottom[3] * ratio)
+        ImageDraw.Draw(base).line([(0, y), (w, y)], fill=(r, g, b, a))
+    mask = Image.new("L", (w, h), 0)
+    draw_mask = ImageDraw.Draw(mask)
+    draw_mask.rounded_rectangle([0, 0, w, h], radius=radius, fill=255)
+    base.putalpha(mask)
+    return base
 
 def draw_decorative_frame(
     img: Image.Image,
@@ -436,6 +453,8 @@ async def get_player_class(player_name: str) -> Optional[str]:
     except Exception as e:
         logger.warning(f"get_player_class失敗: {player_name}: {e}")
         return None
+    finally:
+        await api.close()
 
 async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_width: int = CANVAS_WIDTH) -> BytesIO:
     def sg(d, *keys, default="N/A"):
@@ -538,13 +557,19 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             online_by_role[rank].append(p)
 
     member_rows = 0
+    visible_roles = 0
     for role in role_order:
         n = len(online_by_role[role])
-        member_rows += max(1, math.ceil(n / 2)) if n else 1
-    role_header_height = 32 * len(role_order)
+        if n > 0:  # オンラインメンバーがいる場合のみカウント
+            member_rows += math.ceil(n / 2)
+            visible_roles += 1
+    role_header_height = 32 * visible_roles  # 表示されるランクのみカウント
     member_height = 30 * member_rows
     footer_height = 36
-    extra_height = 30
+    extra_height = 50  # 30から50に増加：下方向の余白を増やす
+    # オンラインメンバーが多い場合は追加の余白を設ける
+    if member_rows > 10:  # メンバー行数が多い場合
+        extra_height += 20  # さらに余白を追加
     img_h = line_y3 + 18 + role_header_height + member_height + footer_height + extra_height
 
     img = create_card_background(img_w, img_h)
@@ -557,9 +582,10 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         font_small = ImageFont.truetype(FONT_PATH, 16)
         font_section = ImageFont.truetype(FONT_PATH, 26)
         font_rank = ImageFont.truetype(FONT_PATH, 22)
+        font_prefix = ImageFont.truetype(FONT_PATH, 12)
     except Exception as e:
         logger.error(f"FONT_PATH 読み込み失敗: {e}")
-        font_title_base = font_sub = font_stats = font_small = font_section = font_rank = ImageFont.load_default()
+        font_title_base = font_sub = font_stats = font_small = font_section = font_rank = font_prefix = ImageFont.load_default()
 
     # --- すべて同じサイズで読み込む ---
     class_icon_size = 28
@@ -582,35 +608,120 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     if banner_img:
         img.paste(banner_img, (banner_x, banner_y), mask=banner_img)
 
+    # プレフィックス表示をバナーの下部に追加
+    if prefix:
+        prefix_text = prefix
+        prefix_font = font_prefix
+        bbox = draw.textbbox((0,0), prefix_text, font=prefix_font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+        padding_x = 6
+        padding_y = 2
+        box_w = text_w + padding_x * 2
+        box_h = text_h + padding_y * 2
+        box_x = banner_x + (banner_w - box_w) // 2
+        box_y = banner_y + banner_h - int(box_h * 0.4)
+        
+        # 影を作成
+        shadow = Image.new("RGBA", (box_w+8, box_h+8), (0,0,0,0))
+        shadow_draw = ImageDraw.Draw(shadow)
+        shadow_draw.rounded_rectangle([4,4,box_w+4,box_h+4], radius=16, fill=(0,0,0,80))
+        shadow = shadow.filter(ImageFilter.GaussianBlur(3))
+        img.paste(shadow, (box_x-4, box_y-4), mask=shadow)
+        
+        # グラデーション矩形を作成
+        rect_img = gradient_rect((box_w, box_h), (30,30,30,220), (60,60,60,160), radius=14)
+        img.paste(rect_img, (box_x, box_y), mask=rect_img)
+        
+        # テキストを描画
+        text_x = box_x + (box_w - text_w) // 2
+        text_y = box_y + (box_h - text_h) // 2
+        draw.text((text_x, text_y), prefix_text, font=prefix_font, fill=(240,240,240,255))
+
     guild_name = name
     font_title = font_title_base
     max_name_width = line_x2 - name_x
     name_w = _text_width(draw, guild_name, font_title)
     font_size = 48
+    original_font_size = font_size
+    resized_count = 0
     while name_w > max_name_width and font_size > 16:
         font_size -= 2
+        resized_count += 1
         font_title = ImageFont.truetype(FONT_PATH, font_size)
         name_w = _text_width(draw, guild_name, font_title)
-    draw.text((name_x, name_y), guild_name, font=font_title, fill=TITLE_COLOR)
+    
+    # フォントサイズ縮小時のY座標調整
+    adjusted_name_y = name_y
+    if resized_count > 0:
+        # リサイズ回数に応じてY座標を下げる
+        if resized_count <= 3:
+            adjusted_name_y = name_y + (resized_count * 2)  # 1-3回: 各2px下げ
+        elif resized_count <= 6:
+            adjusted_name_y = name_y + 6 + ((resized_count - 3) * 3)  # 4-6回: 6px + 各3px下げ
+        else:
+            adjusted_name_y = name_y + 15 + ((resized_count - 6) * 4)  # 7回以上: 15px + 各4px下げ
+    
+    draw.text((name_x, adjusted_name_y), guild_name, font=font_title, fill=TITLE_COLOR)
 
     draw.line([(line_x1, line_y), (line_x2, line_y)], fill=LINE_COLOR, width=2)
 
     stat_icon_x = margin + 20
     stat_icon_y = stat_y
-    draw.rectangle([stat_icon_x, stat_icon_y, stat_icon_x + icon_size, stat_icon_y + icon_size], fill=(220,180,80,255), outline=LINE_COLOR)
-    draw.text((stat_icon_x + icon_size // 2, stat_icon_y + icon_size // 2), str(level), font=font_stats, fill=TITLE_COLOR, anchor="mm")
-    xpbar_x = stat_icon_x + icon_size + icon_gap
-    xpbar_y = stat_icon_y + icon_size // 2 - 12
-    xpbar_w = 220
-    xpbar_h = 24
-    draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], fill=(120, 100, 80, 255))
+    
+    # ドラクエ風レベル表示（テキストのみ）
+    level_text = f"Lv.{level}"
+    draw.text((stat_icon_x, stat_icon_y + 8), level_text, font=font_stats, fill=TITLE_COLOR)
+    level_text_w = _text_width(draw, level_text, font_stats)
+    
+    # XPバーの位置とサイズ
+    xpbar_x = stat_icon_x + level_text_w + 20
+    xpbar_y = stat_icon_y + 4
+    xpbar_w = 240
+    xpbar_h = 28
+    bar_radius = 14
+    
+    # XP進行度の計算
     xp_fill = float(xpPercent) / 100.0 if xpPercent else 0
     fill_w = int(xpbar_w * xp_fill)
-    bar_color = (60, 144, 255, 255) if xp_fill >= 0.8 else (44, 180, 90, 255) if xp_fill >= 0.5 else (220, 160, 52, 255)
+    
+    # 背景バー（グラデーション）
+    bg_gradient = gradient_rect((xpbar_w, xpbar_h), 
+                               (45, 70, 35, 255),    # 上部：暗い緑
+                               (30, 50, 25, 255),    # 下部：より暗い緑
+                               radius=bar_radius)
+    img.paste(bg_gradient, (xpbar_x, xpbar_y), mask=bg_gradient)
+    
+    # XP進行バー（グラデーション）
     if fill_w > 0:
-        draw.rectangle([xpbar_x, xpbar_y, xpbar_x + fill_w, xpbar_y + xpbar_h], fill=bar_color)
-    draw.rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], outline=LINE_COLOR)
-    draw.text((xpbar_x + xpbar_w + 10, xpbar_y + xpbar_h // 2), f"{xpPercent}%", font=font_stats, fill=TITLE_COLOR, anchor="lm")
+        # 進行度に応じて色を変更
+        if xp_fill >= 0.8:
+            # 80%以上：青系
+            top_color = (80, 150, 255, 255)
+            bottom_color = (40, 100, 200, 255)
+        elif xp_fill >= 0.5:
+            # 50-80%：緑系
+            top_color = (70, 200, 120, 255)
+            bottom_color = (40, 150, 80, 255)
+        else:
+            # 50%未満：黄系
+            top_color = (255, 200, 60, 255)
+            bottom_color = (200, 150, 30, 255)
+        
+        xp_gradient = gradient_rect((fill_w, xpbar_h), 
+                                   top_color, bottom_color, 
+                                   radius=bar_radius)
+        img.paste(xp_gradient, (xpbar_x, xpbar_y), mask=xp_gradient)
+    
+    # バーの境界線
+    draw.rounded_rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], 
+                          radius=bar_radius, outline=(40, 30, 20, 255), width=2)
+    
+    # XP%テキスト
+    xp_text = f"{xpPercent}%"
+    xp_text_x = xpbar_x + xpbar_w + 12
+    xp_text_y = xpbar_y + xpbar_h // 2
+    draw.text((xp_text_x, xp_text_y), xp_text, font=font_stats, fill=TITLE_COLOR, anchor="lm")
 
     stats_gap = 80
     stats_y2 = stat_icon_y + icon_size + 12
@@ -632,7 +743,65 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     if owner_icon:
         owner_icon_rs = owner_icon.resize((icon_size, icon_size), Image.LANCZOS)
         img.paste(owner_icon_rs, (stats_x, stats_y2 + 42), mask=owner_icon_rs)
-    draw.text((stats_x + icon_size + 8, stats_y2 + 46), owner, font=font_stats, fill=TITLE_COLOR)
+    
+    # オーナーのオンライン状態とクラス情報を取得
+    owner_is_online = False
+    owner_server = ""
+    owner_class_type = None
+    
+    # オンラインプレイヤーリストからオーナーを検索
+    for player in online_players:
+        if player.get("name") == owner and player.get("rank") == "OWNER":
+            owner_is_online = True
+            owner_server = player.get("server", "")
+            break
+    
+    # オンラインの場合はクラス情報も取得
+    if owner_is_online:
+        owner_class_type = await get_player_class(owner)
+    
+    # オーナー描画の座標計算
+    owner_text_x = stats_x + icon_size + 8
+    owner_text_y = stats_y2 + 46
+    
+    if owner_is_online and owner_class_type and owner_class_type in class_icons and class_icons[owner_class_type]:
+        # オンライン且つクラスアイコンがある場合
+        icon_img_owner = class_icons[owner_class_type]
+        owner_icon_x = owner_text_x
+        owner_icon_y = owner_text_y - 4  # アイコンの位置調整
+        
+        if owner_class_type == "MAGE":
+            size_owner = mage_icon_size
+            rot_img_owner = icon_img_owner.rotate(-45, expand=True, resample=Image.BICUBIC)
+            rot_img_owner = rot_img_owner.resize((size_owner, size_owner), Image.LANCZOS)
+            paste_x_owner = owner_icon_x + (class_icon_size // 2) - (rot_img_owner.width // 2) + mage_icon_x_offset
+            paste_y_owner = owner_icon_y + (class_icon_size // 2) - (rot_img_owner.height // 2)
+            img.paste(rot_img_owner, (paste_x_owner, paste_y_owner), mask=rot_img_owner)
+        elif owner_class_type == "SHAMAN":
+            size_owner = shaman_icon_size
+            rot_img_owner = icon_img_owner.rotate(-45, expand=True, resample=Image.BICUBIC)
+            rot_img_owner = rot_img_owner.resize((size_owner, size_owner), Image.LANCZOS)
+            paste_x_owner = owner_icon_x + (class_icon_size // 2) - (rot_img_owner.width // 2)
+            paste_y_owner = owner_icon_y + (class_icon_size // 2) - (rot_img_owner.height // 2) + shaman_icon_y_offset
+            img.paste(rot_img_owner, (paste_x_owner, paste_y_owner), mask=rot_img_owner)
+        else:
+            icon_img_rs_owner = icon_img_owner.resize((class_icon_size, class_icon_size), Image.LANCZOS)
+            img.paste(icon_img_rs_owner, (owner_icon_x, owner_icon_y), mask=icon_img_rs_owner)
+        
+        # クラスアイコンがある場合は名前の位置を右にずらす
+        name_x_owner = owner_text_x + class_icon_size + 8
+    else:
+        # オフラインまたはクラスアイコンがない場合
+        name_x_owner = owner_text_x
+    
+    # オーナー名を描画
+    draw.text((name_x_owner, owner_text_y), owner, font=font_stats, fill=TITLE_COLOR)
+    
+    # オンラインの場合はワールド名も描画
+    if owner_is_online and owner_server:
+        owner_name_width = _text_width(draw, owner, font_stats)
+        world_x_owner = name_x_owner + owner_name_width + 50  # 名前の右端から50px離れた位置
+        draw.text((world_x_owner, owner_text_y), owner_server, font=font_rank, fill=SUBTITLE_COLOR)
 
     draw.line([(line_x1, line_y2), (img_w - margin - 8, line_y2)], fill=LINE_COLOR, width=2)
 
@@ -673,10 +842,15 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     right_inner_x = img_w - MARGIN - 8
 
     for role in role_order:
+        group_members = online_by_role[role]
+        
+        # オンラインメンバーがいない場合はスキップ
+        if not group_members:
+            continue
+            
         draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=(85, 50, 30, 255))
         member_y += 32
 
-        group_members = online_by_role[role]
         for i in range(0, len(group_members), 2):
             p1 = group_members[i]
             p2 = group_members[i + 1] if i + 1 < len(group_members) else None
