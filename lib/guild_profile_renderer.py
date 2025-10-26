@@ -672,7 +672,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
     right_inner_x = img_w - MARGIN - 8
 
-    for role in role_order:
+        for role in role_order:
         draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=(85, 50, 30, 255))
         member_y += 32
 
@@ -722,6 +722,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 world_x1 = max_world_x1 - world_text_w1
 
             font_size1 = font_rank.size if hasattr(font_rank, 'size') else 22
+            original_font_size1 = font_size1
             min_font_size1 = 12
             font_name_draw1 = font_rank
             current_text_width1 = _text_width(draw, name1, font_name_draw1)
@@ -732,10 +733,21 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 current_text_width1 = _text_width(draw, name1, font_name_draw1)
                 resized1 = True
 
+            resize_count1 = original_font_size1 - font_size1 if resized1 else 0
             ascent1 = font_name_draw1.getmetrics()[0] if hasattr(font_name_draw1, 'getmetrics') else 0
-            base_y1 = name_y1 + ascent1
+            # 補正値計算: 1回リサイズ(1px減)なら+2px、2回以上なら+3px、それ以降+4pxなど
             if resized1:
-                base_y1 += 3  # リサイズ時のみ3px下げる
+                if resize_count1 == 1:
+                    offset_y1 = 2
+                elif resize_count1 == 2:
+                    offset_y1 = 3
+                elif resize_count1 >= 3:
+                    offset_y1 = 4
+                else:
+                    offset_y1 = 3
+            else:
+                offset_y1 = 0
+            base_y1 = name_y1 + ascent1 + offset_y1
 
             draw.text((name_x1, base_y1), name1, font=font_name_draw1, fill=TITLE_COLOR, anchor="ls")
 
@@ -783,6 +795,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                     world_x2 = max_world_x2 - world_text_w2 - 8
 
                 font_size2 = font_rank.size if hasattr(font_rank, 'size') else 22
+                original_font_size2 = font_size2
                 min_font_size2 = 12
                 font_name_draw2 = font_rank
                 current_text_width2 = _text_width(draw, name2, font_name_draw2)
@@ -793,10 +806,20 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                     current_text_width2 = _text_width(draw, name2, font_name_draw2)
                     resized2 = True
 
+                resize_count2 = original_font_size2 - font_size2 if resized2 else 0
                 ascent2 = font_name_draw2.getmetrics()[0] if hasattr(font_name_draw2, 'getmetrics') else 0
-                base_y2 = name_y2 + ascent2
                 if resized2:
-                    base_y2 += 3  # リサイズ時のみ3px下げる
+                    if resize_count2 == 1:
+                        offset_y2 = 2
+                    elif resize_count2 == 2:
+                        offset_y2 = 3
+                    elif resize_count2 >= 3:
+                        offset_y2 = 4
+                    else:
+                        offset_y2 = 3
+                else:
+                    offset_y2 = 0
+                base_y2 = name_y2 + ascent2 + offset_y2
 
                 draw.text((name_x2, base_y2), name2, font=font_name_draw2, fill=TITLE_COLOR, anchor="ls")
 
