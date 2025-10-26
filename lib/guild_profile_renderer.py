@@ -726,26 +726,20 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             min_font_size1 = 12
             font_name_draw1 = font_rank
             current_text_width1 = _text_width(draw, name1, font_name_draw1)
+            logger.info(f"[BEFORE_RESIZE] name={name1} server={server1} font_size={font_size1} name_x={name_x1} name_width={current_text_width1} world_x={world_x1}")
             while server1 and (name_x1 + current_text_width1) > world_x1 and font_size1 > min_font_size1:
                 font_size1 -= 1
                 font_name_draw1 = ImageFont.truetype(FONT_PATH, font_size1)
                 current_text_width1 = _text_width(draw, name1, font_name_draw1)
+                logger.info(f"[RESIZE_LOOP] name={name1} font_size={font_size1} name_x={name_x1} name_right={name_x1+current_text_width1} world_x={world_x1}")
 
-            # y座標合わせ: 名前とワールド名の下端を揃える
-            if server1:
-                world_bbox1 = draw.textbbox((world_x1, y1), server1, font=font_rank)
-                name_bbox1 = draw.textbbox((name_x1, y1), name1, font=font_name_draw1)
-                # world_bbox1[3] ... ワールド名の下端
-                # name_bbox1[3] ... 名前の下端
-                # y座標補正量
-                y_offset1 = world_bbox1[3] - name_bbox1[3]
-                base_y1 = name_y1 + y_offset1
-            else:
-                ascent1 = font_name_draw1.getmetrics()[0] if hasattr(font_name_draw1, 'getmetrics') else 0
-                base_y1 = name_y1 + ascent1
-
+            ascent1 = font_name_draw1.getmetrics()[0] if hasattr(font_name_draw1, 'getmetrics') else 0
+            base_y1 = name_y1 + ascent1
+            logger.info(f"[DRAW_NAME] name={name1} font_size={font_size1} adjusted_name_x={name_x1} base_y={base_y1} ascent={ascent1} anchor=ls")
             draw.text((name_x1, base_y1), name1, font=font_name_draw1, fill=TITLE_COLOR, anchor="ls")
+
             if server1:
+                logger.info(f"[DRAW_WORLD] name={name1} world={server1} world_x={world_x1} y_base={y1}")
                 draw.text((world_x1, y1), server1, font=font_rank, fill=SUBTITLE_COLOR)
 
             # --- 二列目 ---
@@ -794,23 +788,20 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 min_font_size2 = 12
                 font_name_draw2 = font_rank
                 current_text_width2 = _text_width(draw, name2, font_name_draw2)
+                logger.info(f"[BEFORE_RESIZE] name={name2} server={server2} font_size={font_size2} name_x={name_x2} name_width={current_text_width2} world_x={world_x2}")
                 while server2 and (name_x2 + current_text_width2) > world_x2 and font_size2 > min_font_size2:
                     font_size2 -= 1
                     font_name_draw2 = ImageFont.truetype(FONT_PATH, font_size2)
                     current_text_width2 = _text_width(draw, name2, font_name_draw2)
+                    logger.info(f"[RESIZE_LOOP] name={name2} font_size={font_size2} name_x={name_x2} name_right={name_x2+current_text_width2} world_x={world_x2}")
 
-                # y座標合わせ: 名前とワールド名の下端を揃える
-                if server2:
-                    world_bbox2 = draw.textbbox((world_x2, y2), server2, font=font_rank)
-                    name_bbox2 = draw.textbbox((name_x2, y2), name2, font=font_name_draw2)
-                    y_offset2 = world_bbox2[3] - name_bbox2[3]
-                    base_y2 = name_y2 + y_offset2
-                else:
-                    ascent2 = font_name_draw2.getmetrics()[0] if hasattr(font_name_draw2, 'getmetrics') else 0
-                    base_y2 = name_y2 + ascent2
-
+                ascent2 = font_name_draw2.getmetrics()[0] if hasattr(font_name_draw2, 'getmetrics') else 0
+                base_y2 = name_y2 + ascent2
+                logger.info(f"[DRAW_NAME] name={name2} font_size={font_size2} adjusted_name_x={name_x2} base_y={base_y2} ascent={ascent2} anchor=ls")
                 draw.text((name_x2, base_y2), name2, font=font_name_draw2, fill=TITLE_COLOR, anchor="ls")
+
                 if server2:
+                    logger.info(f"[DRAW_WORLD] name={name2} world={server2} world_x={world_x2} y_base={y2}")
                     draw.text((world_x2, y2), server2, font=font_rank, fill=SUBTITLE_COLOR)
 
             member_y += row_h
