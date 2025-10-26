@@ -566,7 +566,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     mage_icon_size = 40
     shaman_icon_size = 36
     shaman_icon_y_offset = -3
-    mage_icon_x_offset = -3
+    mage_icon_x_offset = -2
     
     class_icons = {}
     for class_name, path in CLASS_ICON_MAP.items():
@@ -627,8 +627,8 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     draw.text((stats_x2 + icon_size + 90 + 8, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
     if territory_icon:
         territory_icon_rs = territory_icon.resize((icon_size, icon_size), Image.LANCZOS)
-        img.paste(territory_icon_rs, (stats_x2 + 260, stats_y2), mask=territory_icon_rs)
-    draw.text((stats_x2 + icon_size + 260 + 8, stats_y2 + 4), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
+        img.paste(territory_icon_rs, (stats_x2 + 270, stats_y2), mask=territory_icon_rs)
+    draw.text((stats_x2 + icon_size + 270 + 8, stats_y2 + 4), f"{_fmt_num(territories)}", font=font_stats, fill=TITLE_COLOR)
     if owner_icon:
         owner_icon_rs = owner_icon.resize((icon_size, icon_size), Image.LANCZOS)
         img.paste(owner_icon_rs, (stats_x, stats_y2 + 42), mask=owner_icon_rs)
