@@ -522,7 +522,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     line_y = name_y + 48 + 16
 
     stat_y = line_y + 16
-    icon_size = 31
+    icon_size = 32
     icon_gap = 8
     left_icon_x = margin
 
@@ -623,8 +623,8 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     draw.text((stats_x + icon_size + 8, stats_y2 + 4), f"{len(online_players)}/{total_members}", font=font_stats, fill=TITLE_COLOR)
     if war_icon:
         war_icon_rs = war_icon.resize((icon_size, icon_size), Image.LANCZOS)
-        img.paste(war_icon_rs, (stats_x2 + 80, stats_y2), mask=war_icon_rs)
-    draw.text((stats_x2 + icon_size + 80 + 8, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
+        img.paste(war_icon_rs, (stats_x2 + 90, stats_y2), mask=war_icon_rs)
+    draw.text((stats_x2 + icon_size + 90 + 8, stats_y2 + 4), f"{_fmt_num(wars)}", font=font_stats, fill=TITLE_COLOR)
     if territory_icon:
         territory_icon_rs = territory_icon.resize((icon_size, icon_size), Image.LANCZOS)
         img.paste(territory_icon_rs, (stats_x2 + 260, stats_y2), mask=territory_icon_rs)
@@ -672,7 +672,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
     right_inner_x = img_w - MARGIN - 8
 
-        for role in role_order:
+    for role in role_order:
         draw.text((role_x1, member_y), role_display_map[role], font=font_section, fill=(85, 50, 30, 255))
         member_y += 32
 
