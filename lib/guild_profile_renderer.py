@@ -732,11 +732,11 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 current_text_width1 = _text_width(draw, name1, font_name_draw1)
                 resized1 = True
 
-            # y補正: リサイズが発動した場合だけワールド名の下端に揃える
+            # ★リサイズ時のみ、ワールド名の下端に合わせて名前の下端を合わせる
             if resized1 and server1:
                 world_bbox1 = draw.textbbox((world_x1, y1), server1, font=font_rank)
-                name_bbox1 = draw.textbbox((name_x1, 0), name1, font=font_name_draw1)
                 world_bottom1 = world_bbox1[3]
+                name_bbox1 = draw.textbbox((name_x1, 0), name1, font=font_name_draw1)
                 name_height1 = name_bbox1[3] - name_bbox1[1]
                 base_y1 = world_bottom1 - name_height1
             else:
@@ -800,8 +800,8 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
                 if resized2 and server2:
                     world_bbox2 = draw.textbbox((world_x2, y2), server2, font=font_rank)
-                    name_bbox2 = draw.textbbox((name_x2, 0), name2, font=font_name_draw2)
                     world_bottom2 = world_bbox2[3]
+                    name_bbox2 = draw.textbbox((name_x2, 0), name2, font=font_name_draw2)
                     name_height2 = name_bbox2[3] - name_bbox2[1]
                     base_y2 = world_bottom2 - name_height2
                 else:
