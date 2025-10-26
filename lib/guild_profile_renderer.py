@@ -732,29 +732,21 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 current_text_width1 = _text_width(draw, name1, font_name_draw1)
                 resized1 = True
 
-            # --- ログ付き下端揃え処理 ---
             if resized1 and server1:
                 world_bbox1 = draw.textbbox((world_x1, y1), server1, font=font_rank)
-                name_bbox1 = draw.textbbox((name_x1, 0), name1, font=font_name_draw1)
                 world_bottom1 = world_bbox1[3]
-                name_height1 = name_bbox1[3] - name_bbox1[1]
-                name_top_offset1 = name_bbox1[1]  # 通常負値
-                base_y1 = world_bottom1 - name_height1 - name_top_offset1
+                base_y1 = world_bottom1
                 logger.info(
-                    f"[ALIGN_DEBUG_FINAL] 1COL name={name1} font_size={font_size1} name_x={name_x1} world_x={world_x1} "
-                    f"y1={y1} world_bbox={world_bbox1} world_bottom1={world_bottom1} "
-                    f"name_height1={name_height1} name_top_offset1={name_top_offset1} base_y1={base_y1} name_bottom={base_y1+name_height1+name_top_offset1} (should==world_bbox1[3])"
+                    f"[ALIGN_DEBUG_ANCHOR] 1COL name={name1} font_size={font_size1} name_x={name_x1} world_x={world_x1} y1={y1} world_bbox={world_bbox1} world_bottom1={world_bottom1} base_y1={base_y1}"
                 )
+                draw.text((name_x1, base_y1), name1, font=font_name_draw1, fill=TITLE_COLOR, anchor="ld")
             else:
                 ascent1 = font_name_draw1.getmetrics()[0] if hasattr(font_name_draw1, 'getmetrics') else 0
                 base_y1 = name_y1 + ascent1
                 logger.info(
-                    f"[ALIGN_DEBUG_FINAL] 1COL name={name1} font_size={font_size1} name_x={name_x1} using ascent base_y1={base_y1}"
+                    f"[ALIGN_DEBUG_ANCHOR] 1COL name={name1} font_size={font_size1} name_x={name_x1} using ascent base_y1={base_y1}"
                 )
-
-            draw.text((name_x1, base_y1), name1, font=font_name_draw1, fill=TITLE_COLOR, anchor="ls")
-            if server1:
-                draw.text((world_x1, y1), server1, font=font_rank, fill=SUBTITLE_COLOR)
+                draw.text((name_x1, base_y1), name1, font=font_name_draw1, fill=TITLE_COLOR, anchor="ls")
 
             # --- 二列目 ---
             if p2:
@@ -809,25 +801,20 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
 
                 if resized2 and server2:
                     world_bbox2 = draw.textbbox((world_x2, y2), server2, font=font_rank)
-                    name_bbox2 = draw.textbbox((name_x2, 0), name2, font=font_name_draw2)
                     world_bottom2 = world_bbox2[3]
-                    name_height2 = name_bbox2[3] - name_bbox2[1]
-                    name_top_offset2 = name_bbox2[1]
                     if resized2 and server2:
-                        base_y2 = world_bottom2 - name_height2 - name_top_offset2
+                        base_y2 = world_bottom2
                         logger.info(
-                            f"[ALIGN_DEBUG_FINAL] 2COL name={name2} font_size={font_size2} name_x={name_x2} world_x={world_x2} "
-                            f"y2={y2} world_bbox={world_bbox2} world_bottom2={world_bottom2} "
-                            f"name_height2={name_height2} name_top_offset2={name_top_offset2} base_y2={base_y2} name_bottom={base_y2+name_height2+name_top_offset2} (should==world_bbox2[3])"
+                            f"[ALIGN_DEBUG_ANCHOR] 2COL name={name2} font_size={font_size2} name_x={name_x2} world_x={world_x2} y2={y2} world_bbox={world_bbox2} world_bottom2={world_bottom2} base_y2={base_y2}"
                         )
+                        draw.text((name_x2, base_y2), name2, font=font_name_draw2, fill=TITLE_COLOR, anchor="ld")
                     else:
                         ascent2 = font_name_draw2.getmetrics()[0] if hasattr(font_name_draw2, 'getmetrics') else 0
                         base_y2 = name_y2 + ascent2
                         logger.info(
-                            f"[ALIGN_DEBUG_FINAL] 2COL name={name2} font_size={font_size2} name_x={name_x2} using ascent base_y2={base_y2}"
+                            f"[ALIGN_DEBUG_ANCHOR] 2COL name={name2} font_size={font_size2} name_x={name_x2} using ascent base_y2={base_y2}"
                         )
-    
-                    draw.text((name_x2, base_y2), name2, font=font_name_draw2, fill=TITLE_COLOR, anchor="ls")
+                        draw.text((name_x2, base_y2), name2, font=font_name_draw2, fill=TITLE_COLOR, anchor="ls")
                     if server2:
                         draw.text((world_x2, y2), server2, font=font_rank, fill=SUBTITLE_COLOR)
 
