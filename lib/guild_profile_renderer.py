@@ -638,16 +638,16 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         shadow_draw = ImageDraw.Draw(shadow)
         shadow_draw.rounded_rectangle([4,4,box_w+4,box_h+4], radius=16, fill=(0,0,0,80))
         shadow = shadow.filter(ImageFilter.GaussianBlur(3))
-        img.paste(shadow, (box_x - 4 - 10, box_y - 4 + 70), mask=shadow)
+        img.paste(shadow, (box_x - 4 - 10, box_y - 4 + 75), mask=shadow)
         
         # グラデーション矩形を作成
         rect_img = gradient_rect((box_w, box_h), (30,30,30,220), (60,60,60,160), radius=14)
-        img.paste(rect_img, (box_x - 10, box_y + 70), mask=rect_img)
+        img.paste(rect_img, (box_x - 10, box_y + 75), mask=rect_img)
         
         # テキストを描画
         text_x = box_x + (box_w - text_w) // 2
         text_y = box_y + (box_h - text_h) // 2
-        draw.text((text_x - 10, text_y + 70), prefix_text, font=prefix_font, fill=(240,240,240,255))
+        draw.text((text_x - 10, text_y + 75), prefix_text, font=prefix_font, fill=(240,240,240,255))
 
     guild_name = name
     font_title = font_title_base
@@ -665,15 +665,15 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     # フォントサイズ縮小時のY座標調整
     adjusted_name_y = name_y
     if resized_count > 0:
-        # リサイズ回数に応じてY座標を下げる
-        if resized_count <= 3:
-            adjusted_name_y = name_y + (resized_count * 2)  # 1-3回: 各2px下げ
-        elif resized_count <= 6:
-            adjusted_name_y = name_y + 6 + ((resized_count - 2) * 3)  # 4-6回: 6px + 各3px下げ
+        # リサイズ回数に応じてY座標を下げる（控えめに調整）
+        if resized_count <= 2:
+            adjusted_name_y = name_y + resized_count  # 1-2回: 各1px下げ
+        elif resized_count <= 5:
+            adjusted_name_y = name_y + 2 + ((resized_count - 2) * 1.5)  # 3-5回: 2px + 各1.5px下げ
         else:
-            adjusted_name_y = name_y + 15 + ((resized_count - 2) * 4)  # 7回以上: 15px + 各4px下げ
+            adjusted_name_y = name_y + 6 + ((resized_count - 5) * 2)  # 6回以上: 6px + 各2px下げ
     
-    draw.text((name_x, adjusted_name_y), guild_name, font=font_title, fill=TITLE_COLOR)
+    draw.text((name_x, int(adjusted_name_y)), guild_name, font=font_title, fill=TITLE_COLOR)
 
     draw.line([(line_x1, line_y), (line_x2, line_y)], fill=LINE_COLOR, width=2)
 
