@@ -627,7 +627,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         shadow_draw = ImageDraw.Draw(shadow)
         shadow_draw.rounded_rectangle([4,4,box_w+4,box_h+4], radius=16, fill=(0,0,0,80))
         shadow = shadow.filter(ImageFilter.GaussianBlur(3))
-        img.paste(shadow, (box_x-4, box_y-4), mask=shadow)
+        img.paste(shadow, (box_x - 4 - 10, box_y - 4 + 50), mask=shadow)
         
         # グラデーション矩形を作成
         rect_img = gradient_rect((box_w, box_h), (30,30,30,220), (60,60,60,160), radius=14)
@@ -636,7 +636,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         # テキストを描画
         text_x = box_x + (box_w - text_w) // 2
         text_y = box_y + (box_h - text_h) // 2
-        draw.text((text_x, text_y), prefix_text, font=prefix_font, fill=(240,240,240,255))
+        draw.text((text_x - 10, text_y + 50), prefix_text, font=prefix_font, fill=(240,240,240,255))
 
     guild_name = name
     font_title = font_title_base
@@ -658,9 +658,9 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         if resized_count <= 3:
             adjusted_name_y = name_y + (resized_count * 2)  # 1-3回: 各2px下げ
         elif resized_count <= 6:
-            adjusted_name_y = name_y + 6 + ((resized_count - 3) * 3)  # 4-6回: 6px + 各3px下げ
+            adjusted_name_y = name_y + 6 + ((resized_count - 2) * 3)  # 4-6回: 6px + 各3px下げ
         else:
-            adjusted_name_y = name_y + 15 + ((resized_count - 6) * 4)  # 7回以上: 15px + 各4px下げ
+            adjusted_name_y = name_y + 15 + ((resized_count - 2) * 4)  # 7回以上: 15px + 各4px下げ
     
     draw.text((name_x, adjusted_name_y), guild_name, font=font_title, fill=TITLE_COLOR)
 
@@ -669,9 +669,9 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     stat_icon_x = margin + 20
     stat_icon_y = stat_y
     
-    # ドラクエ風レベル表示（テキストのみ）
+    # レベル表示（テキストのみ）
     level_text = f"Lv.{level}"
-    draw.text((stat_icon_x, stat_icon_y + 8), level_text, font=font_stats, fill=TITLE_COLOR)
+    draw.text((stat_icon_x, stat_icon_y + 3), level_text, font=font_stats, fill=TITLE_COLOR)
     level_text_w = _text_width(draw, level_text, font_stats)
     
     # XPバーの位置とサイズ
@@ -721,7 +721,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     xp_text = f"{xpPercent}%"
     xp_text_x = xpbar_x + xpbar_w + 12
     xp_text_y = xpbar_y + xpbar_h // 2
-    draw.text((xp_text_x, xp_text_y), xp_text, font=font_stats, fill=TITLE_COLOR, anchor="lm")
+    draw.text((xp_text_x, xp_text_y + 1), xp_text, font=font_stats, fill=TITLE_COLOR, anchor="lm")
 
     stats_gap = 80
     stats_y2 = stat_icon_y + icon_size + 12
@@ -768,7 +768,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         # オンライン且つクラスアイコンがある場合
         icon_img_owner = class_icons[owner_class_type]
         owner_icon_x = owner_text_x
-        owner_icon_y = owner_text_y - 4  # アイコンの位置調整
+        owner_icon_y = owner_text_y
         
         if owner_class_type == "MAGE":
             size_owner = mage_icon_size
