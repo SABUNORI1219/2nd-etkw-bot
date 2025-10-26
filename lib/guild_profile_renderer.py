@@ -738,13 +738,13 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             # 補正値計算: 1回リサイズ(1px減)なら+2px、2回以上なら+3px、それ以降+4pxなど
             if resized1:
                 if resize_count1 == 1:
-                    offset_y1 = 2
+                    offset_y1 = 1
                 elif resize_count1 == 2:
-                    offset_y1 = 3
+                    offset_y1 = 2
                 elif resize_count1 >= 3:
-                    offset_y1 = 4
-                else:
                     offset_y1 = 3
+                else:
+                    offset_y1 = 2
             else:
                 offset_y1 = 0
             base_y1 = name_y1 + ascent1 + offset_y1
@@ -810,13 +810,13 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                 ascent2 = font_name_draw2.getmetrics()[0] if hasattr(font_name_draw2, 'getmetrics') else 0
                 if resized2:
                     if resize_count2 == 1:
-                        offset_y2 = 2
+                        offset_y2 = 1
                     elif resize_count2 == 2:
-                        offset_y2 = 3
+                        offset_y2 = 2
                     elif resize_count2 >= 3:
-                        offset_y2 = 4
-                    else:
                         offset_y2 = 3
+                    else:
+                        offset_y2 = 2
                 else:
                     offset_y2 = 0
                 base_y2 = name_y2 + ascent2 + offset_y2
