@@ -563,14 +563,25 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         if n > 0:  # オンラインメンバーがいる場合のみカウント
             member_rows += math.ceil(n / 2)
             visible_roles += 1
+    
+    # オンラインメンバー表示エリアの最低高さを確保
+    min_member_area_height = 200  # 最低200pxの高さを確保
     role_header_height = 32 * visible_roles  # 表示されるランクのみカウント
     member_height = 30 * member_rows
+    calculated_member_area_height = role_header_height + member_height
+    
+    # 計算された高さが最低高さ未満の場合は最低高さを使用
+    if calculated_member_area_height < min_member_area_height:
+        total_member_area_height = min_member_area_height
+    else:
+        total_member_area_height = calculated_member_area_height
+    
     footer_height = 36
     extra_height = 50  # 30から50に増加：下方向の余白を増やす
     # オンラインメンバーが多い場合は追加の余白を設ける
     if member_rows > 10:  # メンバー行数が多い場合
         extra_height += 20  # さらに余白を追加
-    img_h = line_y3 + 18 + role_header_height + member_height + footer_height + extra_height
+    img_h = line_y3 + 18 + total_member_area_height + footer_height + extra_height
 
     img = create_card_background(img_w, img_h)
     draw = ImageDraw.Draw(img)
@@ -627,16 +638,16 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
         shadow_draw = ImageDraw.Draw(shadow)
         shadow_draw.rounded_rectangle([4,4,box_w+4,box_h+4], radius=16, fill=(0,0,0,80))
         shadow = shadow.filter(ImageFilter.GaussianBlur(3))
-        img.paste(shadow, (box_x - 4 - 10, box_y - 4 + 50), mask=shadow)
+        img.paste(shadow, (box_x - 4 - 10, box_y - 4 + 70), mask=shadow)
         
         # グラデーション矩形を作成
         rect_img = gradient_rect((box_w, box_h), (30,30,30,220), (60,60,60,160), radius=14)
-        img.paste(rect_img, (box_x, box_y), mask=rect_img)
+        img.paste(rect_img, (box_x - 10, box_y + 70), mask=rect_img)
         
         # テキストを描画
         text_x = box_x + (box_w - text_w) // 2
         text_y = box_y + (box_h - text_h) // 2
-        draw.text((text_x - 10, text_y + 50), prefix_text, font=prefix_font, fill=(240,240,240,255))
+        draw.text((text_x - 10, text_y + 70), prefix_text, font=prefix_font, fill=(240,240,240,255))
 
     guild_name = name
     font_title = font_title_base
@@ -721,7 +732,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     xp_text = f"{xpPercent}%"
     xp_text_x = xpbar_x + xpbar_w + 12
     xp_text_y = xpbar_y + xpbar_h // 2
-    draw.text((xp_text_x, xp_text_y + 1), xp_text, font=font_stats, fill=TITLE_COLOR, anchor="lm")
+    draw.text((xp_text_x + 5, xp_text_y + 1), xp_text, font=font_stats, fill=TITLE_COLOR, anchor="lm")
 
     stats_gap = 80
     stats_y2 = stat_icon_y + icon_size + 12
