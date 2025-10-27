@@ -468,7 +468,8 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         embed = discord.Embed(title=title_text, color=discord.Color.blue())
         for name, count in sorted_counts[:10]:
             safe_name = discord.utils.escape_markdown(name)
-            embed.add_field(name=safe_name, value=f"Count: {count}", inline=False)
+            okane = count / 2
+            embed.add_field(name=safe_name, value=f"Count: {count} | {okane} <- okane suuji!!!", inline=False)
         embed.set_footer(text=f"Page 1/{view.max_page+1} | Minister Chikuwa")
 
         await interaction.response.send_message(embed=embed, view=view, ephemeral=hidden)
