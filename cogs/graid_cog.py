@@ -160,7 +160,8 @@ class PlayerCountView(discord.ui.View):
         end = start + self.per_page
         for name, count in self.player_counts[start:end]:
             safe_name = discord.utils.escape_markdown(name)
-            embed.add_field(name=safe_name, value=f"Count: {count}", inline=False)
+            okane = count / 2
+            embed.add_field(name=safe_name, value=f"Count: {count} | {okane} <- okane suuji!!!", inline=False)
         embed.set_footer(text=f"Page {self.page+1}/{self.max_page+1} | Minister Chikuwa")
         self.previous.disabled = self.page == 0
         self.next.disabled = self.page == self.max_page
