@@ -5,7 +5,7 @@ import re
 from discord.ext import tasks
 
 from lib.api_stocker import WynncraftAPI
-from lib.db import get_linked_members_page, add_member, remove_member, get_member, get_pending_applications, delete_application_by_discord_id
+from lib.db import get_linked_members_page, add_member, remove_member, get_member, get_pending_applications, delete_application_by_discord_id, get_last_join_cache_for_members
 from lib.discord_notify import notify_member_removed
 from config import RANK_ROLE_ID_MAP, ETKW_SERVER, ETKW, ROLE_ID_TO_RANK
 
@@ -67,7 +67,7 @@ async def member_rank_sync_task(api: WynncraftAPI, bot=None):
                                             await member.add_roles(new_role, reason="ランク同期: 新ランクロール付与")
                                         except Exception as e:
                                             logger.error(f"[MemberSync] 新ランクロール付与失敗: {e}")
-                                    # 3. ETKWロール付与（必要あれば）
+                                    # 3. ETKWロール付与
                                     if ETKW:
                                         etkw_role = guild.get_role(ETKW)
                                         if etkw_role:
@@ -112,26 +112,19 @@ async def member_remove_sync_task(bot, api: WynncraftAPI):
                 for dbm in db_members:
                     mcid = dbm['mcid']
                     if mcid not in api_mcids:
-                        # ゲーム脱退時のみロール削除・ニックネームリセット
+                        # ゲーム脱退時のロール削除・ニックネームリセット
                         if dbm.get('discord_id'):
                             for guild in bot.guilds:
                                 member = guild.get_member(dbm['discord_id'])
                                 if member:
-                                    # ランクロール削除
-                                    roles_to_remove = [role for role in member.roles if role.id in ROLE_ID_TO_RANK]
+                                    # すべてのロールを削除
+                                    roles_to_remove = [role for role in member.roles if role.name != "@everyone"]
                                     if roles_to_remove:
                                         try:
-                                            await member.remove_roles(*roles_to_remove, reason="ゲーム脱退時ランクロール削除")
+                                            await member.remove_roles(*roles_to_remove)
+                                            logger.info(f"[MemberSync] {mcid} の全ロール削除完了（{len(roles_to_remove)}個）")
                                         except Exception as e:
-                                            logger.error(f"ゲーム脱退時ランクロール削除エラー: {e}")
-                                    # ETKWロール削除
-                                    if ETKW:
-                                        etkw_role = guild.get_role(ETKW)
-                                        if etkw_role:
-                                            try:
-                                                await member.remove_roles(etkw_role, reason="ゲーム脱退時ETKWロール削除")
-                                            except Exception as e:
-                                                logger.error(f"ゲーム脱退時ETKWロール削除エラー: {e}")
+                                            logger.error(f"ゲーム脱退時全ロール削除エラー: {e}")
                                     # ニックネームリセット
                                     try:
                                         if not member.guild_permissions.administrator:

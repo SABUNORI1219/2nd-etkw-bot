@@ -109,6 +109,9 @@ async def send_guild_raid_embed(bot, party):
     logger.info(f"Embed通知: {party}")
 
 async def notify_member_removed(bot, member_data):
+    from datetime import datetime, timedelta
+    from lib.db import get_last_join_cache_for_members
+    
     NOTIFY_CHANNEL_ID = int(get_config("MEMBER_NOTIFY_CHANNEL_ID") or "0")
     channel = bot.get_channel(NOTIFY_CHANNEL_ID)
     if not channel:
@@ -125,17 +128,47 @@ async def notify_member_removed(bot, member_data):
     await channel.send(embed=embed)
     logger.info(f"Guild脱退通知: {member_data}")
 
-    DEPARTURE_IDS = [1271173606478708811, 1151511274165895228]
+    # last_join_cacheを参照してロールを決定
+    LONG_ABSENCE_ROLE_ID = 1271173606478708811  # 1週間以上非アクティブ
+    SHORT_ABSENCE_ROLE_ID = 1151511274165895228  # 1週間未満
+    
     discord_id = member_data.get('discord_id')
-    if discord_id:
+    mcid = member_data.get('mcid')
+    
+    if discord_id and mcid:
+        # last_join_cacheから最終ログイン時刻を取得
+        last_join_data = get_last_join_cache_for_members([mcid])
+        last_join_str = last_join_data.get(mcid)
+        
+        role_id_to_add = SHORT_ABSENCE_ROLE_ID  # デフォルトは短期間非アクティブ
+        
+        if last_join_str:
+            try:
+                # lastJoinは "2024-10-29T12:34:56.789Z" 形式
+                last_join_time = datetime.fromisoformat(last_join_str.replace('Z', '+00:00'))
+                now = datetime.now(last_join_time.tzinfo)  # 同じタイムゾーンで比較
+                days_since_last_join = (now - last_join_time).days
+                
+                if days_since_last_join >= 7:
+                    role_id_to_add = LONG_ABSENCE_ROLE_ID
+                    logger.info(f"[MemberRemoved] {mcid}: {days_since_last_join}日前が最終ログイン → 長期非アクティブロール付与")
+                else:
+                    logger.info(f"[MemberRemoved] {mcid}: {days_since_last_join}日前が最終ログイン → 短期非アクティブロール付与")
+                    
+            except Exception as e:
+                logger.warning(f"[MemberRemoved] {mcid}: lastJoin解析失敗 ({last_join_str}) → デフォルトロール付与: {e}")
+        else:
+            logger.info(f"[MemberRemoved] {mcid}: lastJoinデータなし → デフォルトロール付与")
+        
         guild = bot.get_guild(ETKW_SERVER)
         if guild:
             member = guild.get_member(int(discord_id))
             if member:
-                roles_to_add = [guild.get_role(role_id) for role_id in DEPARTURE_IDS if guild.get_role(role_id)]
-                if roles_to_add:
+                role_to_add = guild.get_role(role_id_to_add)
+                if role_to_add:
                     try:
-                        await member.add_roles(*roles_to_add, reason="Guild removal auto role")
+                        await member.add_roles(role_to_add)
+                        logger.info(f"[MemberRemoved] {mcid}: {role_to_add.name}ロール付与完了")
                     except Exception as e:
                         logger.warning(f"ロール追加失敗: {e}")
 
