@@ -70,6 +70,13 @@ def create_table():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         ''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS playtime_cache (
+                mcid TEXT PRIMARY KEY,
+                playtime REAL NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        ''')
         conn.commit()
     conn.close()
     logger.info("全テーブルを作成/確認しました")
@@ -492,4 +499,54 @@ def delete_application_by_discord_id(discord_id: int):
         cur.execute("DELETE FROM applications WHERE discord_id = %s", (discord_id,))
         conn.commit()
     conn.close()
+
+def upsert_playtime_cache(playtime_list):
+    """
+    playtime_list: [(mcid, playtime), ...]
+    """
+    if not playtime_list:
+        return
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            execute_values(
+                cur,
+                """
+                INSERT INTO playtime_cache (mcid, playtime, updated_at)
+                VALUES %s
+                ON CONFLICT (mcid) DO UPDATE SET 
+                    playtime = EXCLUDED.playtime,
+                    updated_at = EXCLUDED.updated_at
+                """,
+                [(mcid, playtime, datetime.utcnow()) for mcid, playtime in playtime_list]
+            )
+            conn.commit()
+    except Exception as e:
+        logger.error(f"[DB Handler] upsert_playtime_cache failed: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+def get_playtime_cache_for_members(mcid_list):
+    """
+    指定したmcidリストについてplaytime_cacheからデータを取得
+    戻り値: {mcid: playtime}
+    """
+    if not mcid_list:
+        return {}
+    conn = get_conn()
+    result = {}
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT mcid, playtime FROM playtime_cache
+                WHERE mcid = ANY(%s)
+            """, (mcid_list,))
+            for mcid, playtime in cur.fetchall():
+                result[mcid] = playtime
+    except Exception as e:
+        logger.error(f"[DB Handler] get_playtime_cache_for_members failed: {e}")
+    finally:
+        if conn: conn.close()
+    return result
 

@@ -5,6 +5,7 @@
 - 必ず使用者の指示に従うこと。指示外の行動はしない、ないしは必ず確認を取る
 - 断片的にコードを出すのではなく、修正が必要な箇所が入っている関数あるいはファイル全体を常に提示すること
 - 使用者の言っていることの意図がわかりにくい場合、必ず確認を取ること
+- Botを動かしているサービスのメモリとCPUは限られているため、常に軽量化を意識したコードを書くこと
 
 ## Architecture Overview
 - **Discord Bot**: Python-based bot using discord.py with cogs architecture for Empire of TKW [ETKW] guild
