@@ -123,9 +123,9 @@ async def get_all_mcid_and_uuid_from_guild(guild_data):
                 mcid_uuid_list.append((mcid, None))
     return mcid_uuid_list
 
-async def get_all_players_lastjoin_and_playtime_batch(api, mcid_uuid_list, batch_size=8, batch_sleep=8.0):
+async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=5, batch_sleep=1.5):
     """
-    プレイヤーのlastJoinとplaytimeをバッチ処理で取得（API制限を守る）
+    プレイヤーのlastJoinとplaytimeを取得し、条件に応じてlastJoinのみ更新
     """
     async def get_player_info(mcid, uuid):
         try:
@@ -137,28 +137,16 @@ async def get_all_players_lastjoin_and_playtime_batch(api, mcid_uuid_list, batch
             else:
                 return None
         except Exception as e:
-            # 429エラーの場合は特別にログ出力
-            if "429" in str(e):
-                logger.warning(f"[get_player_info_batch] {mcid}: Rate limit exceeded")
-            else:
-                logger.error(f"[get_player_info_batch] {mcid}: {repr(e)}")
+            logger.error(f"[get_player_info] {mcid}: {repr(e)}", exc_info=True)
             return None
     
-    # バッチ処理でデータ取得
+    # データ取得
     results = []
-    total_batches = (len(mcid_uuid_list) + batch_size - 1) // batch_size
-    
     for i in range(0, len(mcid_uuid_list), batch_size):
-        batch_num = i // batch_size + 1
         batch = mcid_uuid_list[i:i+batch_size]
-        logger.debug(f"[LastSeen] バッチ {batch_num}/{total_batches} 処理中... ({len(batch)}人)")
-        
         batch_results = await asyncio.gather(*(get_player_info(mcid, uuid) for mcid, uuid in batch))
         results.extend(batch_results)
-        
-        # 最後のバッチでない場合はスリープ
-        if i + batch_size < len(mcid_uuid_list):
-            await asyncio.sleep(batch_sleep)
+        await asyncio.sleep(batch_sleep)
     
     # フィルタリング
     valid_results = [r for r in results if r is not None and r[1] is not None]
@@ -325,7 +313,7 @@ async def last_seen_tracker(api, guild_prefix="ETKW", loop_interval=120):
         if uuid_updates:
             await asyncio.to_thread(update_multiple_member_uuids, uuid_updates)
         
-        await get_all_players_lastjoin_and_playtime_batch(api, mcid_uuid_list, batch_size=8, batch_sleep=8.0)
+        await get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=5, batch_sleep=1.5)
 
         elapsed = time.time() - start_time
         logger.info(f"Last Seen Trackerタスク完了（処理時間: {elapsed:.1f}秒）")
