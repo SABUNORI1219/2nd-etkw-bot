@@ -335,7 +335,7 @@ async def last_seen_tracker(api, guild_prefix="ETKW", loop_interval=120):
         if uuid_updates:
             await asyncio.to_thread(update_multiple_member_uuids, uuid_updates)
         
-        await get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=5, batch_sleep=1.5)
+        await get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=3, batch_sleep=2.0)
 
         elapsed = time.time() - start_time
         logger.info(f"Last Seen Trackerタスク完了（処理時間: {elapsed:.1f}秒）")
