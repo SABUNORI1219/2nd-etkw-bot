@@ -99,7 +99,7 @@ def parse_date_with_time(date_str):
         return None
 
 class GraidCountView(discord.ui.View):
-    def __init__(self, sorted_counts, period_counts, today_counts, yesterday_counts, total_period, total_today, total_yesterday, period_start, period_end, title, color, user_mcid=None, page=0, per_page=12, timeout=120):
+    def __init__(self, sorted_counts, period_counts, today_counts, yesterday_counts, total_period, total_today, total_yesterday, period_start, period_end, title, color, raid_display_name="Total", user_mcid=None, page=0, per_page=12, timeout=120):
         super().__init__(timeout=timeout)
         self.sorted_counts = sorted_counts
         self.period_counts = period_counts  # 期間全体
@@ -110,6 +110,7 @@ class GraidCountView(discord.ui.View):
         self.total_yesterday = total_yesterday  # 先週合計
         self.period_start = period_start
         self.period_end = period_end
+        self.raid_display_name = raid_display_name  # 表示用レイド名
         self.user_mcid = user_mcid  # コマンド実行者のMCID
         self.page = page
         self.per_page = per_page
@@ -129,7 +130,7 @@ class GraidCountView(discord.ui.View):
         embed = discord.Embed(
             title=f"{emoji} Guild Raid Counts (Page `{self.page+1}/{self.max_page+1}` - `#{start+1} ~ #{end}`)",
             color=self.color,
-            description=f"⚔️ Raid: Total\nPeriod: `{self.period_start}` ~ `{self.period_end}`"
+            description=f"⚔️ Raid: {self.raid_display_name}\nPeriod: `{self.period_start}` ~ `{self.period_end}`"
         )
         idx = start
         while idx < end:
@@ -432,6 +433,9 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         user_data = get_member(discord_id=interaction.user.id)
         if user_data:
             user_mcid = user_data.get('mcid')
+            logger.info(f"[GraidList] ユーザー {interaction.user.id} のMCID: {user_mcid}")
+        else:
+            logger.info(f"[GraidList] ユーザー {interaction.user.id} はlinked_membersに登録されていません")
 
         # 日付指定の処理（JST基準）
         date_from = parse_date_with_time(date) if date else None
@@ -464,18 +468,24 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         # データ取得とタイトル設定
         if raid_name == "Total":
             # 全レイドの合計
-            raid_choices_to_fetch = RAID_CHOICES[:-2]  # TestとTotalを除く
+            raid_choices_to_fetch = RAID_CHOICES[:-1]  # Totalを除く
             title_text = "Guild Raid Counts: 合計"
+            raid_display_name = "Total"
             color = discord.Color.orange()
         else:
             # 特定のレイド
-            raid_choices_to_fetch = [choice for choice in RAID_CHOICES[:-2] if choice.value == raid_name]
+            raid_choices_to_fetch = [choice for choice in RAID_CHOICES[:-1] if choice.value == raid_name]
             title_text = f"Guild Raid Counts: {raid_name}"
+            raid_display_name = raid_name
             color = discord.Color.blue()
 
         # 期間指定データの取得
         if date_from:
-            period_start = date_from.strftime("%Y-%m-%d")
+            # 時間指定がある場合は時間まで表示
+            if date and (' ' in date or date.count('-') > 2):
+                period_start = date_from.strftime("%Y-%m-%d %H:%M")
+            else:
+                period_start = date_from.strftime("%Y-%m-%d")
             period_end = today0.strftime("%Y-%m-%d")
             rows = []
             for raid_choice in raid_choices_to_fetch:
@@ -537,6 +547,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             period_end=period_end,
             title=title_text,
             color=color,
+            raid_display_name=raid_display_name,
             user_mcid=user_mcid,
             page=0,
             per_page=12
