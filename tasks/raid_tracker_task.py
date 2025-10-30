@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 from collections import deque
 from lib.api_stocker import WynncraftAPI
-from lib.db import insert_history, insert_server_log, cleanup_old_server_logs, upsert_last_join_cache, upsert_playtime_cache, get_last_join_cache_for_members, get_playtime_cache_for_members
+from lib.db import insert_history, insert_server_log, cleanup_old_server_logs, upsert_last_join_cache, upsert_playtime_cache, get_last_join_cache_for_members, get_playtime_cache_for_members, get_recently_active_members, update_multiple_member_uuids
 from lib.party_estimator import estimate_and_save_parties
 from lib.discord_notify import send_guild_raid_embed
 
@@ -16,7 +16,11 @@ previous_player_data = dict()
 # 直近3ループ分のクリアイベントを保持
 clear_events_window = deque(maxlen=200)
 
+# ループカウンター（パーティ推定で使用）
+current_loop_number = 0
+
 def extract_online_members(guild_data):
+    """オンラインメンバーを取得"""
     ranks = ["owner", "chief", "strategist", "captain", "recruiter", "recruit"]
     online_members = []
     for rank in ranks:
@@ -25,9 +29,52 @@ def extract_online_members(guild_data):
                 online_members.append({
                     "uuid": member_info["uuid"],
                     "name": name,
-                    "server": member_info.get("server")
+                    "server": member_info.get("server"),
+                    "source": "online"  # データソースを識別
                 })
     return online_members
+
+def get_tracking_members(guild_data, recently_active_threshold_minutes=20):
+    """
+    トラッキング対象メンバーを取得
+    オンラインメンバー + 最近アクティブなメンバー（重複除去）
+    """
+    # オンラインメンバーを取得
+    online_members = extract_online_members(guild_data)
+    online_uuids = set(member["uuid"] for member in online_members)
+    
+    # 最近アクティブなメンバーを取得
+    recently_active = get_recently_active_members(recently_active_threshold_minutes)
+    
+    # ギルドデータからUUID→メンバー情報のマッピングを作成
+    uuid_to_member = {}
+    for rank, members in guild_data["members"].items():
+        if not isinstance(members, dict):
+            continue
+        for name, member_info in members.items():
+            uuid = member_info.get("uuid")
+            if uuid:
+                uuid_to_member[uuid] = {
+                    "uuid": uuid,
+                    "name": name,
+                    "server": member_info.get("server"),
+                    "rank": rank
+                }
+    
+    # 最近アクティブなメンバーでオンラインでない人を追加
+    tracking_members = online_members.copy()
+    added_count = 0
+    
+    for mcid, uuid in recently_active:
+        if uuid and uuid not in online_uuids:
+            member_info = uuid_to_member.get(uuid)
+            if member_info:
+                member_info["source"] = "recently_active"
+                tracking_members.append(member_info)
+                added_count += 1
+    
+    logger.info(f"トラッキング対象: オンライン {len(online_members)}人 + 最近アクティブ {added_count}人 = 合計 {len(tracking_members)}人")
+    return tracking_members
 
 def remove_party_events_from_window(window, party, time_threshold=2):
     to_remove = []
@@ -57,9 +104,10 @@ def is_duplicate_event(event, window, threshold_sec=2):
             return True
     return False
 
-def cleanup_old_events(window, max_age_sec=500):
-    now = datetime.utcnow()
-    while window and (now - window[0]["clear_time"]).total_seconds() > max_age_sec:
+def cleanup_old_events(window, max_loop_age=6):
+    """古いループのイベントを削除（現在のループから6ループ以上古いものを削除）"""
+    global current_loop_number
+    while window and (current_loop_number - window[0].get("loop_number", 0)) > max_loop_age:
         window.popleft()
 
 async def get_all_mcid_and_uuid_from_guild(guild_data):
@@ -75,7 +123,77 @@ async def get_all_mcid_and_uuid_from_guild(guild_data):
                 mcid_uuid_list.append((mcid, None))
     return mcid_uuid_list
 
-async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=5, batch_sleep=1.5):
+async def get_all_players_lastjoin_and_playtime_fast(api, mcid_uuid_list, max_concurrent=15, delay_between_requests=0.1):
+    """
+    プレイヤーのlastJoinとplaytimeを高速で取得（最大並列実行数を制限）
+    """
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def get_player_info_with_limit(mcid, uuid):
+        async with semaphore:
+            try:
+                await asyncio.sleep(delay_between_requests)  # レート制限回避
+                player_data = await api.get_official_player_data(uuid or mcid)
+                if player_data:
+                    last_join = player_data.get("lastJoin")
+                    playtime = player_data.get("playtime", 0)
+                    return (mcid, last_join, playtime)
+                else:
+                    return None
+            except Exception as e:
+                logger.error(f"[get_player_info_fast] {mcid}: {repr(e)}")
+                return None
+    
+    # 全てのタスクを同時に開始（semaphoreで制限）
+    tasks = [get_player_info_with_limit(mcid, uuid) for mcid, uuid in mcid_uuid_list]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # 例外やNoneを除外
+    valid_results = [r for r in results if r is not None and not isinstance(r, Exception) and r[1] is not None]
+    if not valid_results:
+        return
+    
+    # 現在のキャッシュデータを取得
+    mcid_list = [r[0] for r in valid_results]
+    previous_lastjoin = get_last_join_cache_for_members(mcid_list)
+    previous_playtime = get_playtime_cache_for_members(mcid_list)
+    
+    # 更新対象を決定
+    lastjoin_updates = []
+    playtime_updates = []
+    
+    for mcid, last_join, playtime in valid_results:
+        # playtimeは常に更新
+        playtime_updates.append((mcid, playtime))
+        
+        # lastJoinの更新判定
+        prev_lastjoin = previous_lastjoin.get(mcid)
+        prev_playtime = previous_playtime.get(mcid, 0)
+        
+        # 前回のlastJoinと異なる場合のみチェック
+        if prev_lastjoin != last_join:
+            playtime_diff = playtime - prev_playtime
+            
+            # playtimeが0.16以上増加している場合、または初回記録の場合にlastJoinを更新
+            if prev_lastjoin is None or playtime_diff >= 0.16:
+                lastjoin_updates.append((mcid, last_join))
+                logger.info(f"[LastJoin更新] {mcid}: playtime差={playtime_diff:.2f}時間")
+            else:
+                logger.debug(f"[LastJoin更新スキップ] {mcid}: playtime差={playtime_diff:.2f}時間 (0.16未満)")
+        else:
+            # lastJoinが同じ場合は更新しない
+            logger.debug(f"[LastJoin変更なし] {mcid}")
+    
+    # データベース更新
+    if playtime_updates:
+        upsert_playtime_cache(playtime_updates)
+        logger.info(f"playtime更新: {len(playtime_updates)}件")
+    
+    if lastjoin_updates:
+        upsert_last_join_cache(lastjoin_updates)
+        logger.info(f"lastJoin更新: {len(lastjoin_updates)}件")
+    else:
+        logger.info("lastJoin更新対象なし")
     """
     プレイヤーのlastJoinとplaytimeを取得し、条件に応じてlastJoinのみ更新
     """
@@ -149,7 +267,10 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
 
 async def guild_raid_tracker(api, bot=None, guild_prefix="ETKW", loop_interval=120):
     logger.info("Guild Raid Trackerタスク開始")
+    global current_loop_number
+    
     while True:
+        current_loop_number += 1
         start_time = time.time()
         try:
             logger.debug("ETKWメンバー情報取得開始...")
@@ -159,21 +280,22 @@ async def guild_raid_tracker(api, bot=None, guild_prefix="ETKW", loop_interval=1
                 await asyncio.sleep(10)
                 continue
     
-            online_members = extract_online_members(guild_data)
-            if not online_members:
-                logger.info("オンラインメンバーがいません。")
+            # オンラインメンバー + 最近アクティブなメンバーを取得（10分以内に短縮）
+            tracking_members = await asyncio.to_thread(get_tracking_members, guild_data, 10)
+            if not tracking_members:
+                logger.info("トラッキング対象メンバーがいません。")
                 elapsed = time.time() - start_time
                 logger.info(f"Guild Raid Trackerタスク完了（処理時間: {elapsed:.1f}秒）")
                 await asyncio.sleep(loop_interval)
                 continue
     
-            player_tasks = [get_player_data(api, member["uuid"]) for member in online_members]
+            player_tasks = [get_player_data(api, member["uuid"]) for member in tracking_members]
             player_results = await asyncio.gather(*player_tasks)
     
             clear_events = []
             now = datetime.utcnow()
     
-            for member, pdata in zip(online_members, player_results):
+            for member, pdata in zip(tracking_members, player_results):
                 uuid = member["uuid"]
                 name = member["name"]
                 if pdata is None:
@@ -198,11 +320,13 @@ async def guild_raid_tracker(api, bot=None, guild_prefix="ETKW", loop_interval=1
                             "player": name,
                             "raid_name": raid,
                             "clear_time": now,
-                            "server": previous.get("server", server)
+                            "server": previous.get("server", server),
+                            "loop_number": current_loop_number  # ループ番号を追加
                         }
                         if not is_duplicate_event(event, clear_events_window) and not is_duplicate_event(event, clear_events):
                             clear_events.append(event)
-                            logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{previous.get('server', server)}")
+                            source_info = f"({member.get('source', 'unknown')})"
+                            logger.info(f"{name}が{raid}をクリア: {prev_count}->{current_count} サーバー:{previous.get('server', server)} {source_info}")
                 previous_player_data[uuid] = {
                     "raids": dict(raids),
                     "server": server,
@@ -215,7 +339,7 @@ async def guild_raid_tracker(api, bot=None, guild_prefix="ETKW", loop_interval=1
                 if not is_duplicate_event(event, clear_events_window):
                     clear_events_window.append(event)
     
-            cleanup_old_events(clear_events_window, max_age_sec=500)
+            cleanup_old_events(clear_events_window, max_loop_age=6)
     
             parties = estimate_and_save_parties(list(clear_events_window), window=clear_events_window)
             for party in parties:
@@ -253,7 +377,13 @@ async def last_seen_tracker(api, guild_prefix="ETKW", loop_interval=120):
             continue
 
         mcid_uuid_list = await get_all_mcid_and_uuid_from_guild(guild_data)
-        await get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=3, batch_sleep=4)
+        
+        # UUIDをlinked_membersテーブルに更新
+        uuid_updates = [(mcid, uuid) for mcid, uuid in mcid_uuid_list if uuid is not None]
+        if uuid_updates:
+            await asyncio.to_thread(update_multiple_member_uuids, uuid_updates)
+        
+        await get_all_players_lastjoin_and_playtime_fast(api, mcid_uuid_list, max_concurrent=25, delay_between_requests=0.05)
 
         elapsed = time.time() - start_time
         logger.info(f"Last Seen Trackerタスク完了（処理時間: {elapsed:.1f}秒）")

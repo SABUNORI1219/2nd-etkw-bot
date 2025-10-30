@@ -1,38 +1,31 @@
 import logging
-from datetime import timedelta
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
-SCORE_THRESHOLD = 80
-TIME_WINDOW_MINUTES = 5
+SCORE_THRESHOLD = 50  # 時間条件を削除したので閾値を下げる
+MAX_LOOP_DIFFERENCE = 3  # 3ループ以内
 
 SERVER_ALL_MATCH_SCORE = 50
 SERVER_PARTIAL_SCORE = 0
 
-TIME_ALL_MATCH_SCORE = 50
-TIME_30_SEC_SCORE = 40
-TIME_60_SEC_SCORE = 30
-TIME_120_SEC_SCORE = 20
-TIME_300_SEC_SCORE = 10
-TIME_OTHER_SCORE = 0
+# 時間関連のスコアは削除（ループベースに変更）
 
 def _round_time(dt):
     return dt.replace(microsecond=0)
 
 def remove_events_from_window(window, party_candidate, time_threshold=500):
-    # party_candidateに含まれるイベントをwindowから除去（5分＝300秒以内）
+    # party_candidateに含まれるイベントをwindowから除去
     to_remove = []
     candidate_names = set(p["player"] for p in party_candidate)
     raid_name = party_candidate[0]["raid_name"]
-    times = [p["clear_time"] for p in party_candidate]
-    min_time = min(times)
-    max_time = max(times)
+    candidate_loops = [p.get("loop_number", 0) for p in party_candidate]
+    
     for e in window:
         if (
             e["raid_name"] == raid_name
             and e["player"] in candidate_names
-            and min_time <= e["clear_time"] <= max_time
+            and e.get("loop_number", 0) in candidate_loops
         ):
             to_remove.append(e)
     for e in to_remove:
@@ -40,6 +33,18 @@ def remove_events_from_window(window, party_candidate, time_threshold=500):
             window.remove(e)
         except ValueError:
             pass
+
+def is_valid_party_by_loops(party_candidate):
+    """ループ番号で3ループ以内かどうか判定"""
+    loop_numbers = [event.get("loop_number", 0) for event in party_candidate]
+    if not loop_numbers:
+        return False
+    
+    min_loop = min(loop_numbers)
+    max_loop = max(loop_numbers)
+    loop_difference = max_loop - min_loop
+    
+    return loop_difference <= MAX_LOOP_DIFFERENCE
 
 def estimate_and_save_parties(clear_events, window=None):
     events_by_raid = defaultdict(list)
@@ -57,6 +62,7 @@ def estimate_and_save_parties(clear_events, window=None):
         server_events = defaultdict(list)
         for e in events:
             server_events[e["server"]].append(e)
+        
         for server, s_events in server_events.items():
             if server is None:
                 continue
@@ -66,16 +72,19 @@ def estimate_and_save_parties(clear_events, window=None):
                 member_names = [p["player"] for p in party_candidate]
                 member_set = frozenset(member_names)
                 first_time = min([p["clear_time"] for p in party_candidate])
-                last_time = max([p["clear_time"] for p in party_candidate])
+                
                 if len(member_set) < 4:
                     continue
+                
+                # ループ番号による判定
+                if not is_valid_party_by_loops(party_candidate):
+                    continue
+                    
                 score, criteria, _ = _score_party(party_candidate)
                 rounded_time = _round_time(first_time)
                 key = (raid, rounded_time, member_set)
-                if (
-                    (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES)
-                    and key not in party_keys
-                ):
+                
+                if key not in party_keys:
                     # サーバー一致グループは強制的に認定
                     party_keys.add(key)
                     party = {
@@ -90,6 +99,7 @@ def estimate_and_save_parties(clear_events, window=None):
                     # 認定イベントのみwindowから除去
                     if window is not None:
                         remove_events_from_window(window, party_candidate, time_threshold=500)
+        
         # 2. サーバー混在グループは、残りイベントで通常スコア判定
         # windowから既に除去されたイベントは対象外
         remaining_events = [e for e in events if window is None or id(e) in window_set]
@@ -98,16 +108,23 @@ def estimate_and_save_parties(clear_events, window=None):
             member_names = [p["player"] for p in party_candidate]
             member_set = frozenset(member_names)
             first_time = min([p["clear_time"] for p in party_candidate])
-            last_time = max([p["clear_time"] for p in party_candidate])
+            
             if len(member_set) < 4:
                 continue
+            
+            # ループ番号による判定
+            if not is_valid_party_by_loops(party_candidate):
+                continue
+                
             score, criteria, server = _score_party(party_candidate)
+            loop_info = f"ループ差: {max([p.get('loop_number', 0) for p in party_candidate]) - min([p.get('loop_number', 0) for p in party_candidate])}"
             logger.info(
-                f"パーティ候補: レイド名: {raid} / メンバー: {member_names}, スコア: {score}, 詳細: {criteria}"
+                f"パーティ候補: レイド名: {raid} / メンバー: {member_names}, スコア: {score}, 詳細: {criteria}, {loop_info}"
             )
             rounded_time = _round_time(first_time)
             key = (raid, rounded_time, member_set)
-            if (last_time - first_time) <= timedelta(minutes=TIME_WINDOW_MINUTES) and score >= SCORE_THRESHOLD and key not in party_keys:
+            
+            if score >= SCORE_THRESHOLD and key not in party_keys:
                 party_keys.add(key)
                 party = {
                     "raid_name": raid,
@@ -120,7 +137,6 @@ def estimate_and_save_parties(clear_events, window=None):
                 saved_parties.append(party)
                 if window is not None:
                     remove_events_from_window(window, party_candidate, time_threshold=500)
-            # 認定されなかった場合もwindowから除外しない（イベントを残す）
 
     return saved_parties
 
@@ -129,6 +145,8 @@ def _score_party(party):
     criteria = {}
     score = 0
     unique_servers = set(servers)
+    
+    # サーバー一致スコア
     if len(unique_servers) == 1 and None not in unique_servers:
         score += SERVER_ALL_MATCH_SCORE
         criteria['server_match'] = f"全員同じサーバー({servers[0]})"
@@ -136,28 +154,20 @@ def _score_party(party):
         score += SERVER_PARTIAL_SCORE
         criteria['server_match'] = f"サーバーが一致しない: {servers}"
 
-    times = [p["clear_time"] for p in party]
-    min_time = min(times)
-    max_time = max(times)
-    time_diff = (max_time - min_time).total_seconds()
-    if time_diff == 0:
-        score += TIME_ALL_MATCH_SCORE
-        criteria['time_proximity'] = "全員同時"
-    elif time_diff <= 30:
-        score += TIME_30_SEC_SCORE
-        criteria['time_proximity'] = f"{int(time_diff)}秒差（30秒以内）"
-    elif time_diff <= 60:
-        score += TIME_60_SEC_SCORE
-        criteria['time_proximity'] = f"{int(time_diff)}秒差（60秒以内）"
-    elif time_diff <= 120:
-        score += TIME_120_SEC_SCORE
-        criteria['time_proximity'] = f"{int(time_diff)}秒差（120秒以内）"
-    elif time_diff <= 300:
-        score += TIME_300_SEC_SCORE
-        criteria['time_proximity'] = f"{int(time_diff)}秒差（5分以内）"
+    # ループ差による追加スコア（3ループ以内は既に確認済み）
+    loop_numbers = [p.get("loop_number", 0) for p in party]
+    min_loop = min(loop_numbers)
+    max_loop = max(loop_numbers)
+    loop_difference = max_loop - min_loop
+    
+    if loop_difference == 0:
+        criteria['loop_proximity'] = "同一ループ"
+    elif loop_difference == 1:
+        criteria['loop_proximity'] = "1ループ差"
+    elif loop_difference == 2:
+        criteria['loop_proximity'] = "2ループ差"
     else:
-        score += TIME_OTHER_SCORE
-        criteria['time_proximity'] = f"{int(time_diff)}秒差（遠い）"
+        criteria['loop_proximity'] = f"{loop_difference}ループ差"
 
     server = servers[0] if servers and servers[0] is not None else None
     return score, criteria, server

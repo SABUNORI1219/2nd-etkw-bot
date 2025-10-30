@@ -44,6 +44,13 @@ def create_table():
                 ingame_rank TEXT NOT NULL
             );
         ''')
+        
+        # uuid カラムを追加（既存の場合はスキップ）
+        cur.execute('''
+            ALTER TABLE linked_members 
+            ADD COLUMN IF NOT EXISTS uuid TEXT;
+        ''')
+        
         cur.execute('''
             CREATE TABLE IF NOT EXISTS last_join_cache (
                 mcid TEXT PRIMARY KEY,
@@ -524,6 +531,81 @@ def get_last_join_cache_for_members(mcid_list):
     finally:
         if conn: conn.close()
     return result
+
+def get_recently_active_members(minutes_threshold=20):
+    """
+    最終ログインから指定分数以内のメンバーのMCIDとUUIDを取得
+    戻り値: [(mcid, uuid), ...]
+    """
+    conn = get_conn()
+    result = []
+    try:
+        with conn.cursor() as cur:
+            # last_joinが文字列として保存されていると仮定して、現在時刻からminutes_threshold分前を計算
+            threshold_time = datetime.utcnow() - timedelta(minutes=minutes_threshold)
+            threshold_str = threshold_time.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+            
+            cur.execute("""
+                SELECT lm.mcid, lm.uuid 
+                FROM linked_members lm
+                JOIN last_join_cache ljc ON lm.mcid = ljc.mcid
+                WHERE ljc.last_join IS NOT NULL 
+                AND ljc.last_join >= %s
+            """, (threshold_str,))
+            
+            for mcid, uuid in cur.fetchall():
+                result.append((mcid, uuid))
+                
+        logger.debug(f"[DB] 最近アクティブなメンバー {len(result)}人を取得（{minutes_threshold}分以内）")
+    except Exception as e:
+        logger.error(f"[DB Handler] get_recently_active_members failed: {e}")
+    finally:
+        if conn: conn.close()
+    return result
+
+def update_member_uuid(mcid: str, uuid: str):
+    """linked_membersテーブルのUUIDを更新"""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE linked_members 
+                SET uuid = %s 
+                WHERE mcid = %s
+            """, (uuid, mcid))
+            conn.commit()
+            if cur.rowcount > 0:
+                logger.debug(f"[DB] UUID更新: {mcid} -> {uuid}")
+    except Exception as e:
+        logger.error(f"[DB Handler] update_member_uuid failed: {e}")
+    finally:
+        if conn: conn.close()
+
+def update_multiple_member_uuids(mcid_uuid_list):
+    """複数のメンバーのUUIDを一括更新"""
+    if not mcid_uuid_list:
+        return
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            execute_values(
+                cur,
+                """
+                UPDATE linked_members 
+                SET uuid = data.uuid
+                FROM (VALUES %s) AS data(mcid, uuid)
+                WHERE linked_members.mcid = data.mcid
+                """,
+                mcid_uuid_list,
+                template=None,
+                page_size=100
+            )
+            conn.commit()
+            logger.info(f"[DB] UUID一括更新: {cur.rowcount}件")
+    except Exception as e:
+        logger.error(f"[DB Handler] update_multiple_member_uuids failed: {e}")
+    finally:
+        if conn: conn.close()
 
 def save_application(mcid: str, discord_id: int, channel_id: int):
     conn = get_conn()
