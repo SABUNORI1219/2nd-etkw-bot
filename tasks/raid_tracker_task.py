@@ -127,8 +127,6 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
     """
     プレイヤーのlastJoinとplaytimeを取得し、条件に応じてlastJoinのみ更新
     """
-    logger.info(f"[LastSeen] 処理開始: 対象メンバー {len(mcid_uuid_list)}人")
-    
     async def get_player_info(mcid, uuid):
         try:
             player_data = await api.get_official_player_data(uuid or mcid)
@@ -137,7 +135,6 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
                 playtime = player_data.get("playtime", 0)
                 return (mcid, last_join, playtime)
             else:
-                logger.warning(f"[get_player_info] {mcid}: プレイヤーデータなし")
                 return None
         except Exception as e:
             logger.error(f"[get_player_info] {mcid}: {repr(e)}")
@@ -145,13 +142,8 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
     
     # データ取得
     results = []
-    total_batches = (len(mcid_uuid_list) + batch_size - 1) // batch_size
-    
     for i in range(0, len(mcid_uuid_list), batch_size):
-        batch_num = i // batch_size + 1
         batch = mcid_uuid_list[i:i+batch_size]
-        logger.info(f"[LastSeen] バッチ {batch_num}/{total_batches} 処理中... ({len(batch)}人)")
-        
         batch_results = await asyncio.gather(*(get_player_info(mcid, uuid) for mcid, uuid in batch))
         results.extend(batch_results)
         
@@ -159,15 +151,10 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
         if i + batch_size < len(mcid_uuid_list):
             await asyncio.sleep(batch_sleep)
     
-    logger.info(f"[LastSeen] API取得完了: {len(results)}件中、有効データ {len([r for r in results if r is not None])}件")
-    
     # フィルタリング
     valid_results = [r for r in results if r is not None and r[1] is not None]
     if not valid_results:
-        logger.warning("[LastSeen] 有効なデータが0件でした")
         return
-    
-    logger.info(f"[LastSeen] lastJoin有効データ: {len(valid_results)}件")
     
     # 現在のキャッシュデータを取得
     mcid_list = [r[0] for r in valid_results]
@@ -177,8 +164,6 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
     # 更新対象を決定
     lastjoin_updates = []
     playtime_updates = []
-    lastjoin_changed_count = 0
-    lastjoin_skipped_count = 0
     
     for mcid, last_join, playtime in valid_results:
         # playtimeは常に更新
@@ -190,21 +175,14 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
         
         # 前回のlastJoinと異なる場合のみチェック
         if prev_lastjoin != last_join:
-            lastjoin_changed_count += 1
             playtime_diff = playtime - prev_playtime
             
-            # playtimeが0.16以上増加している場合、または初回記録の場合にlastJoinを更新
-            if prev_lastjoin is None or playtime_diff >= 0.16:
+            # playtimeが0.15以上増加している場合、または初回記録の場合にlastJoinを更新
+            if prev_lastjoin is None or playtime_diff >= 0.15:
                 lastjoin_updates.append((mcid, last_join))
-                logger.info(f"[LastJoin更新] {mcid}: playtime差={playtime_diff:.2f}時間")
-            else:
-                lastjoin_skipped_count += 1
-                logger.info(f"[LastJoin更新スキップ] {mcid}: playtime差={playtime_diff:.2f}時間 (0.16未満) - lastJoin変化あり")
         else:
             # lastJoinが同じ場合は更新しない
             logger.debug(f"[LastJoin変更なし] {mcid}")
-    
-    logger.info(f"[LastSeen] lastJoin変化: {lastjoin_changed_count}人, うちスキップ: {lastjoin_skipped_count}人")
     
     # データベース更新
     if playtime_updates:
