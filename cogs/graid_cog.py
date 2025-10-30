@@ -46,9 +46,9 @@ def normalize_date(date_str):
     return date_str
 
 def parse_date_with_time(date_str):
-    """JST基準で日付・時刻文字列をパース"""
+    """JST基準で日付・時刻文字列をパース（表示用と検索用の両方を返す）"""
     if not date_str:
-        return None
+        return None, None
     
     # JST タイムゾーンを設定
     jst = pytz.timezone('Asia/Tokyo')
@@ -75,6 +75,7 @@ def parse_date_with_time(date_str):
             
             datetime_str = f"{normalize_date(date_part)} {time_part}"
             parsed_dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M")
+            display_format = f"{normalize_date(date_part)} {time_part}"
         else:
             # 日付のみの場合
             normalized_date = normalize_date(date_str)
@@ -87,16 +88,19 @@ def parse_date_with_time(date_str):
             elif dash_count == 0:
                 parsed_dt = datetime.strptime(normalized_date, "%Y")
             else:
-                return None
+                return None, None
+            
+            display_format = normalized_date
         
-        # JSTタイムゾーンを設定してUTCに変換
+        # JSTタイムゾーンを設定してUTCに変換（データベース検索用）
         jst_dt = jst.localize(parsed_dt)
         utc_dt = jst_dt.astimezone(pytz.UTC).replace(tzinfo=None)
-        return utc_dt
+        
+        return utc_dt, display_format
         
     except Exception as e:
         logger.warning(f"日付パースエラー: {date_str} - {e}")
-        return None
+        return None, None
 
 class GraidCountView(discord.ui.View):
     def __init__(self, sorted_counts, period_counts, today_counts, yesterday_counts, total_period, total_today, total_yesterday, period_start, period_end, title, color, raid_display_name="Total", user_mcid=None, page=0, per_page=12, timeout=120):
@@ -438,7 +442,10 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             logger.info(f"[GraidList] ユーザー {interaction.user.id} はlinked_membersに登録されていません")
 
         # 日付指定の処理（JST基準）
-        date_from = parse_date_with_time(date) if date else None
+        date_from_utc = None
+        date_display = None
+        if date:
+            date_from_utc, date_display = parse_date_with_time(date)
         
         now = datetime.utcnow()
         today0 = datetime(now.year, now.month, now.day)
@@ -480,16 +487,13 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             color = discord.Color.blue()
 
         # 期間指定データの取得
-        if date_from:
-            # 時間指定がある場合は時間まで表示
-            if date and (' ' in date or date.count('-') > 2):
-                period_start = date_from.strftime("%Y-%m-%d %H:%M")
-            else:
-                period_start = date_from.strftime("%Y-%m-%d")
+        if date_from_utc:
+            # 表示用の期間文字列を使用
+            period_start = date_display
             period_end = today0.strftime("%Y-%m-%d")
             rows = []
             for raid_choice in raid_choices_to_fetch:
-                raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from, date_to=today0 + timedelta(days=1))
+                raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from_utc, date_to=today0 + timedelta(days=1))
                 rows.extend(raid_rows)
         else:
             rows = []
