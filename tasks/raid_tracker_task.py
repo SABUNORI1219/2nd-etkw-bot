@@ -141,7 +141,11 @@ async def get_all_players_lastjoin_and_playtime_fast(api, mcid_uuid_list, max_co
                 else:
                     return None
             except Exception as e:
-                logger.error(f"[get_player_info_fast] {mcid}: {repr(e)}")
+                # 429エラーの場合は特別にログ出力
+                if "429" in str(e):
+                    logger.warning(f"[get_player_info_fast] {mcid}: Rate limit exceeded")
+                else:
+                    logger.error(f"[get_player_info_fast] {mcid}: {repr(e)}")
                 return None
     
     # 全てのタスクを同時に開始（semaphoreで制限）
@@ -150,76 +154,6 @@ async def get_all_players_lastjoin_and_playtime_fast(api, mcid_uuid_list, max_co
     
     # 例外やNoneを除外
     valid_results = [r for r in results if r is not None and not isinstance(r, Exception) and r[1] is not None]
-    if not valid_results:
-        return
-    
-    # 現在のキャッシュデータを取得
-    mcid_list = [r[0] for r in valid_results]
-    previous_lastjoin = get_last_join_cache_for_members(mcid_list)
-    previous_playtime = get_playtime_cache_for_members(mcid_list)
-    
-    # 更新対象を決定
-    lastjoin_updates = []
-    playtime_updates = []
-    
-    for mcid, last_join, playtime in valid_results:
-        # playtimeは常に更新
-        playtime_updates.append((mcid, playtime))
-        
-        # lastJoinの更新判定
-        prev_lastjoin = previous_lastjoin.get(mcid)
-        prev_playtime = previous_playtime.get(mcid, 0)
-        
-        # 前回のlastJoinと異なる場合のみチェック
-        if prev_lastjoin != last_join:
-            playtime_diff = playtime - prev_playtime
-            
-            # playtimeが0.16以上増加している場合、または初回記録の場合にlastJoinを更新
-            if prev_lastjoin is None or playtime_diff >= 0.16:
-                lastjoin_updates.append((mcid, last_join))
-                logger.info(f"[LastJoin更新] {mcid}: playtime差={playtime_diff:.2f}時間")
-            else:
-                logger.debug(f"[LastJoin更新スキップ] {mcid}: playtime差={playtime_diff:.2f}時間 (0.16未満)")
-        else:
-            # lastJoinが同じ場合は更新しない
-            logger.debug(f"[LastJoin変更なし] {mcid}")
-    
-    # データベース更新
-    if playtime_updates:
-        upsert_playtime_cache(playtime_updates)
-        logger.info(f"playtime更新: {len(playtime_updates)}件")
-    
-    if lastjoin_updates:
-        upsert_last_join_cache(lastjoin_updates)
-        logger.info(f"lastJoin更新: {len(lastjoin_updates)}件")
-    else:
-        logger.info("lastJoin更新対象なし")
-    """
-    プレイヤーのlastJoinとplaytimeを取得し、条件に応じてlastJoinのみ更新
-    """
-    async def get_player_info(mcid, uuid):
-        try:
-            player_data = await api.get_official_player_data(uuid or mcid)
-            if player_data:
-                last_join = player_data.get("lastJoin")
-                playtime = player_data.get("playtime", 0)
-                return (mcid, last_join, playtime)
-            else:
-                return None
-        except Exception as e:
-            logger.error(f"[get_player_info] {mcid}: {repr(e)}", exc_info=True)
-            return None
-    
-    # データ取得
-    results = []
-    for i in range(0, len(mcid_uuid_list), batch_size):
-        batch = mcid_uuid_list[i:i+batch_size]
-        batch_results = await asyncio.gather(*(get_player_info(mcid, uuid) for mcid, uuid in batch))
-        results.extend(batch_results)
-        await asyncio.sleep(batch_sleep)
-    
-    # フィルタリング
-    valid_results = [r for r in results if r is not None and r[1] is not None]
     if not valid_results:
         return
     
@@ -280,8 +214,8 @@ async def guild_raid_tracker(api, bot=None, guild_prefix="ETKW", loop_interval=1
                 await asyncio.sleep(10)
                 continue
     
-            # オンラインメンバー + 最近アクティブなメンバーを取得（10分以内に短縮）
-            tracking_members = await asyncio.to_thread(get_tracking_members, guild_data, 10)
+            # オンラインメンバー + 最近アクティブなメンバーを取得（15分以内に調整）
+            tracking_members = await asyncio.to_thread(get_tracking_members, guild_data, 15)
             if not tracking_members:
                 logger.info("トラッキング対象メンバーがいません。")
                 elapsed = time.time() - start_time
@@ -383,7 +317,7 @@ async def last_seen_tracker(api, guild_prefix="ETKW", loop_interval=120):
         if uuid_updates:
             await asyncio.to_thread(update_multiple_member_uuids, uuid_updates)
         
-        await get_all_players_lastjoin_and_playtime_fast(api, mcid_uuid_list, max_concurrent=25, delay_between_requests=0.05)
+        await get_all_players_lastjoin_and_playtime_fast(api, mcid_uuid_list, max_concurrent=10, delay_between_requests=0.6)
 
         elapsed = time.time() - start_time
         logger.info(f"Last Seen Trackerタスク完了（処理時間: {elapsed:.1f}秒）")
