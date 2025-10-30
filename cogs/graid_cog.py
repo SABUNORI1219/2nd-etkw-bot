@@ -103,15 +103,19 @@ def parse_date_with_time(date_str):
         return None, None
 
 class GraidCountView(discord.ui.View):
-    def __init__(self, sorted_counts, period_counts, today_counts, yesterday_counts, total_period, total_today, total_yesterday, period_start, period_end, title, color, raid_display_name="Total", user_mcid=None, page=0, per_page=12, timeout=120):
+    def __init__(self, sorted_counts, period_counts, today_counts, yesterday_counts, total_period, total_today, total_yesterday, period_start, period_end, title, color, raid_display_name="Total", user_mcid=None, page=0, per_page=12, this_week_counts=None, last_week_counts=None, total_this_week=0, total_last_week=0, timeout=120):
         super().__init__(timeout=timeout)
         self.sorted_counts = sorted_counts
         self.period_counts = period_counts  # 期間全体
-        self.today_counts = today_counts    # 今週分
-        self.yesterday_counts = yesterday_counts  # 先週分
+        self.today_counts = today_counts    # 今日分
+        self.yesterday_counts = yesterday_counts  # 前日分
         self.total_period = total_period    # 期間合計
-        self.total_today = total_today      # 今週合計
-        self.total_yesterday = total_yesterday  # 先週合計
+        self.total_today = total_today      # 今日合計
+        self.total_yesterday = total_yesterday  # 前日合計
+        self.this_week_counts = this_week_counts or {}  # 今週分
+        self.last_week_counts = last_week_counts or {}  # 先週分
+        self.total_this_week = total_this_week  # 今週合計
+        self.total_last_week = total_last_week  # 先週合計
         self.period_start = period_start
         self.period_end = period_end
         self.raid_display_name = raid_display_name  # 表示用レイド名
@@ -141,14 +145,14 @@ class GraidCountView(discord.ui.View):
             for i in range(3):
                 if idx + i < end:
                     name, count = self.sorted_counts[idx + i]
-                    this_week_count = self.today_counts.get(name, 0)
-                    last_week_count = self.yesterday_counts.get(name, 0)
+                    today_count = self.today_counts.get(name, 0)
+                    yesterday_count = self.yesterday_counts.get(name, 0)
                     
-                    # 先週・今週両方0の場合はNone表示
-                    if this_week_count == 0 and last_week_count == 0:
+                    # 前日比計算：今日と前日の差分
+                    if today_count == 0 and yesterday_count == 0:
                         diff_str = "None"
                     else:
-                        diff_val = this_week_count - last_week_count
+                        diff_val = today_count - yesterday_count
                         diff_str = f"+{diff_val}" if diff_val > 0 else f"{diff_val}"
                     
                     rank_label = rank_emojis[idx + i] if (idx + i) < len(rank_emojis) else f"#{idx + i + 1}"
@@ -168,21 +172,21 @@ class GraidCountView(discord.ui.View):
         # Average Per Player: 期間合計 / プレイヤー数
         avg_raids = int(self.total_period / len(self.period_counts)) if self.period_counts else 0
         # 📈 Compared to Last Week: 今週合計 - 先週合計
-        total_diff = self.total_today - self.total_yesterday
+        total_week_diff = self.total_this_week - self.total_last_week
         # 週の％計算: 先週が0なら0.0%、それ以外は (今週/先週)*100
-        if self.total_yesterday == 0:
-            total_pct = 0.0 if self.total_today == 0 else float('inf')
-            total_pct_str = "0.0%" if self.total_today == 0 else "∞%"
+        if self.total_last_week == 0:
+            total_week_pct = 0.0 if self.total_this_week == 0 else float('inf')
+            total_week_pct_str = "0.0%" if self.total_this_week == 0 else "∞%"
         else:
-            total_pct = (self.total_today / self.total_yesterday) * 100
-            total_pct_str = f"{total_pct:.1f}%"
+            total_week_pct = (self.total_this_week / self.total_last_week) * 100
+            total_week_pct_str = f"{total_week_pct:.1f}%"
         
         embed.add_field(
             name="\u200b",
             value=(
                 f"Total Guild Raids: `{self.total_period // 4}`\n"
                 f"Average Per Player: `{avg_raids}`\n"
-                f"📈 Compared to Last Week: `{total_diff}` (`{total_pct_str}`)"
+                f"📈 Compared to Last Week: `{total_week_diff}` (`{total_week_pct_str}`)"
             ),
             inline=False
         )
@@ -445,6 +449,9 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         now = datetime.utcnow()
         today0 = datetime(now.year, now.month, now.day)
 
+        # 前日と今週の計算
+        yesterday0 = today0 - timedelta(days=1)
+        
         # 週の計算: 月曜日を週の開始とする
         def get_week_start(dt):
             """指定された日付の週の月曜日を返す"""
@@ -456,7 +463,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             days_since_monday = dt.weekday()
             return dt + timedelta(days=6 - days_since_monday)
 
-        # 今週と先週の範囲計算
+        # 今週と先週の範囲計算（週間統計用）
         this_week_start = get_week_start(today0)
         this_week_end = get_week_end(today0)
         last_week_start = this_week_start - timedelta(days=7)
@@ -514,7 +521,23 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             period_counts[str(member)] = period_counts.get(str(member), 0) + 1
         sorted_counts = sorted(period_counts.items(), key=lambda x: (-x[1], x[0]))
 
-        # 今週分（月曜～現在まで）
+        # 今日分（本日分のレイド数）
+        today_counts = {}
+        for raid_choice in raid_choices_to_fetch:
+            today_rows = fetch_history(raid_name=raid_choice.value, date_from=today0, date_to=today0 + timedelta(days=1))
+            for row in today_rows:
+                member = row[3]
+                today_counts[str(member)] = today_counts.get(str(member), 0) + 1
+
+        # 前日分（前日分のレイド数）
+        yesterday_counts = {}
+        for raid_choice in raid_choices_to_fetch:
+            yesterday_rows = fetch_history(raid_name=raid_choice.value, date_from=yesterday0, date_to=yesterday0 + timedelta(days=1))
+            for row in yesterday_rows:
+                member = row[3]
+                yesterday_counts[str(member)] = yesterday_counts.get(str(member), 0) + 1
+
+        # 今週分（月曜～現在まで）週間統計用
         this_week_counts = {}
         for raid_choice in raid_choices_to_fetch:
             this_week_rows = fetch_history(raid_name=raid_choice.value, date_from=this_week_start, date_to=today0 + timedelta(days=1))
@@ -522,7 +545,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 member = row[3]
                 this_week_counts[str(member)] = this_week_counts.get(str(member), 0) + 1
 
-        # 先週分（先週月曜～先週日曜）
+        # 先週分（先週月曜～先週日曜）週間統計用
         last_week_counts = {}
         for raid_choice in raid_choices_to_fetch:
             last_week_rows = fetch_history(raid_name=raid_choice.value, date_from=last_week_start, date_to=last_week_end + timedelta(days=1))
@@ -531,17 +554,19 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
                 last_week_counts[str(member)] = last_week_counts.get(str(member), 0) + 1
 
         total_period = sum(period_counts.values())
+        total_today = sum(today_counts.values())
+        total_yesterday = sum(yesterday_counts.values())
         total_this_week = sum(this_week_counts.values())
         total_last_week = sum(last_week_counts.values())
 
         view = GraidCountView(
             sorted_counts=sorted_counts,
             period_counts=period_counts,
-            today_counts=this_week_counts,
-            yesterday_counts=last_week_counts,
+            today_counts=today_counts,
+            yesterday_counts=yesterday_counts,
             total_period=total_period,
-            total_today=total_this_week,
-            total_yesterday=total_last_week,
+            total_today=total_today,
+            total_yesterday=total_yesterday,
             period_start=period_start,
             period_end=period_end,
             title=title_text,
@@ -549,7 +574,11 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             raid_display_name=raid_display_name,
             user_mcid=user_mcid,
             page=0,
-            per_page=12
+            per_page=12,
+            this_week_counts=this_week_counts,
+            last_week_counts=last_week_counts,
+            total_this_week=total_this_week,
+            total_last_week=total_last_week
         )
         embed = view.get_embed()
         await interaction.response.send_message(embed=embed, view=view, ephemeral=hidden)
