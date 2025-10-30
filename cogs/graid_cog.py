@@ -5,8 +5,9 @@ from datetime import datetime, timedelta
 import os
 import re
 import logging
+import pytz
 
-from lib.db import fetch_history, set_config, adjust_player_raid_count
+from lib.db import fetch_history, set_config, adjust_player_raid_count, get_member
 from lib.api_stocker import WynncraftAPI
 from lib.utils import create_embed
 from lib.discord_notify import RAID_EMOJIS, DEFAULT_EMOJI, get_emoji_for_raid
@@ -19,8 +20,7 @@ RAID_CHOICES = [
     app_commands.Choice(name="Orphion's Nexus of Light", value="Orphion's Nexus of Light"),
     app_commands.Choice(name="The Canyon Colossus", value="The Canyon Colossus"),
     app_commands.Choice(name="The Nameless Anomaly", value="The Nameless Anomaly"),
-    app_commands.Choice(name="Total", value="Total"),
-    app_commands.Choice(name="Test", value="Test"),
+    app_commands.Choice(name="Total", value="Total")
 ]
 
 ADDC_RAID_CHOICES = [
@@ -33,6 +33,7 @@ ADDC_RAID_CHOICES = [
 GUILDRAID_SUBMIT_CHANNEL_ID = 1397480193270222888
 
 def normalize_date(date_str):
+    """JST基準で日付文字列を正規化"""
     parts = date_str.split('-')
     if len(parts) == 3:
         year, month, day = parts
@@ -44,18 +45,72 @@ def normalize_date(date_str):
         return parts[0]
     return date_str
 
-class TestPlayerCountView(discord.ui.View):
-    def __init__(self, sorted_counts, period_counts, today_counts, yesterday_counts, total_period, total_today, total_yesterday, period_start, period_end, title, color, page=0, per_page=12, timeout=120):
+def parse_date_with_time(date_str):
+    """JST基準で日付・時刻文字列をパース"""
+    if not date_str:
+        return None
+    
+    # JST タイムゾーンを設定
+    jst = pytz.timezone('Asia/Tokyo')
+    
+    try:
+        # 時刻指定がある場合 (YYYY-MM-DD HH:MM or YYYY-MM-DD-HH:MM)
+        if ' ' in date_str or date_str.count('-') > 2:
+            # スペースまたは3番目以降のハイフンを時刻区切りとして扱う
+            if ' ' in date_str:
+                date_part, time_part = date_str.split(' ', 1)
+            else:
+                parts = date_str.split('-')
+                if len(parts) >= 4:
+                    date_part = '-'.join(parts[:3])
+                    time_part = ':'.join(parts[3:])
+                else:
+                    date_part = date_str
+                    time_part = "00:00"
+            
+            # 時刻部分の処理
+            time_part = time_part.replace('-', ':')
+            if ':' not in time_part:
+                time_part = f"{time_part}:00"
+            
+            datetime_str = f"{normalize_date(date_part)} {time_part}"
+            parsed_dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M")
+        else:
+            # 日付のみの場合
+            normalized_date = normalize_date(date_str)
+            dash_count = normalized_date.count('-')
+            
+            if dash_count == 2:
+                parsed_dt = datetime.strptime(normalized_date, "%Y-%m-%d")
+            elif dash_count == 1:
+                parsed_dt = datetime.strptime(normalized_date, "%Y-%m")
+            elif dash_count == 0:
+                parsed_dt = datetime.strptime(normalized_date, "%Y")
+            else:
+                return None
+        
+        # JSTタイムゾーンを設定してUTCに変換
+        jst_dt = jst.localize(parsed_dt)
+        utc_dt = jst_dt.astimezone(pytz.UTC).replace(tzinfo=None)
+        return utc_dt
+        
+    except Exception as e:
+        logger.warning(f"日付パースエラー: {date_str} - {e}")
+        return None
+
+class GraidCountView(discord.ui.View):
+    def __init__(self, sorted_counts, period_counts, today_counts, yesterday_counts, total_period, total_today, total_yesterday, period_start, period_end, title, color, user_mcid=None, page=0, per_page=12, timeout=120):
         super().__init__(timeout=timeout)
         self.sorted_counts = sorted_counts
         self.period_counts = period_counts  # 期間全体
-        self.today_counts = today_counts    # 今日分
-        self.yesterday_counts = yesterday_counts  # 昨日分
+        self.today_counts = today_counts    # 今週分
+        self.yesterday_counts = yesterday_counts  # 先週分
         self.total_period = total_period    # 期間合計
-        self.total_today = total_today      # 今日合計
-        self.total_yesterday = total_yesterday  # 昨日合計
+        self.total_today = total_today      # 今週合計
+        self.total_yesterday = total_yesterday  # 先週合計
         self.period_start = period_start
         self.period_end = period_end
+        self.user_mcid = user_mcid  # コマンド実行者のMCID
         self.page = page
         self.per_page = per_page
         self.max_page = (len(sorted_counts) - 1) // per_page if sorted_counts else 0
@@ -81,13 +136,25 @@ class TestPlayerCountView(discord.ui.View):
             for i in range(3):
                 if idx + i < end:
                     name, count = self.sorted_counts[idx + i]
-                    today_count = self.today_counts.get(name, 0)
-                    yesterday_count = self.yesterday_counts.get(name, 0)
-                    diff_val = today_count - yesterday_count
-                    diff_str = f"+{diff_val}" if diff_val > 0 else f"{diff_val}"
+                    this_week_count = self.today_counts.get(name, 0)
+                    last_week_count = self.yesterday_counts.get(name, 0)
+                    
+                    # 先週・今週両方0の場合はNone表示
+                    if this_week_count == 0 and last_week_count == 0:
+                        diff_str = "None"
+                    else:
+                        diff_val = this_week_count - last_week_count
+                        diff_str = f"+{diff_val}" if diff_val > 0 else f"{diff_val}"
+                    
                     rank_label = rank_emojis[idx + i] if (idx + i) < len(rank_emojis) else f"#{idx + i + 1}"
-                    field_name = f"{rank_label} {name}"
-                    field_value = f"{raid_emoji} Raids: {count} ({diff_str})"
+                    
+                    # ユーザーのMCIDをハイライト（🌟マークと太字）
+                    if self.user_mcid and name == self.user_mcid:
+                        field_name = f"{rank_label} 🌟 **{name}**"
+                        field_value = f"{raid_emoji} Raids: **{count}** (**{diff_str}**)"
+                    else:
+                        field_name = f"{rank_label} {name}"
+                        field_value = f"{raid_emoji} Raids: {count} ({diff_str})"
                 else:
                     field_name = field_value = "\u200b"
                 embed.add_field(name=field_name, value=field_value, inline=True)
@@ -95,15 +162,22 @@ class TestPlayerCountView(discord.ui.View):
         # 集計系
         # Average Per Player: 期間合計 / プレイヤー数
         avg_raids = int(self.total_period / len(self.period_counts)) if self.period_counts else 0
-        # 📈 Compared to Last Day: 今日合計 - 昨日合計
+        # 📈 Compared to Last Week: 今週合計 - 先週合計
         total_diff = self.total_today - self.total_yesterday
-        total_pct = int((self.total_today / self.total_yesterday) * 100) if self.total_yesterday > 0 else 0
+        # 週の％計算: 先週が0なら0.0%、それ以外は (今週/先週)*100
+        if self.total_yesterday == 0:
+            total_pct = 0.0 if self.total_today == 0 else float('inf')
+            total_pct_str = "0.0%" if self.total_today == 0 else "∞%"
+        else:
+            total_pct = (self.total_today / self.total_yesterday) * 100
+            total_pct_str = f"{total_pct:.1f}%"
+        
         embed.add_field(
             name="\u200b",
             value=(
                 f"Total Raids: `{self.total_period}`\n"
                 f"Average Per Player: `{avg_raids}`\n"
-                f"📈 Compared to Last Day: `{total_diff}` (`{total_pct}%`)"
+                f"📈 Compared to Last Week: `{total_diff}` (`{total_pct_str}`)"
             ),
             inline=False
         )
@@ -343,135 +417,131 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     @app_commands.command(name="list", description="指定レイド・日付の履歴をリスト表示")
     @app_commands.describe(
         raid_name="表示するレイド名(Totalはすべてのレイド合計)",
-        date="履歴を表示したい日付(YYYY-MM-DD表記)",
+        date="履歴を表示したい日時(YYYY-MM-DD HH:MM 形式、JST基準)",
         hidden="実行結果を自分だけに表示する（デフォルト: True）"
     )
     @app_commands.choices(raid_name=RAID_CHOICES)
     async def guildraid_list(self, interaction: discord.Interaction, raid_name: str, date: str = None, hidden: bool = True):
-        # 日付指定の処理
-        date_from = None
-        period_start = None
-        period_end = None
-        if date:
-            normalized_date = normalize_date(date).strip()
-            try:
-                dash_count = normalized_date.count('-')
-                if dash_count == 2:
-                    date_from = datetime.strptime(normalized_date, "%Y-%m-%d")
-                elif dash_count == 1:
-                    date_from = datetime.strptime(normalized_date, "%Y-%m")
-                elif dash_count == 0:
-                    date_from = datetime.strptime(normalized_date, "%Y")
-            except Exception as e:
-                date_from = None
-
-        if raid_name == "Test":
-            if interaction.user.id not in AUTHORIZED_USER_IDS:
-                await send_authorized_only_message(interaction)
-                return
-
-            now = datetime.utcnow()
-            today0 = datetime(now.year, now.month, now.day)
-
-            # 期間指定： date_from～今日
-            if date_from:
-                period_start = date_from.strftime("%Y-%m-%d")
-                period_end = today0.strftime("%Y-%m-%d")
-                rows = []
-                for raid_choice in RAID_CHOICES[:-2]:
-                    raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from, date_to=today0 + timedelta(days=1))
-                    rows.extend(raid_rows)
-            else:
-                rows = []
-                for raid_choice in RAID_CHOICES[:-2]:
-                    raid_rows = fetch_history(raid_name=raid_choice.value)
-                    rows.extend(raid_rows)
-                # 表示期間: 最初～最新
-                if rows:
-                    period_start = min([r[2].strftime("%Y-%m-%d") for r in rows])
-                    period_end = max([r[2].strftime("%Y-%m-%d") for r in rows])
-                else:
-                    period_start = period_end = today0.strftime("%Y-%m-%d")
-
-            # 指定期間のMCID集計
-            period_counts = {}
-            for row in rows:
-                member = row[3]
-                period_counts[str(member)] = period_counts.get(str(member), 0) + 1
-            sorted_counts = sorted(period_counts.items(), key=lambda x: (-x[1], x[0]))
-
-            # 今日分（今日のみ）
-            today_counts = {}
-            for raid_choice in RAID_CHOICES[:-2]:
-                today_rows = fetch_history(raid_name=raid_choice.value, date_from=today0, date_to=today0 + timedelta(days=1))
-                for row in today_rows:
-                    member = row[3]
-                    today_counts[str(member)] = today_counts.get(str(member), 0) + 1
-
-            # 昨日分（昨日のみ）
-            yesterday0 = today0 - timedelta(days=1)
-            yesterday_counts = {}
-            for raid_choice in RAID_CHOICES[:-2]:
-                yesterday_rows = fetch_history(raid_name=raid_choice.value, date_from=yesterday0, date_to=today0)
-                for row in yesterday_rows:
-                    member = row[3]
-                    yesterday_counts[str(member)] = yesterday_counts.get(str(member), 0) + 1
-
-            total_period = sum(period_counts.values())
-            total_today = sum(today_counts.values())
-            total_yesterday = sum(yesterday_counts.values())
-
-            view = TestPlayerCountView(
-                sorted_counts=sorted_counts,
-                period_counts=period_counts,
-                today_counts=today_counts,
-                yesterday_counts=yesterday_counts,
-                total_period=total_period,
-                total_today=total_today,
-                total_yesterday=total_yesterday,
-                period_start=period_start,
-                period_end=period_end,
-                title="Guild Raid Counts",
-                color=discord.Color.orange(),
-                page=0,
-                per_page=12
-            )
-            embed = view.get_embed()
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=hidden)
-            msg = await interaction.original_response()
-            view.message = msg
+        # 権限チェック
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
             return
+
+        # コマンド実行者のMCIDを取得
+        user_mcid = None
+        user_data = get_member(discord_id=interaction.user.id)
+        if user_data:
+            user_mcid = user_data.get('mcid')
+
+        # 日付指定の処理（JST基準）
+        date_from = parse_date_with_time(date) if date else None
         
-        # 合計集計
+        now = datetime.utcnow()
+        today0 = datetime(now.year, now.month, now.day)
+
+        # 週の計算: 月曜日を週の開始とする
+        def get_week_start(dt):
+            """指定された日付の週の月曜日を返す"""
+            days_since_monday = dt.weekday()
+            return dt - timedelta(days=days_since_monday)
+        
+        def get_week_end(dt):
+            """指定された日付の週の日曜日を返す"""
+            days_since_monday = dt.weekday()
+            return dt + timedelta(days=6 - days_since_monday)
+
+        # 今週と先週の範囲計算
+        this_week_start = get_week_start(today0)
+        this_week_end = get_week_end(today0)
+        last_week_start = this_week_start - timedelta(days=7)
+        last_week_end = this_week_start - timedelta(days=1)
+
+        # レイド名による処理分岐
+        if raid_name == "Test":
+            # Testは廃止予定のため、Totalにリダイレクト
+            raid_name = "Total"
+        
+        # データ取得とタイトル設定
         if raid_name == "Total":
-            rows = []
-            for raid_choice in RAID_CHOICES[:-1]:
-                raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from)
-                rows.extend(raid_rows)
-            title_text = "Guild Raid Player Counts: 合計"
+            # 全レイドの合計
+            raid_choices_to_fetch = RAID_CHOICES[:-2]  # TestとTotalを除く
+            title_text = "Guild Raid Counts: 合計"
+            color = discord.Color.orange()
         else:
-            rows = fetch_history(raid_name=raid_name, date_from=date_from)
-            title_text = f"Guild Raid Player Counts: {raid_name}"
+            # 特定のレイド
+            raid_choices_to_fetch = [choice for choice in RAID_CHOICES[:-2] if choice.value == raid_name]
+            title_text = f"Guild Raid Counts: {raid_name}"
+            color = discord.Color.blue()
+
+        # 期間指定データの取得
+        if date_from:
+            period_start = date_from.strftime("%Y-%m-%d")
+            period_end = today0.strftime("%Y-%m-%d")
+            rows = []
+            for raid_choice in raid_choices_to_fetch:
+                raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from, date_to=today0 + timedelta(days=1))
+                rows.extend(raid_rows)
+        else:
+            rows = []
+            for raid_choice in raid_choices_to_fetch:
+                raid_rows = fetch_history(raid_name=raid_choice.value)
+                rows.extend(raid_rows)
+            # 表示期間: 最初～最新
+            if rows:
+                period_start = min([r[2].strftime("%Y-%m-%d") for r in rows])
+                period_end = max([r[2].strftime("%Y-%m-%d") for r in rows])
+            else:
+                period_start = period_end = today0.strftime("%Y-%m-%d")
 
         if not rows:
             embed = create_embed(description="履歴がありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
-        player_counts = {}
+        # 指定期間のMCID集計
+        period_counts = {}
         for row in rows:
             member = row[3]
-            player_counts[str(member)] = player_counts.get(str(member), 0) + 1
-        sorted_counts = sorted(player_counts.items(), key=lambda x: (-x[1], x[0]))
+            period_counts[str(member)] = period_counts.get(str(member), 0) + 1
+        sorted_counts = sorted(period_counts.items(), key=lambda x: (-x[1], x[0]))
 
-        view = PlayerCountView(sorted_counts, title=title_text, color=discord.Color.blue(), page=0)
-        embed = discord.Embed(title=title_text, color=discord.Color.blue())
-        for name, count in sorted_counts[:10]:
-            safe_name = discord.utils.escape_markdown(name)
-            okane = count / 2
-            embed.add_field(name=safe_name, value=f"Count: {count} | {okane} <- okane suuji!!!", inline=False)
-        embed.set_footer(text=f"Page 1/{view.max_page+1} | Minister Chikuwa")
+        # 今週分（月曜～現在まで）
+        this_week_counts = {}
+        for raid_choice in raid_choices_to_fetch:
+            this_week_rows = fetch_history(raid_name=raid_choice.value, date_from=this_week_start, date_to=today0 + timedelta(days=1))
+            for row in this_week_rows:
+                member = row[3]
+                this_week_counts[str(member)] = this_week_counts.get(str(member), 0) + 1
 
+        # 先週分（先週月曜～先週日曜）
+        last_week_counts = {}
+        for raid_choice in raid_choices_to_fetch:
+            last_week_rows = fetch_history(raid_name=raid_choice.value, date_from=last_week_start, date_to=last_week_end + timedelta(days=1))
+            for row in last_week_rows:
+                member = row[3]
+                last_week_counts[str(member)] = last_week_counts.get(str(member), 0) + 1
+
+        total_period = sum(period_counts.values())
+        total_this_week = sum(this_week_counts.values())
+        total_last_week = sum(last_week_counts.values())
+
+        view = GraidCountView(
+            sorted_counts=sorted_counts,
+            period_counts=period_counts,
+            today_counts=this_week_counts,
+            yesterday_counts=last_week_counts,
+            total_period=total_period,
+            total_today=total_this_week,
+            total_yesterday=total_last_week,
+            period_start=period_start,
+            period_end=period_end,
+            title=title_text,
+            color=color,
+            user_mcid=user_mcid,
+            page=0,
+            per_page=12
+        )
+        embed = view.get_embed()
         await interaction.response.send_message(embed=embed, view=view, ephemeral=hidden)
         msg = await interaction.original_response()
         view.message = msg

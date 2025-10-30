@@ -140,10 +140,23 @@ def insert_history(raid_name, clear_time, member):
     try:
         conn = get_conn()
         with conn.cursor() as cur:
+            # レイド履歴を挿入
             cur.execute("""
                 INSERT INTO guild_raid_history (raid_name, clear_time, member)
                 VALUES (%s, %s, %s)
             """, (raid_name, clear_time, member))
+            
+            # 2ヶ月以上前のデータを削除（メモリ効率を考慮してLIMIT付きで分割削除）
+            two_months_ago = datetime.utcnow() - timedelta(days=60)
+            cur.execute("""
+                DELETE FROM guild_raid_history 
+                WHERE clear_time < %s
+            """, (two_months_ago,))
+            
+            deleted_count = cur.rowcount
+            if deleted_count > 0:
+                logger.info(f"[DB Cleanup] 2ヶ月以上前のレイド履歴を{deleted_count}件削除しました")
+            
             conn.commit()
         conn.close()
     except Exception as e:
@@ -161,6 +174,18 @@ def adjust_player_raid_count(player, raid_name, count):
                     "INSERT INTO guild_raid_history (raid_name, clear_time, member) VALUES %s",
                     [(raid_name, now, player)] * count
                 )
+                
+                # データ追加時にクリーンアップを実行
+                two_months_ago = now - timedelta(days=60)
+                cur.execute("""
+                    DELETE FROM guild_raid_history 
+                    WHERE clear_time < %s
+                """, (two_months_ago,))
+                
+                deleted_count = cur.rowcount
+                if deleted_count > 0:
+                    logger.info(f"[DB Cleanup] 2ヶ月以上前のレイド履歴を{deleted_count}件削除しました")
+                    
             elif count < 0:
                 cur.execute(
                     """
@@ -296,6 +321,27 @@ def cleanup_old_server_logs(minutes=5):
         conn.commit()
     conn.close()
     logger.info(f"{minutes}分より前のplayer_server_logを削除しました")
+
+def cleanup_old_raid_history(days=60):
+    """
+    指定した日数より古いレイド履歴を削除する関数
+    デフォルトは60日（2ヶ月）
+    """
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            threshold = datetime.utcnow() - timedelta(days=days)
+            cur.execute("DELETE FROM guild_raid_history WHERE clear_time < %s", (threshold,))
+            deleted_count = cur.rowcount
+            conn.commit()
+            logger.info(f"[DB Cleanup] {days}日より前のレイド履歴を{deleted_count}件削除しました")
+            return deleted_count
+    except Exception as e:
+        logger.error(f"[DB Cleanup] cleanup_old_raid_history failed: {e}")
+        return 0
+    finally:
+        if conn:
+            conn.close()
 
 def add_member(mcid: str, discord_id: int, rank: str) -> bool:
     sql = "INSERT INTO linked_members (mcid, discord_id, ingame_rank) VALUES (%s, %s, %s) ON CONFLICT(mcid) DO UPDATE SET discord_id = EXCLUDED.discord_id, ingame_rank = EXCLUDED.ingame_rank"
