@@ -180,7 +180,7 @@ class GraidCountView(discord.ui.View):
         embed.add_field(
             name="\u200b",
             value=(
-                f"Total Raids: `{self.total_period}`\n"
+                f"Total Guild Raids: `{self.total_period // 4}`\n"
                 f"Average Per Player: `{avg_raids}`\n"
                 f"📈 Compared to Last Week: `{total_diff}` (`{total_pct_str}`)"
             ),
@@ -427,11 +427,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     )
     @app_commands.choices(raid_name=RAID_CHOICES)
     async def guildraid_list(self, interaction: discord.Interaction, raid_name: str, date: str = None, hidden: bool = True):
-        # 権限チェック
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
-            return
-
         # コマンド実行者のMCIDを取得
         user_mcid = None
         user_data = get_member(discord_id=interaction.user.id)
