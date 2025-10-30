@@ -431,6 +431,13 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     )
     @app_commands.choices(raid_name=RAID_CHOICES)
     async def guildraid_list(self, interaction: discord.Interaction, raid_name: str, date: str = None, hidden: bool = True):
+        # 処理時間が長い可能性があるため、事前にdeferを実行
+        # hiddenがFalseなら全体表示（ephemeral=False）、TrueならプライベートQ表示（ephemeral=True）
+        await interaction.response.defer(ephemeral=hidden)
+        
+        start_time = datetime.utcnow()
+        logger.info(f"[GraidList] 処理開始 - ユーザー: {interaction.user.id}, レイド: {raid_name}, hidden: {hidden}")
+        
         # コマンド実行者のMCIDを取得
         user_mcid = None
         user_data = get_member(discord_id=interaction.user.id)
@@ -511,7 +518,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
         if not rows:
             embed = create_embed(description="履歴がありません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=embed)
             return
 
         # 指定期間のMCID集計
@@ -581,9 +588,13 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             total_last_week=total_last_week
         )
         embed = view.get_embed()
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=hidden)
+        await interaction.followup.send(embed=embed, view=view)
         msg = await interaction.original_response()
         view.message = msg
+        
+        end_time = datetime.utcnow()
+        processing_time = (end_time - start_time).total_seconds()
+        logger.info(f"[GraidList] 処理完了 - 処理時間: {processing_time:.2f}秒")
 
     @app_commands.command(name="count", description="指定プレイヤーのレイドクリア回数を補正")
     @app_commands.describe(
