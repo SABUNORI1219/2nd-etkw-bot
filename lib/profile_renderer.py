@@ -229,7 +229,7 @@ def generate_profile_card(info, output_path="profile_card.png", skin_image=None)
             except Exception as ee:
                 logger.error(f"Unknown skin image load failed: {ee}")
     else:
-        logger.error(f"Skin image load failed: {e}")
+        logger.error("Skin image not available")
         # fallback
         try:
             unknown_skin = Image.open(UNKNOWN_SKIN_PATH).convert("RGBA")

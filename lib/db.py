@@ -678,3 +678,80 @@ def get_playtime_cache_for_members(mcid_list):
         if conn: conn.close()
     return result
 
+def cleanup_non_guild_members_raid_history(current_guild_uuids):
+    """
+    現在のギルドメンバーのUUID以外のレイド履歴を削除する
+    """
+    if not current_guild_uuids:
+        return 0
+    
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            # guild_raid_historyテーブルにmember_uuid列があることを前提
+            # ない場合はmember_nameで対応する必要がある
+            cur.execute("""
+                SELECT member_name FROM guild_raid_history 
+                WHERE member_name NOT IN (
+                    SELECT mcid FROM linked_members WHERE uuid = ANY(%s)
+                )
+                GROUP BY member_name
+            """, (current_guild_uuids,))
+            non_guild_members = [row[0] for row in cur.fetchall()]
+            
+            if non_guild_members:
+                cur.execute("""
+                    DELETE FROM guild_raid_history 
+                    WHERE member_name = ANY(%s)
+                """, (non_guild_members,))
+                deleted_count = cur.rowcount
+                conn.commit()
+                logger.info(f"[DB Cleanup] ギルド外メンバーのレイド履歴を{deleted_count}件削除: {non_guild_members}")
+                return deleted_count
+            else:
+                logger.info("[DB Cleanup] ギルド外メンバーのレイド履歴削除対象なし")
+                return 0
+    except Exception as e:
+        logger.error(f"[DB Cleanup] cleanup_non_guild_members_raid_history failed: {e}")
+        return 0
+    finally:
+        if conn: conn.close()
+
+def update_raid_history_member_names(uuid_to_name_mapping):
+    """
+    UUIDに対応する現在の名前でレイド履歴のmember_nameを更新する
+    """
+    if not uuid_to_name_mapping:
+        return 0
+    
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            updated_count = 0
+            for uuid, current_name in uuid_to_name_mapping.items():
+                # linked_membersから古い名前を取得
+                cur.execute("SELECT mcid FROM linked_members WHERE uuid = %s", (uuid,))
+                old_names = [row[0] for row in cur.fetchall()]
+                
+                # 古い名前と現在の名前が異なる場合、レイド履歴を更新
+                for old_name in old_names:
+                    if old_name != current_name:
+                        cur.execute("""
+                            UPDATE guild_raid_history 
+                            SET member_name = %s 
+                            WHERE member_name = %s
+                        """, (current_name, old_name))
+                        if cur.rowcount > 0:
+                            updated_count += cur.rowcount
+                            logger.info(f"[DB Cleanup] レイド履歴の名前更新: {old_name} -> {current_name} ({cur.rowcount}件)")
+            
+            conn.commit()
+            if updated_count > 0:
+                logger.info(f"[DB Cleanup] レイド履歴の名前更新完了: 合計{updated_count}件")
+            return updated_count
+    except Exception as e:
+        logger.error(f"[DB Cleanup] update_raid_history_member_names failed: {e}")
+        return 0
+    finally:
+        if conn: conn.close()
+

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # スパムと判断する基準
 SPAM_MESSAGE_COUNT = 3
-SPAM_TIME_WINDOW = timedelta(seconds=1.0)
+SPAM_TIME_WINDOW = timedelta(seconds=0.95)
 
 class SpamDetectorCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -24,35 +24,6 @@ class SpamDetectorCog(commands.Cog):
     async def on_message(self, message: discord.Message):
         # Bot自身のメッセージは無視
         if message.author == self.bot.user:
-            return
-
-        # atu関連
-        if message.content.strip() == "atu":
-            await message.reply("usi")
-            return
-        if message.content.strip() == "ATU":
-            await message.reply("USI")
-            return
-        if message.content.strip() == "not atu":
-            await message.reply("fake usi")
-            return
-        if message.content.strip() == "NOT ATU":
-            await message.reply("FAKE USI")
-            return
-        if message.content.strip() == "usi":
-            await message.reply("atu")
-            return
-        if message.content.strip() == "USI":
-            await message.reply("ATU")
-            return
-        if message.content.strip() == "fake usi":
-            await message.reply("not atu")
-            return
-        if message.content.strip() == "FAKE USI":
-            await message.reply("NOT ATU")
-            return
-        if message.content.strip() == "attu":
-            await message.reply("morph")
             return
 
         # 監視対象のユーザーでなければ、何もしない

@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 from collections import deque
 from lib.api_stocker import WynncraftAPI
-from lib.db import insert_history, insert_server_log, cleanup_old_server_logs, upsert_last_join_cache, upsert_playtime_cache, get_last_join_cache_for_members, get_playtime_cache_for_members, get_recently_active_members, update_multiple_member_uuids
+from lib.db import insert_history, insert_server_log, cleanup_old_server_logs, upsert_last_join_cache, upsert_playtime_cache, get_last_join_cache_for_members, get_playtime_cache_for_members, get_recently_active_members, update_multiple_member_uuids, cleanup_non_guild_members_raid_history, update_raid_history_member_names
 from lib.party_estimator import estimate_and_save_parties
 from lib.discord_notify import send_guild_raid_embed
 
@@ -314,6 +314,31 @@ async def last_seen_tracker(api, guild_prefix="ETKW", loop_interval=120):
             await asyncio.to_thread(update_multiple_member_uuids, uuid_updates)
         
         await get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=3, batch_sleep=2.0)
+
+        # ギルドレイド履歴のクリーンアップ処理
+        try:
+            # 現在のギルドメンバーのUUIDリストを作成
+            current_guild_uuids = [uuid for mcid, uuid in mcid_uuid_list if uuid is not None]
+            
+            # UUID→現在の名前のマッピングを作成
+            uuid_to_name_mapping = {}
+            for rank, members in guild_data["members"].items():
+                if isinstance(members, dict):
+                    for current_name, member_info in members.items():
+                        uuid = member_info.get("uuid")
+                        if uuid:
+                            uuid_to_name_mapping[uuid] = current_name
+            
+            # 1. ギルド外メンバーのレイド履歴削除
+            deleted_count = await asyncio.to_thread(cleanup_non_guild_members_raid_history, current_guild_uuids)
+            
+            # 2. 名前変更されたメンバーのレイド履歴更新
+            updated_count = await asyncio.to_thread(update_raid_history_member_names, uuid_to_name_mapping)
+            
+            if deleted_count > 0 or updated_count > 0:
+                logger.info(f"[レイド履歴クリーンアップ] 削除: {deleted_count}件, 名前更新: {updated_count}件")
+        except Exception as e:
+            logger.error(f"[レイド履歴クリーンアップ] 処理中にエラー: {e}")
 
         elapsed = time.time() - start_time
         logger.info(f"Last Seen Trackerタスク完了（処理時間: {elapsed:.1f}秒）")

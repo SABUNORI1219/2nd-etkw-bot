@@ -319,7 +319,7 @@ class PlayerCog(commands.Cog):
             logger.error(f"画像生成または送信失敗: {e}")
             if use_edit:
                 failed_embed = create_embed(description="プロフィール画像生成に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
-                await interaction.followup.send(embed=failed_embed, view=None)
+                await interaction.followup.send(embed=failed_embed)
             else:
                 embed = create_embed(description="プロフィール画像生成に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
                 await interaction.followup.send(embed=embed)

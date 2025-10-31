@@ -6,6 +6,8 @@ import os
 import re
 import logging
 import pytz
+import secrets
+import string
 
 from lib.db import fetch_history, set_config, adjust_player_raid_count, get_member
 from lib.api_stocker import WynncraftAPI
@@ -31,6 +33,10 @@ ADDC_RAID_CHOICES = [
 ]
 
 GUILDRAID_SUBMIT_CHANNEL_ID = 1397480193270222888
+
+def generate_application_id():
+    """申請IDを生成（8文字の英数字）"""
+    return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
 
 def normalize_date(date_str):
     """JST基準で日付文字列を正規化"""
@@ -282,6 +288,11 @@ class GraidSubmitView(discord.ui.View):
     def extract_raid_name(self, field_value):
         return re.sub(r"^(<a?:\w+:\d+>|\s*[\U0001F300-\U0001FAFF\u2600-\u27BF])+[\s]*", "", field_value)
     
+    def extract_application_id(self, description):
+        """embedのdescriptionから申請IDを抽出"""
+        match = re.search(r'申請ID: `([A-Z0-9]{8})`', description)
+        return match.group(1) if match else "不明"
+    
     def unescape_mcid(self, m):
         return m.replace("\\_", "_").replace("\\*", "*").replace("\\~", "~")
 
@@ -294,6 +305,7 @@ class GraidSubmitView(discord.ui.View):
         members = [m.strip() for m in member_field.value.split(",")] if member_field else []
         raid_name = raid_field.value if raid_field else ""
         submitter_id = int(embed.description.split("申請者: <@")[1].split(">")[0]) if embed.description else None
+        application_id = self.extract_application_id(embed.description)
 
         real_members = [self.unescape_mcid(m.strip()) for m in member_field.value.split(",")] if member_field else []
         real_raid_name = self.extract_raid_name(raid_field.value) if raid_field else ""
@@ -309,6 +321,7 @@ class GraidSubmitView(discord.ui.View):
                 color=discord.Color.green(),
                 footer_text="Guild Raidシステム | Minister Chikuwa"
             )
+            embed_dm.add_field(name="申請ID", value=f"`{application_id}`", inline=False)
             embed_dm.add_field(name="メンバー", value=", ".join(members), inline=False)
             embed_dm.add_field(name="レイド", value=raid_name, inline=False)
             try:
@@ -334,17 +347,19 @@ class GraidSubmitView(discord.ui.View):
         members = [m.strip() for m in member_field.value.split(",")] if member_field else []
         raid_name = raid_field.value if raid_field else ""
         submitter_id = int(embed.description.split("申請者: <@")[1].split(">")[0]) if embed.description else None
-        await interaction.response.send_modal(GraidRejectModal("Guild Raidシステム", submitter_id, members, raid_name, interaction.message))
+        application_id = self.extract_application_id(embed.description)
+        await interaction.response.send_modal(GraidRejectModal("Guild Raidシステム", submitter_id, members, raid_name, application_id, interaction.message))
 
 class GraidRejectModal(discord.ui.Modal, title="拒否理由を入力"):
     reason = discord.ui.TextInput(label="理由", style=discord.TextStyle.paragraph, required=True)
 
-    def __init__(self, system_name, submitter_id, member_ids, raid_name, message):
+    def __init__(self, system_name, submitter_id, member_ids, raid_name, application_id, message):
         super().__init__()
         self.system_name = system_name
         self.submitter_id = submitter_id
         self.member_ids = member_ids
         self.raid_name = raid_name
+        self.application_id = application_id
         self.message = message
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -355,6 +370,7 @@ class GraidRejectModal(discord.ui.Modal, title="拒否理由を入力"):
             color=discord.Color.red(),
             footer_text=f"{self.system_name} | Minister Chikuwa"
         )
+        embed_dm.add_field(name="申請ID", value=f"`{self.application_id}`", inline=False)
         embed_dm.add_field(
             name="メンバー",
             value=", ".join(self.member_ids),
@@ -718,10 +734,11 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
 
         image_url = proof.url
         emoji = get_emoji_for_raid(raid_name)
+        application_id = generate_application_id()
 
         app_embed = discord.Embed(
             title="ギルドレイドクリア申請",
-            description=f"申請者: <@{interaction.user.id}>",
+            description=f"申請者: <@{interaction.user.id}>\n申請ID: `{application_id}`",
             color=discord.Color.orange()
         )
         app_embed.add_field(
