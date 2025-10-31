@@ -144,7 +144,7 @@ class GraidCountView(discord.ui.View):
         embed = discord.Embed(
             title=f"{emoji} Guild Raid Counts (Page `{self.page+1}/{self.max_page+1}` - `#{start+1} ~ #{end}`)",
             color=self.color,
-            description=f"⚔️ Raid: {self.raid_display_name}\nPeriod: `{self.period_start}` ~ `{self.period_end}`"
+            description=f"⚔️ Raid: {self.raid_display_name}\n⌛️ Period: `{self.period_start}` ~ `{self.period_end}`"
         )
         idx = start
         while idx < end:
