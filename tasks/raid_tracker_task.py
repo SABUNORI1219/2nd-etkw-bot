@@ -129,7 +129,11 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
     """
     async def get_player_info(mcid, uuid):
         try:
-            player_data = await api.get_official_player_data(uuid or mcid)
+            search_target = uuid or mcid
+            # DEBUG: API検索対象をログ出力（デバッグ用）
+            logger.info(f"[DEBUG-API検索] {mcid} -> 検索対象: {'UUID' if uuid else 'MCID'}({search_target})")
+            
+            player_data = await api.get_official_player_data(search_target)
             if player_data:
                 last_join = player_data.get("lastJoin")
                 playtime = player_data.get("playtime", 0)

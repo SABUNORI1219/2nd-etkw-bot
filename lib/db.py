@@ -688,21 +688,20 @@ def cleanup_non_guild_members_raid_history(current_guild_uuids):
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            # guild_raid_historyテーブルにmember_uuid列があることを前提
-            # ない場合はmember_nameで対応する必要がある
+            # guild_raid_historyテーブルのmemberカラムを使用
             cur.execute("""
-                SELECT member_name FROM guild_raid_history 
-                WHERE member_name NOT IN (
+                SELECT member FROM guild_raid_history 
+                WHERE member NOT IN (
                     SELECT mcid FROM linked_members WHERE uuid = ANY(%s)
                 )
-                GROUP BY member_name
+                GROUP BY member
             """, (current_guild_uuids,))
             non_guild_members = [row[0] for row in cur.fetchall()]
             
             if non_guild_members:
                 cur.execute("""
                     DELETE FROM guild_raid_history 
-                    WHERE member_name = ANY(%s)
+                    WHERE member = ANY(%s)
                 """, (non_guild_members,))
                 deleted_count = cur.rowcount
                 conn.commit()
@@ -719,7 +718,7 @@ def cleanup_non_guild_members_raid_history(current_guild_uuids):
 
 def update_raid_history_member_names(uuid_to_name_mapping):
     """
-    UUIDに対応する現在の名前でレイド履歴のmember_nameを更新する
+    UUIDに対応する現在の名前でレイド履歴のmemberを更新する
     """
     if not uuid_to_name_mapping:
         return 0
@@ -738,8 +737,8 @@ def update_raid_history_member_names(uuid_to_name_mapping):
                     if old_name != current_name:
                         cur.execute("""
                             UPDATE guild_raid_history 
-                            SET member_name = %s 
-                            WHERE member_name = %s
+                            SET member = %s 
+                            WHERE member = %s
                         """, (current_name, old_name))
                         if cur.rowcount > 0:
                             updated_count += cur.rowcount
