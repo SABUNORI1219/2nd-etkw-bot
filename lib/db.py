@@ -545,18 +545,22 @@ def get_recently_active_members(minutes_threshold=20):
             threshold_time = datetime.utcnow() - timedelta(minutes=minutes_threshold)
             threshold_str = threshold_time.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
             
+            # DEBUG: しきい値をログ出力
+            logger.info(f"[DEBUG-最近アクティブ判定] しきい値: {threshold_str} ({minutes_threshold}分前)")
+            
             cur.execute("""
-                SELECT lm.mcid, lm.uuid 
+                SELECT lm.mcid, lm.uuid, ljc.last_join
                 FROM linked_members lm
                 JOIN last_join_cache ljc ON lm.mcid = ljc.mcid
                 WHERE ljc.last_join IS NOT NULL 
                 AND ljc.last_join >= %s
             """, (threshold_str,))
             
-            for mcid, uuid in cur.fetchall():
+            for mcid, uuid, last_join in cur.fetchall():
                 result.append((mcid, uuid))
+                logger.info(f"[DEBUG-最近アクティブ] {mcid}: {last_join}")
                 
-        logger.debug(f"[DB] 最近アクティブなメンバー {len(result)}人を取得（{minutes_threshold}分以内）")
+        logger.info(f"[DB] 最近アクティブなメンバー {len(result)}人を取得（{minutes_threshold}分以内）")
     except Exception as e:
         logger.error(f"[DB Handler] get_recently_active_members failed: {e}")
     finally:
