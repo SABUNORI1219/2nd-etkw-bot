@@ -179,19 +179,11 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
         if prev_lastjoin != last_join:
             playtime_diff = playtime - prev_playtime
             
-            # DEBUG: playtime差分をログ出力
-            if mcid == "sabunori1219":  # 特定のユーザーのみデバッグ
-                logger.info(f"[DEBUG-lastJoin] {mcid}: lastJoin変更 {prev_lastjoin} -> {last_join}, playtime差分: {playtime_diff}")
-            
-            # playtimeが0.15以上増加している場合、または初回記録の場合にlastJoinを更新
-            if prev_lastjoin is None or playtime_diff >= 0.15:
+            # playtimeが0.083以上増加している場合、または初回記録の場合にlastJoinを更新
+            if prev_lastjoin is None or playtime_diff >= 0.083:
                 lastjoin_updates.append((mcid, last_join))
-                if mcid == "sabunori1219":  # 特定のユーザーのみデバッグ
-                    logger.info(f"[DEBUG-lastJoin] {mcid}: lastJoin更新対象に追加")
         else:
             # lastJoinが同じ場合は更新しない
-            if mcid == "sabunori1219":  # 特定のユーザーのみデバッグ
-                logger.info(f"[DEBUG-lastJoin] {mcid}: lastJoin変更なし ({last_join})")
             logger.debug(f"[LastJoin変更なし] {mcid}")
     
     # データベース更新
@@ -221,7 +213,6 @@ async def guild_raid_tracker(api, bot=None, guild_prefix="ETKW", loop_interval=1
                 continue
     
             # オンラインメンバー + 最近アクティブなメンバーを取得（15分以内に調整）
-            logger.info(f"[DEBUG-トラッキング] 最近アクティブ判定しきい値: 15分前")
             tracking_members = await asyncio.to_thread(get_tracking_members, guild_data, 15)
             if not tracking_members:
                 logger.info("トラッキング対象メンバーがいません。")
