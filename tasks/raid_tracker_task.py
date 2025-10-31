@@ -92,8 +92,6 @@ def remove_party_events_from_window(window, party, time_threshold=2):
             pass
 
 async def get_player_data(api, uuid, member_name=None):
-    # DEBUG: API検索対象をログ出力（デバッグ用）
-    logger.info(f"[DEBUG-レイドトラック] {member_name or 'Unknown'} -> 検索対象: UUID({uuid})")
     return await api.get_official_player_data(uuid)
 
 def is_duplicate_event(event, window, threshold_sec=2):

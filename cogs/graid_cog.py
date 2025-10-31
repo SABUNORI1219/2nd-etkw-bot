@@ -177,8 +177,9 @@ class GraidCountView(discord.ui.View):
         # 集計系
         # Average Per Player: 期間合計 / プレイヤー数
         avg_raids = int(self.total_period / len(self.period_counts)) if self.period_counts else 0
-        # 📈 Compared to Last Week: 今週合計 - 先週合計
+        # 📈 Compared to Last Week: 今週合計 - 先週合計（パーティ単位で表示）
         total_week_diff = self.total_this_week - self.total_last_week
+        total_week_diff_parties = total_week_diff // 4  # パーティ単位
         # 週の％計算: 先週が0なら0.0%、それ以外は (今週/先週)*100
         if self.total_last_week == 0:
             total_week_pct = 0.0 if self.total_this_week == 0 else float('inf')
@@ -192,7 +193,7 @@ class GraidCountView(discord.ui.View):
             value=(
                 f"Total Guild Raids: `{self.total_period // 4}`\n"
                 f"Average Per Player: `{avg_raids}`\n"
-                f"📈 Compared to Last Week: `{total_week_diff}` (`{total_week_pct_str}`)"
+                f"📈 Compared to Last Week: `{total_week_diff_parties}` (`{total_week_pct_str}`)"
             ),
             inline=False
         )
@@ -226,58 +227,6 @@ class GraidCountView(discord.ui.View):
         for child in self.children:
             if isinstance(child, discord.ui.Button):
                 child.disabled = True
-        if self.message:
-            await self.message.edit(view=self)
-
-class PlayerCountView(discord.ui.View):
-    def __init__(self, player_counts, title, color=discord.Color.blue(), page=0, per_page=10, timeout=120):
-        super().__init__(timeout=timeout)
-        self.player_counts = player_counts
-        self.page = page
-        self.per_page = per_page
-        self.max_page = (len(player_counts) - 1) // per_page
-        self.title = title
-        self.color = color
-        self.message = None
-
-        self.previous.disabled = self.page == 0
-        self.next.disabled = self.page == self.max_page
-
-    async def update_message(self, interaction):
-        embed = discord.Embed(title=self.title, color=self.color)
-        start = self.page * self.per_page
-        end = start + self.per_page
-        for name, count in self.player_counts[start:end]:
-            safe_name = discord.utils.escape_markdown(name)
-            okane = count / 2
-            embed.add_field(name=safe_name, value=f"Count: {count} | {okane} <- okane suuji!!!", inline=False)
-        embed.set_footer(text=f"Page {self.page+1}/{self.max_page+1} | Minister Chikuwa")
-        self.previous.disabled = self.page == 0
-        self.next.disabled = self.page == self.max_page
-        await interaction.response.edit_message(embed=embed, view=self)
-
-    @discord.ui.button(label="⏪️", style=discord.ButtonStyle.secondary)
-    async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.page > 0:
-            self.page -= 1
-            await self.update_message(interaction)
-
-    @discord.ui.button(label="⏩️", style=discord.ButtonStyle.secondary)
-    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.page < self.max_page:
-            self.page += 1
-            await self.update_message(interaction)
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if self.message is None:
-            self.message = interaction.message
-        return True
-
-    async def on_timeout(self):
-        for child in self.children:
-            if isinstance(child, discord.ui.Button):
-                child.disabled = True
-
         if self.message:
             await self.message.edit(view=self)
 
