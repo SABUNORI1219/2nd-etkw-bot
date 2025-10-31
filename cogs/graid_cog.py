@@ -610,11 +610,6 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
     async def guildraid_submit(self, interaction: discord.Interaction, members: str, raid_name: str, proof: discord.Attachment):
         await interaction.response.defer(ephemeral=True)
 
-        # 権限チェック
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
-            return
-
         guild: discord.Guild | None = interaction.guild
         if guild is None:
             embed = create_embed(description="このコマンドはサーバー内でのみ利用可能です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
