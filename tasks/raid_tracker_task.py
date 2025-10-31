@@ -91,7 +91,9 @@ def remove_party_events_from_window(window, party, time_threshold=2):
         except ValueError:
             pass
 
-async def get_player_data(api, uuid):
+async def get_player_data(api, uuid, member_name=None):
+    # DEBUG: API検索対象をログ出力（デバッグ用）
+    logger.info(f"[DEBUG-レイドトラック] {member_name or 'Unknown'} -> 検索対象: UUID({uuid})")
     return await api.get_official_player_data(uuid)
 
 def is_duplicate_event(event, window, threshold_sec=2):
@@ -129,11 +131,7 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
     """
     async def get_player_info(mcid, uuid):
         try:
-            search_target = uuid or mcid
-            # DEBUG: API検索対象をログ出力（デバッグ用）
-            logger.info(f"[DEBUG-API検索] {mcid} -> 検索対象: {'UUID' if uuid else 'MCID'}({search_target})")
-            
-            player_data = await api.get_official_player_data(search_target)
+            player_data = await api.get_official_player_data(uuid or mcid)
             if player_data:
                 last_join = player_data.get("lastJoin")
                 playtime = player_data.get("playtime", 0)
@@ -223,7 +221,7 @@ async def guild_raid_tracker(api, bot=None, guild_prefix="ETKW", loop_interval=1
                 await asyncio.sleep(loop_interval)
                 continue
     
-            player_tasks = [get_player_data(api, member["uuid"]) for member in tracking_members]
+            player_tasks = [get_player_data(api, member["uuid"], member["name"]) for member in tracking_members]
             player_results = await asyncio.gather(*player_tasks)
     
             clear_events = []
@@ -333,11 +331,11 @@ async def last_seen_tracker(api, guild_prefix="ETKW", loop_interval=120):
                         if uuid:
                             uuid_to_name_mapping[uuid] = current_name
             
-            # 1. ギルド外メンバーのレイド履歴削除
-            deleted_count = await asyncio.to_thread(cleanup_non_guild_members_raid_history, current_guild_uuids)
-            
-            # 2. 名前変更されたメンバーのレイド履歴更新
+            # 1. 名前変更されたメンバーのレイド履歴更新（先にやる）
             updated_count = await asyncio.to_thread(update_raid_history_member_names, uuid_to_name_mapping)
+            
+            # 2. ギルド外メンバーのレイド履歴削除（後にやる）
+            deleted_count = await asyncio.to_thread(cleanup_non_guild_members_raid_history, current_guild_uuids)
             
             if deleted_count > 0 or updated_count > 0:
                 logger.info(f"[レイド履歴クリーンアップ] 削除: {deleted_count}件, 名前更新: {updated_count}件")
