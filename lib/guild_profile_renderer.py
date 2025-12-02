@@ -565,7 +565,7 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             visible_roles += 1
     
     # オンラインメンバー表示エリアの最低高さを確保
-    min_member_area_height = 200  # 最低200pxの高さを確保
+    min_member_area_height = 250  # 最低250pxの高さを確保
     role_header_height = 32 * visible_roles  # 表示されるランクのみカウント
     member_height = 30 * member_rows
     calculated_member_area_height = role_header_height + member_height
