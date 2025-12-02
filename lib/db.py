@@ -58,17 +58,6 @@ def create_table():
             );
         ''')
         cur.execute('''
-            CREATE TABLE IF NOT EXISTS guild_territory_state (
-                guild_prefix TEXT,
-                territory_name TEXT,
-                acquired TIMESTAMP,
-                lost TIMESTAMP,
-                from_guild TEXT,
-                to_guild TEXT,
-                PRIMARY KEY (guild_prefix, territory_name)
-            );
-        ''')
-        cur.execute('''
             CREATE TABLE IF NOT EXISTS applications (
                 id SERIAL PRIMARY KEY,
                 mcid TEXT NOT NULL,
@@ -87,61 +76,6 @@ def create_table():
         conn.commit()
     conn.close()
     logger.info("全テーブルを作成/確認しました")
-
-def upsert_guild_territory_state(guild_territory_history):
-    conn = get_conn()
-    try:
-        with conn.cursor() as cur:
-            rows = []
-            for g, tdict in guild_territory_history.items():
-                for t, info in tdict.items():
-                    acquired = info.get("acquired")
-                    lost = info.get("lost")
-                    from_guild = info.get("from_guild")
-                    to_guild = info.get("to_guild")
-                    rows.append((
-                        g, t,
-                        acquired if isinstance(acquired, datetime) else None,
-                        lost if isinstance(lost, datetime) else None,
-                        from_guild, to_guild
-                    ))
-            if rows:
-                execute_values(
-                    cur,
-                    """
-                    INSERT INTO guild_territory_state (guild_prefix, territory_name, acquired, lost, from_guild, to_guild)
-                    VALUES %s
-                    ON CONFLICT (guild_prefix, territory_name)
-                    DO UPDATE SET acquired = EXCLUDED.acquired, lost = EXCLUDED.lost, from_guild = EXCLUDED.from_guild, to_guild = EXCLUDED.to_guild
-                    """,
-                    rows
-                )
-            conn.commit()
-    except Exception as e:
-        logger.error(f"upsert_guild_territory_state failed: {e}")
-    finally:
-        if conn: conn.close()
-
-def get_guild_territory_state():
-    conn = get_conn()
-    result = defaultdict(dict)
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT guild_prefix, territory_name, acquired, lost, from_guild, to_guild FROM guild_territory_state
-            """)
-            for g, t, acq, lost, from_guild, to_guild in cur.fetchall():
-                result[g][t] = {
-                    "acquired": acq,
-                    "lost": lost,
-                    "from_guild": from_guild,
-                    "to_guild": to_guild
-                }
-    except Exception as e:
-        logger.error(f"get_guild_territory_state failed: {e}")
-    finally:
-        if conn: conn.close()
-    return result
 
 def insert_history(raid_name, clear_time, member):
     try:

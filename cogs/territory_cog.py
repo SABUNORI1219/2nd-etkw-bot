@@ -17,9 +17,7 @@ from io import BytesIO
 from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.map_renderer import MapRenderer
 from lib.cache_handler import CacheHandler
-from lib.db import get_guild_territory_state
 from lib.utils import create_embed
-from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db
 from config import RESOURCE_EMOJIS, AUTHORIZED_USER_IDS, send_authorized_only_message
 
 logger = logging.getLogger(__name__)
@@ -52,7 +50,12 @@ class Territory(commands.GroupCog, name="territory"):
         self.cache = CacheHandler()
         self.system_name = "Territory Map"
         self.territory_guilds_cache = [] # ギルド名のリスト
-        self.update_territory_cache.start() # 定期更新タスクを開始
+        self.latest_territory_data = {}  # 最新の領地データを保存
+        
+        # 定期更新タスクを開始
+        self.update_territory_data.start()
+        self.update_territory_cache.start()
+        
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
         try:
@@ -98,24 +101,42 @@ class Territory(commands.GroupCog, name="territory"):
         return embed
 
     def cog_unload(self):
+        self.update_territory_data.cancel()
         self.update_territory_cache.cancel()
 
     def safe_filename(self, name: str) -> str:
         return re.sub(r'[^a-zA-Z0-9_-]', '_', name)
 
     @tasks.loop(minutes=1.0)
-    async def update_territory_cache(self):
-        logger.info("--- [TerritoryCache] テリトリー所有ギルドのキャッシュを更新します...")
-        from tasks.guild_territory_tracker import latest_territory_data
-        global latest_territory_data
-        territory_data = latest_territory_data
+    async def update_territory_data(self):
+        """領地データを定期取得してインスタンス変数に保存"""
+        logger.info("[TerritoryTracker] 領地データの取得を開始します...")
+        territory_data = await self.wynn_api.get_territory_list()
+        
         if not territory_data:
+            logger.warning("[TerritoryTracker] 領地データ取得失敗。次回取得時に再試行します。")
+            return
+        
+        self.latest_territory_data = territory_data
+        logger.info(f"[TerritoryTracker] ✅ 領地データ更新完了: {len(territory_data)}個の領地")
+
+    @update_territory_data.before_loop
+    async def before_territory_data_update(self):
+        await self.bot.wait_until_ready()
+
+    @tasks.loop(minutes=1.0)
+    async def update_territory_cache(self):
+        """テリトリー所有ギルドのキャッシュを更新"""
+        logger.info("--- [TerritoryCache] テリトリー所有ギルドのキャッシュを更新します...")
+        
+        if not self.latest_territory_data:
             logger.warning("latest_territory_dataが空のためキャッシュ更新をスキップ")
             return
+            
         guild_names = set(
             data['guild']['prefix']
-            for data in territory_data.values()
-            if data['guild']['prefix']
+            for data in self.latest_territory_data.values()
+            if data.get('guild', {}).get('prefix')
         )
         self.territory_guilds_cache = sorted(list(guild_names))
         logger.info(f"--- [TerritoryCache] ✅ {len(self.territory_guilds_cache)}個のギルドをキャッシュしました。")
@@ -136,12 +157,18 @@ class Territory(commands.GroupCog, name="territory"):
         return result
 
     async def get_territory_data_with_cache(self):
+        # インスタンス変数の最新データを優先的に使用
+        if self.latest_territory_data:
+            return self.latest_territory_data
+            
+        # フォールバック：キャッシュから取得
         cache_key = "wynn_territory_list"
         territory_data = self.cache.get_cache(cache_key)
         if not territory_data:
             territory_data = await self.wynn_api.get_territory_list()
             if territory_data:
                 self.cache.set_cache(cache_key, territory_data)
+                self.latest_territory_data = territory_data  # インスタンス変数にも保存
         return territory_data
 
     async def get_guild_color_map_with_cache(self):
@@ -165,9 +192,8 @@ class Territory(commands.GroupCog, name="territory"):
             embed = create_embed(description="テリトリーまたはギルドカラー情報の取得に失敗しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
             return
-        sync_history_from_db()
-        db_state = get_guild_territory_state()
-        owned_territories_map = {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
+
+        show_held_time = False
         if guild:
             territories_to_render = {
                 name: data for name, data in territory_data.items()
@@ -177,6 +203,7 @@ class Territory(commands.GroupCog, name="territory"):
                 embed = create_embed(description=f"ギルド **{guild}** は現在、領地を所有していません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
                 await interaction.followup.send(embed=embed)
                 return
+            show_held_time = True  # 個別ギルド指定時は保持時間を表示
         else:
             territories_to_render = territory_data
 
@@ -184,7 +211,7 @@ class Territory(commands.GroupCog, name="territory"):
             'territory_data': territory_data,
             'territories_to_render': territories_to_render,
             'guild_color_map': guild_color_map,
-            'owned_territories_map': owned_territories_map
+            'show_held_time': show_held_time
         }
         with tempfile.TemporaryFile() as inpipe, tempfile.TemporaryFile() as outpipe:
             pickle.dump(params, inpipe)
@@ -207,6 +234,10 @@ class Territory(commands.GroupCog, name="territory"):
             await interaction.followup.send(file=file, embed=embed)
             file.close()
             del file, embed
+            
+            # 統計Embedを送信
+            stats_embed = self.map_renderer.create_territory_stats_embed(territory_data)
+            await interaction.followup.send(embed=stats_embed)
         else:
             embed = create_embed(description="マップの生成中にエラーが発生しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)

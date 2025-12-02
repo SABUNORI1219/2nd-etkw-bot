@@ -4,20 +4,15 @@ import os
 import logging
 import json
 import discord
-import time
 import gc
 from datetime import datetime, timezone, timedelta
 from math import sqrt
-import collections
 
 logger = logging.getLogger(__name__)
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_PATH = os.path.join(project_root, "assets", "map")
 FONT_PATH = os.path.join(project_root, "assets", "fonts", "Minecraftia-Regular.ttf")
-
-from lib.db import get_guild_territory_state
-from tasks.guild_territory_tracker import get_effective_owned_territories, sync_history_from_db
 
 class MapRenderer:
     def __init__(self):
@@ -39,166 +34,71 @@ class MapRenderer:
         except (ValueError, IndexError):
             return (255, 255, 255)
 
-    def _is_city_territory(self, territory_data):
-        emeralds = int(territory_data.get("resources", {}).get("emeralds", "0"))
-        return emeralds == 18000
-
-    def _calc_conn_ext_hqbuff(self, owned_territories, territory_name):
-        connections = set()
-        externals = set()
-        visited = set()
-        queue = [(territory_name, 0)]
-        while queue:
-            current, dist = queue.pop(0)
-            if current in visited or dist > 3:
+    def _get_guild_territory_stats(self, territory_data):
+        """ギルドごとの領地保持統計を計算"""
+        guild_stats = {}
+        for name, info in territory_data.items():
+            if "guild" not in info or not info["guild"].get("prefix"):
                 continue
-            visited.add(current)
-            if dist == 1 and current in owned_territories:
-                connections.add(current)
-            if dist > 0 and current in owned_territories and current != territory_name:
-                externals.add(current)
-            for conn in self.local_territories.get(current, {}).get("Trading Routes", []):
-                if conn not in visited:
-                    queue.append((conn, dist + 1))
-        multiplier = (1.5 + (len(externals) * 0.25)) * (1.0 + (len(connections) * 0.30))
-        hq_buff = int(multiplier * 100)
-        return len(connections), len(externals), hq_buff
-
-    def _sum_resources(self, owned_territories):
-        total = {"emeralds": 0, "ore": 0, "crops": 0, "fish": 0, "wood": 0}
-        for t in owned_territories:
-            res = self.local_territories.get(t, {}).get("resources", {})
-            for k in total:
-                total[k] += int(res.get(k, "0"))
-        return total
-
-    def _get_owned_territories_map_from_db(self):
-        now = time.time()
-        if hasattr(self, "_db_cache") and self._db_cache and (now - self._db_cache_time < 60):
-            return self._db_cache
-        sync_history_from_db()
-        db_state = get_guild_territory_state()
-        result = {prefix: set(get_effective_owned_territories(prefix)) for prefix in db_state}
-        self._db_cache = result
-        self._db_cache_time = now
-        return result
-
-    def _pick_hq_candidate(self, hq_candidates, territory_api_data, all_owned_territories=None, exclude_lost=None, debug_prefix=None):
-        # Conn/Ext計算用セット（現所有+1時間以内失領）を用意
-        if all_owned_territories is None:
-            all_owned_territories = set(hq_candidates) | (exclude_lost or set())
-        hq_stats = []
-
-        # HQ候補（現所有のみ）でループ
-        for t in hq_candidates:
-            conn, ext, hq_buff = self._calc_conn_ext_hqbuff(all_owned_territories, t)
-            acquired = territory_api_data.get(t, {}).get("acquired", "")
-            if not acquired:
-                acquired = "9999-12-31T23:59:59.999999Z"
-            is_city = self._is_city_territory(self.local_territories[t])
-            hq_stats.append({
-                "name": t,
-                "conn": conn,
-                "ext": ext,
-                "hq_buff": hq_buff,
-                "is_city": is_city,
-                "acquired": acquired,
-                "resources": self.local_territories[t].get("resources", {})
-            })
-        if not hq_stats:
-            return None, [], [], {}
+            prefix = info["guild"]["prefix"]
+            guild_name = info["guild"]["name"]
+            if prefix not in guild_stats:
+                guild_stats[prefix] = {
+                    "name": guild_name,
+                    "prefix": prefix,
+                    "count": 0
+                }
+            guild_stats[prefix]["count"] += 1
         
-        # Conn+Ext多い順→Conn多い順→HQバフ多い順→取得時刻古い順
-        hq_stats.sort(key=lambda x: (-(x["conn"] + x["ext"]), -x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
-        top5 = hq_stats[:5]
-        total_res = self._sum_resources(all_owned_territories)
-
-        # 1. Conn+Ext最大グループ（ネットワーク力最強グループ）抽出
-        max_conn_ext = max(x["conn"] + x["ext"] for x in top5)
-        conn_ext_tops = [x for x in top5 if x["conn"] + x["ext"] == max_conn_ext]
-        conn_ext_top_names = [x["name"] for x in conn_ext_tops]
-
-        # 2. Conn+Ext最大グループ以外のtop5領地で、Conn値が2個以上多いやつを探す
-        other_top5 = [x for x in top5 if x not in conn_ext_tops]
-        hq_conn_candidates = []
-        max_group_conn = max(x["conn"] for x in conn_ext_tops)
-        for cand in other_top5:
-            if cand["conn"] - max_group_conn >= 2:
-                hq_conn_candidates.append(cand)
-
-        # もし該当があればその中でConn値最大のものをHQに
-        if hq_conn_candidates:
-            hq_conn_candidates.sort(key=lambda x: (-x["conn"], -x["ext"], -x["hq_buff"], x["acquired"]))
-            return hq_conn_candidates[0]["name"], hq_stats, top5, total_res
-
-        # 3. Conn+Ext最大グループ内で複数ある場合はConn最大ユニークならHQ
-        if len(conn_ext_tops) > 1:
-            conn_max_in_group = max(x["conn"] for x in conn_ext_tops)
-            conn_maxs = [x for x in conn_ext_tops if x["conn"] == conn_max_in_group]
-            if len(conn_maxs) == 1:
-                return conn_maxs[0]["name"], hq_stats, top5, total_res
+        # 領地数で降順ソート
+        return sorted(guild_stats.values(), key=lambda x: x["count"], reverse=True)
+    
+    def create_territory_stats_embed(self, territory_data: dict) -> discord.Embed:
+        """領地統計Embedを作成"""
+        guild_stats = self._get_guild_territory_stats(territory_data)
+        
+        embed = discord.Embed(
+            title="🏰 Territory Holdings",
+            color=discord.Color.blue()
+        )
+        
+        if guild_stats:
+            # 上位15ギルドまで表示
+            top_guilds = guild_stats[:15]
+            stats_text = []
+            
+            for i, guild in enumerate(top_guilds, 1):
+                prefix = guild["prefix"]
+                name = guild["name"]
+                count = guild["count"]
+                
+                # 順位に応じて絵文字を追加
+                if i == 1:
+                    rank_emoji = "🥇"
+                elif i == 2:
+                    rank_emoji = "🥈"
+                elif i == 3:
+                    rank_emoji = "🥉"
+                else:
+                    rank_emoji = f"`{i:2d}.`"
+                
+                stats_text.append(f"{rank_emoji} **{prefix}** - {count} territories")
+            
+            embed.description = "\n".join(stats_text)
+            
+            total_territories = sum(g["count"] for g in guild_stats)
+            total_guilds = len(guild_stats)
+            
+            embed.add_field(
+                name="📊 Summary",
+                value=f"**{total_territories}** territories held by **{total_guilds}** guilds",
+                inline=False
+            )
         else:
-            conn_maxs = conn_ext_tops
-
-        # 4. 所持領地6個以下なら取得時刻最古
-        if len(hq_candidates) <= 6:
-            oldest = min(top5, key=lambda x: x["acquired"] or "9999")
-            return oldest["name"], hq_stats, top5, total_res
-
-        # 5. Conn同数&Ext<20で街領地あれば優先
-        max_conn = max(x["conn"] for x in top5)
-        conn_top_group = [x for x in top5 if x["conn"] == max_conn]
-        if len(conn_top_group) > 1:
-            ext_lt20 = [x for x in conn_top_group if x["ext"] < 20]
-            city = next((x for x in ext_lt20 if x["is_city"]), None)
-            if city:
-                return city["name"], hq_stats, top5, total_res
-
-        # 6. Ext,Conn同値→資源判定
-        if len(conn_maxs) > 1 and all(x["conn"] == conn_maxs[0]["conn"] and x["ext"] == conn_maxs[0]["ext"] for x in conn_maxs):
-            res_priority = ["crops", "ore", "wood", "fish"]
-            min_val = float("inf")
-            min_type = None
-            for rtype in res_priority:
-                val = total_res.get(rtype, 0)
-                if val > 0 and val < min_val:
-                    min_val = val
-                    min_type = rtype
-            if min_type:
-                from math import inf
-                def trading_route_distance(start, goals):
-                    queue = collections.deque()
-                    visited = set()
-                    queue.append((start, 0))
-                    while queue:
-                        current, dist = queue.popleft()
-                        if current in visited:
-                            continue
-                        visited.add(current)
-                        if current in goals:
-                            return dist
-                        neighbors = self.local_territories.get(current, {}).get("Trading Routes", [])
-                        neighbors = [n for n in neighbors if n in all_owned_territories]
-                        queue.extend((n, dist+1) for n in neighbors)
-                    return inf
-                res_territories = [x for x in hq_stats if int(x["resources"].get(min_type, "0")) > 0]
-                res_names = [x["name"] for x in res_territories]
-                min_dist = inf
-                best_cand = conn_maxs[0]
-                for cand in conn_maxs:
-                    d = trading_route_distance(cand["name"], set(res_names))
-                    if d < min_dist:
-                        min_dist = d
-                        best_cand = cand
-                    elif d == min_dist:
-                        cand_res = int(self.local_territories[cand["name"]].get("resources", {}).get(min_type, "0"))
-                        best_res = int(self.local_territories[best_cand["name"]].get("resources", {}).get(min_type, "0"))
-                        if cand_res > best_res:
-                            best_cand = cand
-                return best_cand["name"], hq_stats, top5, total_res
-
-        # fallback
-        return conn_ext_tops[0]["name"], hq_stats, top5, total_res
+            embed.description = "No territory data available"
+        
+        embed.set_footer(text="Territory Statistics | Minister Chikuwa")
+        return embed
 
     def _get_map_and_scale(self):
         map_img = Image.open(os.path.join(ASSETS_PATH, "main-map.png")).convert("RGBA")
@@ -210,17 +110,13 @@ class MapRenderer:
         map_img.close()
         return resized_map, scale_factor
 
-    def _get_crown_img(self):
-        img = Image.open(os.path.join(ASSETS_PATH, "guild_headquarters.png")).convert("RGBA")
-        return img
-
     def _get_font(self, size):
         try:
             return ImageFont.truetype(self.font_path, size)
         except Exception:
             return ImageFont.load_default()
 
-    def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, hq_territories=None, upscale_factor=1.5):
+    def _draw_trading_and_territories(self, map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, show_held_time=False, upscale_factor=1.5):
         upscaled_lines = None
         overlay = None
 
@@ -267,6 +163,9 @@ class MapRenderer:
             draw = ImageDraw.Draw(map_to_draw_on)
             scaled_font_size = max(12, int(self._get_font(40).size * self.scale_factor))
             scaled_font = self._get_font(scaled_font_size)
+            time_font_size = max(8, int(scaled_font_size * 0.6))
+            time_font = self._get_font(time_font_size)
+            
             for name, info in territory_data.items():
                 static = self.local_territories.get(name)
                 if not static or "Location" not in static:
@@ -289,10 +188,13 @@ class MapRenderer:
                 color_rgb = self._hex_to_rgb(color_hex)
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
-                if hq_territories and name in hq_territories:
-                    continue
+                
+                center_x = (x_min + x_max) / 2
+                center_y = (y_min + y_max) / 2
+                
+                # ギルド名描画
                 draw.text(
-                    ((x_min + x_max) / 2, (y_min + y_max) / 2),
+                    (center_x, center_y),
                     prefix,
                     font=scaled_font,
                     fill=color_rgb,
@@ -300,6 +202,43 @@ class MapRenderer:
                     stroke_width=2,
                     stroke_fill="black"
                 )
+                
+                # 保持時間描画（show_held_timeがTrueの場合のみ）
+                if show_held_time and "acquired" in info:
+                    try:
+                        acquired_dt = datetime.fromisoformat(info['acquired'].replace("Z", "+00:00"))
+                        duration = datetime.now(timezone.utc) - acquired_dt
+                        
+                        days = duration.days
+                        hours, remainder = divmod(duration.seconds, 3600)
+                        minutes, seconds = divmod(remainder, 60)
+                        
+                        time_parts = []
+                        if days > 0:
+                            time_parts.append(f"{days}d")
+                        if hours > 0:
+                            time_parts.append(f"{hours}h")
+                        if minutes > 0:
+                            time_parts.append(f"{minutes}m")
+                        if seconds > 0 or not time_parts:
+                            time_parts.append(f"{seconds}s")
+                        
+                        time_text = " ".join(time_parts[:2])  # 最大2つのパートまで表示
+                        
+                        # ギルド名の下に時間を表示
+                        time_y = center_y + scaled_font_size // 2 + 2
+                        draw.text(
+                            (center_x, time_y),
+                            time_text,
+                            font=time_font,
+                            fill=(200, 200, 200),
+                            anchor="mm",
+                            stroke_width=1,
+                            stroke_fill="black"
+                        )
+                    except (ValueError, KeyError):
+                        pass
+                        
             map_to_draw_on.alpha_composite(overlay)
             del overlay_draw, draw
         finally:
@@ -308,131 +247,17 @@ class MapRenderer:
             if overlay is not None:
                 overlay.close()
 
-    def draw_guild_hq_on_map(self, territory_data, guild_color_map, territory_api_data, box=None, is_zoomed=False, map_to_draw_on=None, owned_territories_map=None):
-        crown_img = None
+    def draw_territories_on_map(self, territory_data, guild_color_map, box=None, is_zoomed=False, map_to_draw_on=None, show_held_time=False):
+        """領地をマップ上に描画する（HQ機能なし）"""
         try:
-            map_img = map_to_draw_on
-            prefix_to_territories = {}
-            for name, info in territory_data.items():
-                prefix = info.get("guild", {}).get("prefix", "")
-                if not prefix:
-                    continue
-                prefix_to_territories.setdefault(prefix, set()).add(name)
-            db_state = get_guild_territory_state()
-            hq_names = set()
-            for prefix, api_owned in prefix_to_territories.items():
-                all_owned = owned_territories_map.get(prefix, set()) if owned_territories_map else set(api_owned)
-                lost_only = set()
-                for t in db_state.get(prefix, {}):
-                    lost_time = db_state[prefix][t].get("lost")
-                    if lost_time is not None:
-                        lost_only.add(t)
-                candidate_territories = set(api_owned)
-                hq_name, _, _, _ = self._pick_hq_candidate(
-                    candidate_territories,
-                    territory_api_data,
-                    all_owned_territories=all_owned,
-                    exclude_lost=lost_only,
-                    debug_prefix=prefix
-                )
-                if hq_name:
-                    hq_names.add(hq_name)
-            self._draw_trading_and_territories(map_img, box, is_zoomed, territory_data, guild_color_map, hq_territories=hq_names)
-            draw = ImageDraw.Draw(map_img)
-            crown_img = self._get_crown_img()
-            for prefix, api_owned in prefix_to_territories.items():
-                all_owned = owned_territories_map.get(prefix, set()) if owned_territories_map else set(api_owned)
-                lost_only = set()
-                for t in db_state.get(prefix, {}):
-                    lost_time = db_state[prefix][t].get("lost")
-                    if lost_time is not None:
-                        lost_only.add(t)
-                candidate_territories = set(api_owned)
-                hq_name, _, _, _ = self._pick_hq_candidate(
-                    candidate_territories,
-                    territory_api_data,
-                    all_owned_territories=all_owned,
-                    exclude_lost=lost_only,
-                    debug_prefix=prefix
-                )
-                if not hq_name:
-                    continue
-                loc = self.local_territories.get(hq_name, {}).get("Location")
-                if not loc:
-                    continue
-                x = (loc["start"][0] + loc["end"][0]) // 2
-                z = (loc["start"][1] + loc["end"][1]) // 2
-                px, py = self._coord_to_pixel(x, z)
-                if hasattr(self, "scale_factor"):
-                    px = px * self.scale_factor
-                    py = py * self.scale_factor
-                if is_zoomed and box:
-                    px -= box[0]
-                    py -= box[1]
-                color_hex = guild_color_map.get(prefix, "#FFFFFF")
-                color_rgb = self._hex_to_rgb(color_hex)
-                x1, y1 = self._coord_to_pixel(loc["start"][0], loc["start"][1])
-                x2, y2 = self._coord_to_pixel(loc["end"][0], loc["end"][1])
-                x1, x2 = x1 * self.scale_factor, x2 * self.scale_factor
-                y1, y2 = y1 * self.scale_factor, y2 * self.scale_factor
-                width = abs(x2 - x1)
-                height = abs(y2 - y1)
-                scaled_font_size = max(12, int(self._get_font(40).size * self.scale_factor))
-                crown_size_limit = int(scaled_font_size * 1.8)
-                crown_size_limit = max(28, min(crown_size_limit, 120))
-                crown_size = int(min(width, height) * 0.9)
-                crown_size = max(18, min(crown_size, crown_size_limit))
-                orig_w, orig_h = crown_img.size
-                ratio = min(crown_size / orig_w, crown_size / orig_h)
-                new_w = int(orig_w * ratio)
-                new_h = int(orig_h * ratio)
-                crown_img_resized = crown_img.resize((new_w, new_h), Image.LANCZOS)
-                crown_x = int(px - new_w/2)
-                crown_y = int(py - new_h/2)
-                map_img.alpha_composite(crown_img_resized, dest=(crown_x, crown_y))
-                crown_img_resized.close()
-                prefix_font_size = crown_size
-                font_found = False
-                for test_size in range(crown_size, 5, -1):
-                    try:
-                        test_font = self._get_font(test_size)
-                    except IOError:
-                        test_font = ImageFont.load_default()
-                    bbox = test_font.getbbox(prefix)
-                    text_width = bbox[2] - bbox[0]
-                    text_height = bbox[3] - bbox[1]
-                    if text_width <= crown_size and text_height <= crown_size:
-                        prefix_font_size = test_size
-                        font_found = True
-                        break
-                if font_found:
-                    prefix_font = self._get_font(prefix_font_size)
-                else:
-                    prefix_font = ImageFont.load_default()
-                bbox = prefix_font.getbbox(prefix)
-                text_width = bbox[2] - bbox[0]
-                text_height = bbox[3] - bbox[1]
-                text_x = px
-                text_y = crown_y - text_height // 2 - 2
-                draw.text(
-                    (text_x, text_y),
-                    prefix,
-                    font=prefix_font,
-                    fill=color_rgb,
-                    anchor="mm",
-                    stroke_width=2,
-                    stroke_fill="black"
-                )
-            del draw
-            return map_img, [(0, 0, "", hq_name) for hq_name in hq_names]
-        finally:
-            if crown_img is not None:
-                crown_img.close()
+            self._draw_trading_and_territories(map_to_draw_on, box, is_zoomed, territory_data, guild_color_map, show_held_time=show_held_time)
+            return map_to_draw_on
+        except Exception as e:
+            logger.error(f"領地描画中にエラー: {e}")
+            return map_to_draw_on
 
     # デフォルトマップ生成するやつ
-    def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict, owned_territories_map=None) -> tuple[discord.File | None, discord.Embed | None]:
-        if owned_territories_map is None:
-            owned_territories_map = self._get_owned_territories_map_from_db()
+    def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict, show_held_time: bool = False) -> tuple[discord.File | None, discord.Embed | None]:
         if not territories_to_render:
             return None, None
         resized_map, scale_factor = self._get_map_and_scale()
@@ -466,14 +291,13 @@ class MapRenderer:
                 map_to_draw_on = cropped
             else:
                 map_to_draw_on = resized_map
-            final_map, _ = self.draw_guild_hq_on_map(
+            final_map = self.draw_territories_on_map(
                 territory_data=territory_data,
                 guild_color_map=guild_color_map,
-                territory_api_data=territory_data,
                 box=box,
                 is_zoomed=is_zoomed,
                 map_to_draw_on=map_to_draw_on,
-                owned_territories_map=owned_territories_map
+                show_held_time=show_held_time
             )
             map_bytes = BytesIO()
             try:
@@ -513,18 +337,16 @@ class MapRenderer:
         if not owner_prefix:
             logger.error(f"領地 {territory} の所有ギルドprefixがAPIデータにありません")
             return None
-        owned_territories_map = self._get_owned_territories_map_from_db()
         resized_map, scale_factor = self._get_map_and_scale()
         self.scale_factor = scale_factor
         map_to_draw_on = resized_map
-        final_map, _ = self.draw_guild_hq_on_map(
+        final_map = self.draw_territories_on_map(
             territory_data=territory_data,
             guild_color_map=guild_color_map,
-            territory_api_data=territory_data,
             box=None,
             is_zoomed=False,
             map_to_draw_on=map_to_draw_on,
-            owned_territories_map=owned_territories_map
+            show_held_time=True  # 単一領地表示では保持時間を表示
         )
         static = terri_static
         loc = static.get("Location", {})

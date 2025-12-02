@@ -16,7 +16,7 @@ def main():
             territory_data=params['territory_data'],
             territories_to_render=params['territories_to_render'],
             guild_color_map=params['guild_color_map'],
-            owned_territories_map=params['owned_territories_map']
+            show_held_time=params.get('show_held_time', False)
         )
         map_bytes = None
         if file is not None:

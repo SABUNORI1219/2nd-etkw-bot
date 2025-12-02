@@ -719,9 +719,12 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             top_color = (255, 200, 60, 255)
             bottom_color = (200, 150, 30, 255)
         
+        # 進行バーの角丸半径を幅に応じて調整（枠内に収まるように）
+        progress_radius = min(bar_radius, fill_w // 2, xpbar_h // 2)
+        
         xp_gradient = gradient_rect((fill_w, xpbar_h), 
                                    top_color, bottom_color, 
-                                   radius=bar_radius)
+                                   radius=progress_radius)
         img.paste(xp_gradient, (xpbar_x, xpbar_y), mask=xp_gradient)
     
     # バーの境界線
