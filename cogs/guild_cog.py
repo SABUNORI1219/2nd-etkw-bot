@@ -40,26 +40,19 @@ class GuildImageCog(commands.Cog):
 
         cache_key = f"guild_{guild}"
         data_to_use = None
-        found_by_prefix = False  # prefixで見つかったかどうかを追跡
 
         cached = self.cache.get_cache(cache_key)
         if cached:
             data_to_use = cached
-            # キャッシュの場合は検索方法を推測（後で改良可能）
-            # とりあえずギルド名に一致するかチェック
-            guild_name = self._safe_get(data_to_use, ["name"], "")
-            found_by_prefix = guild.upper() != guild_name.upper()
         else:
             # 二段検索（prefix -> name）
             data_as_prefix = await self.wynn_api.get_guild_by_prefix(guild)
             if data_as_prefix and data_as_prefix.get("name"):
                 data_to_use = data_as_prefix
-                found_by_prefix = True
             else:
                 data_as_name = await self.wynn_api.get_guild_by_name(guild)
                 if data_as_name and data_as_name.get("name"):
                     data_to_use = data_as_name
-                    found_by_prefix = False
 
             if data_to_use:
                 self.cache.set_cache(cache_key, data_to_use)
@@ -73,32 +66,21 @@ class GuildImageCog(commands.Cog):
         try:
             img_io: BytesIO = await create_guild_image(data_to_use, self.banner_renderer)
             file = discord.File(fp=img_io, filename="guild_card.png")
-            await interaction.followup.send(file=file)
             
-            # 公式サイトリンクのEmbed送信
+            # 公式サイトリンクのEmbed作成（シンプル版）
             guild_name = self._safe_get(data_to_use, ["name"], "Unknown Guild")
-            guild_prefix = self._safe_get(data_to_use, ["prefix"], "")
-            
-            # URLエンコード
             encoded_name = quote(guild_name)
+            url = f"https://wynncraft.com/stats/guild/{encoded_name}"
             
-            # 検索方法に応じてURL生成
-            if found_by_prefix:
-                url = f"https://wynncraft.com/stats/guild/{encoded_name}?prefix=true"
-                search_method = f"プレフィックス「{guild_prefix}」"
-            else:
-                url = f"https://wynncraft.com/stats/guild/{encoded_name}"
-                search_method = f"ギルド名「{guild_name}」"
-            
-            # リンクEmbed作成
             link_embed = create_embed(
-                title="🔗 Wynncraftでギルド詳細を見る",
-                description=f"{search_method}で検索されました\n[**{guild_name}** の公式ページ]({url})",
+                title="🔗 公式サイトへのリンク",
+                description=f"[**{guild_name}** の公式ページ]({url})",
                 color=discord.Color.blue(),
                 footer_text=f"{self.system_name} | Minister Chikuwa"
             )
             
-            await interaction.followup.send(embed=link_embed)
+            # 画像とEmbedを同時に送信
+            await interaction.followup.send(file=file, embed=link_embed)
             
         except Exception as e:
             logger.exception("ギルド画像生成中に例外が発生しました")

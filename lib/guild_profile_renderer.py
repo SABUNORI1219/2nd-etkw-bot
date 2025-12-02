@@ -720,7 +720,14 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             bottom_color = (200, 150, 30, 255)
         
         # 進行バーの角丸半径を幅に応じて調整（枠内に収まるように）
-        progress_radius = min(bar_radius, fill_w // 2, xpbar_h // 2)
+        # より安全な計算：最小半径と幅制限を組み合わせ
+        safe_radius = min(
+            bar_radius,          # 元の半径
+            fill_w // 2 if fill_w > 2 else 1,  # 幅の半分（最小1）
+            xpbar_h // 2         # 高さの半分
+        )
+        # さらに安全のため、最大でもバーの高さの40%に制限
+        progress_radius = min(safe_radius, int(xpbar_h * 0.4))
         
         xp_gradient = gradient_rect((fill_w, xpbar_h), 
                                    top_color, bottom_color, 
