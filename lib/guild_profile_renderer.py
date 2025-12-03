@@ -739,9 +739,8 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             bottom_color = (200, 150, 30, 255)
         
         # 進行バーの角丸半径を精密計算
-        if fill_w <= 8:
-            # 極小の場合：角丸をほぼなくす
-            progress_radius = 2
+        if fill_w <= 12:  # 12px以下は完全に角丸なしにする
+            progress_radius = 0
         elif fill_w <= bar_radius:
             # 小さい場合：半径を大幅削減
             progress_radius = max(3, fill_w // 4)
@@ -752,10 +751,16 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             # 十分大きい場合：元の半径だが少し控えめに
             progress_radius = min(bar_radius, fill_w // 2)
         
-        # 進行バーを生成
-        xp_gradient = gradient_rect((fill_w, xpbar_h), 
-                                   top_color, bottom_color, 
-                                   radius=progress_radius)
+        # 進行バーを生成（角丸なしの場合は通常の矩形）
+        if progress_radius == 0:
+            # 角丸なしの単純な矩形グラデーション
+            xp_gradient = gradient_rect((fill_w, xpbar_h), 
+                                       top_color, bottom_color, 
+                                       radius=0)
+        else:
+            xp_gradient = gradient_rect((fill_w, xpbar_h), 
+                                       top_color, bottom_color, 
+                                       radius=progress_radius)
         
         # はみ出し防止用のマスクを作成（背景バーと同じ形状）
         # アンチエイリアシング用に少し大きめに作成
