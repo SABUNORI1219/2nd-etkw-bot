@@ -695,25 +695,25 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     # XP進行度の計算
     xp_fill = float(xpPercent) / 100.0 if xpPercent else 0
     
-    # 角丸矩形の実際の描画可能領域を計算
-    # 角丸部分を除いた直線部分の長さ
-    usable_width = max(0, xpbar_w - (2 * bar_radius))
-    # 角丸部分での描画可能な追加長さ（半径分）
-    corner_width = bar_radius
-    # 総描画可能幅
-    total_usable_width = usable_width + (2 * corner_width)
+    # より精密な角丸矩形fill計算
+    # 基本的な進行幅
+    basic_fill_w = int(xpbar_w * xp_fill)
     
-    # 実際のfill幅を計算（角丸を考慮）
-    raw_fill_w = total_usable_width * xp_fill
-    
-    # 最小描画幅（角丸が破綻しない範囲）
-    min_fill_w = bar_radius if xp_fill > 0 else 0
-    
-    # 実際の描画幅を決定
-    if raw_fill_w < min_fill_w:
-        fill_w = 0  # 最小幅未満なら描画しない
+    # 非常に小さな割合の場合の特別処理
+    if xp_fill <= 0.05:  # 5%以下
+        # 最小視認可能幅として6pxに設定
+        fill_w = max(6, basic_fill_w) if xp_fill > 0 else 0
     else:
-        fill_w = min(int(raw_fill_w), xpbar_w)  # 最大でもバー幅まで
+        # 角丸を考慮した調整
+        # 角丸半径の影響を減らすため、少し補正
+        adjusted_fill = xpbar_w * xp_fill
+        # 角丸による「実効的な短縮」を補償
+        if xp_fill < 0.2:  # 20%未満の場合
+            # 小さい値では角丸の影響が大きいので少し広げる
+            compensation = (0.2 - xp_fill) * bar_radius * 0.3
+            adjusted_fill += compensation
+        
+        fill_w = min(int(adjusted_fill), xpbar_w)
     
     # 背景バー（グラデーション）
     bg_gradient = gradient_rect((xpbar_w, xpbar_h), 
@@ -738,17 +738,19 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             top_color = (255, 200, 60, 255)
             bottom_color = (200, 150, 30, 255)
         
-        # 進行バーの角丸半径を動的計算
-        # fill_wが小さい時は角丸半径も比例して小さくする
-        if fill_w <= bar_radius:
-            # 非常に小さい場合は角丸なしに近づける
-            progress_radius = max(1, fill_w // 3)
-        elif fill_w <= bar_radius * 2:
-            # 小さい場合は半径を制限
-            progress_radius = min(fill_w // 2, bar_radius // 2)
+        # 進行バーの角丸半径を精密計算
+        if fill_w <= 8:
+            # 極小の場合：角丸をほぼなくす
+            progress_radius = 2
+        elif fill_w <= bar_radius:
+            # 小さい場合：半径を大幅削減
+            progress_radius = max(3, fill_w // 4)
+        elif fill_w <= bar_radius * 1.5:
+            # 中小の場合：半径を制限
+            progress_radius = max(5, min(fill_w // 3, bar_radius // 2))
         else:
-            # 十分大きい場合は元の半径を使用
-            progress_radius = bar_radius
+            # 十分大きい場合：元の半径だが少し控えめに
+            progress_radius = min(bar_radius, fill_w // 2)
         
         xp_gradient = gradient_rect((fill_w, xpbar_h), 
                                    top_color, bottom_color, 
