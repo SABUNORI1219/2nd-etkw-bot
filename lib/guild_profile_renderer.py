@@ -752,10 +752,26 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             # 十分大きい場合：元の半径だが少し控えめに
             progress_radius = min(bar_radius, fill_w // 2)
         
+        # 進行バーを生成
         xp_gradient = gradient_rect((fill_w, xpbar_h), 
                                    top_color, bottom_color, 
                                    radius=progress_radius)
-        img.paste(xp_gradient, (xpbar_x, xpbar_y), mask=xp_gradient)
+        
+        # はみ出し防止用のマスクを作成（背景バーと同じ形状）
+        mask_img = Image.new("L", (xpbar_w, xpbar_h), 0)
+        mask_draw = ImageDraw.Draw(mask_img)
+        mask_draw.rounded_rectangle([0, 0, xpbar_w, xpbar_h], radius=bar_radius, fill=255)
+        
+        # 進行バーをバー領域内にクリップして描画
+        # 進行バー用の一時画像を作成
+        temp_progress = Image.new("RGBA", (xpbar_w, xpbar_h), (0, 0, 0, 0))
+        temp_progress.paste(xp_gradient, (0, 0), mask=xp_gradient)
+        
+        # マスクを適用してはみ出し部分をカット
+        temp_progress.putalpha(mask_img)
+        
+        # 最終的に貼り付け
+        img.paste(temp_progress, (xpbar_x, xpbar_y), mask=temp_progress)
     
     # バーの境界線
     draw.rounded_rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], 
