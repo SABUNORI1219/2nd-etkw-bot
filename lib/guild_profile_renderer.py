@@ -758,20 +758,22 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
                                    radius=progress_radius)
         
         # はみ出し防止用のマスクを作成（背景バーと同じ形状）
+        # アンチエイリアシング用に少し大きめに作成
         mask_img = Image.new("L", (xpbar_w, xpbar_h), 0)
         mask_draw = ImageDraw.Draw(mask_img)
-        mask_draw.rounded_rectangle([0, 0, xpbar_w, xpbar_h], radius=bar_radius, fill=255)
+        mask_draw.rounded_rectangle([0, 0, xpbar_w-1, xpbar_h-1], radius=bar_radius, fill=255)
         
         # 進行バーをバー領域内にクリップして描画
-        # 進行バー用の一時画像を作成
+        # 進行バー用の一時画像を作成（背景バーと同サイズ）
         temp_progress = Image.new("RGBA", (xpbar_w, xpbar_h), (0, 0, 0, 0))
         temp_progress.paste(xp_gradient, (0, 0), mask=xp_gradient)
         
-        # マスクを適用してはみ出し部分をカット
-        temp_progress.putalpha(mask_img)
+        # マスクを適用してはみ出し部分をカット（アンチエイリアシング適用）
+        # 背景色を透明ではなく背景バーの色に設定
+        masked_progress = Image.composite(temp_progress, Image.new("RGBA", (xpbar_w, xpbar_h), (0, 0, 0, 0)), mask_img)
         
         # 最終的に貼り付け
-        img.paste(temp_progress, (xpbar_x, xpbar_y), mask=temp_progress)
+        img.paste(masked_progress, (xpbar_x, xpbar_y), mask=masked_progress)
     
     # バーの境界線
     draw.rounded_rectangle([xpbar_x, xpbar_y, xpbar_x + xpbar_w, xpbar_y + xpbar_h], 
