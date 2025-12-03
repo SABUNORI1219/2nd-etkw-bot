@@ -694,7 +694,26 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
     
     # XP進行度の計算
     xp_fill = float(xpPercent) / 100.0 if xpPercent else 0
-    fill_w = int(xpbar_w * xp_fill)
+    
+    # 角丸矩形の実際の描画可能領域を計算
+    # 角丸部分を除いた直線部分の長さ
+    usable_width = max(0, xpbar_w - (2 * bar_radius))
+    # 角丸部分での描画可能な追加長さ（半径分）
+    corner_width = bar_radius
+    # 総描画可能幅
+    total_usable_width = usable_width + (2 * corner_width)
+    
+    # 実際のfill幅を計算（角丸を考慮）
+    raw_fill_w = total_usable_width * xp_fill
+    
+    # 最小描画幅（角丸が破綻しない範囲）
+    min_fill_w = bar_radius if xp_fill > 0 else 0
+    
+    # 実際の描画幅を決定
+    if raw_fill_w < min_fill_w:
+        fill_w = 0  # 最小幅未満なら描画しない
+    else:
+        fill_w = min(int(raw_fill_w), xpbar_w)  # 最大でもバー幅まで
     
     # 背景バー（グラデーション）
     bg_gradient = gradient_rect((xpbar_w, xpbar_h), 
@@ -719,15 +738,17 @@ async def create_guild_image(guild_data: Dict[str, Any], banner_renderer, max_wi
             top_color = (255, 200, 60, 255)
             bottom_color = (200, 150, 30, 255)
         
-        # 進行バーの角丸半径を幅に応じて調整（枠内に収まるように）
-        # より安全な計算：最小半径と幅制限を組み合わせ
-        safe_radius = min(
-            bar_radius,          # 元の半径
-            fill_w // 2 if fill_w > 2 else 1,  # 幅の半分（最小1）
-            xpbar_h // 2         # 高さの半分
-        )
-        # さらに安全のため、最大でもバーの高さの40%に制限
-        progress_radius = min(safe_radius, int(xpbar_h * 0.4))
+        # 進行バーの角丸半径を動的計算
+        # fill_wが小さい時は角丸半径も比例して小さくする
+        if fill_w <= bar_radius:
+            # 非常に小さい場合は角丸なしに近づける
+            progress_radius = max(1, fill_w // 3)
+        elif fill_w <= bar_radius * 2:
+            # 小さい場合は半径を制限
+            progress_radius = min(fill_w // 2, bar_radius // 2)
+        else:
+            # 十分大きい場合は元の半径を使用
+            progress_radius = bar_radius
         
         xp_gradient = gradient_rect((fill_w, xpbar_h), 
                                    top_color, bottom_color, 
