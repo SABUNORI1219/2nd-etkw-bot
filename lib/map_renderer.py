@@ -228,7 +228,7 @@ class MapRenderer:
                         # ギルド名の下に時間を表示
                         time_y = center_y + scaled_font_size // 2 + 2
                         draw.text(
-                            (center_x, time_y),
+                            (center_x, time_y + 3),
                             time_text,
                             font=time_font,
                             fill=(200, 200, 200),
