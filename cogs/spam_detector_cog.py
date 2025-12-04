@@ -94,32 +94,14 @@ class SpamDetectorCog(commands.Cog):
             embed.set_thumbnail(url=member.display_avatar.url)
             embed.timestamp = current_time
             
-            # そのVCのテキストチャンネルに送信
-            text_channel = after.channel.guild.get_channel(after.channel.id)
-            if hasattr(after.channel, 'category') and after.channel.category:
-                # カテゴリ内で同じ名前のテキストチャンネルを探す
-                for channel in after.channel.category.text_channels:
-                    if channel.name.lower() == after.channel.name.lower().replace(' ', '-'):
-                        text_channel = channel
-                        break
-                else:
-                    # 見つからない場合は、そのVCに権限のあるテキストチャンネルを探す
-                    for channel in after.channel.guild.text_channels:
-                        if channel.permissions_for(member).send_messages:
-                            # VCと同じカテゴリのテキストチャンネルを優先
-                            if hasattr(channel, 'category') and channel.category == after.channel.category:
-                                text_channel = channel
-                                break
-            
-            # テキストチャンネルが見つかった場合のみ送信
-            if text_channel and isinstance(text_channel, discord.TextChannel):
-                try:
-                    await text_channel.send(embed=embed)
-                    logger.info(f"--- [VCNotify] {member.display_name} が {after.channel.name} に参加 -> {text_channel.name} に通知送信")
-                except discord.Forbidden:
-                    logger.warning(f"--- [VCNotify] {text_channel.name} に送信権限がありません")
-                except Exception as e:
-                    logger.error(f"--- [VCNotify] 通知送信エラー: {e}")
+            # そのVCのチャットに送信
+            try:
+                await after.channel.send(embed=embed)
+                logger.info(f"--- [VCNotify] {member.display_name} が {after.channel.name} に参加 -> VCチャットに通知送信")
+            except discord.Forbidden:
+                logger.warning(f"--- [VCNotify] {after.channel.name} のVCチャットに送信権限がありません")
+            except Exception as e:
+                logger.error(f"--- [VCNotify] 通知送信エラー: {e}")
         
         # VC退室の場合
         elif before.channel is not None and after.channel is None:
@@ -146,32 +128,14 @@ class SpamDetectorCog(commands.Cog):
             embed.set_thumbnail(url=member.display_avatar.url)
             embed.timestamp = current_time
             
-            # そのVCのテキストチャンネルに送信
-            text_channel = before.channel.guild.get_channel(before.channel.id)
-            if hasattr(before.channel, 'category') and before.channel.category:
-                # カテゴリ内で同じ名前のテキストチャンネルを探す
-                for channel in before.channel.category.text_channels:
-                    if channel.name.lower() == before.channel.name.lower().replace(' ', '-'):
-                        text_channel = channel
-                        break
-                else:
-                    # 見つからない場合は、そのVCに権限のあるテキストチャンネルを探す
-                    for channel in before.channel.guild.text_channels:
-                        if channel.permissions_for(member).send_messages:
-                            # VCと同じカテゴリのテキストチャンネルを優先
-                            if hasattr(channel, 'category') and channel.category == before.channel.category:
-                                text_channel = channel
-                                break
-            
-            # テキストチャンネルが見つかった場合のみ送信
-            if text_channel and isinstance(text_channel, discord.TextChannel):
-                try:
-                    await text_channel.send(embed=embed)
-                    logger.info(f"--- [VCNotify] {member.display_name} が {before.channel.name} から退室 -> {text_channel.name} に通知送信")
-                except discord.Forbidden:
-                    logger.warning(f"--- [VCNotify] {text_channel.name} に送信権限がありません")
-                except Exception as e:
-                    logger.error(f"--- [VCNotify] 通知送信エラー: {e}")
+            # そのVCのチャットに送信
+            try:
+                await before.channel.send(embed=embed)
+                logger.info(f"--- [VCNotify] {member.display_name} が {before.channel.name} から退室 -> VCチャットに通知送信")
+            except discord.Forbidden:
+                logger.warning(f"--- [VCNotify] {before.channel.name} のVCチャットに送信権限がありません")
+            except Exception as e:
+                logger.error(f"--- [VCNotify] 通知送信エラー: {e}")
         
         # VC移動の場合（参加→別のVCに移動）
         elif before.channel is not None and after.channel is not None and before.channel != after.channel:
@@ -199,32 +163,14 @@ class SpamDetectorCog(commands.Cog):
             embed.set_thumbnail(url=member.display_avatar.url)
             embed.timestamp = current_time
             
-            # 移動先VCのテキストチャンネルに送信
-            text_channel = after.channel.guild.get_channel(after.channel.id)
-            if hasattr(after.channel, 'category') and after.channel.category:
-                # カテゴリ内で同じ名前のテキストチャンネルを探す
-                for channel in after.channel.category.text_channels:
-                    if channel.name.lower() == after.channel.name.lower().replace(' ', '-'):
-                        text_channel = channel
-                        break
-                else:
-                    # 見つからない場合は、そのVCに権限のあるテキストチャンネルを探す
-                    for channel in after.channel.guild.text_channels:
-                        if channel.permissions_for(member).send_messages:
-                            # VCと同じカテゴリのテキストチャンネルを優先
-                            if hasattr(channel, 'category') and channel.category == after.channel.category:
-                                text_channel = channel
-                                break
-            
-            # テキストチャンネルが見つかった場合のみ送信
-            if text_channel and isinstance(text_channel, discord.TextChannel):
-                try:
-                    await text_channel.send(embed=embed)
-                    logger.info(f"--- [VCNotify] {member.display_name} が {before.channel.name} から {after.channel.name} に移動 -> {text_channel.name} に通知送信")
-                except discord.Forbidden:
-                    logger.warning(f"--- [VCNotify] {text_channel.name} に送信権限がありません")
-                except Exception as e:
-                    logger.error(f"--- [VCNotify] 通知送信エラー: {e}")
+            # 移動先VCのチャットに送信
+            try:
+                await after.channel.send(embed=embed)
+                logger.info(f"--- [VCNotify] {member.display_name} が {before.channel.name} から {after.channel.name} に移動 -> 移動先VCチャットに通知送信")
+            except discord.Forbidden:
+                logger.warning(f"--- [VCNotify] {after.channel.name} のVCチャットに送信権限がありません")
+            except Exception as e:
+                logger.error(f"--- [VCNotify] 通知送信エラー: {e}")
 
 # セットアップ関数
 async def setup(bot: commands.Bot):
