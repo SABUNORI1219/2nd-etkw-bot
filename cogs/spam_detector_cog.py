@@ -6,7 +6,8 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from config import SPAM_TARGET_USER_IDS
+from config import SPAM_TARGET_USER_IDS, ETKW_SERVER
+from lib.utils import create_embed
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ class SpamDetectorCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.user_message_timestamps = defaultdict(list)
+        self.vc_join_times = {}  # ユーザーのVC参加時間を記録
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
     @commands.Cog.listener()
@@ -68,6 +70,161 @@ class SpamDetectorCog(commands.Cog):
             
             # 一度応答したら、そのユーザーの履歴をリセット
             self.user_message_timestamps[user_id] = []
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        # ETKW_SERVERでない場合は無視
+        if member.guild.id != ETKW_SERVER:
+            return
+        
+        current_time = datetime.utcnow()
+        
+        # VC参加の場合
+        if before.channel is None and after.channel is not None:
+            # 参加時間を記録
+            self.vc_join_times[member.id] = current_time
+            
+            # 緑色のEmbed作成
+            embed = create_embed(
+                title=member.display_name,
+                description=f"Joined `{after.channel.name}`",
+                color=discord.Color.green(),
+                footer_text=f"現在のメンバー数: {len(after.channel.members)}/{after.channel.user_limit if after.channel.user_limit else '∞'}"
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.timestamp = current_time
+            
+            # そのVCのテキストチャンネルに送信
+            text_channel = after.channel.guild.get_channel(after.channel.id)
+            if hasattr(after.channel, 'category') and after.channel.category:
+                # カテゴリ内で同じ名前のテキストチャンネルを探す
+                for channel in after.channel.category.text_channels:
+                    if channel.name.lower() == after.channel.name.lower().replace(' ', '-'):
+                        text_channel = channel
+                        break
+                else:
+                    # 見つからない場合は、そのVCに権限のあるテキストチャンネルを探す
+                    for channel in after.channel.guild.text_channels:
+                        if channel.permissions_for(member).send_messages:
+                            # VCと同じカテゴリのテキストチャンネルを優先
+                            if hasattr(channel, 'category') and channel.category == after.channel.category:
+                                text_channel = channel
+                                break
+            
+            # テキストチャンネルが見つかった場合のみ送信
+            if text_channel and isinstance(text_channel, discord.TextChannel):
+                try:
+                    await text_channel.send(embed=embed)
+                    logger.info(f"--- [VCNotify] {member.display_name} が {after.channel.name} に参加 -> {text_channel.name} に通知送信")
+                except discord.Forbidden:
+                    logger.warning(f"--- [VCNotify] {text_channel.name} に送信権限がありません")
+                except Exception as e:
+                    logger.error(f"--- [VCNotify] 通知送信エラー: {e}")
+        
+        # VC退室の場合
+        elif before.channel is not None and after.channel is None:
+            # 接続時間を計算
+            connection_time = ""
+            if member.id in self.vc_join_times:
+                duration = current_time - self.vc_join_times[member.id]
+                minutes = int(duration.total_seconds() // 60)
+                seconds = int(duration.total_seconds() % 60)
+                if minutes > 0:
+                    connection_time = f" (接続時間: {minutes}分{seconds}秒)"
+                else:
+                    connection_time = f" (接続時間: {seconds}秒)"
+                # 記録を削除
+                del self.vc_join_times[member.id]
+            
+            # 赤色のEmbed作成
+            embed = create_embed(
+                title=member.display_name,
+                description=f"Left `{before.channel.name}`{connection_time}",
+                color=discord.Color.red(),
+                footer_text=f"現在のメンバー数: {len(before.channel.members)}/{before.channel.user_limit if before.channel.user_limit else '∞'}"
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.timestamp = current_time
+            
+            # そのVCのテキストチャンネルに送信
+            text_channel = before.channel.guild.get_channel(before.channel.id)
+            if hasattr(before.channel, 'category') and before.channel.category:
+                # カテゴリ内で同じ名前のテキストチャンネルを探す
+                for channel in before.channel.category.text_channels:
+                    if channel.name.lower() == before.channel.name.lower().replace(' ', '-'):
+                        text_channel = channel
+                        break
+                else:
+                    # 見つからない場合は、そのVCに権限のあるテキストチャンネルを探す
+                    for channel in before.channel.guild.text_channels:
+                        if channel.permissions_for(member).send_messages:
+                            # VCと同じカテゴリのテキストチャンネルを優先
+                            if hasattr(channel, 'category') and channel.category == before.channel.category:
+                                text_channel = channel
+                                break
+            
+            # テキストチャンネルが見つかった場合のみ送信
+            if text_channel and isinstance(text_channel, discord.TextChannel):
+                try:
+                    await text_channel.send(embed=embed)
+                    logger.info(f"--- [VCNotify] {member.display_name} が {before.channel.name} から退室 -> {text_channel.name} に通知送信")
+                except discord.Forbidden:
+                    logger.warning(f"--- [VCNotify] {text_channel.name} に送信権限がありません")
+                except Exception as e:
+                    logger.error(f"--- [VCNotify] 通知送信エラー: {e}")
+        
+        # VC移動の場合（参加→別のVCに移動）
+        elif before.channel is not None and after.channel is not None and before.channel != after.channel:
+            # 移動時間を計算
+            connection_time = ""
+            if member.id in self.vc_join_times:
+                duration = current_time - self.vc_join_times[member.id]
+                minutes = int(duration.total_seconds() // 60)
+                seconds = int(duration.total_seconds() % 60)
+                if minutes > 0:
+                    connection_time = f" (滞在時間: {minutes}分{seconds}秒)"
+                else:
+                    connection_time = f" (滞在時間: {seconds}秒)"
+            
+            # 新しいVCの参加時間を記録
+            self.vc_join_times[member.id] = current_time
+            
+            # 青色のEmbed作成（移動を示す）
+            embed = create_embed(
+                title=member.display_name,
+                description=f"Moved from `{before.channel.name}` to `{after.channel.name}`{connection_time}",
+                color=discord.Color.blue(),
+                footer_text=f"移動先メンバー数: {len(after.channel.members)}/{after.channel.user_limit if after.channel.user_limit else '∞'}"
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.timestamp = current_time
+            
+            # 移動先VCのテキストチャンネルに送信
+            text_channel = after.channel.guild.get_channel(after.channel.id)
+            if hasattr(after.channel, 'category') and after.channel.category:
+                # カテゴリ内で同じ名前のテキストチャンネルを探す
+                for channel in after.channel.category.text_channels:
+                    if channel.name.lower() == after.channel.name.lower().replace(' ', '-'):
+                        text_channel = channel
+                        break
+                else:
+                    # 見つからない場合は、そのVCに権限のあるテキストチャンネルを探す
+                    for channel in after.channel.guild.text_channels:
+                        if channel.permissions_for(member).send_messages:
+                            # VCと同じカテゴリのテキストチャンネルを優先
+                            if hasattr(channel, 'category') and channel.category == after.channel.category:
+                                text_channel = channel
+                                break
+            
+            # テキストチャンネルが見つかった場合のみ送信
+            if text_channel and isinstance(text_channel, discord.TextChannel):
+                try:
+                    await text_channel.send(embed=embed)
+                    logger.info(f"--- [VCNotify] {member.display_name} が {before.channel.name} から {after.channel.name} に移動 -> {text_channel.name} に通知送信")
+                except discord.Forbidden:
+                    logger.warning(f"--- [VCNotify] {text_channel.name} に送信権限がありません")
+                except Exception as e:
+                    logger.error(f"--- [VCNotify] 通知送信エラー: {e}")
 
 # セットアップ関数
 async def setup(bot: commands.Bot):

@@ -173,13 +173,16 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
         prev_lastjoin = previous_lastjoin.get(mcid)
         prev_playtime = previous_playtime.get(mcid, 0)
         
-        # 前回のlastJoinと異なる場合のみチェック
+        # lastJoinの更新判定
         if prev_lastjoin != last_join:
             playtime_diff = playtime - prev_playtime
             
-            # playtimeが0.083以上増加している場合、または初回記録の場合にlastJoinを更新
-            if prev_lastjoin is None or playtime_diff >= 0.083:
+            # playtimeが0.167以上増加している場合（約10分）、または初回記録の場合にlastJoinを更新
+            if prev_lastjoin is None or playtime_diff >= 0.167:
                 lastjoin_updates.append((mcid, last_join))
+                logger.debug(f"[LastJoin更新対象] {mcid}: playtime差={playtime_diff:.3f}時間")
+            else:
+                logger.debug(f"[LastJoin更新除外] {mcid}: playtime差={playtime_diff:.3f}時間 < 0.167時間")
         else:
             # lastJoinが同じ場合は更新しない
             logger.debug(f"[LastJoin変更なし] {mcid}")
@@ -191,7 +194,7 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
     
     if lastjoin_updates:
         upsert_last_join_cache(lastjoin_updates)
-        logger.info(f"lastJoin更新: {len(lastjoin_updates)}件")
+        logger.info(f"lastJoin更新: {len(lastjoin_updates)}件 - {[mcid for mcid, _ in lastjoin_updates]}")
     else:
         logger.info("lastJoin更新対象なし")
 
