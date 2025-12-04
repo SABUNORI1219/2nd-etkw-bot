@@ -13,6 +13,8 @@ from lib.utils import create_embed
 
 logger = logging.getLogger(__name__)
 
+@app_commands.allowed_installs(guilds=True, users=True)
+@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 class GuildImageCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot

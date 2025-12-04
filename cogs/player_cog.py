@@ -248,6 +248,8 @@ class PlayerSelectView(discord.ui.View):
         await self.cog_instance.handle_player_data(interaction, data, use_edit=True)
         await self.cleanup_emojis()
 
+@app_commands.allowed_installs(guilds=True, users=True)
+@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 class PlayerCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
