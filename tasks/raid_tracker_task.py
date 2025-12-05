@@ -177,12 +177,12 @@ async def get_all_players_lastjoin_and_playtime(api, mcid_uuid_list, batch_size=
         if prev_lastjoin != last_join:
             playtime_diff = playtime - prev_playtime
             
-            # playtimeが0.167以上増加している場合（約10分）、または初回記録の場合にlastJoinを更新
-            if prev_lastjoin is None or playtime_diff >= 0.167:
+            # playtimeが約5分以上増加している場合、または初回記録の場合にlastJoinを更新
+            if prev_lastjoin is None or playtime_diff >= 0.083:
                 lastjoin_updates.append((mcid, last_join))
                 logger.debug(f"[LastJoin更新対象] {mcid}: playtime差={playtime_diff:.3f}時間")
             else:
-                logger.debug(f"[LastJoin更新除外] {mcid}: playtime差={playtime_diff:.3f}時間 < 0.167時間")
+                logger.debug(f"[LastJoin更新除外] {mcid}: playtime差={playtime_diff:.3f}時間 < 0.083時間")
         else:
             # lastJoinが同じ場合は更新しない
             logger.debug(f"[LastJoin変更なし] {mcid}")
