@@ -149,15 +149,16 @@ class SpamDetectorCog(commands.Cog):
             logger.info(f"--- [TerritoryLoss] ✅ 監視対象領地を確認: {territory_name}")
             
             # 正規表現で奪取ギルドを抽出
-            # パターン: "Empire of TKW (61 -> 60) -> Bruhters (0 -> 1)"
+            # パターン: "**Empire of TKW** (61 -> 60) -> Magic Cake (0 -> 1)"
             # "->"の後のギルド名を抽出
-            attacker_match = re.search(r'-> ([^(]+) \(\d+ -> \d+\)$', field_value)
+            attacker_match = re.search(r'-> ([^(]+) \(\d+ -> \d+\)$', field_value, re.MULTILINE)
             
             if not attacker_match:
                 logger.warning(f"--- [TerritoryLoss] 領地奪取情報の解析に失敗: {field_value}")
                 # パターンマッチングのデバッグ用に追加パターンも試す
                 logger.info(f"--- [TerritoryLoss] 代替パターンを試行中...")
-                alt_match = re.search(r'-> (.+?) \(', field_value)
+                # より正確な代替パターン: ") -> " の後から " (" の前まで
+                alt_match = re.search(r'\) -> ([^(]+) \(', field_value)
                 if alt_match:
                     logger.info(f"--- [TerritoryLoss] 代替パターンで検出: {alt_match.group(1)}")
                     attacker_guild = alt_match.group(1).strip()
@@ -202,7 +203,6 @@ class SpamDetectorCog(commands.Cog):
                 value=f"<t:{int(datetime.utcnow().timestamp())}:R>",
                 inline=False
             )
-            notification_embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/1395325625522458654.png")  # Emerald絵文字
             notification_embed.timestamp = datetime.utcnow()
             
             try:
