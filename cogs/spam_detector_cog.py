@@ -35,8 +35,8 @@ class SpamDetectorCog(commands.Cog):
             if message.author == self.bot.user:
                 return
 
-            # 領地奪取監視機能（一時的に無効化）
-            # await self._check_territory_loss(message)
+            # 領地奪取監視機能（簡易版テスト）
+            await self._check_territory_loss(message)
 
             # 以下は既存のスパム検知機能
             # 監視対象のユーザーでなければ、何もしない
@@ -88,10 +88,25 @@ class SpamDetectorCog(commands.Cog):
     async def _check_territory_loss(self, message: discord.Message):
         """領地奪取監視機能（簡素版テスト）"""
         try:
-            # 最低限のログのみ
-            if message.channel.id == TERRITORY_MONITOR_CHANNEL and message.author.bot:
-                logger.info(f"--- [TerritoryLoss] テスト: チャンネル一致・Bot投稿を確認")
-                return
+            # 全てのメッセージについてログ出力
+            logger.info(f"--- [TerritoryLoss] 簡易版: チャンネルID={message.channel.id}, Bot={message.author.bot}, 作者={message.author.name}")
+            
+            # 設定値の確認
+            logger.info(f"--- [TerritoryLoss] 監視対象チャンネル: {TERRITORY_MONITOR_CHANNEL}")
+            
+            # チャンネル条件のチェック
+            if message.channel.id == TERRITORY_MONITOR_CHANNEL:
+                logger.info(f"--- [TerritoryLoss] ✅ チャンネル条件一致!")
+                if message.author.bot:
+                    logger.info(f"--- [TerritoryLoss] ✅ Bot投稿確認! Embedあり: {len(message.embeds) > 0}")
+                    if message.embeds:
+                        embed = message.embeds[0]
+                        logger.info(f"--- [TerritoryLoss] Embedタイトル: '{embed.title}'")
+                else:
+                    logger.info(f"--- [TerritoryLoss] ❌ Bot以外の投稿")
+            else:
+                logger.debug(f"--- [TerritoryLoss] チャンネル不一致: {message.channel.id} != {TERRITORY_MONITOR_CHANNEL}")
+                
         except Exception as e:
             logger.error(f"--- [TerritoryLoss] 簡素版で例外: {e}", exc_info=True)
 
