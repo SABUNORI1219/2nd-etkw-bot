@@ -83,30 +83,47 @@ class SpamDetectorCog(commands.Cog):
 
     async def _check_territory_loss(self, message: discord.Message):
         """領地奪取監視機能"""
+        # デバッグログ追加
+        logger.info(f"--- [TerritoryLoss] メッセージ受信: チャンネルID={message.channel.id}, 作者={message.author.name}, Bot={message.author.bot}")
+        
         # 指定されたチャンネルでなければ無視
         if message.channel.id != TERRITORY_MONITOR_CHANNEL:
+            logger.debug(f"--- [TerritoryLoss] チャンネル不一致: {message.channel.id} != {TERRITORY_MONITOR_CHANNEL}")
             return
+        
+        logger.info(f"--- [TerritoryLoss] 監視チャンネルでのメッセージを検出")
         
         # Botのメッセージに限定（別Botの通知）
         if not message.author.bot:
+            logger.debug(f"--- [TerritoryLoss] Bot以外のメッセージのためスキップ")
             return
+        
+        logger.info(f"--- [TerritoryLoss] Botからのメッセージを確認")
         
         # Embedがない場合は無視
         if not message.embeds:
+            logger.debug(f"--- [TerritoryLoss] Embedなしのためスキップ")
             return
         
         embed = message.embeds[0]
+        logger.info(f"--- [TerritoryLoss] Embed検出: title='{embed.title}', fields={len(embed.fields) if embed.fields else 0}個")
         
         # タイトルが"🔴 Territory Lost"かどうかチェック
         if not embed.title or "🔴 Territory Lost" not in embed.title:
+            logger.debug(f"--- [TerritoryLoss] タイトル不一致: '{embed.title}'")
             return
+        
+        logger.info(f"--- [TerritoryLoss] 領地喪失Embedを確認")
         
         # フィールドから情報を抽出
         if not embed.fields:
+            logger.warning(f"--- [TerritoryLoss] フィールドが存在しません")
             return
         
         territory_name = embed.fields[0].name if embed.fields[0].name else "不明"
         field_value = embed.fields[0].value if embed.fields[0].value else ""
+        
+        logger.info(f"--- [TerritoryLoss] フィールド抽出: territory='{territory_name}', value='{field_value}'")
         
         # 正規表現で奪取ギルドを抽出
         # パターン: "Empire of TKW (61 -> 60) -> Bruhters (0 -> 1)"
@@ -115,6 +132,13 @@ class SpamDetectorCog(commands.Cog):
         
         if not attacker_match:
             logger.warning(f"--- [TerritoryLoss] 領地奪取情報の解析に失敗: {field_value}")
+            # パターンマッチングのデバッグ用に追加パターンも試す
+            logger.info(f"--- [TerritoryLoss] 代替パターンを試行中...")
+            alt_match = re.search(r'-> (.+?) \(', field_value)
+            if alt_match:
+                logger.info(f"--- [TerritoryLoss] 代替パターンで検出: {alt_match.group(1)}")
+            else:
+                logger.warning(f"--- [TerritoryLoss] 代替パターンでも抽出失敗")
             return
         
         attacker_guild = attacker_match.group(1).strip()
@@ -127,13 +151,15 @@ class SpamDetectorCog(commands.Cog):
             logger.error(f"--- [TerritoryLoss] 通知チャンネルが見つかりません: {TERRITORY_LOSS_NOTIFICATION_CHANNEL}")
             return
         
+        logger.info(f"--- [TerritoryLoss] 通知チャンネル確認: {notification_channel.name}")
+        
         # メンション文字列を作成
         mentions = " ".join([f"<@{user_id}>" for user_id in TERRITORY_LOSS_MENTION_USERS])
         
         # 通知用Embedを作成
         notification_embed = create_embed(
             title="領地が奪われたよ！起きよう！",
-            description=f"**{territory_name}**が**{attacker_guild}**に奪われました！",
+            description=f"**{territory_name}**が**{attacker_guild}**に奪われたよ！",
             color=discord.Color.red(),
             footer_text="Territory Monitor | Minister Chikuwa"
         )
@@ -156,6 +182,7 @@ class SpamDetectorCog(commands.Cog):
         notification_embed.timestamp = datetime.utcnow()
         
         try:
+            logger.info(f"--- [TerritoryLoss] 通知送信試行中...")
             await notification_channel.send(content=mentions, embed=notification_embed)
             logger.info(f"--- [TerritoryLoss] 通知送信完了: {territory_name} -> {attacker_guild}")
         except Exception as e:
