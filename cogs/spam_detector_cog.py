@@ -122,36 +122,24 @@ class SpamDetectorCog(commands.Cog):
                 return
             
             embed = message.embeds[0]
-            logger.info(f"--- [TerritoryLoss] Embed検出: title='{embed.title}', fields={len(embed.fields) if embed.fields else 0}個")
             
             # タイトルが"Territory Lost"を含むかチェック（**も考慮）
             if not embed.title or "Territory Lost" not in embed.title:
-                logger.debug(f"--- [TerritoryLoss] タイトル不一致: '{embed.title}'")
                 return
-            
-            logger.info(f"--- [TerritoryLoss] ✅ 領地喪失Embedを確認しました！")
             
             # フィールドから情報を抽出
             if not embed.fields:
-                logger.warning(f"--- [TerritoryLoss] フィールドが存在しません")
                 return
             
             territory_name = embed.fields[0].name if embed.fields[0].name else "不明"
             field_value = embed.fields[0].value if embed.fields[0].value else ""
             
-            logger.info(f"--- [TerritoryLoss] フィールド抽出: territory='{territory_name}', value='{field_value}'")
-            
             # 監視対象の領地かどうかをチェック
             if territory_name not in MONITORED_TERRITORIES:
-                logger.info(f"--- [TerritoryLoss] 監視対象外の領地のためスキップ: {territory_name}")
                 return
             
-            logger.info(f"--- [TerritoryLoss] ✅ 監視対象領地を確認: {territory_name}")
-            
             # 正規表現で奪取ギルドを抽出
-            # パターン: "**Empire of TKW** (61 -> 60) -> Magic Cake (0 -> 1)"
-            # "->"の後のギルド名を抽出
-            attacker_match = re.search(r'-> ([^(]+) \(\d+ -> \d+\)$', field_value, re.MULTILINE)
+            attacker_match = re.search(r'->\s*([^(]+?)\s*\(\d+\s*->\s*\d+\)', field_value)
             
             if not attacker_match:
                 logger.warning(f"--- [TerritoryLoss] 領地奪取情報の解析に失敗: {field_value}")
@@ -168,15 +156,11 @@ class SpamDetectorCog(commands.Cog):
             else:
                 attacker_guild = attacker_match.group(1).strip()
             
-            logger.info(f"--- [TerritoryLoss] 領地奪取を検出: {territory_name} -> {attacker_guild}")
-            
             # 通知用チャンネルを取得
             notification_channel = self.bot.get_channel(TERRITORY_LOSS_NOTIFICATION_CHANNEL)
             if not notification_channel:
                 logger.error(f"--- [TerritoryLoss] 通知チャンネルが見つかりません: {TERRITORY_LOSS_NOTIFICATION_CHANNEL}")
                 return
-            
-            logger.info(f"--- [TerritoryLoss] 通知チャンネル確認: {notification_channel.name}")
             
             # メンション文字列を作成
             mentions = " ".join([f"<@{user_id}>" for user_id in TERRITORY_LOSS_MENTION_USERS])
@@ -189,17 +173,17 @@ class SpamDetectorCog(commands.Cog):
                 footer_text="Territory Monitor | Minister Chikuwa"
             )
             notification_embed.add_field(
-                name="🏰 どの領地！？",
+                name="どの領地！？",
                 value=f"`{territory_name}`",
                 inline=False
             )
             notification_embed.add_field(
-                name="⚔️ どこのギルド！？",
+                name="どこのギルド！？",
                 value=f"`{attacker_guild}`",
                 inline=False
             )
             notification_embed.add_field(
-                name="🕐 いつ！？",
+                name="いつ！？",
                 value=f"<t:{int(datetime.utcnow().timestamp())}:R>",
                 inline=False
             )
