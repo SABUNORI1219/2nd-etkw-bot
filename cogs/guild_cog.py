@@ -13,8 +13,6 @@ from lib.utils import create_embed
 
 logger = logging.getLogger(__name__)
 
-@app_commands.allowed_installs(guilds=True, users=True)
-@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 class GuildImageCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -34,6 +32,8 @@ class GuildImageCog(commands.Cog):
                 return default
         return v if v is not None else default
 
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.command(name="guild", description="ギルドのステータスカードを表示")
     @app_commands.describe(guild="Name or Prefix")

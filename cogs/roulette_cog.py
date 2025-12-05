@@ -11,8 +11,6 @@ from lib.utils import create_embed
 
 logger = logging.getLogger(__name__)
 
-@app_commands.allowed_installs(guilds=True, users=True)
-@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 class RouletteCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -20,6 +18,8 @@ class RouletteCog(commands.Cog):
         self.system_name = "ルーレット"
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.checks.cooldown(1, 20.0)
     @app_commands.command(name="roulette", description="ルーレットを回してランダムに一つを当選")
     @app_commands.describe(

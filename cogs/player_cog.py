@@ -248,8 +248,6 @@ class PlayerSelectView(discord.ui.View):
         await self.cog_instance.handle_player_data(interaction, data, use_edit=True)
         await self.cleanup_emojis()
 
-@app_commands.allowed_installs(guilds=True, users=True)
-@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 class PlayerCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -336,7 +334,9 @@ class PlayerCog(commands.Cog):
                 try: file.close()
                 except Exception: pass
             gc.collect()
-
+    
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.command(name="player", description="プレイヤーのプロファイルカードを表示")
     @app_commands.describe(player="MCID or UUID")

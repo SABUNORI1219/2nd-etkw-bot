@@ -187,13 +187,13 @@ class HelpView(discord.ui.View):
         for item in self.children:
             item.disabled = True
 
-@app_commands.allowed_installs(guilds=True, users=True)
-@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 class HelpCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
+    @app_commands.allowed_installs(guilds=True, users=True)
+    @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.command(name="help", description="Botのコマンド一覧を表示")
     async def help(self, interaction: discord.Interaction):
