@@ -135,6 +135,9 @@ async def notify_member_removed(bot, member_data):
     discord_id = member_data.get('discord_id')
     mcid = member_data.get('mcid')
     
+    # DM通知を送信するかどうかのフラグ
+    should_send_dm = False
+    
     if discord_id and mcid:
         # last_join_cacheから最終ログイン時刻を取得
         last_join_data = get_last_join_cache_for_members([mcid])
@@ -151,14 +154,15 @@ async def notify_member_removed(bot, member_data):
                 
                 if days_since_last_join >= 7:
                     role_id_to_add = LONG_ABSENCE_ROLE_ID
-                    logger.info(f"[MemberRemoved] {mcid}: {days_since_last_join}日前が最終ログイン → 長期非アクティブロール付与")
+                    should_send_dm = True  # 1週間以上非アクティブの場合のみDM送信
+                    logger.info(f"[MemberRemoved] {mcid}: {days_since_last_join}日前が最終ログイン → 長期非アクティブロール付与 + DM送信")
                 else:
-                    logger.info(f"[MemberRemoved] {mcid}: {days_since_last_join}日前が最終ログイン → 短期非アクティブロール付与")
+                    logger.info(f"[MemberRemoved] {mcid}: {days_since_last_join}日前が最終ログイン → 短期非アクティブロール付与 (DM送信なし)")
                     
             except Exception as e:
-                logger.warning(f"[MemberRemoved] {mcid}: lastJoin解析失敗 ({last_join_str}) → デフォルトロール付与: {e}")
+                logger.warning(f"[MemberRemoved] {mcid}: lastJoin解析失敗 ({last_join_str}) → デフォルトロール付与 (DM送信なし): {e}")
         else:
-            logger.info(f"[MemberRemoved] {mcid}: lastJoinデータなし → デフォルトロール付与")
+            logger.info(f"[MemberRemoved] {mcid}: lastJoinデータなし → デフォルトロール付与 (DM送信なし)")
         
         guild = bot.get_guild(ETKW_SERVER)
         if guild:
@@ -172,28 +176,32 @@ async def notify_member_removed(bot, member_data):
                     except Exception as e:
                         logger.warning(f"ロール追加失敗: {e}")
 
-        user = bot.get_user(int(discord_id))
-        embed_dm = make_japanese_embed()
-        dm_failed = False
-        try:
-            logger.info("脱退通知Embedを該当メンバーに送信しました。")
-            await user.send(embed=embed_dm, view=LanguageSwitchView())
-        except Exception as e:
-            logger.warning(f"DM送信失敗: {e}")
-            dm_failed = True
+        # 1週間以上非アクティブだった場合のみDM送信
+        if should_send_dm:
+            user = bot.get_user(int(discord_id))
+            embed_dm = make_japanese_embed()
+            dm_failed = False
+            try:
+                logger.info("脱退通知Embedを該当メンバー(1週間以上非アクティブ)に送信しました。")
+                await user.send(embed=embed_dm, view=LanguageSwitchView())
+            except Exception as e:
+                logger.warning(f"DM送信失敗: {e}")
+                dm_failed = True
 
-        if dm_failed:
-            backup_channel_id = 1271174069433274399
-            backup_channel = bot.get_channel(backup_channel_id)
-            if backup_channel:
-                logger.info("inactiveチャンネルに脱退通知Embedを該当メンバーに送信しました。")
-                await backup_channel.send(
-                    content=f"<@{discord_id}>",
-                    embed=embed_dm,
-                    view=LanguageSwitchView()
-                )
-            else:
-                logger.warning(f"バックアップ通知チャンネル({backup_channel_id})が見つかりません")
+            if dm_failed:
+                backup_channel_id = 1271174069433274399
+                backup_channel = bot.get_channel(backup_channel_id)
+                if backup_channel:
+                    logger.info("inactiveチャンネルに脱退通知Embedを該当メンバー(1週間以上非アクティブ)に送信しました。")
+                    await backup_channel.send(
+                        content=f"<@{discord_id}>",
+                        embed=embed_dm,
+                        view=LanguageSwitchView()
+                    )
+                else:
+                    logger.warning(f"バックアップ通知チャンネル({backup_channel_id})が見つかりません")
+        else:
+            logger.info(f"[MemberRemoved] {mcid}: 1週間未満の非アクティブまたはデータ不明のため、DM通知をスキップ")
 
 async def notify_member_left_discord(bot, member_data):
     NOTIFY_CHANNEL_ID = int(get_config("MEMBER_NOTIFY_CHANNEL_ID") or "0")

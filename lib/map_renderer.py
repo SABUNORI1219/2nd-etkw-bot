@@ -63,11 +63,10 @@ class MapRenderer:
         )
         
         if guild_stats:
-            # 上位15ギルドまで表示
-            top_guilds = guild_stats[:15]
+            # 全ギルドを表示
             stats_text = []
             
-            for i, guild in enumerate(top_guilds, 1):
+            for i, guild in enumerate(guild_stats, 1):
                 prefix = guild["prefix"]
                 name = guild["name"]
                 count = guild["count"]
@@ -85,15 +84,6 @@ class MapRenderer:
                 stats_text.append(f"{rank_emoji} **{prefix}** - {count} territories")
             
             embed.description = "\n".join(stats_text)
-            
-            total_territories = sum(g["count"] for g in guild_stats)
-            total_guilds = len(guild_stats)
-            
-            embed.add_field(
-                name="📊 Summary",
-                value=f"**{total_territories}** territories held by **{total_guilds}** guilds",
-                inline=False
-            )
         else:
             embed.description = "No territory data available"
         

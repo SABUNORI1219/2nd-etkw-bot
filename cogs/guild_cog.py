@@ -76,7 +76,7 @@ class GuildImageCog(commands.Cog):
             
             link_embed = create_embed(
                 title="🔗 公式サイトへのリンク",
-                description=f"[**{guild_name}** の公式ページ]({url})",
+                description=f"[**{guild_name}**]({url})",
                 color=discord.Color.blue(),
                 footer_text=f"{self.system_name} | Minister Chikuwa"
             )

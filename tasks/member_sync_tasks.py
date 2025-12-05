@@ -75,15 +75,43 @@ async def member_rank_sync_task(api: WynncraftAPI, bot=None):
                                                 await member.add_roles(etkw_role, reason="ランク同期: ETKWロール付与")
                                             except Exception as e:
                                                 logger.error(f"[MemberSync] ETKWロール付与失敗: {e}")
-                                    # 4. ニックネーム変更（ロール名から[]除去）
-                                    prefix = new_role.name if new_role else api_rank
-                                    prefix = re.sub(r"\s*\[.*?]\s*", " ", prefix).strip()
-                                    new_nick = f"{prefix} {mcid}"
+                                    # 4. ニックネーム変更（既存のニックネームを保持、ランク部分のみ変更）
+                                    current_nick = member.nick or member.display_name
+                                    
+                                    # 新しいランクプレフィックスを作成
+                                    new_prefix = new_role.name if new_role else api_rank
+                                    new_prefix = re.sub(r"\s*\[.*?]\s*", " ", new_prefix).strip()
+                                    
+                                    # 既存のニックネームからランク部分を除去して名前部分を抽出
+                                    # パターン: "<ランク名> <名前>" から名前部分を抽出
+                                    name_part = mcid  # デフォルトはMCID
+                                    
+                                    if current_nick:
+                                        # 既存のランクロール名リストを作成（[]部分を除去したもの）
+                                        rank_prefixes = []
+                                        for role_name in [guild.get_role(rid).name for rid in ROLE_ID_TO_RANK.keys() if guild.get_role(rid)]:
+                                            clean_prefix = re.sub(r"\s*\[.*?]\s*", " ", role_name).strip()
+                                            rank_prefixes.append(clean_prefix)
+                                        
+                                        # 現在のニックネームからランク部分を削除
+                                        temp_name = current_nick
+                                        for rank_prefix in rank_prefixes:
+                                            if temp_name.startswith(rank_prefix + " "):
+                                                temp_name = temp_name[len(rank_prefix + " "):]
+                                                break
+                                        
+                                        # ランク部分が削除されて何かしら残っている場合は、それを名前部分として使用
+                                        if temp_name and temp_name != current_nick:
+                                            name_part = temp_name
+                                    
+                                    new_nick = f"{new_prefix} {name_part}"
                                     if len(new_nick) > 32:
                                         new_nick = new_nick[:32]
+                                    
                                     try:
                                         if not member.guild_permissions.administrator:
-                                            await member.edit(nick=new_nick, reason="ランク同期: ニックネーム更新")
+                                            await member.edit(nick=new_nick, reason="ランク同期: ニックネーム更新（名前部分保持）")
+                                            logger.info(f"[MemberSync] ニックネーム更新: {current_nick} → {new_nick}")
                                     except Exception as e:
                                         logger.error(f"[MemberSync] ニックネーム更新失敗: {e}")
                                     break  # 該当guildで見つかったら終わり
