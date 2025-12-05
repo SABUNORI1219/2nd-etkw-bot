@@ -108,8 +108,8 @@ class SpamDetectorCog(commands.Cog):
         embed = message.embeds[0]
         logger.info(f"--- [TerritoryLoss] Embed検出: title='{embed.title}', fields={len(embed.fields) if embed.fields else 0}個")
         
-        # タイトルが"🔴 Territory Lost"かどうかチェック
-        if not embed.title or "🔴 Territory Lost" not in embed.title:
+        # タイトルが"🔴 Territory Lost"かどうかチェック（**も考慮）
+        if not embed.title or "Territory Lost" not in embed.title:
             logger.debug(f"--- [TerritoryLoss] タイトル不一致: '{embed.title}'")
             return
         
