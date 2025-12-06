@@ -139,22 +139,13 @@ class SpamDetectorCog(commands.Cog):
                 return
             
             # 正規表現で奪取ギルドを抽出
-            attacker_match = re.search(r'->\s*([^(]+?)\s*\(\d+\s*->\s*\d+\)', field_value)
+            attacker_match = re.search(r'.*->\s*([^(]+?)\s*\(\d+\s*->\s*\d+\)', field_value)
             
             if not attacker_match:
                 logger.warning(f"--- [TerritoryLoss] 領地奪取情報の解析に失敗: {field_value}")
-                # パターンマッチングのデバッグ用に追加パターンも試す
-                logger.info(f"--- [TerritoryLoss] 代替パターンを試行中...")
-                # より正確な代替パターン: ") -> " の後から " (" の前まで
-                alt_match = re.search(r'\) -> ([^(]+) \(', field_value)
-                if alt_match:
-                    logger.info(f"--- [TerritoryLoss] 代替パターンで検出: {alt_match.group(1)}")
-                    attacker_guild = alt_match.group(1).strip()
-                else:
-                    logger.warning(f"--- [TerritoryLoss] 代替パターンでも抽出失敗")
-                    return
-            else:
-                attacker_guild = attacker_match.group(1).strip()
+                return
+            
+            attacker_guild = attacker_match.group(1).strip()
             
             # 通知用チャンネルを取得
             notification_channel = self.bot.get_channel(TERRITORY_LOSS_NOTIFICATION_CHANNEL)
