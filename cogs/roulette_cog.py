@@ -2,7 +2,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import random
-import gc
 import logging
 import asyncio
 
@@ -90,8 +89,6 @@ class RouletteCog(commands.Cog):
             embed = create_embed(description="GIF画像の生成に失敗しました。\nもう一度コマンドをお試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
             del embed
-
-        gc.collect()
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(RouletteCog(bot))

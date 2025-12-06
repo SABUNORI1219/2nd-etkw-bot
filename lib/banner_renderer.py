@@ -87,19 +87,14 @@ class BannerRenderer:
 
                 pattern_path = os.path.join(ASSETS_DIR, f"{color_name}-{pattern_abbr}.png")
                 if os.path.exists(pattern_path):
-                    pattern_image_src = Image.open(pattern_path)
-                    try:
+                    with Image.open(pattern_path) as pattern_image_src:
                         pattern_image = pattern_image_src.convert("RGBA")
                         if pattern_abbr in border_remove_patterns:
-                            pattern_image_src.close()
-                            pattern_image_src = pattern_image
                             pattern_image = remove_border_lines(pattern_image, border_colors, tolerance=25, alpha_value=0)
                         if banner_image.size == pattern_image.size:
                             banner_image = Image.alpha_composite(banner_image, pattern_image)
                         else:
                             banner_image.paste(pattern_image, (0, 0), pattern_image)
-                    finally:
-                        pattern_image_src.close()
                 else:
                     logger.warning(f"アセットファイルが見つかりません: {pattern_path}")
     

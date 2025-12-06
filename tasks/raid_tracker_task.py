@@ -73,7 +73,14 @@ def get_tracking_members(guild_data, recently_active_threshold_minutes=20):
                 tracking_members.append(member_info)
                 added_count += 1
     
+    # トラッキング対象の詳細ログ出力
+    online_names = [member["name"] for member in online_members]
+    recently_active_names = [member["name"] for member in tracking_members if member.get("source") == "recently_active"]
+    
     logger.info(f"トラッキング対象: オンライン {len(online_members)}人 + 最近アクティブ {added_count}人 = 合計 {len(tracking_members)}人")
+    logger.info(f"オンラインメンバー: {online_names}")
+    logger.info(f"最近アクティブメンバー: {recently_active_names}")
+    
     return tracking_members
 
 def remove_party_events_from_window(window, party, time_threshold=2):
@@ -206,7 +213,6 @@ async def guild_raid_tracker(api, bot=None, guild_prefix="ETKW", loop_interval=1
         current_loop_number += 1
         start_time = time.time()
         try:
-            logger.debug("ETKWメンバー情報取得開始...")
             guild_data = await api.get_guild_by_prefix(guild_prefix)
             if guild_data is None:
                 logger.warning("guild_data取得失敗。10秒後に再試行します。")
@@ -266,7 +272,6 @@ async def guild_raid_tracker(api, bot=None, guild_prefix="ETKW", loop_interval=1
                     "timestamp": now,
                     "name": name
                 }
-            logger.debug("ETKWメンバー情報取得完了！")
     
             for event in clear_events:
                 if not is_duplicate_event(event, clear_events_window):

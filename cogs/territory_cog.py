@@ -7,7 +7,6 @@ import json
 import os
 import re
 from datetime import datetime, timezone
-import gc
 import subprocess
 import pickle
 import tempfile
@@ -242,7 +241,6 @@ class Territory(commands.GroupCog, name="territory"):
         else:
             embed = create_embed(description="マップの生成中にエラーが発生しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
-        gc.collect()
 
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     @app_commands.command(name="status", description="指定されたテリトリーのステータスを表示")
@@ -300,7 +298,6 @@ class Territory(commands.GroupCog, name="territory"):
         else:
             await interaction.followup.send(embed=embed)
             del embed
-        gc.collect()
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Territory(bot))

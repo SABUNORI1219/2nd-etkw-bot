@@ -4,7 +4,6 @@ from io import BytesIO
 import os
 import logging
 import random
-import gc
 import time
 import textwrap
 
@@ -162,7 +161,6 @@ class RouletteRenderer:
                     frame.close()
                 except Exception:
                     pass
-            gc.collect()
 
     def create_result_image(self, candidates: list, winner_index: int) -> BytesIO:
         num_candidates = len(candidates)
@@ -190,4 +188,3 @@ class RouletteRenderer:
             return png_buffer
         finally:
             frame.close()
-            gc.collect()

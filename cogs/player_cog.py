@@ -3,7 +3,6 @@ from discord import app_commands
 from discord.ext import commands
 import logging
 import os
-import gc
 from datetime import datetime, timezone, timedelta
 import requests
 import time
@@ -333,7 +332,6 @@ class PlayerCog(commands.Cog):
             if file is not None:
                 try: file.close()
                 except Exception: pass
-            gc.collect()
     
     @app_commands.allowed_installs(guilds=True, users=True)
     @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)

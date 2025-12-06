@@ -4,7 +4,6 @@ import os
 import logging
 import json
 import discord
-import gc
 from datetime import datetime, timezone, timedelta
 from math import sqrt
 
@@ -310,8 +309,6 @@ class MapRenderer:
         except Exception as e:
             logger.error(f"マップ生成中にエラー: {e}", exc_info=True)
             return None, None
-        finally:
-            gc.collect()
 
     # 単一テリトリー生成
     def create_single_territory_image(self, territory: str, territory_data: dict, guild_color_map: dict) -> BytesIO | None:
@@ -385,4 +382,3 @@ class MapRenderer:
             cropped_image.close()
             final_map.close()
             map_to_draw_on.close()
-            gc.collect()

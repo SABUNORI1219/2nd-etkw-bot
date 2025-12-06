@@ -4,7 +4,6 @@ from io import BytesIO
 import logging
 import os
 import asyncio
-import gc
 
 logger = logging.getLogger(__name__)
 
@@ -122,22 +121,21 @@ def generate_profile_card(info, output_path="profile_card.png", skin_image=None)
     guild_banner_img = None
     icon_img = None
     dummy = None
-    rect_img = None
-    shadow = None
-    unknown_skin = None
-    skin = None
     try:
-        img = Image.open(BASE_IMG_PATH).convert("RGBA")
+        with Image.open(BASE_IMG_PATH) as base_img:
+            img = base_img.convert("RGBA")
     except Exception as e:
         logger.error(f"BASE_IMG_PATH 読み込み失敗: {e}")
         img = Image.new("RGBA", (900, 1600), (255, 255, 255, 255))
     try:
-        PLAYER_BACKGROUND = Image.open(PLAYER_BACKGROUND_PATH).convert("RGBA")
+        with Image.open(PLAYER_BACKGROUND_PATH) as bg_img:
+            PLAYER_BACKGROUND = bg_img.convert("RGBA")
     except Exception as e:
         logger.error(f"PLAYER_BACKGROUND_PATH 読み込み失敗: {e}")
         PLAYER_BACKGROUND = Image.new("RGBA", (200, 200), (200, 200, 200, 255))
     try:
-        rank_star_img = Image.open(RANK_STAR_PATH).convert("RGBA")
+        with Image.open(RANK_STAR_PATH) as star_img:
+            rank_star_img = star_img.convert("RGBA")
     except Exception as e:
         logger.error(f"RANK_STAR_PATH 読み込み失敗: {e}")
         rank_star_img = Image.new("RGBA", (200, 200), (200, 200, 200, 255))
@@ -167,7 +165,8 @@ def generate_profile_card(info, output_path="profile_card.png", skin_image=None)
     guild_banner_img = None
     if banner_bytes and isinstance(banner_bytes, BytesIO):
         try:
-            guild_banner_img = Image.open(banner_bytes).convert("RGBA")
+            with Image.open(banner_bytes) as banner_img:
+                guild_banner_img = banner_img.convert("RGBA")
         except Exception as e:
             logger.error(f"guild_banner_img読み込み失敗: {e}")
             guild_banner_img = None
@@ -223,18 +222,20 @@ def generate_profile_card(info, output_path="profile_card.png", skin_image=None)
             logger.error(f"Skin image process failed: {e}")
             # fallback
             try:
-                unknown_skin = Image.open(UNKNOWN_SKIN_PATH).convert("RGBA")
-                unknown_skin = unknown_skin.resize((196, 196), Image.LANCZOS)
-                img.paste(unknown_skin, (106, 340), mask=unknown_skin)
+                with Image.open(UNKNOWN_SKIN_PATH) as unknown_img:
+                    unknown_skin = unknown_img.convert("RGBA")
+                    unknown_skin = unknown_skin.resize((196, 196), Image.LANCZOS)
+                    img.paste(unknown_skin, (106, 340), mask=unknown_skin)
             except Exception as ee:
                 logger.error(f"Unknown skin image load failed: {ee}")
     else:
         logger.error("Skin image not available")
         # fallback
         try:
-            unknown_skin = Image.open(UNKNOWN_SKIN_PATH).convert("RGBA")
-            unknown_skin = unknown_skin.resize((196, 196), Image.LANCZOS)
-            img.paste(unknown_skin, (106, 340), mask=unknown_skin)
+            with Image.open(UNKNOWN_SKIN_PATH) as unknown_img:
+                unknown_skin = unknown_img.convert("RGBA")
+                unknown_skin = unknown_skin.resize((196, 196), Image.LANCZOS)
+                img.paste(unknown_skin, (106, 340), mask=unknown_skin)
         except Exception as ee:
             logger.error(f"Unknown skin image load failed: {ee}")
 
@@ -250,9 +251,10 @@ def generate_profile_card(info, output_path="profile_card.png", skin_image=None)
     target_icon_h = 24
     if icon_path and os.path.exists(icon_path):
         try:
-            original_icon = Image.open(icon_path).convert("RGBA")
-            icon_img = resize_icon_keep_ratio(original_icon, target_icon_h)
-            icon_w, icon_h = icon_img.size
+            with Image.open(icon_path) as original_icon:
+                icon_rgba = original_icon.convert("RGBA")
+                icon_img = resize_icon_keep_ratio(icon_rgba, target_icon_h)
+                icon_w, icon_h = icon_img.size
         except Exception as e:
             logger.error(f"Rank icon load failed: {e}")
     else:
@@ -429,13 +431,5 @@ def generate_profile_card(info, output_path="profile_card.png", skin_image=None)
         img.save(output_path)
     except Exception as e:
         logger.error(f"画像保存失敗: {e}")
-    finally:
-        for obj in [img, PLAYER_BACKGROUND, rank_star_img, guild_banner_img, icon_img, dummy, rect_img, shadow, unknown_skin, skin]:
-            try:
-                if obj is not None:
-                    obj.close()
-            except Exception:
-                pass
-        gc.collect()
     return output_path
 

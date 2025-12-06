@@ -118,7 +118,6 @@ class SpamDetectorCog(commands.Cog):
             
             # Embedがない場合は無視
             if not message.embeds:
-                logger.debug(f"--- [TerritoryLoss] Embedなしのためスキップ")
                 return
             
             embed = message.embeds[0]
