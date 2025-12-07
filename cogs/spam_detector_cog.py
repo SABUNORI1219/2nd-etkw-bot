@@ -21,27 +21,6 @@ logger = logging.getLogger(__name__)
 # スパムと判断する基準
 SPAM_MESSAGE_COUNT = 3
 SPAM_TIME_WINDOW = timedelta(seconds=0.95)
-
-# 監視対象の領地リスト（ETKWが保持している領地）
-MONITORED_TERRITORIES = {
-    "Dragonbone Graveyard", "Pyroclastic Flow", "Freezing Heights", "Dogun Ritual Site", 
-    "Lava Lakes", "Crater Descent", "Rodoroc", "Entrance to Molten Heights", "Eltom", 
-    "Ranol's Farm", "Thesead Suburbs", "Cherry Blossom Grove", "Displaced Housing", 
-    "Thesead", "Entrance to Thesead", "Path to the Dojo", "Canyon High Path", 
-    "The Hive", "Wanderer's Way", "Thanos Exit", "Illuminant Path", "Workshop Glade", 
-    "Bandit's Toll", "Canyon Walkway", "Molten Passage", "Path to Ozoth's Spire", 
-    "Secluded Ponds", "Burning Airship", "Bandit Cave", "Wizard's Warning", 
-    "Perilous Grotto", "Inhospitable Mountain", "Wizard Tower", "Thesead Underpass", 
-    "Cliffside Passage North", "Cliffside Passage South", "Elephelk Trail", 
-    "Bantisu Approach", "Bantisu Air Temple", "Krolton's Cave", "Hobgoblin's Hoard", 
-    "Harpy's Haunt North", "Harpy's Haunt South", "Elepholk Stomping Grounds", 
-    "Fleris Cranny", "Perilous Passage", "Wayward Split", "Cascading Basins", 
-    "Cycrospordial Hazard", "Turncoat Turnabout", "Winding Waters", 
-    "Parasitic Slime Mine", "Panda Kingdom", "Panda Path", "Troll Tower", 
-    "Featherfall Cliffs", "Protector's Pathway", "Kandon-Beda", "Housing Crisis", 
-    "Canyon Dropoff", "Rocky Bend"
-}
-
 class SpamDetectorCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -55,9 +34,6 @@ class SpamDetectorCog(commands.Cog):
             # Bot自身のメッセージは無視
             if message.author == self.bot.user:
                 return
-
-            # 領地奪取監視機能（簡易版テスト）
-            await self._check_territory_loss(message)
 
             # 以下は既存のスパム検知機能
             # 監視対象のユーザーでなければ、何もしない
