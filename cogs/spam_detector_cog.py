@@ -137,14 +137,17 @@ class SpamDetectorCog(commands.Cog):
             if territory_name not in MONITORED_TERRITORIES:
                 return
             
-            # 正規表現で奪取ギルドを抽出（CPU負荷減少のため最適化）
-            attacker_match = re.search(r'\)\s*->\s*([^(]+?)\s*\(', field_value)
+            # "-> " の後ろにあって、その後の " (" までの文字を抜き出す
+            # 最も確実なパターン：数字の矢印パターンの後の矢印を対象とする
+            attacker_match = re.search(r'\(\d+\s*->\s*\d+\)\s*->\s*(.+?)\s*\(', field_value)
             
-            if not attacker_match:
-                logger.warning(f"--- [TerritoryLoss] 領地奪取情報の解析に失敗: {field_value}")
+            if attacker_match:
+                # 抽出できた場合（例: Nerfuria）
+                attacker_guild = attacker_match.group(1).strip()
+            else:
+                # 抽出できなかった場合、ログに原文を出して確認する（これが重要！）
+                logger.warning(f"--- [RegexFail] 抽出失敗。原文: {field_value}")
                 return
-            
-            attacker_guild = attacker_match.group(1).strip()
             
             # 通知用チャンネルを取得
             notification_channel = self.bot.get_channel(TERRITORY_LOSS_NOTIFICATION_CHANNEL)
