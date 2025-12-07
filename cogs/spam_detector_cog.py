@@ -3,6 +3,7 @@ import re
 from discord.ext import commands
 from collections import Counter
 import logging
+import asyncio
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -108,26 +109,32 @@ class SpamDetectorCog(commands.Cog):
     async def _check_territory_loss(self, message: discord.Message):
         """領地奪取監視機能"""
         try:
+            logger.info("[TerritoryLoss] _check_territory_loss: 開始")
             # 指定されたチャンネルでなければ無視
             if message.channel.id != TERRITORY_MONITOR_CHANNEL:
+                logger.info("[TerritoryLoss] チャンネルID不一致: スキップ")
                 return
             
             # Botのメッセージに限定（別Botの通知）
             if not message.author.bot:
+                logger.info("[TerritoryLoss] Botメッセージでない: スキップ")
                 return
             
             # Embedがない場合は無視
             if not message.embeds:
+                logger.info("[TerritoryLoss] Embedなし: スキップ")
                 return
             
             embed = message.embeds[0]
             
             # タイトルが"Territory Lost"を含むかチェック（**も考慮）
             if not embed.title or "Territory Lost" not in embed.title:
+                logger.info(f"[TerritoryLoss] タイトル不一致: {getattr(embed, 'title', None)}")
                 return
             
             # フィールドから情報を抽出
             if not embed.fields:
+                logger.info("[TerritoryLoss] フィールドなし: スキップ")
                 return
             
             territory_name = embed.fields[0].name if embed.fields[0].name else "不明"
@@ -135,21 +142,23 @@ class SpamDetectorCog(commands.Cog):
             
             # 監視対象の領地かどうかをチェック
             if territory_name not in MONITORED_TERRITORIES:
+                logger.info(f"[TerritoryLoss] 監視対象外領地: {territory_name}")
                 return
             
             # "-> " の後ろにあって、その後の " (" までの文字を抜き出す
             # 最も確実なパターン：数字の矢印パターンの後の矢印を対象とする
+            logger.info(f"[TerritoryLoss] 正規表現抽出開始: {field_value}")
             attacker_match = re.search(r'\(\d+\s*->\s*\d+\)\s*->\s*(.+?)\s*\(', field_value)
             
             if attacker_match:
-                # 抽出できた場合（例: Nerfuria）
                 attacker_guild = attacker_match.group(1).strip()
+                logger.info(f"[TerritoryLoss] ギルド名抽出成功: {attacker_guild}")
             else:
-                # 抽出できなかった場合、ログに原文を出して確認する（これが重要！）
                 logger.warning(f"--- [RegexFail] 抽出失敗。原文: {field_value}")
                 return
             
             # 通知用チャンネルを取得
+            logger.info("[TerritoryLoss] 通知チャンネル取得開始")
             notification_channel = self.bot.get_channel(TERRITORY_LOSS_NOTIFICATION_CHANNEL)
             if not notification_channel:
                 logger.error(f"--- [TerritoryLoss] 通知チャンネルが見つかりません: {TERRITORY_LOSS_NOTIFICATION_CHANNEL}")
@@ -183,14 +192,21 @@ class SpamDetectorCog(commands.Cog):
             notification_embed.timestamp = datetime.utcnow()
             
             try:
-                logger.info(f"--- [TerritoryLoss] 通知送信試行中...")
-                await notification_channel.send(content=mentions, embed=notification_embed)
+                logger.info(f"[TerritoryLoss] 通知送信試行中... (asyncio.wait_forでタイムアウト監視)")
+                await asyncio.wait_for(
+                    notification_channel.send(content=mentions, embed=notification_embed),
+                    timeout=7.0
+                )
                 logger.info(f"--- [TerritoryLoss] 通知送信完了: {territory_name} -> {attacker_guild}")
+            except asyncio.TimeoutError:
+                logger.error(f"--- [TerritoryLoss] 通知送信タイムアウト: {territory_name} -> {attacker_guild}")
             except Exception as e:
                 logger.error(f"--- [TerritoryLoss] 通知送信エラー: {e}")
                 
         except Exception as e:
             logger.error(f"--- [TerritoryLoss] _check_territory_loss で予期しない例外: {e}", exc_info=True)
+        finally:
+            logger.info("[TerritoryLoss] _check_territory_loss: 終了")
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
