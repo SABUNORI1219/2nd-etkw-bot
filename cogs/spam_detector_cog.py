@@ -137,8 +137,8 @@ class SpamDetectorCog(commands.Cog):
             if territory_name not in MONITORED_TERRITORIES:
                 return
             
-            # 正規表現で奪取ギルドを抽出
-            attacker_match = re.search(r'.*->\s*([^(]+?)\s*\(\d+\s*->\s*\d+\)', field_value)
+            # 正規表現で奪取ギルドを抽出（CPU負荷減少のため最適化）
+            attacker_match = re.search(r'\)\s*->\s*([^(]+?)\s*\(', field_value)
             
             if not attacker_match:
                 logger.warning(f"--- [TerritoryLoss] 領地奪取情報の解析に失敗: {field_value}")

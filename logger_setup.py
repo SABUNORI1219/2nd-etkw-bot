@@ -14,6 +14,10 @@ def setup_logger():
     formatter = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}', dt_fmt, style='{')
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
+    
+    # Render環境でのログバッファリング問題を解決
+    handler.setLevel(logging.INFO)
+    handler.flush = lambda: sys.stdout.flush()  # 強制フラッシュ
 
     # ルートロガーだけにハンドラをつける
     root_logger.setLevel(logging.INFO)
