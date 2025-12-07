@@ -1,29 +1,33 @@
 import re
 
-# 修正後の正規表現パターン（正しい版）
-pattern = r'\)\s*->\s*([^(]+?)\s*\('
-
 # テスト用の文章
 test_text = "Empire of TKW (61 -> 60) -> Nerfuria (0 -> 1)"
 
 print(f"テスト文章: {test_text}")
-print(f"正規表現パターン: {pattern}")
-print("-" * 50)
+print("-" * 70)
 
-# パターンマッチを実行
-match = re.search(pattern, test_text)
+# 複数のパターンをテスト
+patterns = [
+    (r'->\s*(.+?)\s*\(', "ユーザー提案パターン"),
+    (r'\)\s*->\s*(.+?)\s*\(', "私の修正パターン"),
+    (r'(?<=\))\s*->\s*(.+?)\s*\(', "後読みアサーション使用"),
+    (r'\(\d+\s*->\s*\d+\)\s*->\s*(.+?)\s*\(', "数字パターン明示"),
+]
 
-if match:
-    extracted_guild = match.group(1).strip()
-    print(f"✅ 抽出成功!")
-    print(f"抽出されたギルド名: '{extracted_guild}'")
-    print(f"マッチした全体: '{match.group(0)}'")
-else:
-    print("❌ マッチしませんでした")
+for pattern, description in patterns:
+    print(f"{description}: {pattern}")
+    match = re.search(pattern, test_text)
+    if match:
+        extracted = match.group(1).strip()
+        print(f"  ✅ 抽出成功: '{extracted}'")
+        print(f"  マッチ全体: '{match.group(0)}'")
+    else:
+        print(f"  ❌ マッチしませんでした")
+    print()
 
-print("-" * 50)
+print("-" * 70)
+print("追加テストケース:")
 
-# 他のパターンもテスト
 test_cases = [
     "Guild A (50 -> 49) -> Guild B (0 -> 1)",
     "Very Long Guild Name (100 -> 99) -> Short (5 -> 6)",
@@ -31,11 +35,13 @@ test_cases = [
     "Empire of TKW (61 -> 60) -> Nerfuria (0 -> 1)"
 ]
 
-print("追加テストケース:")
+# 最適なパターンで全テストケースを確認
+best_pattern = r'\)\s*->\s*(.+?)\s*\('
+print(f"最適パターンでテスト: {best_pattern}")
 for i, text in enumerate(test_cases, 1):
-    match = re.search(pattern, text)
+    match = re.search(best_pattern, text)
     if match:
         extracted = match.group(1).strip()
-        print(f"{i}. '{text}' -> '{extracted}'")
+        print(f"{i}. '{extracted}'")
     else:
-        print(f"{i}. '{text}' -> マッチなし")
+        print(f"{i}. マッチなし")
