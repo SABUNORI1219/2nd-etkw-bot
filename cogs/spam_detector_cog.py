@@ -196,15 +196,13 @@ class SpamDetectorCog(commands.Cog):
         # ETKW_SERVERでない場合は無視
         if member.guild.id != ETKW_SERVER:
             return
-        
+
         current_time = datetime.utcnow()
-        
-        # VC参加の場合
+
+        # VC参加
         if before.channel is None and after.channel is not None:
-            # 参加時間を記録
             self.vc_join_times[member.id] = current_time
-            
-            # 緑色のEmbed作成
+
             embed = create_embed(
                 title=member.display_name,
                 description=f"Joined `{after.channel.name}`",
@@ -213,21 +211,35 @@ class SpamDetectorCog(commands.Cog):
             )
             embed.set_thumbnail(url=member.display_avatar.url)
             embed.timestamp = current_time
-            
-            # そのVCのチャットに送信
+
             try:
                 await after.channel.send(embed=embed)
                 logger.info(f"--- [VCNotify] {member.display_name} が {after.channel.name} に参加 -> VCチャットに通知送信")
             except discord.Forbidden:
                 logger.warning(f"--- [VCNotify] {after.channel.name} のVCチャットに送信権限がありません")
             except Exception as e:
-                logger.error(f"--- [TerritoryLoss] _check_territory_loss で予期しない例外: {e}", exc_info=True)
+                logger.error(f"--- [VCNotify] 通知送信エラー: {e}", exc_info=True)
+
+        # VC退出
+        elif before.channel is not None and after.channel is None:
+            # 接続時間の計算
+            connection_time = ""
+            if member.id in self.vc_join_times:
+                duration = current_time - self.vc_join_times[member.id]
+                minutes = int(duration.total_seconds() // 60)
+                seconds = int(duration.total_seconds() % 60)
+                connection_time = f" (滞在時間: {minutes}分{seconds}秒)" if minutes > 0 else f" (滞在時間: {seconds}秒)"
+                self.vc_join_times.pop(member.id, None)
+
+            embed = create_embed(
+                title=member.display_name,
+                description=f"Left `{before.channel.name}`{connection_time}",
                 color=discord.Color.red(),
                 footer_text=f"現在のメンバー数: {len(before.channel.members)}/{before.channel.user_limit if before.channel.user_limit else '∞'}"
+            )
             embed.set_thumbnail(url=member.display_avatar.url)
             embed.timestamp = current_time
-            
-            # そのVCのチャットに送信
+
             try:
                 await before.channel.send(embed=embed)
                 logger.info(f"--- [VCNotify] {member.display_name} が {before.channel.name} から退室 -> VCチャットに通知送信")
@@ -235,24 +247,19 @@ class SpamDetectorCog(commands.Cog):
                 logger.warning(f"--- [VCNotify] {before.channel.name} のVCチャットに送信権限がありません")
             except Exception as e:
                 logger.error(f"--- [VCNotify] 通知送信エラー: {e}")
-        
-        # VC移動の場合（参加→別のVCに移動）
+
+        # VC移動（別のVCへ）
         elif before.channel is not None and after.channel is not None and before.channel != after.channel:
-            # 移動時間を計算
             connection_time = ""
             if member.id in self.vc_join_times:
                 duration = current_time - self.vc_join_times[member.id]
                 minutes = int(duration.total_seconds() // 60)
                 seconds = int(duration.total_seconds() % 60)
-                if minutes > 0:
-                    connection_time = f" (滞在時間: {minutes}分{seconds}秒)"
-                else:
-                    connection_time = f" (滞在時間: {seconds}秒)"
-            
-            # 新しいVCの参加時間を記録
+                connection_time = f" (滞在時間: {minutes}分{seconds}秒)" if minutes > 0 else f" (滞在時間: {seconds}秒)"
+
+            # 新しいVCでの参加時間を記録
             self.vc_join_times[member.id] = current_time
-            
-            # 青色のEmbed作成（移動を示す）
+
             embed = create_embed(
                 title=member.display_name,
                 description=f"Moved from `{before.channel.name}` to `{after.channel.name}`{connection_time}",
@@ -261,8 +268,7 @@ class SpamDetectorCog(commands.Cog):
             )
             embed.set_thumbnail(url=member.display_avatar.url)
             embed.timestamp = current_time
-            
-            # 移動先VCのチャットに送信
+
             try:
                 await after.channel.send(embed=embed)
                 logger.info(f"--- [VCNotify] {member.display_name} が {before.channel.name} から {after.channel.name} に移動 -> 移動先VCチャットに通知送信")

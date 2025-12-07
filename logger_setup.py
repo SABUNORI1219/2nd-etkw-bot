@@ -5,10 +5,10 @@ def setup_logger():
     """
     Bot全体のロガーを設定する関数。
     """
-    # 既にハンドラが追加されていれば何もしない
+    # 既存ハンドラの状態に関わらず、標準出力へのストリームを強制設定
     root_logger = logging.getLogger()
-    if root_logger.hasHandlers():
-        return
+    for h in list(root_logger.handlers):
+        root_logger.removeHandler(h)
 
     dt_fmt = '%Y-%m-%d %H:%M:%S'
     formatter = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}', dt_fmt, style='{')
