@@ -41,6 +41,10 @@ MONITORED_TERRITORIES = {
     "Featherfall Cliffs", "Protector's Pathway", "Kandon-Beda", "Housing Crisis", 
     "Canyon Dropoff", "Rocky Bend"
 }
+
+# 領地奪取通知でロールをメンションするためのロールID
+# 依頼に基づき固定IDを使用（必要ならconfigへ移行可）
+TERRITORY_LOSS_MENTION_ROLE_ID = 1447563387327352854
 class SpamDetectorCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -152,8 +156,8 @@ class SpamDetectorCog(commands.Cog):
             if not notification_channel:
                 return
             
-            # メンション文字列を作成
-            mentions = " ".join([f"<@{user_id}>" for user_id in TERRITORY_LOSS_MENTION_USERS])
+            # ロールメンションに変更
+            mentions = f"<@&{TERRITORY_LOSS_MENTION_ROLE_ID}>"
             
             # 通知用Embedを作成
             notification_embed = create_embed(
@@ -181,7 +185,11 @@ class SpamDetectorCog(commands.Cog):
             
             try:
                 await asyncio.wait_for(
-                    notification_channel.send(content=mentions, embed=notification_embed),
+                    notification_channel.send(
+                        content=mentions,
+                        embed=notification_embed,
+                        allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False)
+                    ),
                     timeout=7.0
                 )
             except asyncio.TimeoutError:
