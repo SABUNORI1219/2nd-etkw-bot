@@ -158,7 +158,7 @@ class SpamDetectorCog(commands.Cog):
             # 通知用Embedを作成
             notification_embed = create_embed(
                 title="領地が奪われたよ！起きよう！",
-                description=f"**{territory_name}**が**{attacker_guild}**に奪われたよ！",
+                description="",
                 color=discord.Color.red(),
                 footer_text="Territory Monitor | Minister Chikuwa"
             )
