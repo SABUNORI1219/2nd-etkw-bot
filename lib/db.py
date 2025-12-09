@@ -497,6 +497,36 @@ def get_recently_active_members(minutes_threshold=20):
         if conn: conn.close()
     return result
 
+def get_inactive_members(minutes_threshold=10):
+    """
+    最終ログインが指定分数より古いメンバーのMCIDとUUIDを取得
+    戻り値: [(mcid, uuid), ...]
+    """
+    conn = get_conn()
+    result = []
+    try:
+        with conn.cursor() as cur:
+            threshold_time = datetime.utcnow() - timedelta(minutes=minutes_threshold)
+            threshold_str = threshold_time.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+            cur.execute(
+                """
+                SELECT lm.mcid, lm.uuid
+                FROM linked_members lm
+                JOIN last_join_cache ljc ON lm.mcid = ljc.mcid
+                WHERE ljc.last_join IS NOT NULL
+                AND ljc.last_join < %s
+                """,
+                (threshold_str,)
+            )
+            for mcid, uuid in cur.fetchall():
+                result.append((mcid, uuid))
+        logger.debug(f"[DB] 非アクティブなメンバー {len(result)}人を取得（{minutes_threshold}分より古い）")
+    except Exception as e:
+        logger.error(f"[DB Handler] get_inactive_members failed: {e}")
+    finally:
+        if conn: conn.close()
+    return result
+
 def update_member_uuid(mcid: str, uuid: str):
     """linked_membersテーブルのUUIDを更新"""
     conn = get_conn()

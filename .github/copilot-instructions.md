@@ -9,6 +9,8 @@
 - できないことはできないと正直に答えること。
 - 推論は避け、必ず事実に基づいて回答すること。
 - 適当なことを言わないこと。
+- 回答に自信がない場合は、その旨を明記すること。
+- コードの整合性を必ず保つこと。
 
 ## Architecture Overview
 - **Discord Bot**: Python-based bot using discord.py with cogs architecture for Empire of TKW [ETKW] guild

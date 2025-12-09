@@ -15,7 +15,7 @@ from config import (
     TERRITORY_MONITOR_CHANNEL
 )
 from lib.utils import create_embed
-from lib.db import get_all_linked_members, get_last_join_cache_for_members
+from lib.db import get_all_linked_members, get_inactive_members
 
 logger = logging.getLogger(__name__)
 
@@ -154,37 +154,18 @@ class SpamDetectorCog(commands.Cog):
             if not notification_channel:
                 return
             
-            # Ping対象を指定ユーザーのうち LastSeen>10分 に限定
+            # Ping対象を指定ユーザーのうち LastSeen>10分 に限定（DBクエリで厳密抽出）
             linked_members = get_all_linked_members()
-            mcid_list = [m["mcid"] for m in linked_members if m.get("mcid")]
-            # 指定ユーザーのみ対象
             target_set = set(TERRITORY_LOSS_MENTION_USERS or [])
-            discord_map = {m["mcid"]: m.get("discord_id") for m in linked_members if m.get("discord_id") in target_set}
-            last_join_map = get_last_join_cache_for_members(mcid_list)
+            # mcid->discord_id のマップ（指定ユーザーのみ）
+            mcid_to_discord = {m["mcid"]: m.get("discord_id") for m in linked_members if m.get("discord_id") in target_set}
+            # 最終ログインが10分より古いMCID一覧を取得
+            inactive_mcid_list = [mcid for mcid, _ in get_inactive_members(10)]
+            # 指定ユーザーの中で非アクティブな人だけを抽出
+            ping_user_ids = [mcid_to_discord[mcid] for mcid in inactive_mcid_list if mcid in mcid_to_discord]
 
-            cutoff_ts = datetime.utcnow() - timedelta(minutes=10)
-            cutoff_str = cutoff_ts.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-
-            def is_older_than_10m(last_join_str: str) -> bool:
-                try:
-                    # last_joinはISO文字列として保存されている前提
-                    # マイクロ秒あり/なしの両方を許容
-                    fmt = '%Y-%m-%dT%H:%M:%S.%fZ' if '.' in last_join_str else '%Y-%m-%dT%H:%M:%SZ'
-                    lj = datetime.strptime(last_join_str, fmt)
-                    return lj < cutoff_ts
-                except Exception:
-                    # パースできない場合はPing対象外にする
-                    return False
-
-            ping_user_ids = []
-            for mcid, last_join in last_join_map.items():
-                if last_join and is_older_than_10m(last_join):
-                    uid = discord_map.get(mcid)
-                    if uid:
-                        ping_user_ids.append(uid)
-
-            # 箇条書きのユーザーPing（LastSeen>10分のみ）。対象者が0ならメンションなし。
-            mentions = "\n".join([f"<@{uid}>" for uid in ping_user_ids]) if ping_user_ids else None
+            # ユーザーPing（LastSeen>10分のみ）。対象者が0ならメンションなし。
+            mentions = " ".join([f"<@{uid}>" for uid in ping_user_ids]) if ping_user_ids else None
             
             # 通知用Embedを作成
             notification_embed = create_embed(
