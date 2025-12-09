@@ -184,7 +184,7 @@ class SpamDetectorCog(commands.Cog):
                         ping_user_ids.append(uid)
 
             # 箇条書きのユーザーPing（LastSeen>10分のみ）。対象者が0ならメンションなし。
-            mentions = "\n".join([f"- <@{uid}>" for uid in ping_user_ids]) if ping_user_ids else None
+            mentions = "\n".join([f"<@{uid}>" for uid in ping_user_ids]) if ping_user_ids else None
             
             # 通知用Embedを作成
             notification_embed = create_embed(
