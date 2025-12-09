@@ -11,10 +11,11 @@ from config import (
     SPAM_TARGET_USER_IDS, 
     ETKW_SERVER, 
     TERRITORY_LOSS_NOTIFICATION_CHANNEL,
-    TERRITORY_LOSS_MENTION_ROLE_ID,
+    TERRITORY_LOSS_MENTION_USERS,
     TERRITORY_MONITOR_CHANNEL
 )
 from lib.utils import create_embed
+from lib.db import get_all_linked_members, get_last_join_cache_for_members
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +43,6 @@ MONITORED_TERRITORIES = {
     "Canyon Dropoff", "Rocky Bend"
 }
 
-# 領地奪取通知でロールをメンションするためのロールID
-# 依頼に基づき固定IDを使用（必要ならconfigへ移行可）
-TERRITORY_LOSS_MENTION_ROLE_ID = 1447563387327352854
 class SpamDetectorCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -156,8 +154,37 @@ class SpamDetectorCog(commands.Cog):
             if not notification_channel:
                 return
             
-            # ロールメンションに変更
-            mentions = f"<@&{TERRITORY_LOSS_MENTION_ROLE_ID}>"
+            # Ping対象を指定ユーザーのうち LastSeen>10分 に限定
+            linked_members = get_all_linked_members()
+            mcid_list = [m["mcid"] for m in linked_members if m.get("mcid")]
+            # 指定ユーザーのみ対象
+            target_set = set(TERRITORY_LOSS_MENTION_USERS or [])
+            discord_map = {m["mcid"]: m.get("discord_id") for m in linked_members if m.get("discord_id") in target_set}
+            last_join_map = get_last_join_cache_for_members(mcid_list)
+
+            cutoff_ts = datetime.utcnow() - timedelta(minutes=10)
+            cutoff_str = cutoff_ts.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+
+            def is_older_than_10m(last_join_str: str) -> bool:
+                try:
+                    # last_joinはISO文字列として保存されている前提
+                    # マイクロ秒あり/なしの両方を許容
+                    fmt = '%Y-%m-%dT%H:%M:%S.%fZ' if '.' in last_join_str else '%Y-%m-%dT%H:%M:%SZ'
+                    lj = datetime.strptime(last_join_str, fmt)
+                    return lj < cutoff_ts
+                except Exception:
+                    # パースできない場合はPing対象外にする
+                    return False
+
+            ping_user_ids = []
+            for mcid, last_join in last_join_map.items():
+                if last_join and is_older_than_10m(last_join):
+                    uid = discord_map.get(mcid)
+                    if uid:
+                        ping_user_ids.append(uid)
+
+            # 箇条書きのユーザーPing（LastSeen>10分のみ）。対象者が0ならメンションなし。
+            mentions = "\n".join([f"- <@{uid}>" for uid in ping_user_ids]) if ping_user_ids else None
             
             # 通知用Embedを作成
             notification_embed = create_embed(
@@ -188,7 +215,7 @@ class SpamDetectorCog(commands.Cog):
                     notification_channel.send(
                         content=mentions,
                         embed=notification_embed,
-                        allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False)
+                        allowed_mentions=discord.AllowedMentions(roles=False, users=True, everyone=False)
                     ),
                     timeout=7.0
                 )
