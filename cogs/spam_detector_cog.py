@@ -15,7 +15,7 @@ from config import (
     TERRITORY_MONITOR_CHANNEL
 )
 from lib.utils import create_embed
-from lib.db import get_all_linked_members, get_inactive_members
+from lib.db import get_all_linked_members
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ MONITORED_TERRITORIES = {
     "Bantisu Approach", "Bantisu Air Temple", "Krolton's Cave", "Hobgoblin's Hoard", 
     "Harpy's Haunt North", "Harpy's Haunt South", "Elepholk Stomping Grounds", 
     "Fleris Cranny", "Perilous Passage", "Wayward Split", "Cascading Basins", 
-    "Cycrospordial Hazard", "Turncoat Turnabout", "Winding Waters", 
+    "Cyclospordial Hazard", "Turncoat Turnabout", "Winding Waters", 
     "Parasitic Slime Mine", "Panda Kingdom", "Panda Path", "Troll Tower", 
     "Featherfall Cliffs", "Protector's Pathway", "Kandon-Beda", "Housing Crisis", 
     "Canyon Dropoff", "Rocky Bend"
@@ -158,17 +158,23 @@ class SpamDetectorCog(commands.Cog):
             if not notification_channel:
                 return
             
-            # Ping対象を指定ユーザーのうち LastSeen>10分 に限定（DBクエリで厳密抽出）
+            # Ping対象：raid_tracker_taskのオンライン＋最近アクティブメンバーからconfig指定ユーザーのみ抽出
+            from tasks.raid_tracker_task import current_tracking_members
             linked_members = get_all_linked_members()
             target_set = set(TERRITORY_LOSS_MENTION_USERS or [])
-            # mcid->discord_id のマップ（指定ユーザーのみ）
+            # mcid->discord_id のマップ（config指定ユーザーのみ）
             mcid_to_discord = {m["mcid"]: m.get("discord_id") for m in linked_members if m.get("discord_id") in target_set}
-            # 最終ログインが10分より古いMCID一覧を取得
-            inactive_mcid_list = [mcid for mcid, _ in get_inactive_members(10)]
-            # 指定ユーザーの中で非アクティブな人だけを抽出
-            ping_user_ids = [mcid_to_discord[mcid] for mcid in inactive_mcid_list if mcid in mcid_to_discord]
-
-            # ユーザーPing（LastSeen>10分のみ）。対象者が0ならメンションなし。
+            # raid_tracker_taskのtracking_membersからconfig指定ユーザーを抽出
+            ping_user_ids = []
+            for member in current_tracking_members:
+                mcid = member.get("name")
+                if mcid and mcid in mcid_to_discord:
+                    discord_id = mcid_to_discord[mcid]
+                    if discord_id in target_set:
+                        ping_user_ids.append(discord_id)
+            
+            # 重複除去
+            ping_user_ids = sorted(set(ping_user_ids))
             mentions = " ".join([f"<@{uid}>" for uid in ping_user_ids]) if ping_user_ids else None
             
             # 通知用Embedを作成

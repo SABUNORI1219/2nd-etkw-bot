@@ -19,6 +19,9 @@ clear_events_window = deque(maxlen=200)
 # ループカウンター（パーティ推定で使用）
 current_loop_number = 0
 
+# 最新のトラッキング対象メンバー（領地監視機能で参照）
+current_tracking_members = []
+
 def extract_online_members(guild_data):
     """オンラインメンバーを取得"""
     ranks = ["owner", "chief", "strategist", "captain", "recruiter", "recruit"]
@@ -221,6 +224,8 @@ async def guild_raid_tracker(api, bot=None, guild_prefix="ETKW", loop_interval=1
     
             # オンラインメンバー + 最近アクティブなメンバーを取得（15分以内に調整）
             tracking_members = await asyncio.to_thread(get_tracking_members, guild_data, 15)
+            global current_tracking_members
+            current_tracking_members = tracking_members.copy()  # グローバル変数に保存
             if not tracking_members:
                 logger.info("トラッキング対象メンバーがいません。")
                 elapsed = time.time() - start_time
