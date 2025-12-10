@@ -158,20 +158,23 @@ class SpamDetectorCog(commands.Cog):
             if not notification_channel:
                 return
             
-            # Ping対象：raid_tracker_taskのオンライン＋最近アクティブメンバーからconfig指定ユーザーのみ抽出
+            # Ping対象：config指定ユーザーの中でオンライン＋最近アクティブでない人のみ抽出
             from tasks.raid_tracker_task import current_tracking_members
             linked_members = get_all_linked_members()
             target_set = set(TERRITORY_LOSS_MENTION_USERS or [])
             # mcid->discord_id のマップ（config指定ユーザーのみ）
             mcid_to_discord = {m["mcid"]: m.get("discord_id") for m in linked_members if m.get("discord_id") in target_set}
-            # raid_tracker_taskのtracking_membersからconfig指定ユーザーを抽出
-            ping_user_ids = []
+            # オンライン＋最近アクティブなMCIDセットを作成
+            active_mcids = set()
             for member in current_tracking_members:
                 mcid = member.get("name")
-                if mcid and mcid in mcid_to_discord:
-                    discord_id = mcid_to_discord[mcid]
-                    if discord_id in target_set:
-                        ping_user_ids.append(discord_id)
+                if mcid:
+                    active_mcids.add(mcid)
+            # config指定ユーザーの中で、オンライン＋最近アクティブでない人を抽出
+            ping_user_ids = []
+            for mcid, discord_id in mcid_to_discord.items():
+                if mcid not in active_mcids:  # オンライン＋最近アクティブでない人
+                    ping_user_ids.append(discord_id)
             
             # 重複除去
             ping_user_ids = sorted(set(ping_user_ids))
