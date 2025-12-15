@@ -55,6 +55,17 @@ def get_user_timezone(user):
     
     return pytz.timezone(DEFAULT_TIMEZONE)
 
+def get_timezone_abbrev(timezone):
+    """タイムゾーンオブジェクトから略称を取得"""
+    tz_name = str(timezone)
+    timezone_abbrevs = {
+        "Asia/Tokyo": "JST",
+        "Asia/Hong_Kong": "HKT", 
+        "Europe/Amsterdam": "CET",
+        "America/Vancouver": "PST"
+    }
+    return timezone_abbrevs.get(tz_name, "UTC")
+
 def generate_application_id():
     """申請IDを生成（8文字の英数字）"""
     return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
@@ -130,7 +141,7 @@ def parse_date_with_time(date_str):
         return None, None
 
 class GraidCountView(discord.ui.View):
-    def __init__(self, sorted_counts, period_counts, today_counts, yesterday_counts, total_period, total_today, total_yesterday, period_start, period_end, title, color, raid_display_name="Total", user_mcid=None, page=0, per_page=12, this_week_counts=None, last_week_counts=None, total_this_week=0, total_last_week=0, timeout=120):
+    def __init__(self, sorted_counts, period_counts, today_counts, yesterday_counts, total_period, total_today, total_yesterday, period_start, period_end, title, color, raid_display_name="Total", user_mcid=None, page=0, per_page=12, this_week_counts=None, last_week_counts=None, total_this_week=0, total_last_week=0, timezone_abbrev="JST", timeout=120):
         super().__init__(timeout=timeout)
         self.sorted_counts = sorted_counts
         self.period_counts = period_counts  # 期間全体
@@ -143,6 +154,7 @@ class GraidCountView(discord.ui.View):
         self.last_week_counts = last_week_counts or {}  # 先週分
         self.total_this_week = total_this_week  # 今週合計
         self.total_last_week = total_last_week  # 先週合計
+        self.timezone_abbrev = timezone_abbrev  # タイムゾーン略称
         self.period_start = period_start
         self.period_end = period_end
         self.raid_display_name = raid_display_name  # 表示用レイド名
@@ -218,7 +230,7 @@ class GraidCountView(discord.ui.View):
             ),
             inline=False
         )
-        embed.set_footer(text="Guild Raidシステム | Minister Chikuwa")
+        embed.set_footer(text=f"Guild Raidシステム・{self.timezone_abbrev} based | Minister Chikuwa")
         return embed
 
     async def update_message(self, interaction):
@@ -574,6 +586,9 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         total_this_week = sum(this_week_counts.values())
         total_last_week = sum(last_week_counts.values())
 
+        # ユーザーのタイムゾーン略称を取得
+        user_timezone_abbrev = get_timezone_abbrev(user_timezone)
+        
         view = GraidCountView(
             sorted_counts=sorted_counts,
             period_counts=period_counts,
@@ -593,7 +608,8 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             this_week_counts=this_week_counts,
             last_week_counts=last_week_counts,
             total_this_week=total_this_week,
-            total_last_week=total_last_week
+            total_last_week=total_last_week,
+            timezone_abbrev=user_timezone_abbrev
         )
         embed = view.get_embed()
         await interaction.followup.send(embed=embed, view=view)
