@@ -34,6 +34,27 @@ ADDC_RAID_CHOICES = [
 
 GUILDRAID_SUBMIT_CHANNEL_ID = 1397480193270222888
 
+# ロールIDとタイムゾーンのマッピング
+ROLE_TIMEZONE_MAP = {
+    1347437602063519775: "Asia/Tokyo",        # JST基準
+    1347437926061183037: "Asia/Hong_Kong",    # 香港時間基準
+    1330405966688292884: "Asia/Hong_Kong",    # 香港時間基準
+    1347438141446946847: "Europe/Amsterdam",  # オランダ時間基準
+    1347438188679008276: "America/Vancouver", # カナダ（バンクーバー）時間基準
+}
+DEFAULT_TIMEZONE = "Asia/Tokyo"  # どのロールも持たない場合はJST基準
+
+def get_user_timezone(user):
+    """ユーザーのロールに基づいてタイムゾーンを取得"""
+    if not hasattr(user, 'roles'):
+        return pytz.timezone(DEFAULT_TIMEZONE)
+    
+    for role in user.roles:
+        if role.id in ROLE_TIMEZONE_MAP:
+            return pytz.timezone(ROLE_TIMEZONE_MAP[role.id])
+    
+    return pytz.timezone(DEFAULT_TIMEZONE)
+
 def generate_application_id():
     """申請IDを生成（8文字の英数字）"""
     return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
@@ -418,33 +439,38 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         if date:
             date_from_utc, date_display = parse_date_with_time(date)
         
-        now = datetime.utcnow()
-        today0 = datetime(now.year, now.month, now.day)
-
-        # 前日と今週の計算
-        yesterday0 = today0 - timedelta(days=1)
+        # ユーザーのタイムゾーンを取得
+        user_timezone = get_user_timezone(interaction.user)
+        now_user_tz = datetime.now(user_timezone)
         
-        # 週の計算: 月曜日を週の開始とする
-        def get_week_start(dt):
-            """指定された日付の週の月曜日を返す"""
-            days_since_monday = dt.weekday()
-            return dt - timedelta(days=days_since_monday)
+        # ユーザーのタイムゾーンでの「今日」を取得（UTC時刻で計算するためUTCに変換）
+        today_user_tz = now_user_tz.replace(hour=0, minute=0, second=0, microsecond=0)
+        today0 = today_user_tz.astimezone(pytz.UTC).replace(tzinfo=None)
+
+        # 前日と今週の計算（ユーザーのタイムゾーン基準）
+        yesterday_user_tz = today_user_tz - timedelta(days=1)
+        yesterday0 = yesterday_user_tz.astimezone(pytz.UTC).replace(tzinfo=None)
         
-        def get_week_end(dt):
-            """指定された日付の週の日曜日を返す"""
-            days_since_monday = dt.weekday()
-            return dt + timedelta(days=6 - days_since_monday)
+        # 週の計算: 月曜日を週の開始とする（ユーザーのタイムゾーン基準）
+        def get_week_start_user_tz(dt_user_tz):
+            """指定された日付（ユーザータイムゾーン）の週の月曜日を返す（UTC）"""
+            days_since_monday = dt_user_tz.weekday()
+            week_start_user_tz = dt_user_tz - timedelta(days=days_since_monday)
+            return week_start_user_tz.astimezone(pytz.UTC).replace(tzinfo=None)
+        
+        def get_week_end_user_tz(dt_user_tz):
+            """指定された日付（ユーザータイムゾーン）の週の日曜日を返す（UTC）"""
+            days_since_monday = dt_user_tz.weekday()
+            week_end_user_tz = dt_user_tz + timedelta(days=6 - days_since_monday)
+            return week_end_user_tz.astimezone(pytz.UTC).replace(tzinfo=None)
 
-        # 今週と先週の範囲計算（週間統計用）
-        this_week_start = get_week_start(today0)
-        this_week_end = get_week_end(today0)
-        last_week_start = this_week_start - timedelta(days=7)
-        last_week_end = this_week_start - timedelta(days=1)
-
-        # レイド名による処理分岐
-        if raid_name == "Test":
-            # Testは廃止予定のため、Totalにリダイレクト
-            raid_name = "Total"
+        # 今週と先週の範囲計算（週間統計用、ユーザーのタイムゾーン基準）
+        this_week_start = get_week_start_user_tz(today_user_tz)
+        this_week_end = get_week_end_user_tz(today_user_tz)
+        last_week_start_user_tz = today_user_tz - timedelta(days=7)
+        last_week_start = get_week_start_user_tz(last_week_start_user_tz)
+        last_week_end_user_tz = today_user_tz - timedelta(days=1)
+        last_week_end = get_week_end_user_tz(last_week_end_user_tz)
         
         # データ取得とタイトル設定
         if raid_name == "Total":
@@ -457,14 +483,26 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             # 特定のレイド
             raid_choices_to_fetch = [choice for choice in RAID_CHOICES[:-1] if choice.value == raid_name]
             title_text = f"Guild Raid Counts: {raid_name}"
-            raid_display_name = raid_name
+            # レイド名に対応する絵文字を追加
+            raid_emoji = get_emoji_for_raid(raid_name)
+            raid_display_name = f"{raid_emoji} {raid_name}"
             color = discord.Color.blue()
 
         # 期間指定データの取得
         if date_from_utc:
             # 表示用の期間文字列を使用
             period_start = date_display
-            period_end = today0.strftime("%Y-%m-%d")
+            
+            # date引数に時刻が含まれているかどうかを判定（":"が含まれていれば時刻指定）
+            has_time_specified = ":" in date_display if date_display else False
+            
+            if has_time_specified:
+                # 時刻が指定されている場合は、現在の日時も時分まで表示
+                period_end = now_user_tz.strftime("%Y-%m-%d %H:%M")
+            else:
+                # 日付のみの場合は、従来通り日付のみ表示
+                period_end = today_user_tz.strftime("%Y-%m-%d")
+                
             rows = []
             for raid_choice in raid_choices_to_fetch:
                 raid_rows = fetch_history(raid_name=raid_choice.value, date_from=date_from_utc, date_to=today0 + timedelta(days=1))
