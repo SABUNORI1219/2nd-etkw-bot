@@ -467,10 +467,15 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         # 今週と先週の範囲計算（週間統計用、ユーザーのタイムゾーン基準）
         this_week_start = get_week_start_user_tz(today_user_tz)
         this_week_end = get_week_end_user_tz(today_user_tz)
-        last_week_start_user_tz = today_user_tz - timedelta(days=7)
-        last_week_start = get_week_start_user_tz(last_week_start_user_tz)
-        last_week_end_user_tz = today_user_tz - timedelta(days=1)
-        last_week_end = get_week_end_user_tz(last_week_end_user_tz)
+        
+        # 先週の計算：ユーザータイムゾーンで今週の月曜から7日前が先週の月曜
+        this_week_monday_user_tz = today_user_tz - timedelta(days=today_user_tz.weekday())
+        last_week_monday_user_tz = this_week_monday_user_tz - timedelta(days=7)
+        last_week_sunday_user_tz = this_week_monday_user_tz - timedelta(days=1)
+        
+        # 先週の範囲をUTCに変換
+        last_week_start = last_week_monday_user_tz.astimezone(pytz.UTC).replace(tzinfo=None)
+        last_week_end = last_week_sunday_user_tz.astimezone(pytz.UTC).replace(tzinfo=None)
         
         # データ取得とタイトル設定
         if raid_name == "Total":
