@@ -52,8 +52,8 @@ async def member_rank_sync_task(api: WynncraftAPI, bot=None):
                             for guild in bot.guilds:
                                 member = guild.get_member(dbm['discord_id'])
                                 if member:
-                                    # 1. 旧ランクロール全削除（ROLE_ID_TO_RANKに含まれるもの全て）
-                                    old_roles = [role for role in member.roles if role.id in ROLE_ID_TO_RANK]
+                                    # 1. 旧ランクロール全削除（ROLE_ID_TO_RANKに含まれるもの全て、managedロール除外）
+                                    old_roles = [role for role in member.roles if role.id in ROLE_ID_TO_RANK and not role.managed]
                                     if old_roles:
                                         try:
                                             await member.remove_roles(*old_roles, reason="ランク同期: 旧ランクロール削除")
@@ -145,8 +145,8 @@ async def member_remove_sync_task(bot, api: WynncraftAPI):
                             for guild in bot.guilds:
                                 member = guild.get_member(dbm['discord_id'])
                                 if member:
-                                    # すべてのロールを削除
-                                    roles_to_remove = [role for role in member.roles if role.name != "@everyone"]
+                                    # すべてのロールを削除（managedロール除外）
+                                    roles_to_remove = [role for role in member.roles if role.name != "@everyone" and not role.managed]
                                     if roles_to_remove:
                                         try:
                                             await member.remove_roles(*roles_to_remove)
