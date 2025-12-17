@@ -646,6 +646,11 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
             await interaction.followup.send(embed=embed)
             return
             
+        if count > 10:
+            embed = create_embed(description=f"カウントには10を超える数を入力することはできません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+            await interaction.followup.send(embed=embed)
+            return
+            
         before_count = len([row for row in fetch_history(raid_name=raid_name) if row[3] == player])
         adjust_player_raid_count(player, raid_name, count)
         after_count = len([row for row in fetch_history(raid_name=raid_name) if row[3] == player])
