@@ -35,7 +35,7 @@ MONITORED_TERRITORIES = {
     "Perilous Grotto", "Inhospitable Mountain", "Wizard Tower", "Thesead Underpass", 
     "Cliffside Passage North", "Cliffside Passage South", "Elephelk Trail", 
     "Bantisu Approach", "Bantisu Air Temple", "Krolton's Cave", "Hobgoblin's Hoard", 
-    "Harpy's Haunt North", "Harpy's Haunt South", "Elepholk Stomping Grounds", 
+    "Harpy's Haunt North", "Harpy's Haunt South", "Elefolk Stomping Grounds", 
     "Fleris Cranny", "Perilous Passage", "Wayward Split", "Cascading Basins", 
     "Cyclospordial Hazard", "Turncoat Turnabout", "Winding Waters", 
     "Parasitic Slime Mine", "Panda Kingdom", "Panda Path", "Troll Tower", 
