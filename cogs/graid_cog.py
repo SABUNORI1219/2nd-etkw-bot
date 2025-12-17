@@ -774,5 +774,5 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         await interaction.followup.send(embed=embed)
 
 # セットアップ関数
-# async def setup(bot: commands.Bot):
-    # await bot.add_cog(GuildRaidDetector(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(GuildRaidDetector(bot))
