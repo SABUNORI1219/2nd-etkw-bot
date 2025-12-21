@@ -146,7 +146,7 @@ class SpamDetectorCog(commands.Cog):
             if attacker_match:
                 attacker_guild = attacker_match.group(1).strip()
                 # 指定ギルドに奪われた場合はスルー
-                SKIP_GUILDS = {"The Nameless Samurai", "JFZN JAPAN", "wasting consumables"}
+                SKIP_GUILDS = {"The Nameless Samurai", "JFZN JAPAN", "wasting consumables", "Nobody"}
                 if attacker_guild in SKIP_GUILDS:
                     return
             else:
