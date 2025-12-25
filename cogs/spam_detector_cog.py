@@ -1,6 +1,6 @@
 import discord
 import re
-from discord.ext import commands
+from discord.ext import commands, tasks
 from collections import Counter
 import logging
 import asyncio
@@ -16,12 +16,16 @@ from config import (
 )
 from lib.utils import create_embed
 from lib.db import get_all_linked_members
+from lib.api_stocker import WynncraftAPI
 
 logger = logging.getLogger(__name__)
 
 # スパムと判断する基準
 SPAM_MESSAGE_COUNT = 3
 SPAM_TIME_WINDOW = timedelta(seconds=0.95)
+
+# オフシーズン判定フラグ
+is_offseason = False
 
 # 監視対象の領地リスト（ETKWが保持している領地）
 MONITORED_TERRITORIES = {
@@ -48,7 +52,47 @@ class SpamDetectorCog(commands.Cog):
         self.bot = bot
         self.user_message_timestamps = defaultdict(list)
         self.vc_join_times = {}  # ユーザーのVC参加時間を記録
+        self.api = WynncraftAPI()  # シーズンチェック用API
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
+        # シーズンチェックタスクを開始
+        self.season_check_task.start()
+
+    def cog_unload(self):
+        self.season_check_task.cancel()
+
+    @tasks.loop(minutes=1)
+    async def season_check_task(self):
+        """1分おきにシーズン状態をチェック"""
+        try:
+            global is_offseason
+            seq_data = await self.api.get_seq_guild_for_season_check()
+            if not seq_data or 'seasonRanks' not in seq_data:
+                logger.warning("[SeasonCheck] SEQギルドのseasonRanksデータ取得失敗")
+                return
+                
+            season_ranks = seq_data['seasonRanks']
+            if not season_ranks:
+                logger.warning("[SeasonCheck] seasonRanksが空です")
+                return
+                
+            # 最新シーズンを取得（シーズン番号でソート）
+            latest_season_key = max(season_ranks.keys(), key=int)
+            latest_season = season_ranks[latest_season_key]
+            
+            # finalTerritoriesの存在でオフシーズン判定
+            new_offseason_status = 'finalTerritories' in latest_season
+            
+            if new_offseason_status != is_offseason:
+                is_offseason = new_offseason_status
+                status_msg = "オフシーズン" if is_offseason else "シーズン中"
+                logger.info(f"[SeasonCheck] シーズン状態変更: {status_msg} (シーズン{latest_season_key})")
+            
+        except Exception as e:
+            logger.error(f"[SeasonCheck] シーズンチェックで例外: {e}", exc_info=True)
+
+    @season_check_task.before_loop
+    async def before_season_check_task(self):
+        await self.bot.wait_until_ready()
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -110,6 +154,20 @@ class SpamDetectorCog(commands.Cog):
     async def _check_territory_loss(self, message: discord.Message):
         """領地奪取監視機能"""
         try:
+            # オフシーズンチェック（raid_tracker_taskのseasonRanksデータを参照）
+            from tasks.raid_tracker_task import current_season_ranks
+            if current_season_ranks:
+                try:
+                    # 最新シーズンを取得
+                    latest_season_key = max(current_season_ranks.keys(), key=int)
+                    latest_season = current_season_ranks[latest_season_key]
+                    # finalTerritoriesが存在すればオフシーズン
+                    if 'finalTerritories' in latest_season:
+                        logger.debug(f"[TerritoryLoss] オフシーズンのため領地監視機能は停止中 (シーズン{latest_season_key})")
+                        return
+                except (ValueError, KeyError) as e:
+                    logger.warning(f"[TerritoryLoss] seasonRanks解析エラー: {e}")
+                
             # 指定されたチャンネルでなければ無視
             if message.channel.id != TERRITORY_MONITOR_CHANNEL:
                 return
