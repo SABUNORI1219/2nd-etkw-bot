@@ -117,9 +117,9 @@ class SpamDetectorCog(commands.Cog):
                     # 最新シーズンを取得
                     latest_season_key = max(current_season_ranks.keys(), key=int)
                     latest_season = current_season_ranks[latest_season_key]
-                    # finalTerritoriesが存在すればオフシーズン
-                    if 'finalTerritories' in latest_season:
-                        logger.debug(f"[TerritoryLoss] オフシーズンのため領地監視機能は停止中 (シーズン{latest_season_key})")
+                    # finalTerritoriesが存在してかつ値が0の場合オフシーズン
+                    if 'finalTerritories' in latest_season and latest_season['finalTerritories'] != 0:
+                        logger.info(f"[TerritoryLoss] オフシーズンのため領地監視機能は停止中 (シーズン{latest_season_key})")
                         return
                 except (ValueError, KeyError) as e:
                     logger.warning(f"[TerritoryLoss] seasonRanks解析エラー: {e}")
@@ -160,7 +160,7 @@ class SpamDetectorCog(commands.Cog):
             if attacker_match:
                 attacker_guild = attacker_match.group(1).strip()
                 # 指定ギルドに奪われた場合はスルー
-                SKIP_GUILDS = {"The Nameless Samurai", "JFZN JAPAN", "wasting consumables", "Nobody"}
+                SKIP_GUILDS = {"Empire of TKW", "The Nameless Samurai", "JFZN JAPAN", "wasting consumables", "Nobody"}
                 if attacker_guild in SKIP_GUILDS:
                     return
             else:
