@@ -81,20 +81,34 @@ class WynncraftAPI:
 class OtherAPI:
     def __init__(self):
         self.guild_color_headers = {
-            'User-Agent': 'Mozilla/5.0 ...',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://athena.wynntils.com/'
         }
         self.vzge_headers = {
-            'User-Agent': 'Mozilla/5.0 ...',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Cache-Control': 'no-cache',
             'Referer': 'https://vzge.me/'
         }
-        self.session = aiohttp.ClientSession()
+        # コネクション最適化
+        connector = aiohttp.TCPConnector(
+            limit=20,  # 総接続数制限
+            limit_per_host=5,  # ホスト別接続数制限
+            ttl_dns_cache=300,  # DNS キャッシュ時間
+            use_dns_cache=True,  # DNS キャッシュ有効
+            keepalive_timeout=30,  # Keep-Alive タイムアウト
+            enable_cleanup_closed=True  # 閉じた接続のクリーンアップ
+        )
+        self.session = aiohttp.ClientSession(connector=connector)
 
-    async def _make_request(self, url: str, *, headers=None, return_bytes: bool = False, max_retries: int = 5, timeout: int = 10):
+    async def _make_request(self, url: str, *, headers=None, return_bytes: bool = False, max_retries: int = 5, timeout: int = 6):
         for i in range(max_retries):
             try:
-                async with self.session.get(url, headers=headers, timeout=timeout) as response:
+                # より短い個別タイムアウト設定
+                timeout_obj = aiohttp.ClientTimeout(total=timeout, connect=3)
+                async with self.session.get(url, headers=headers, timeout=timeout_obj) as response:
                     if 200 <= response.status < 301:
                         if return_bytes:
                             data = await response.read()
@@ -106,14 +120,21 @@ class OtherAPI:
                         logger.warning(f"APIが{response.status}エラーを返しました。URL: {url}")
                         return None
                     if response.status in [408, 500, 502, 503, 504]:
-                        logger.warning(f"APIが{response.status}。再試行 ({i+1}/{max_retries}) URL: {url}")
-                        await asyncio.sleep(2)
+                        # 短めの間隔で素早くリトライ
+                        wait_time = min(1.5 ** i, 4)  # 指数バックオフ、最大4秒
+                        logger.warning(f"APIが{response.status}。{wait_time:.1f}秒後に再試行 ({i+1}/{max_retries}) URL: {url}")
+                        await asyncio.sleep(wait_time)
                         continue
                     logger.error(f"API予期せぬエラー: Status {response.status}, URL: {url}")
                     return None
+            except asyncio.TimeoutError:
+                wait_time = min(1.0 ** i, 2)  # タイムアウト時はより短い間隔
+                logger.warning(f"タイムアウト。{wait_time:.1f}秒後に再試行 ({i+1}/{max_retries}) URL: {url}")
+                await asyncio.sleep(wait_time)
+                continue
             except Exception as e:
                 logger.error(f"APIリクエスト例外: {repr(e)}", exc_info=True)
-                await asyncio.sleep(2)
+                await asyncio.sleep(1.5)
         logger.error(f"最大再試行回数({max_retries})到達。URL: {url}")
         return None
 
