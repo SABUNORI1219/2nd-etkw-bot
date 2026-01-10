@@ -12,6 +12,7 @@ from config import (
     ETKW_SERVER, 
     TERRITORY_LOSS_NOTIFICATION_CHANNEL,
     TERRITORY_LOSS_MENTION_USERS,
+    HQ_OR_CONN_LOSS_USERS,
     TERRITORY_MONITOR_CHANNEL
 )
 from lib.utils import create_embed
@@ -172,10 +173,21 @@ class SpamDetectorCog(commands.Cog):
             if not notification_channel:
                 return
             
+            # 重要領地リスト（HQ_OR_CONN_LOSS_USERSも追加メンション対象）
+            CRITICAL_TERRITORIES = {
+                "Illuminant Path", "Canyon Walkway", "Wizard Tower", 
+                "Workshop Glade", "Bandit's Toll"
+            }
+            
             # Ping対象：config指定ユーザーの中でオンライン＋最近アクティブでない人のみ抽出
             from tasks.raid_tracker_task import current_tracking_members
             linked_members = get_all_linked_members()
             target_set = set(TERRITORY_LOSS_MENTION_USERS or [])
+            
+            # 重要領地の場合はHQ_OR_CONN_LOSS_USERSも対象に追加
+            if territory_name in CRITICAL_TERRITORIES:
+                target_set.update(set(HQ_OR_CONN_LOSS_USERS or []))
+            
             # mcid->discord_id のマップ（config指定ユーザーのみ）
             mcid_to_discord = {m["mcid"]: m.get("discord_id") for m in linked_members if m.get("discord_id") in target_set}
             # オンライン＋最近アクティブなMCIDセットを作成
