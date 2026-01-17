@@ -22,6 +22,7 @@ from config import (
     send_authorized_only_message,
     RANK_ROLE_ID_MAP,
     ETKW,
+    ETKW_SERVER,
     Ticket,
     PROMOTION_ROLE_MAP,
     ROLE_ID_TO_RANK
@@ -199,6 +200,10 @@ class MemberCog(commands.GroupCog, group_name="member", description="ギルド�
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
+        # ETKW_SERVERでない場合は無視
+        if member.guild.id != ETKW_SERVER:
+            return
+
         linked_member = get_member(discord_id=member.id)
         if linked_member:
             # discord_idだけ解除
