@@ -193,7 +193,38 @@ class PlayerSelectView(discord.ui.View):
                         "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"
                     }
                     response = requests.get(skin_url, headers=headers)
+                    
+                    # HTTPレスポンスのチェック
+                    if response.status_code != 200:
+                        logger.warning(f"スキン画像取得失敗: HTTP {response.status_code} for {uuid}")
+                        raise Exception(f"HTTP {response.status_code}")
+                    
+                    # Content-Typeのチェック
+                    content_type = response.headers.get('content-type', '').lower()
+                    if not content_type.startswith('image/'):
+                        logger.warning(f"無効なContent-Type: {content_type} for {uuid}")
+                        raise Exception(f"Invalid content-type: {content_type}")
+                    
                     image_bytes = response.content
+                    
+                    # 画像データの検証とPNG形式への変換
+                    try:
+                        # PILで画像を読み込んで検証
+                        temp_image = Image.open(BytesIO(image_bytes))
+                        temp_image.verify()  # 画像の整合性チェック
+                        
+                        # 再度開いてPNG形式に変換（verifyすると画像が壊れるため）
+                        temp_image = Image.open(BytesIO(image_bytes))
+                        png_bytes = BytesIO()
+                        temp_image.save(png_bytes, format='PNG')
+                        image_bytes = png_bytes.getvalue()
+                        png_bytes.close()
+                        temp_image.close()
+                        
+                    except Exception as img_error:
+                        logger.warning(f"画像検証/変換失敗 for {uuid}: {img_error}")
+                        raise Exception(f"Image validation failed: {img_error}")
+                    
                     emoji_name = f"skin_{stored_name}_{uuid[:6]}"
                     emoji = await guild.create_custom_emoji(name=emoji_name, image=image_bytes)
                     self.skin_emojis[uuid] = emoji
@@ -204,7 +235,7 @@ class PlayerSelectView(discord.ui.View):
                         emoji=discord.PartialEmoji(name=emoji.name, id=emoji.id)
                     )
                 except Exception as e:
-                    logger.error(f"絵文字追加失敗: {e}")
+                    logger.error(f"絵文字追加失敗 for {stored_name} ({uuid[:8]}): {e}")
                     option = discord.SelectOption(
                         label=label_text,
                         value=uuid,
