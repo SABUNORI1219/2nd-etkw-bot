@@ -94,7 +94,7 @@ class OdenecoCog(commands.Cog):
 
             while self.is_pinging:
                 try:
-                    await channel.send(f"<@&{ODENECO_TARGET_ROLE}>")
+                    await channel.send(f"<@&{ODENECO_TARGET_ROLE}> ECO SIYOU BY TKB!!!")
                     await asyncio.sleep(1)
                 except discord.Forbidden:
                     logger.error(f"--- [Odeneco] チャンネル {channel.name} に送信権限がありません")
