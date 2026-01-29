@@ -20,7 +20,7 @@ class OdenecoCog(commands.Cog):
         self.is_pinging = False
         logger.info(f"--- [Cog] {self.__class__.__name__} が読み込まれました。")
 
-    @discord.app_commands.command(name="odeneco", description="指定のロールを1秒おきにpingし続ける")
+    @discord.app_commands.command(name="odeneco", description="おでんロールを1秒おきにぴんぎんぐ")
     async def odeneco_command(self, interaction: discord.Interaction):
         # 権限チェック
         if interaction.user.id not in ODENECO_AUTHORIZED_USERS:
@@ -51,7 +51,7 @@ class OdenecoCog(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
         logger.info(f"--- [Odeneco] {interaction.user.name} がodenecoを開始しました")
 
-    @discord.app_commands.command(name="stop", description="odenecoのpingを停止する")
+    @discord.app_commands.command(name="stop", description="おでんのぴんぐをストップ")
     async def stop_command(self, interaction: discord.Interaction):
         # 権限チェック
         if interaction.user.id not in ODENECO_AUTHORIZED_USERS:
