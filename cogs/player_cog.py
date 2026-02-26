@@ -4,7 +4,6 @@ from discord.ext import commands
 import logging
 import os
 from datetime import datetime, timezone, timedelta
-import requests
 import time
 from io import BytesIO
 from PIL import Image
@@ -187,25 +186,12 @@ class PlayerSelectView(discord.ui.View):
                 label_text = f"[{rank_display}] {stored_name}"
 
                 try:
-                    skin_url = f"https://crafatar.com/avatars/{uuid}?size=32&overlay&ts={int(time.time())}"
-                    headers = {
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-                        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"
-                    }
-                    response = requests.get(skin_url, headers=headers)
+                    # api_stocker.pyのretry機能付きCrafatar API関数を使用
+                    image_bytes = await self.cog_instance.other_api.get_crafatar_avatar(uuid, size=32, overlay=True)
                     
-                    # HTTPレスポンスのチェック
-                    if response.status_code != 200:
-                        logger.warning(f"スキン画像取得失敗: HTTP {response.status_code} for {uuid}")
-                        raise Exception(f"HTTP {response.status_code}")
-                    
-                    # Content-Typeのチェック
-                    content_type = response.headers.get('content-type', '').lower()
-                    if not content_type.startswith('image/'):
-                        logger.warning(f"無効なContent-Type: {content_type} for {uuid}")
-                        raise Exception(f"Invalid content-type: {content_type}")
-                    
-                    image_bytes = response.content
+                    if not image_bytes:
+                        logger.warning(f"スキン画像取得失敗: Empty response for {uuid}")
+                        raise Exception("Empty response")
                     
                     # 画像データの検証とPNG形式への変換
                     try:
@@ -235,7 +221,7 @@ class PlayerSelectView(discord.ui.View):
                         emoji=discord.PartialEmoji(name=emoji.name, id=emoji.id)
                     )
                 except Exception as e:
-                    logger.error(f"絵文字追加失敗 for {stored_name} ({uuid[:8]}): {e}")
+                    logger.warning(f"絵文字追加失敗 for {stored_name} ({uuid[:8]}): {e}")
                     option = discord.SelectOption(
                         label=label_text,
                         value=uuid,

@@ -89,7 +89,7 @@ class Territory(commands.GroupCog, name="territory"):
                 production_text_list.append(f"{emoji} {display_res_name}: `+{amount}/h`")
         production_text = "\n".join(production_text_list) if production_text_list else "None"
         conns_count = len(static_data.get('Trading Routes', []))
-        embed = discord.Embed(title=f"{territory}", color=discord.Color.dark_teal())
+        embed = discord.Embed(title=f"{territory}", color=discord.Color.purple)
         guild_name = target_territory_live_data['guild']['name']
         guild_prefix = target_territory_live_data['guild']['prefix']
         embed.add_field(name="Guild", value=f"[{guild_prefix}] {guild_name}", inline=False)
@@ -186,11 +186,6 @@ class Territory(commands.GroupCog, name="territory"):
     async def map(self, interaction: discord.Interaction, guild: str = None):
         await interaction.response.defer()
 
-        # 権限チェック
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
-            return
-
         territory_data = await self.get_territory_data_with_cache()
         guild_color_map = await self.get_guild_color_map_with_cache()
         if not territory_data or not guild_color_map:
@@ -257,11 +252,6 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.describe(territory="Territory Name")
     async def status(self, interaction: discord.Interaction, territory: str):
         await interaction.response.defer()
-
-        # 権限チェック
-        if interaction.user.id not in AUTHORIZED_USER_IDS:
-            await send_authorized_only_message(interaction)
-            return
 
         static_data = self.map_renderer.local_territories.get(territory)
         guild_color_map = await self.get_guild_color_map_with_cache()

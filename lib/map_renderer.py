@@ -297,7 +297,7 @@ class MapRenderer:
                 file = discord.File(map_bytes, filename="wynn_map.png")
                 embed = discord.Embed(
                     title="",
-                    color=discord.Color.green()
+                    color=discord.Color.purple()
                 )
                 embed.set_image(url="attachment://wynn_map.png")
                 embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
