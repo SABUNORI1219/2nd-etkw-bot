@@ -24,7 +24,7 @@ class MapRenderer:
             raise
 
     def _coord_to_pixel(self, x, z):
-        return x + 3200, z + 7200
+        return x + 2400, z + 6600
 
     def _hex_to_rgb(self, hex_color: str) -> tuple:
         hex_color = hex_color.lstrip('#')
