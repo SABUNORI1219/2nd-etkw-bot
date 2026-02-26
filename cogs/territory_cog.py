@@ -231,13 +231,16 @@ class Territory(commands.GroupCog, name="territory"):
             file = discord.File(fp=BytesIO(map_bytes), filename="wynn_map.png")
             embed = discord.Embed.from_dict(embed_dict)
             
-            # 統計Embedを作成
-            stats_embed = self.map_renderer.create_territory_stats_embed(territory_data)
+            # guildが指定されていない場合のみ統計Embedを作成・送信
+            if guild is None:
+                stats_embed = self.map_renderer.create_territory_stats_embed(territory_data)
+                await interaction.followup.send(file=file, embeds=[embed, stats_embed])
+                del stats_embed
+            else:
+                await interaction.followup.send(file=file, embed=embed)
             
-            # 画像と統計Embedを同時に送信
-            await interaction.followup.send(file=file, embeds=[embed, stats_embed])
             file.close()
-            del file, embed, stats_embed
+            del file, embed
         else:
             embed = create_embed(description="マップの生成中にエラーが発生しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
