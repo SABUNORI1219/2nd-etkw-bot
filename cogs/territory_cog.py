@@ -89,7 +89,7 @@ class Territory(commands.GroupCog, name="territory"):
                 production_text_list.append(f"{emoji} {display_res_name}: `+{amount}/h`")
         production_text = "\n".join(production_text_list) if production_text_list else "None"
         conns_count = len(static_data.get('Trading Routes', []))
-        embed = discord.Embed(title=f"{territory}", color=discord.Color.purple)
+        embed = discord.Embed(title=f"{territory}", color=discord.Color.purple())
         guild_name = target_territory_live_data['guild']['name']
         guild_prefix = target_territory_live_data['guild']['prefix']
         embed.add_field(name="Guild", value=f"[{guild_prefix}] {guild_name}", inline=False)
