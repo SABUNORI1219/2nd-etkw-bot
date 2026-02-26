@@ -185,6 +185,12 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.describe(guild="On-map Guild Prefix")
     async def map(self, interaction: discord.Interaction, guild: str = None):
         await interaction.response.defer()
+
+        # 権限チェック
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
+            return
+
         territory_data = await self.get_territory_data_with_cache()
         guild_color_map = await self.get_guild_color_map_with_cache()
         if not territory_data or not guild_color_map:
@@ -251,6 +257,12 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.describe(territory="Territory Name")
     async def status(self, interaction: discord.Interaction, territory: str):
         await interaction.response.defer()
+
+        # 権限チェック
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
+            return
+
         static_data = self.map_renderer.local_territories.get(territory)
         guild_color_map = await self.get_guild_color_map_with_cache()
         territory_data = await self.get_territory_data_with_cache()
