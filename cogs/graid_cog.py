@@ -411,6 +411,7 @@ class GuildRaidDetector(commands.GroupCog, name="graid"):
         if interaction.user.id not in AUTHORIZED_USER_IDS:
             await send_authorized_only_message(interaction)
             return
+        
         set_config("NOTIFY_CHANNEL_ID", str(channel.id))
         embed = create_embed(
             description=None,

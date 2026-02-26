@@ -185,6 +185,12 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.describe(guild="On-map Guild Prefix")
     async def map(self, interaction: discord.Interaction, guild: str = None):
         await interaction.response.defer()
+
+        # 権限チェック
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
+            return
+
         territory_data = await self.get_territory_data_with_cache()
         guild_color_map = await self.get_guild_color_map_with_cache()
         if not territory_data or not guild_color_map:
@@ -231,13 +237,16 @@ class Territory(commands.GroupCog, name="territory"):
             file = discord.File(fp=BytesIO(map_bytes), filename="wynn_map.png")
             embed = discord.Embed.from_dict(embed_dict)
             
-            # 統計Embedを作成
-            stats_embed = self.map_renderer.create_territory_stats_embed(territory_data)
+            # guildが指定されていない場合のみ統計Embedを作成・送信
+            if guild is None:
+                stats_embed = self.map_renderer.create_territory_stats_embed(territory_data)
+                await interaction.followup.send(file=file, embeds=[embed, stats_embed])
+                del stats_embed
+            else:
+                await interaction.followup.send(file=file, embed=embed)
             
-            # 画像と統計Embedを同時に送信
-            await interaction.followup.send(file=file, embeds=[embed, stats_embed])
             file.close()
-            del file, embed, stats_embed
+            del file, embed
         else:
             embed = create_embed(description="マップの生成中にエラーが発生しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
             await interaction.followup.send(embed=embed)
@@ -248,6 +257,12 @@ class Territory(commands.GroupCog, name="territory"):
     @app_commands.describe(territory="Territory Name")
     async def status(self, interaction: discord.Interaction, territory: str):
         await interaction.response.defer()
+
+        # 権限チェック
+        if interaction.user.id not in AUTHORIZED_USER_IDS:
+            await send_authorized_only_message(interaction)
+            return
+
         static_data = self.map_renderer.local_territories.get(territory)
         guild_color_map = await self.get_guild_color_map_with_cache()
         territory_data = await self.get_territory_data_with_cache()
