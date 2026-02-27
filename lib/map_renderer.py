@@ -159,8 +159,19 @@ class MapRenderer:
                 static = self.local_territories.get(name)
                 if not static or "Location" not in static:
                     continue
+                
+                # ギルドデータがない場合のデフォルト値を設定
                 if "guild" not in info or not info["guild"].get("prefix"):
-                    continue
+                    # 無所属領地として扱う
+                    guild_info = {
+                        "prefix": "None",
+                        "name": "No Owner"
+                    }
+                    prefix = "None"
+                else:
+                    guild_info = info["guild"]
+                    prefix = info["guild"]["prefix"]
+                
                 t_px1, t_py1 = self._coord_to_pixel(*static["Location"]["start"])
                 t_px2, t_py2 = self._coord_to_pixel(*static["Location"]["end"])
                 t_scaled_px1, t_scaled_py1 = t_px1 * self.scale_factor, t_py1 * self.scale_factor
@@ -172,8 +183,13 @@ class MapRenderer:
                     t_px1_rel, t_py1_rel, t_px2_rel, t_py2_rel = t_scaled_px1, t_scaled_py1, t_scaled_px2, t_scaled_py2
                 x_min, x_max = sorted([t_px1_rel, t_px2_rel])
                 y_min, y_max = sorted([t_py1_rel, t_py2_rel])
-                prefix = info["guild"]["prefix"]
-                color_hex = guild_color_map.get(prefix, "#FFFFFF")
+                
+                # 無所属領地の場合は白色、それ以外はギルドカラー
+                if prefix == "None":
+                    color_hex = "#FFFFFF"  # 白色
+                else:
+                    color_hex = guild_color_map.get(prefix, "#FFFFFF")
+                    
                 color_rgb = self._hex_to_rgb(color_hex)
                 overlay_draw.rectangle([x_min, y_min, x_max, y_max], fill=(*color_rgb, 64))
                 draw.rectangle([x_min, y_min, x_max, y_max], outline=color_rgb, width=2)
