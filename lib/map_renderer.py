@@ -36,11 +36,19 @@ class MapRenderer:
     def _get_guild_territory_stats(self, territory_data):
         """ギルドごとの領地保持統計を計算"""
         guild_stats = {}
-        for name, info in territory_data.items():
-            if "guild" not in info or not info["guild"].get("prefix"):
-                continue
-            prefix = info["guild"]["prefix"]
-            guild_name = info["guild"]["name"]
+        
+        # 全領地をベースにして統計を計算（APIデータがない領地も含む）
+        for name in self.local_territories.keys():
+            info = territory_data.get(name)
+            
+            if not info or "guild" not in info or not info["guild"].get("prefix"):
+                # APIデータがない、またはギルドデータがない場合はNoneとして扱う
+                prefix = "None"
+                guild_name = "No Owner"
+            else:
+                prefix = info["guild"]["prefix"]
+                guild_name = info["guild"]["name"]
+            
             if prefix not in guild_stats:
                 guild_stats[prefix] = {
                     "name": guild_name,
@@ -155,21 +163,26 @@ class MapRenderer:
             time_font_size = max(8, int(scaled_font_size * 0.6))
             time_font = self._get_font(time_font_size)
             
-            for name, info in territory_data.items():
-                static = self.local_territories.get(name)
-                if not static or "Location" not in static:
+            # 全領地をベースにして描画（APIデータがない領地も含む）
+            for name, static in self.local_territories.items():
+                if "Location" not in static:
                     continue
                 
-                # ギルドデータがない場合のデフォルト値を設定
-                if "guild" not in info or not info["guild"].get("prefix"):
-                    # 無所属領地として扱う
-                    guild_info = {
-                        "prefix": "None",
-                        "name": "No Owner"
-                    }
+                # APIデータを取得、なければデフォルト値を使用
+                info = territory_data.get(name)
+                
+                if not info or "guild" not in info or not info["guild"].get("prefix"):
+                    # APIデータがない、またはギルドデータがない場合のデフォルト値
                     prefix = "None"
+                    # デフォルトのacquiredデータも設定（統計用）
+                    info = {
+                        "guild": {
+                            "prefix": "None",
+                            "name": "No Owner"
+                        },
+                        "acquired": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                    }
                 else:
-                    guild_info = info["guild"]
                     prefix = info["guild"]["prefix"]
                 
                 t_px1, t_py1 = self._coord_to_pixel(*static["Location"]["start"])
