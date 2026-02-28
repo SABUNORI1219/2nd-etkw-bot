@@ -276,8 +276,25 @@ class MapRenderer:
 
     # デフォルトマップ生成するやつ
     def create_territory_map(self, territory_data: dict, territories_to_render: dict, guild_color_map: dict, show_held_time: bool = False) -> tuple[discord.File | None, discord.Embed | None]:
-        if not territories_to_render:
+        # territories_to_render を全領地ベースに変更（APIデータがない領地も含む）
+        all_territories_to_render = {}
+        for name in self.local_territories.keys():
+            if name in territories_to_render:
+                all_territories_to_render[name] = territories_to_render[name]
+            else:
+                # APIデータがない場合のデフォルト値
+                all_territories_to_render[name] = {
+                    "guild": {
+                        "prefix": "None", 
+                        "name": "No Owner"
+                    },
+                    "acquired": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "location": self.local_territories[name]["Location"]  # static dataから位置情報を取得
+                }
+        
+        if not all_territories_to_render:
             return None, None
+            
         resized_map, scale_factor = self._get_map_and_scale()
         self.scale_factor = scale_factor
         map_to_draw_on = None
@@ -285,11 +302,23 @@ class MapRenderer:
         embed = None
         box = None
         all_x, all_y = [], []
-        is_zoomed = len(territories_to_render) < len(self.local_territories)
+        
+        # 元のterritories_to_renderが一部のギルドのみの場合のみズーム
+        original_guild_filter = len(territories_to_render) < len(self.local_territories) and len(territories_to_render) > 0
+        is_zoomed = original_guild_filter
+        
         try:
             if is_zoomed:
-                for terri_data in territories_to_render.values():
-                    loc = terri_data.get("location", {})
+                for name, terri_data in territories_to_render.items():
+                    loc = terri_data.get("location")
+                    if not loc:
+                        # APIデータがない場合はstatic dataから取得
+                        static_data = self.local_territories.get(name)
+                        if static_data and "Location" in static_data:
+                            loc = static_data["Location"]
+                        else:
+                            continue
+                    
                     start_x, start_z = loc.get("start", [0,0])
                     end_x, end_z = loc.get("end", [0,0])
                     px1, py1 = self._coord_to_pixel(start_x, start_z)
@@ -345,14 +374,15 @@ class MapRenderer:
         if not terri_static or 'Location' not in terri_static:
             logger.error(f"'{territory}'にLocationデータがありません。")
             return None
+            
         terri_live = territory_data.get(territory)
-        if not terri_live or "guild" not in terri_live:
-            logger.error(f"領地 {territory} にAPIライブデータがありません。")
-            return None
-        owner_prefix = terri_live["guild"].get("prefix")
-        if not owner_prefix:
-            logger.error(f"領地 {territory} の所有ギルドprefixがAPIデータにありません")
-            return None
+        if not terri_live or "guild" not in terri_live or not terri_live["guild"].get("prefix"):
+            # APIデータがない場合はNoneとして扱う
+            logger.info(f"領地 {territory} のAPIデータがないため、Noneとして処理します。")
+            owner_prefix = "None"
+        else:
+            owner_prefix = terri_live["guild"].get("prefix")
+        
         resized_map, scale_factor = self._get_map_and_scale()
         self.scale_factor = scale_factor
         map_to_draw_on = resized_map
