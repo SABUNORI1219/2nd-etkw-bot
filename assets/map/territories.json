@@ -1542,7 +1542,8 @@
       "wood": "0"
     },
     "Trading Routes": [
-      "Lighthouse Lookout"
+      "Lighthouse Lookout",
+      "Fort Torann"
     ],
     "Location": {
       "start": [-1822, -1995],
@@ -9818,5 +9819,412 @@
       "prefix": ""
     },
     "Acquired": ""
+  },
+  "Fort Torann": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "3600",
+      "crops": "0",
+      "fish": "0",
+      "wood": "0"
+    },
+    "Trading Routes": [
+      "Royal Gate",
+      "Forts in Fall",
+      "Wellspring of Eternity",
+      "Xima Valley"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-1999, -1674],
+      "end": [-1604, -1499]
+    }
+  },
+  "Wellspring of Eternity": {
+    "resources": {
+      "emeralds": "1800",
+      "ore": "900",
+      "crops": "900",
+      "fish": "900",
+      "wood": "900"
+    },
+    "Trading Routes": [
+      "Fort Torann",
+      "The Frog Bog"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-2290, -1751],
+      "end": [-2019, -1555]
+    }
+  },
+  "Royal Dam": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "0",
+      "crops": "0",
+      "fish": "0",
+      "wood": "3600"
+    },
+    "Trading Routes": [
+      "Forts in Fall",
+      "Lake Gitephe"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-1779, -1003],
+      "end": [-1609, -1014]
+    }
+  },
+  "Xima Valley": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "0",
+      "crops": "0",
+      "fish": "3600",
+      "wood": "0"
+    },
+    "Trading Routes": [
+      "Fort Torann"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [1824, -1749],
+      "end": [-1634, -1518]
+    }
+  },
+  "The Frog Bog": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "0",
+      "crops": "0",
+      "fish": "3600",
+      "wood": "0"
+    },
+    "Trading Routes": [
+      "Forts in Fall",
+      "Wellspring of Eternity",
+      "Festival Grounds"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-2224, -1492],
+      "end": [-2077, -1336]
+    }
+  },
+  "Forts in Fall": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "0",
+      "crops": "0",
+      "fish": "0",
+      "wood": "3600"
+    },
+    "Trading Routes": [
+      "The Lumbermill",
+      "Espren",
+      "Royal Dam",
+      "Fort Torann",
+      "The Frog Bog"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-2038, -1475],
+      "end": [-1816, -1133]
+    }
+  },
+  "Festival Grounds": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "0",
+      "crops": "0",
+      "fish": "0",
+      "wood": "3600"
+    },
+    "Trading Routes": [
+      "Espren",
+      "The Frog Bog"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-2274, -1299],
+      "end": [-2153, -968]
+    }
+  },
+  "Espren": {
+    "resources": {
+      "emeralds": "18000",
+      "ore": "0",
+      "crops": "0",
+      "fish": "0",
+      "wood": "3600"
+    },
+    "Trading Routes": [
+      "Forts in Fall",
+      "Agricultural Sector",
+      "The Lumbermill",
+      "Festival Grounds"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-2142, -1135],
+      "end": [-1978, -936]
+    }
+  },
+  "Aldwell": {
+    "resources": {
+      "emeralds": "18000",
+      "ore": "0",
+      "crops": "3600",
+      "fish": "0",
+      "wood": "0"
+    },
+    "Trading Routes": [
+      "Deforested Ecotone",
+      "Verdant Grove",
+      "Fort Hegea",
+      "Alder Understory"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-1355, -757],
+      "end": [-1201, -645]
+    }
+  },
+  "Fort Hegea": {
+    "resources": {
+      "emeralds": "1800",
+      "ore": "900",
+      "crops": "900",
+      "fish": "900",
+      "wood": "900"
+    },
+    "Trading Routes": [
+      "Alder Understory",
+      "Aldwell"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-1193, -790],
+      "end": [-1053, -578]
+    }
+  },
+  "The Lumbermill": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "0",
+      "crops": "0",
+      "fish": "0",
+      "wood": "3600"
+    },
+    "Trading Routes": [
+      "Forts in Fall",
+      "Espren",
+      "Royal Barracks"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-1904, -1081],
+      "end": [-1805, -919]
+    }
+  },
+  "Agricultural Sector": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "0",
+      "crops": "3600",
+      "fish": "0",
+      "wood": "0"
+    },
+    "Trading Routes": [
+      "Residence Sector",
+      "Water Processing Sector",
+      "Espren",
+      "Industrial Sector"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-2290, -933],
+      "end": [-1975, -767]
+    }
+  },
+  "Residence Sector": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "0",
+      "crops": "3600",
+      "fish": "0",
+      "wood": "0"
+    },
+    "Trading Routes": [
+      "Agricultural Sector",
+      "Timasca"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-1965, -916],
+      "end": [-1804, -747]
+    }
+  },
+  "Verdant Grove": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "0",
+      "crops": "0",
+      "fish": "0",
+      "wood": "3600"
+    },
+    "Trading Routes": [
+      "Contested District",
+      "Deforested Ecotone",
+      "Highlands Gate",
+      "Aldwell"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-1480, -726],
+      "end": [-1369, -649]
+    }
+  },
+  "Industrial Sector": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "0",
+      "crops": "0",
+      "fish": "3600",
+      "wood": "0"
+    },
+    "Trading Routes": [
+      "Agricultural Sector",
+      "Water Processing Sector",
+      "Timasca"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-2112, -751],
+      "end": [-1895, -514]
+    }
+  },
+  "Water Processing Sector": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "0",
+      "crops": "3600",
+      "fish": "0",
+      "wood": "0"
+    },
+    "Trading Routes": [
+      "Agricultural Sector",
+      "Industrial Sector"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-2276, -751],
+      "end": [-2113, -500]
+    }
+  },
+  "Deforested Ecotone": {
+    "resources": {
+      "emeralds": "9000",
+      "ore": "0",
+      "crops": "0",
+      "fish": "0",
+      "wood": "3600"
+    },
+    "Trading Routes": [
+      "Verdant Grove",
+      "Aldwell",
+      "Timasca"
+    ],
+    "Guild": {
+      "uuid": "",
+      "name": "",
+      "prefix": ""
+    },
+    "Acquired": "",
+    "Location": {
+      "start": [-1575, -648],
+      "end": [-1315, -514]
+    }
   }
 }
