@@ -149,6 +149,17 @@ class OtherAPI:
         url = f"https://vzge.me/bust/256/{quote(uuid)}"
         return await self._make_request(url, headers=self.vzge_headers, return_bytes=True)
 
+    async def get_crafatar_avatar(self, uuid: str, size: int = 32, overlay: bool = True):
+        """Visage API からアバター画像を取得（絵文字用）"""
+        import time
+        # Visage APIではsizeはURLパスに含まれる、overlayパラメータは使用しない
+        url = f"https://visage.surgeplay.com/face/{size}/{quote(uuid)}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+        }
+        return await self._make_request(url, headers=headers, return_bytes=True, timeout=5)
+
     async def get_vzge_skin_image(self, uuid: str, size: int = 196):
         data = await self.get_vzge_skin(uuid)
         if not data:
