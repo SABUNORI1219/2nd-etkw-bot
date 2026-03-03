@@ -23,7 +23,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 # commands.Botを継承したカスタムBotクラス
 class MyBot(commands.Bot):
     def __init__(self):
-        super().__init__(command_prefix="!")
+        super().__init__(command_prefix="!", intents=discord.Intents.all())
 
     async def setup_hook(self):
         """Botの非同期セットアップを管理する"""
