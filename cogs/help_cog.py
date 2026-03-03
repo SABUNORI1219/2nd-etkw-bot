@@ -18,22 +18,10 @@ class HelpSelectMenu(discord.ui.Select):
                 value="player_guild"
             ),
             discord.SelectOption(
-                label="Empire of TKW メンバー管理",
-                description="ギルドメンバーの管理・検索コマンド",
-                emoji="🏰",
-                value="member"
-            ),
-            discord.SelectOption(
                 label="テリトリー関連",
                 description="テリトリーマップやステータスの確認",
                 emoji="🗺️",
                 value="territory"
-            ),
-            discord.SelectOption(
-                label="Guild Raid関連",
-                description="ギルドレイドの管理・履歴確認",
-                emoji="👹",
-                value="graid"
             ),
             discord.SelectOption(
                 label="その他・ユーティリティ",
@@ -75,43 +63,6 @@ class HelpSelectMenu(discord.ui.Select):
                 value="指定したギルドの詳細情報を表示します。\n• メンバー数、レベル、テリトリー数\n• ギルドバナー形式で表示\n• プレフィックスまたはギルド名で検索可能",
                 inline=False
             )
-        elif self.values[0] == "member":
-            embed = create_embed(
-                title="🏰 Empire of TKW メンバー管理",
-                description="ギルドメンバーの管理・検索に関するコマンド群です。",
-                color=discord.Color.gold(),
-                footer_text="引数: <> = 必須, [] = 任意 | Minister Chikuwa"
-            )
-            embed.add_field(
-                name="/member add <mcid> [discord_user]",
-                value="メンバーをリストに登録します。\n• discord_userが未指定の場合「discordなし」になります",
-                inline=False
-            )
-            embed.add_field(
-                name="/member remove [mcid] [discord_user]",
-                value="メンバーをリストから削除します。\n• MCIDまたはDiscord IDで指定\n• 両方指定された場合はMCIDが優先",
-                inline=False
-            )
-            embed.add_field(
-                name="/member search [mcid] [discord_user]",
-                value="メンバーの個人情報を表示します。\n• MCIDまたはDiscord IDで指定\n• 両方指定された場合はMCIDが優先",
-                inline=False
-            )
-            embed.add_field(
-                name="/member list [rank] [sort]",
-                value="メンバーリストを表示します。\n• rank: ゲーム内ランクで絞り込み\n• sort: 最終ログイン順で表示",
-                inline=False
-            )
-            embed.add_field(
-                name="/member promote <user> (管理者限定)",
-                value="Discord IDを指定してロールを昇格します。\n• **煮しめ** → **五目煮**\n• **五目煮** → **ちくわ懐石**",
-                inline=False
-            )
-            embed.add_field(
-                name="/member rename <name>",
-                value="自身のDiscord表示名を変更します。\n• ロール名含む32文字まで",
-                inline=False
-            )
         elif self.values[0] == "territory":
             embed = create_embed(
                 title="🗺️ テリトリー関連",
@@ -127,33 +78,6 @@ class HelpSelectMenu(discord.ui.Select):
             embed.add_field(
                 name="/territory status <territory>",
                 value="指定したテリトリーの詳細ステータスを表示します。\n• 保持ギルド、リソース情報\n• 保持開始時間、経過時間",
-                inline=False
-            )
-        elif self.values[0] == "graid":
-            embed = create_embed(
-                title="👹 Guild Raid関連",
-                description="ギルドレイドの管理・履歴確認に関するコマンド群です。",
-                color=discord.Color.red(),
-                footer_text="引数: <> = 必須, [] = 任意 | Minister Chikuwa"
-            )
-            embed.add_field(
-                name="/graid channel <channel> (制作者限定)",
-                value="Guild Raidをトラックするチャンネルを設定します。",
-                inline=False
-            )
-            embed.add_field(
-                name="/graid list <raid_name> [date] [hidden]",
-                value="Guild Raidのクリア履歴を表示します。\n• date: YYYY-MM-DD形式で日付指定\n• hidden: 非表示設定",
-                inline=False
-            )
-            embed.add_field(
-                name="/graid count <player> <raid_name> <count> (Mythic Chikuwa以上)",
-                value="プレイヤーのGuild Raidクリア回数を補正します。",
-                inline=False
-            )
-            embed.add_field(
-                name="/graid submit",
-                value="レイドクリア申請を行います。\n• モーダル形式で詳細入力",
                 inline=False
             )
         elif self.values[0] == "utility":
