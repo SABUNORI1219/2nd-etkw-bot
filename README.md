@@ -1,11 +1,9 @@
-# Minister Chikuwa
+# Onyx
 
-Empire of TKW [ETKW]メンバー専用のBot。
-Emperor Chikuwaという初代がいるため2ndとなっている。
-文字通り初代が皇帝なので、二代目は大臣となっている。
+Wynncraft関連の機能を持つユーティリティボット。
 
 ## 概要
-- Python製のDiscord Bot
+- Python 100%
 - 機能の追加は`cogs/`ディレクトリ配下で管理
 
 ## セットアップ
