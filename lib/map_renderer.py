@@ -316,7 +316,7 @@ class MapRenderer:
                     color=discord.Color.purple()
                 )
                 embed.set_image(url="attachment://wynn_map.png")
-                embed.set_footer(text=f"Territory Map ({formatted_time}) | Minister Chikuwa")
+                embed.set_footer(text=f"Territory Map ({formatted_time}) | Onyx")
                 return file, embed
             finally:
                 map_bytes.close()
