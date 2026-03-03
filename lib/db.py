@@ -1,9 +1,6 @@
 import os
 import logging
 import psycopg2
-from psycopg2.extras import execute_values
-from datetime import datetime, timedelta
-from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 

@@ -5,8 +5,6 @@ import os
 import logging
 import random
 import math
-import asyncio
-import requests
 from typing import Dict, List, Any, Optional
 
 from lib.api_stocker import WynncraftAPI

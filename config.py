@@ -5,49 +5,14 @@ from lib.utils import create_embed
 
 WYNNCRAFT_API_TOKEN = os.getenv('WYNN_API_TOKEN')
 
-# Discord関連 (環境変数から読み込み)
-TRACKING_CHANNEL_ID = int(os.getenv('NOTIFICATION_CHANNEL_ID', 0))
-
-# コマンドの許可ユーザーリスト（IDで管理）
+# コマンドの許可ユーザーリスト
 AUTHORIZED_USER_IDS = [
     1062535250099589120,
     1074666910496600174
     ]  # 必要ならここに追加
-SPAM_TARGET_USER_IDS = [
-    472416402255511555,
-    1062535250099589120,
-    861793764120330250
-]
 
 # サーバーID（スキン頭絵文字用）
 SKIN_EMOJI_SERVER_ID = 1158535340110381157
-
-ETKW_SERVER = 1119277416431501394
-
-# 領地奪取通知の設定
-TERRITORY_LOSS_NOTIFICATION_CHANNEL = 1398323430398623905  # 通知を送信するチャンネル
-TERRITORY_LOSS_MENTION_USERS = [
-    1133031420080697375, # surainu
-    977493951663706113, # torikun
-    1332780582345773186, # sylrym san?
-    1105036152978817047, # ougoniei
-    617964944385769472, # piepietale
-    1231810167717494857, # etkw strongest tank
-    976060044816842782, # irairausi
-    1065179809707208705, # whytonight
-    783536109589757973, # gas i
-]
-HQ_OR_CONN_LOSS_USERS = [
-    986597732728856620 # sutiru
-]
-TERRITORY_MONITOR_CHANNEL = 1168201699878506596  # 別Botが送信するチャンネル
-
-# odeneco機能の設定
-ODENECO_AUTHORIZED_USERS = [
-    472416402255511555 # tkb
-]
-ODENECO_TARGET_CHANNEL = 1134998208712560640
-ODENECO_TARGET_ROLE = 1166030526214320178
 
 # テリトリーリソースと絵文字の対応表
 RESOURCE_EMOJIS = {
@@ -56,37 +21,6 @@ RESOURCE_EMOJIS = {
     "WOOD": "<:wynn_wood:1395325681440788621>",
     "FISH": "<:wynn_fish:1395325644899881011>",
     "CROPS": "<:wynn_crop:1395325604806656032>"
-}
-
-RESTRICTION = 1132652296635961385
-
-ETKW = 1134305502323556403
-Ticket = 1387259707743277177
-
-# ここにランク→ロールIDのマッピング
-RANK_ROLE_ID_MAP = {
-    "Owner": 1240476623090876516,
-    "Chief": 1138142855517446144,
-    "Strategist": 1166030526214320178,
-    "Captain": 1166035741189607494,
-    "Recruiter": 1166036063081467914,
-    "Recruit": 1166036348050886657,
-}
-
-ROLE_ID_TO_RANK = {
-    1240476623090876516: "Owner",   # Owner Chikuwa-Owner
-    1127967768520704250: "Chief",   # Shiny Mythic Chikuwa-Chikuwa Kaiseki
-    1132652296635961385: "Chief",   # Mythic Chikuwa-Gomoku-ni
-    1138142855517446144: "Chief",   # Fabled Chikuwa-Nishime
-    1166030526214320178: "Strategist",   # Set Chikuwa-Oden
-    1166035741189607494: "Captain",   # Unique Chikuwa-Isobe Tempura
-    1166036063081467914: "Recruiter",   # Normal Chikuwa-Stuffed Chikuwa
-    1166036348050886657: "Chikuwa"   # Chikuwa-Raw Chikuwa
-}
-
-PROMOTION_ROLE_MAP = {
-    1138142855517446144: 1132652296635961385,  # Fabled -> Mythic
-    1132652296635961385: 1127967768520704250  # Mythic -> Shiny Mythic
 }
 
 async def send_authorized_only_message(interaction: discord.Interaction, user_ids=None):
@@ -98,5 +32,5 @@ async def send_authorized_only_message(interaction: discord.Interaction, user_id
         user_ids = AUTHORIZED_USER_IDS
     # mention形式のユーザー名リストを作る
     mentions = ", ".join([f"<@{uid}>" for uid in user_ids])
-    embed = create_embed(description=f"このコマンドは現在 {mentions} のみ使用できます！", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"Config | Minister Chikuwa")
+    embed = create_embed(description=f"このコマンドは現在 {mentions} のみ使用できます！", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"Config | Onyx")
     await interaction.response.send_message(embed=embed)

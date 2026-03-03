@@ -1,9 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-import requests
 from io import BytesIO
 import logging
 import os
-import asyncio
 
 logger = logging.getLogger(__name__)
 

@@ -3,14 +3,13 @@ from discord import app_commands
 from discord.ext import commands
 import logging
 import os
-from datetime import datetime, timezone, timedelta
-import time
+from datetime import datetime
 from io import BytesIO
 from PIL import Image
 
 from lib.api_stocker import WynncraftAPI, OtherAPI
 from lib.utils import create_embed
-from config import AUTHORIZED_USER_IDS, SKIN_EMOJI_SERVER_ID
+from config import SKIN_EMOJI_SERVER_ID
 from lib.cache_handler import CacheHandler
 from lib.banner_renderer import BannerRenderer
 from lib.profile_renderer import generate_profile_card
@@ -334,10 +333,10 @@ class PlayerCog(commands.Cog):
         except Exception as e:
             logger.error(f"画像生成または送信失敗: {e}")
             if use_edit:
-                failed_embed = create_embed(description="プロフィール画像生成に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                failed_embed = create_embed(description="プロフィール画像生成に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
                 await interaction.followup.send(embed=failed_embed)
             else:
-                embed = create_embed(description="プロフィール画像生成に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                embed = create_embed(description="プロフィール画像生成に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
                 await interaction.followup.send(embed=embed)
         finally:
             if skin_image is not None:
@@ -365,7 +364,7 @@ class PlayerCog(commands.Cog):
         else:
             data = await self.wynn_api.get_official_player_data(player)
             if not data or (isinstance(data, dict) and "error" in data and data.get("error") != "MultipleObjectsReturned"):
-                embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
                 await interaction.followup.send(embed=embed)
                 return
 
@@ -374,16 +373,16 @@ class PlayerCog(commands.Cog):
                 view = PlayerSelectView(player_collision_dict=player_collision_dict, cog_instance=self, owner_id=interaction.user.id)
                 await view.prepare_options(self.bot)
                 if hasattr(view, "select_menu") and view.select_menu.options:
-                    embed = create_embed(description="どちらの情報を表示しますか?\n(Multiple Object Returned)", title="👀 複数のプレイヤーが見つかりました", color=discord.Color.purple(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                    embed = create_embed(description="どちらの情報を表示しますか?\n(Multiple Object Returned)", title="👀 複数のプレイヤーが見つかりました", color=discord.Color.purple(), footer_text=f"{self.system_name} | Onyx")
                     await interaction.followup.send(embed=embed, view=view)
                 else:
-                    embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                    embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
                     await interaction.followup.send(embed=embed)
                 return
             if isinstance(data, dict) and 'username' in data:
                 self.cache.set_cache(cache_key, data)
             else:
-                embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Minister Chikuwa")
+                embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
                 await interaction.followup.send(embed=embed)
                 return
 

@@ -44,14 +44,14 @@ class HelpSelectMenu(discord.ui.Select):
                 title="💡 ヘルプメニュー",
                 description="このBotで利用できるコマンドのカテゴリです。\n下のメニューから詳細を確認したいカテゴリを選択してください。",
                 color=discord.Color.blurple(),
-                footer_text="ヘルプメニュー | Minister Chikuwa"
+                footer_text="ヘルプメニュー | Onyx"
             )
         elif self.values[0] == "player_guild":
             embed = create_embed(
                 title="👤 プレイヤー・ギルド情報",
                 description="プレイヤーやギルドの情報を表示するコマンド群です。",
                 color=discord.Color.green(),
-                footer_text="引数: <> = 必須, [] = 任意 | Minister Chikuwa"
+                footer_text="引数: <> = 必須, [] = 任意 | Onyx"
             )
             embed.add_field(
                 name="/player <name>",
@@ -68,7 +68,7 @@ class HelpSelectMenu(discord.ui.Select):
                 title="🗺️ テリトリー関連",
                 description="テリトリーマップやステータスの確認に関するコマンド群です。",
                 color=discord.Color.purple(),
-                footer_text="引数: <> = 必須, [] = 任意 | Minister Chikuwa"
+                footer_text="引数: <> = 必須, [] = 任意 | Onyx"
             )
             embed.add_field(
                 name="/territory map [guild]",
@@ -85,7 +85,7 @@ class HelpSelectMenu(discord.ui.Select):
                 title="🎲 その他・ユーティリティ",
                 description="ルーレットなどのその他機能に関するコマンド群です。",
                 color=discord.Color.orange(),
-                footer_text="引数: <> = 必須, [] = 任意 | Minister Chikuwa"
+                footer_text="引数: <> = 必須, [] = 任意 | Onyx"
             )
             embed.add_field(
                 name="/roulette <title> <options>",
@@ -125,7 +125,7 @@ class HelpCog(commands.Cog):
             title="💡 ヘルプメニュー",
             description="このBotで利用できるコマンドのカテゴリです。\n下のメニューから詳細を確認したいカテゴリを選択してください。",
             color=discord.Color.blurple(),
-            footer_text="ヘルプメニュー | Minister Chikuwa"
+            footer_text="ヘルプメニュー | Onyx"
         )
 
         view = HelpView()
