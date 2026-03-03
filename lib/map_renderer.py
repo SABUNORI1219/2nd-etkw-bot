@@ -86,7 +86,7 @@ class MapRenderer:
         else:
             embed.description = "No territory data available"
         
-        embed.set_footer(text="Territory Statistics | Minister Chikuwa")
+        embed.set_footer(text="Territory Statistics | Onyx_")
         return embed
 
     def _get_map_and_scale(self):
@@ -316,7 +316,7 @@ class MapRenderer:
                     color=discord.Color.purple()
                 )
                 embed.set_image(url="attachment://wynn_map.png")
-                embed.set_footer(text=f"Territory Map ({formatted_time}) | Onyx")
+                embed.set_footer(text=f"Territory Map ({formatted_time}) | Onyx_")
                 return file, embed
             finally:
                 map_bytes.close()

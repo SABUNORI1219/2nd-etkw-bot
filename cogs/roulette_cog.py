@@ -32,16 +32,16 @@ class RouletteCog(commands.Cog):
         random.shuffle(candidate_list)
 
         if len(candidate_list) < 2:
-            embed = create_embed(description="候補は2つ以上指定してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+            embed = create_embed(description="候補は2つ以上指定してください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
             await interaction.followup.send(embed=embed)
             return
         if len(candidate_list) > 8:
-            embed = create_embed(description="候補は最大8個までにしてください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+            embed = create_embed(description="候補は最大8個までにしてください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
             await interaction.followup.send(embed=embed)
             return
         for candidate in candidate_list:
             if len(candidate) > 10:
-                embed = create_embed(description=f"候補「{candidate}」が長すぎます。\n各候補は10文字以内にしてください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+                embed = create_embed(description=f"候補「{candidate}」が長すぎます。\n各候補は10文字以内にしてください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
                 await interaction.followup.send(embed=embed)
                 return
 
@@ -61,7 +61,7 @@ class RouletteCog(commands.Cog):
                 color=discord.Color.light_gray()
             )
             embed.set_image(url="attachment://roulette.gif")
-            embed.set_footer(text=f"ルーレット | Onyx")
+            embed.set_footer(text=f"ルーレット | Onyx_")
             message = await interaction.followup.send(embed=embed, file=gif_file)
 
             gif_buffer.close()
@@ -79,14 +79,14 @@ class RouletteCog(commands.Cog):
                 color=discord.Color.gold(),
             )
             result_embed.set_image(url="attachment://roulette_result.png")
-            result_embed.set_footer(text=f"ルーレット | Onyx")
+            result_embed.set_footer(text=f"ルーレット | Onyx_")
             await message.edit(embed=result_embed, attachments=[result_file])
 
             result_buffer.close()
             result_file.close()
             del result_buffer, result_file, result_embed
         else:
-            embed = create_embed(description="GIF画像の生成に失敗しました。\nもう一度コマンドをお試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+            embed = create_embed(description="GIF画像の生成に失敗しました。\nもう一度コマンドをお試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
             await interaction.followup.send(embed=embed)
             del embed
 

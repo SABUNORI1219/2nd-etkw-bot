@@ -1,4 +1,4 @@
-# Onyx
+# Onyx_
 
 Wynncraft関連の機能を持つユーティリティボット。
 

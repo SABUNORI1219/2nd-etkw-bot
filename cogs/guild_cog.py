@@ -60,7 +60,7 @@ class GuildImageCog(commands.Cog):
                 self.cache.set_cache(cache_key, data_to_use)
 
         if not data_to_use:
-            embed = create_embed(description=f"ギルド **{guild}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+            embed = create_embed(description=f"ギルド **{guild}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
             await interaction.followup.send(embed=embed)
             return
 
@@ -78,7 +78,7 @@ class GuildImageCog(commands.Cog):
                 title="🔗 公式サイトへのリンク",
                 description=f"[**{guild_name}**]({url})",
                 color=discord.Color.blue(),
-                footer_text=f"{self.system_name} | Onyx"
+                footer_text=f"{self.system_name} | Onyx_"
             )
             
             # 画像とEmbedを同時に送信
@@ -86,7 +86,7 @@ class GuildImageCog(commands.Cog):
             
         except Exception as e:
             logger.exception("ギルド画像生成中に例外が発生しました")
-            embed = create_embed(description="画像生成中にエラーが発生しました。", title="🔴 エラー", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+            embed = create_embed(description="画像生成中にエラーが発生しました。", title="🔴 エラー", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
             await interaction.followup.send(embed=embed)
 
 async def setup(bot: commands.Bot):

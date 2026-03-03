@@ -1,4 +1,4 @@
-# Minister Chikuwa (2nd-etkw-bot) Development Guide
+# Onyx_ (2nd-etkw-bot) Development Guide
 
 ## Communication Guidelines
 - 日本語で回答すること。

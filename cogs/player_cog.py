@@ -246,16 +246,16 @@ class PlayerSelectView(discord.ui.View):
 
     async def select_callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.owner_id:
-            embed = create_embed(description="この操作はコマンドを実行したユーザーのみ有効です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.cog_instance.system_name} | Minister Chikuwa")
+            embed = create_embed(description="この操作はコマンドを実行したユーザーのみ有効です。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.cog_instance.system_name} | Onyx_")
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         selected_uuid = self.select_menu.values[0]
         self.select_menu.disabled = True
-        embed = create_embed(description="プレイヤー情報を取得中...", title="👀 複数のプレイヤーが見つかりました", color=discord.Color.purple(), footer_text=f"{self.cog_instance.system_name} | Minister Chikuwa")
+        embed = create_embed(description="プレイヤー情報を取得中...", title="👀 複数のプレイヤーが見つかりました", color=discord.Color.purple(), footer_text=f"{self.cog_instance.system_name} | Onyx_")
         await interaction.response.edit_message(embed=embed, view=self)
         data = await self.cog_instance.wynn_api.get_official_player_data(selected_uuid)
         if not data or 'uuid' not in data:
-            failed_embed = create_embed(description="選択されたプレイヤーの情報を取得できませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.cog_instance.system_name} | Minister Chikuwa")
+            failed_embed = create_embed(description="選択されたプレイヤーの情報を取得できませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.cog_instance.system_name} | Onyx_")
             await interaction.message.edit(embed=failed_embed, view=None)
             await self.cleanup_emojis()
             return
@@ -333,10 +333,10 @@ class PlayerCog(commands.Cog):
         except Exception as e:
             logger.error(f"画像生成または送信失敗: {e}")
             if use_edit:
-                failed_embed = create_embed(description="プロフィール画像生成に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+                failed_embed = create_embed(description="プロフィール画像生成に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
                 await interaction.followup.send(embed=failed_embed)
             else:
-                embed = create_embed(description="プロフィール画像生成に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+                embed = create_embed(description="プロフィール画像生成に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
                 await interaction.followup.send(embed=embed)
         finally:
             if skin_image is not None:
@@ -364,7 +364,7 @@ class PlayerCog(commands.Cog):
         else:
             data = await self.wynn_api.get_official_player_data(player)
             if not data or (isinstance(data, dict) and "error" in data and data.get("error") != "MultipleObjectsReturned"):
-                embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+                embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
                 await interaction.followup.send(embed=embed)
                 return
 
@@ -373,16 +373,16 @@ class PlayerCog(commands.Cog):
                 view = PlayerSelectView(player_collision_dict=player_collision_dict, cog_instance=self, owner_id=interaction.user.id)
                 await view.prepare_options(self.bot)
                 if hasattr(view, "select_menu") and view.select_menu.options:
-                    embed = create_embed(description="どちらの情報を表示しますか?\n(Multiple Object Returned)", title="👀 複数のプレイヤーが見つかりました", color=discord.Color.purple(), footer_text=f"{self.system_name} | Onyx")
+                    embed = create_embed(description="どちらの情報を表示しますか?\n(Multiple Object Returned)", title="👀 複数のプレイヤーが見つかりました", color=discord.Color.purple(), footer_text=f"{self.system_name} | Onyx_")
                     await interaction.followup.send(embed=embed, view=view)
                 else:
-                    embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+                    embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
                     await interaction.followup.send(embed=embed)
                 return
             if isinstance(data, dict) and 'username' in data:
                 self.cache.set_cache(cache_key, data)
             else:
-                embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+                embed = create_embed(description=f"プレイヤー **{player}** が見つかりませんでした。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
                 await interaction.followup.send(embed=embed)
                 return
 

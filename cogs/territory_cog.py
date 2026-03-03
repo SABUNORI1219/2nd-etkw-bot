@@ -95,7 +95,7 @@ class Territory(commands.GroupCog, name="territory"):
         embed.add_field(name="Time Held for", value=f"`{held_for}`", inline=False)
         embed.add_field(name="Production", value=production_text, inline=False)
         embed.add_field(name="Original Conns", value=f"{conns_count} Conns", inline=False)
-        embed.set_footer(text="Territory Status | Minister Chikuwa")
+        embed.set_footer(text="Territory Status | Onyx_")
         return embed
 
     def cog_unload(self):
@@ -188,7 +188,7 @@ class Territory(commands.GroupCog, name="territory"):
         territory_data = await self.get_territory_data_with_cache()
         guild_color_map = await self.get_guild_color_map_with_cache()
         if not territory_data or not guild_color_map:
-            embed = create_embed(description="テリトリーまたはギルドカラー情報の取得に失敗しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+            embed = create_embed(description="テリトリーまたはギルドカラー情報の取得に失敗しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
             await interaction.followup.send(embed=embed)
             return
 
@@ -199,7 +199,7 @@ class Territory(commands.GroupCog, name="territory"):
                 if data['guild']['prefix'].upper() == guild.upper()
             }
             if not territories_to_render:
-                embed = create_embed(description=f"ギルド **{guild}** は現在、領地を所有していません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+                embed = create_embed(description=f"ギルド **{guild}** は現在、領地を所有していません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
                 await interaction.followup.send(embed=embed)
                 return
             show_held_time = True  # 個別ギルド指定時は保持時間を表示
@@ -242,7 +242,7 @@ class Territory(commands.GroupCog, name="territory"):
             file.close()
             del file, embed
         else:
-            embed = create_embed(description="マップの生成中にエラーが発生しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+            embed = create_embed(description="マップの生成中にエラーが発生しました。\nコマンドをもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
             await interaction.followup.send(embed=embed)
 
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
@@ -256,12 +256,12 @@ class Territory(commands.GroupCog, name="territory"):
         guild_color_map = await self.get_guild_color_map_with_cache()
         territory_data = await self.get_territory_data_with_cache()
         if not territory_data:
-            embed = create_embed(description="テリトリー情報の取得に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+            embed = create_embed(description="テリトリー情報の取得に失敗しました。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
             await interaction.followup.send(embed=embed)
             return
         target_territory_live_data = territory_data.get(territory)
         if not target_territory_live_data:
-            embed = create_embed(description=f"**{territory}** は存在しない領地か、現在どのギルドも所有していません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx")
+            embed = create_embed(description=f"**{territory}** は存在しない領地か、現在どのギルドも所有していません。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"{self.system_name} | Onyx_")
             await interaction.followup.send(embed=embed)
             return
         embed = self._create_status_embed(

@@ -27,7 +27,7 @@ class MyBot(commands.Bot):
 
     async def setup_hook(self):
         """Botの非同期セットアップを管理する"""
-        logger.info("[Minister Chikuwa] -> 起動準備を開始")
+        logger.info("[Onyx_] -> 起動準備を開始")
         
         # 同期的な準備処理を最初に実行
         create_table()
@@ -38,24 +38,24 @@ class MyBot(commands.Bot):
             if filename.endswith('.py'):
                 try:
                     await self.load_extension(f'cogs.{filename[:-3]}')
-                    logger.info(f"[Minister Chikuwa] -> ✅ Cog '{filename}' をセットアップしました")
+                    logger.info(f"[Onyx_] -> ✅ Cog '{filename}' をセットアップしました")
                 except Exception as e:
-                    logger.error(f"[Minister Chikuwa] -> ❌ Cog '{filename}' のセットアップに失敗: {e}")
+                    logger.error(f"[Onyx_] -> ❌ Cog '{filename}' のセットアップに失敗: {e}")
 
         # tasksを読み込む
         for filename in os.listdir('./tasks'):
             if filename.endswith('.py'):
                 try:
                     await self.load_extension(f'tasks.{filename[:-3]}')
-                    logger.info(f"[Minister Chikuwa] -> ✅ Task '{filename}' をセットアップしました")
+                    logger.info(f"[Onyx_] -> ✅ Task '{filename}' をセットアップしました")
                 except Exception as e:
-                    logger.error(f"[Minister Chikuwa] -> ❌ Task '{filename}' のセットアップに失敗: {e}")
+                    logger.error(f"[Onyx_] -> ❌ Task '{filename}' のセットアップに失敗: {e}")
 
         try:
             synced = await self.tree.sync()
-            logger.info(f"[Minister Chikuwa] -> ✅ {len(synced)}個のコマンドの同期が完了しました")
+            logger.info(f"[Onyx_] -> ✅ {len(synced)}個のコマンドの同期が完了しました")
         except Exception as e:
-            logger.error(f"[Minister Chikuwa] -> ❌ コマンドの同期に失敗しました: {e}")
+            logger.error(f"[Onyx_] -> ❌ コマンドの同期に失敗しました: {e}")
 
     async def on_ready(self):
         """Botの準備が完了したときに呼ばれるイベント"""
@@ -71,15 +71,15 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     if isinstance(error, app_commands.CommandOnCooldown):
         # 残り時間を秒単位で取得し、小数点以下を切り上げ
         remaining_seconds = math.ceil(error.retry_after)
-        embed = create_embed(description=f"現在クールダウン中です。\nあと **{remaining_seconds}秒** 待ってからもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"Main System | Onyx")
+        embed = create_embed(description=f"現在クールダウン中です。\nあと **{remaining_seconds}秒** 待ってからもう一度お試しください。", title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"Main System | Onyx_")
         await interaction.response.send_message(embed=embed, ephemeral=True)
     elif isinstance(error, app_commands.CheckFailure):
         # CheckFailure時のカスタムメッセージ
-        embed = create_embed(description=str(error), title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"Main System | Onyx")
+        embed = create_embed(description=str(error), title="🔴 エラーが発生しました", color=discord.Color.red(), footer_text=f"Main System | Onyx_")
         await interaction.response.send_message(embed=embed, ephemeral=True)
     else:
         # 他のエラーはコンソールに出力
-        logger.error(f"[Minister Chikuwa] -> 予期せぬエラーが発生: {error}", exc_info=True)
+        logger.error(f"[Onyx_] -> 予期せぬエラーが発生: {error}", exc_info=True)
 
 # メインの実行ブロック
 if __name__ == '__main__':
@@ -88,8 +88,8 @@ if __name__ == '__main__':
         sys.exit(1)
         
     try:
-        logger.info("[Minister Chikuwa] -> Botの起動を開始します... ---")
+        logger.info("[Onyx_] -> Botの起動を開始します... ---")
         bot.run(TOKEN)
     except Exception as e:
-        logger.critical(f"[Minister Chikuwa] -> Botの起動中に予期せぬエラーが発生しました: {e}")
+        logger.critical(f"[Onyx_] -> Botの起動中に予期せぬエラーが発生しました: {e}")
         sys.exit(1)
