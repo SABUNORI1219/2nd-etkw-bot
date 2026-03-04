@@ -74,6 +74,10 @@ class WynncraftAPI:
         url = "https://api.wynncraft.com/v3/guild/list/territory"
         return await self._make_request(url)
 
+    async def get_all_guilds(self):
+        url = "https://api.wynncraft.com/v3/guild/list/guild"
+        return await self._make_request(url)
+
     async def close(self):
         await self.session.close()
 
