@@ -45,6 +45,13 @@ def upsert_guild_seasonal_rating(guild_name: str, guild_prefix: str, season_numb
     conn = get_conn()
     try:
         with conn.cursor() as cur:
+            # 既存レコードをチェック
+            cur.execute("""
+                SELECT seasonal_rating FROM guild_seasonal_ratings 
+                WHERE guild_name = %s AND season_number = %s
+            """, (guild_name, season_number))
+            existing = cur.fetchone()
+            
             cur.execute("""
                 INSERT INTO guild_seasonal_ratings 
                 (guild_name, guild_prefix, season_number, seasonal_rating, updated_at)
@@ -56,10 +63,13 @@ def upsert_guild_seasonal_rating(guild_name: str, guild_prefix: str, season_numb
                     updated_at = CURRENT_TIMESTAMP
             """, (guild_name, guild_prefix, season_number, seasonal_rating))
             conn.commit()
-            logger.info(f"ギルド {guild_name}({guild_prefix}) のS{season_number} Rating {seasonal_rating} を保存しました")
+            
+            action = "更新" if existing else "新規作成"
+            logger.debug(f"ギルド {guild_name}({guild_prefix}) のS{season_number} Rating {seasonal_rating} を{action}しました")
     except Exception as e:
         logger.error(f"ギルドSeasonal Rating保存エラー: {e}", exc_info=True)
         conn.rollback()
+        raise  # エラーを再発生させて呼び出し元に通知
     finally:
         conn.close()
 
