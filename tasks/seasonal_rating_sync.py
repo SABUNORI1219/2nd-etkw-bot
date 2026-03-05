@@ -22,27 +22,32 @@ class SeasonalRatingSync(commands.Cog):
         if self.api:
             asyncio.create_task(self.api.close())
             
-    async def get_latest_season_rating(self, guild_data):
-        """ギルドデータから最新のSeasonal Ratingを取得"""
+    async def get_all_season_ratings(self, guild_data):
+        """ギルドデータから全シーズンのSeasonal Ratingを取得"""
         try:
             season_ranks = guild_data.get("seasonRanks", {})
             if not season_ranks:
-                return None, None
+                return []
             
-            # 最新のシーズン番号を取得
-            latest_season = max([int(k) for k in season_ranks.keys() if k.isdigit()])
-            latest_season_data = season_ranks.get(str(latest_season), {})
-            rating = latest_season_data.get("rating", 0)
+            # 全シーズンデータを取得
+            ratings = []
+            for season_str, season_data in season_ranks.items():
+                if season_str.isdigit():
+                    season_number = int(season_str)
+                    rating = season_data.get("rating", 0)
+                    if rating > 0:  # 0より大きいレートのみ保存
+                        ratings.append((season_number, rating))
             
-            return rating, latest_season
+            return ratings
         except Exception as e:
-            logger.warning(f"Seasonal Rating取得エラー: {e}")
-            return None, None
+            logger.warning(f"Seasonal Ratings取得エラー: {e}")
+            return []
     
     async def process_guild_batch(self, guild_names, batch_num, total_batches):
         """ギルドバッチを処理"""
         processed = 0
         errors = 0
+        saved_records = 0
         
         logger.info(f"[SeasonalRatingSync] バッチ {batch_num}/{total_batches} 開始 ({len(guild_names)}ギルド)")
         
@@ -60,22 +65,25 @@ class SeasonalRatingSync(commands.Cog):
                 
                 # データ抽出
                 guild_prefix = guild_data.get("prefix", "")
-                rating, season_number = await self.get_latest_season_rating(guild_data)
+                season_ratings = await self.get_all_season_ratings(guild_data)
                 
-                if rating is not None and rating > 0 and guild_prefix:
-                    # DBに保存
-                    upsert_guild_seasonal_rating(guild_name, guild_prefix, rating, season_number)
+                if season_ratings and guild_prefix:
+                    # 全シーズンのデータを保存
+                    for season_number, rating in season_ratings:
+                        upsert_guild_seasonal_rating(guild_name, guild_prefix, season_number, rating)
+                        saved_records += 1
+                    
                     processed += 1
                     
                     if processed % 50 == 0:
-                        logger.info(f"[SeasonalRatingSync] 進捗: {processed}/{len(guild_names)} 処理完了")
+                        logger.info(f"[SeasonalRatingSync] 進捗: {processed}/{len(guild_names)} 処理完了 ({saved_records}レコード保存)")
                         
             except Exception as e:
                 logger.error(f"ギルド {guild_name} 処理中エラー: {e}")
                 errors += 1
                 continue
         
-        logger.info(f"[SeasonalRatingSync] バッチ {batch_num} 完了: {processed}成功, {errors}エラー")
+        logger.info(f"[SeasonalRatingSync] バッチ {batch_num} 完了: {processed}ギルド成功, {saved_records}レコード保存, {errors}エラー")
         return processed, errors
     
     async def get_unprocessed_guilds(self, all_guilds, limit=None):
@@ -85,7 +93,7 @@ class SeasonalRatingSync(commands.Cog):
             with conn.cursor() as cur:
                 # 過去24時間以内に更新されたギルドを除外
                 cur.execute("""
-                    SELECT guild_name FROM guild_seasonal_ratings 
+                    SELECT DISTINCT guild_name FROM guild_seasonal_ratings 
                     WHERE updated_at > %s
                 """, (datetime.now() - timedelta(hours=24),))
                 
