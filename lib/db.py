@@ -1,6 +1,7 @@
 import os
 import logging
 import psycopg2
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -12,9 +13,13 @@ def get_conn():
 def create_table():
     conn = get_conn()
     with conn.cursor() as cur:
+        # 既存テーブルを削除（データ収集問題解決のため）
+        cur.execute("DROP TABLE IF EXISTS guild_seasonal_ratings CASCADE")
+        logger.info("既存のguild_seasonal_ratingsテーブルを削除しました")
+        
         # ギルドのSeasonal Ratingテーブルを作成（シーズンごと）
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS guild_seasonal_ratings (
+            CREATE TABLE guild_seasonal_ratings (
                 guild_name TEXT NOT NULL,
                 guild_prefix TEXT NOT NULL,
                 season_number INTEGER NOT NULL,
@@ -26,19 +31,29 @@ def create_table():
         
         # インデックスを作成（シーズン別レーティング順でのソート用）
         cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_guild_seasonal_ratings_season_rating 
+            CREATE INDEX idx_guild_seasonal_ratings_season_rating 
             ON guild_seasonal_ratings(season_number, seasonal_rating DESC)
         """)
         
         # ギルドプレフィックス用のインデックス
         cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_guild_seasonal_ratings_prefix 
+            CREATE INDEX idx_guild_seasonal_ratings_prefix 
             ON guild_seasonal_ratings(guild_prefix)
+        """)
+        
+        # 最新シーズン管理テーブル
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS current_season_info (
+                id INTEGER PRIMARY KEY DEFAULT 1,
+                current_season INTEGER NOT NULL,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT single_row CHECK (id = 1)
+            )
         """)
         
         conn.commit()
     conn.close()
-    logger.info("全テーブルを作成/確認しました")
+    logger.info("全テーブルを新規作成しました")
 
 def upsert_guild_seasonal_rating(guild_name: str, guild_prefix: str, season_number: int, seasonal_rating: int):
     """ギルドの特定シーズンのSeasonal Ratingを挿入または更新"""
@@ -151,5 +166,69 @@ def get_guild_seasonal_data(guild_name: str):
     except Exception as e:
         logger.error(f"ギルド {guild_name} データ取得エラー: {e}", exc_info=True)
         return []
+    finally:
+        conn.close()
+
+def update_current_season(season_number: int):
+    """現在のシーズン番号を更新"""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO current_season_info (id, current_season, last_updated)
+                VALUES (1, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (id)
+                DO UPDATE SET 
+                    current_season = EXCLUDED.current_season,
+                    last_updated = CURRENT_TIMESTAMP
+            """, (season_number,))
+            conn.commit()
+            logger.info(f"現在のシーズンをSeason {season_number}に更新しました")
+    except Exception as e:
+        logger.error(f"現在シーズン更新エラー: {e}", exc_info=True)
+        conn.rollback()
+    finally:
+        conn.close()
+
+def get_current_season():
+    """現在のシーズン番号を取得"""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT current_season FROM current_season_info WHERE id = 1")
+            result = cur.fetchone()
+            return result[0] if result else None
+    except Exception as e:
+        logger.error(f"現在シーズン取得エラー: {e}", exc_info=True)
+        return None
+    finally:
+        conn.close()
+
+def is_season_completed(season_number: int):
+    """指定シーズンの収集が完了しているかチェック"""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            # そのシーズンで24時間以内に更新されたギルドがあるかチェック
+            cur.execute("""
+                SELECT COUNT(*) FROM guild_seasonal_ratings 
+                WHERE season_number = %s AND updated_at > %s
+            """, (season_number, datetime.now() - timedelta(hours=24)))
+            result = cur.fetchone()
+            recent_updates = result[0] if result else 0
+            
+            # 過去シーズンで最近更新があったら「未完了」とみなす
+            current_season = get_current_season()
+            if current_season and season_number < current_season and recent_updates > 0:
+                return False
+            
+            # 過去シーズンで最近更新がなければ「完了済み」
+            if current_season and season_number < current_season:
+                return True
+                
+            return False
+    except Exception as e:
+        logger.error(f"シーズン完了状況確認エラー: {e}", exc_info=True)
+        return False
     finally:
         conn.close()
